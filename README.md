@@ -132,6 +132,12 @@ and write ownership will be explicitly documented.
 
 ## Migration strategy
 
+Project contribution, branching, review, and CI requirements are documented in
+[Development Workflow](docs/development-workflow.md).
+Security reports should follow the [Security Policy](SECURITY.md).
+Environment setup and sanitized-data requirements are documented in
+[Development and Test Environments](docs/environments.md).
+
 The migration will follow an incremental strangler approach:
 
 ```text
