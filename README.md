@@ -366,6 +366,9 @@ migration safeguards have been reviewed.
 See the [project roadmap](ROADMAP.md) for the proposed phases, decision gates,
 and migration workstreams.
 
+The project's DDD approach is documented in
+[Domain-Driven Design Guide](docs/domain-driven-design.md).
+
 ## License
 
 OpenEMR Next is licensed under the [Apache License 2.0](LICENSE).
