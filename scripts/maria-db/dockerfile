@@ -1,0 +1,6 @@
+FROM mariadb:12.3
+
+# Runs once, on first start with an empty data directory
+COPY baseline.sql /docker-entrypoint-initdb.d/01-baseline.sql
+
+CMD ["mariadbd", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_general_ci"]

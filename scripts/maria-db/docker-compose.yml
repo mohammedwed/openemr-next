@@ -1,0 +1,22 @@
+services:
+  db:
+    build: ./
+    restart: unless-stopped
+    ports:
+      - "3307:3306"            # host 3307, so it won't clash with other MariaDBs
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: openemr
+      MARIADB_USER: openemr
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 1m
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  dbdata:

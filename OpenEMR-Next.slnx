@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/tests/">
+    <Project Path="tests/Db.Tests/Db.Tests.csproj" />
+  </Folder>
+  <Project Path="OpenEMR-Next.csproj" />
+</Solution>
