@@ -27,7 +27,7 @@ jobs:
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: global.json
+          global-json-file: global.json
 
       - name: Restore dependencies
         run: dotnet restore tests/primitve.tests/primitve.tests.csproj
