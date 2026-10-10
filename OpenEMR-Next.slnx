@@ -4,6 +4,7 @@
     <Project Path="src/OpenEmr.Data/OpenEmr.Data.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/AuthFacade.Integration.Tests/AuthFacade.Integration.Tests.csproj" />
     <Project Path="tests/Db.Tests/Db.Tests.csproj" />
   </Folder>
 </Solution>
