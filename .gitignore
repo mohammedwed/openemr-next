@@ -55,3 +55,19 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+
+# Upstream OpenEMR Docker assets (clone the release tag instead)
+/docker/library/
+
+# Local secrets and state
+**/.env
+!**/.env.example
+**/snapshot/
+**/sites/
+
+# .NET build output
+**/bin/
+**/obj/
+**/.vs/
+*.user

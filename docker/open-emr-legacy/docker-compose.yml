@@ -1,0 +1,55 @@
+services:
+  mysql:
+    image: ${MARIADB_IMAGE}
+    restart: unless-stopped
+    ports:
+      - "${WT_MYSQL_PORT:-8320}:3306"
+    volumes:
+      - databasevolume:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 1m
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  openemr:
+    image: ${OPENEMR_IMAGE:?Set OPENEMR_IMAGE in .env}
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "${WT_HTTP_PORT:-8300}:80"
+      - "${WT_HTTPS_PORT:-9300}:443"
+    volumes:
+      - sitesvolume:/var/www/localhost/htdocs/openemr/sites
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_ROOT_PASS: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
+      MYSQL_USER: ${DB_USER:-openemr}
+      MYSQL_PASS: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      OE_USER: ${OE_USER:-admin}
+      OE_PASS: ${OE_PASS:?Set OE_PASS in .env}
+      OPENEMR_SETTING_site_addr_oath: "https://localhost:${WT_HTTPS_PORT:-9300}"
+      OPENEMR_SETTING_oauth_password_grant: 3
+      OPENEMR_SETTING_rest_api: 1
+      OPENEMR_SETTING_rest_fhir_api: 1
+      OPENEMR_SETTING_rest_system_scopes_api: 1
+
+  phpmyadmin:
+    image: ${PHPMYADMIN_IMAGE}
+    restart: unless-stopped
+    ports:
+      - "${WT_PMA_PORT:-8310}:80"
+    environment:
+      PMA_HOSTS: mysql
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  databasevolume: {}
+  sitesvolume: {}

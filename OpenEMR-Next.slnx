@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/AuthFacade/AuthFacade.csproj" />
     <Project Path="src/OpenEmr.Data/OpenEmr.Data.csproj" />
   </Folder>
   <Folder Name="/tests/">
