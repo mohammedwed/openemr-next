@@ -79,52 +79,5 @@ jobs:
             "ALTER USER 'openemr'@'%' IDENTIFIED BY '${APP_PASS}';" \
             "GRANT ALL PRIVILEGES ON openemr.* TO 'openemr'@'%';" \
             "FLUSH PRIVILEGES;" > create-user.sql
-          docker compose cp create-user.sql mysql:/tmp/create-user.sql
-          docker compose exec -T mysql sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" < /tmp/create-user.sql'
-
-      - name: Restore OpenEMR sites
-        run: |
-          docker volume create openemr-next_sitesvolume
-          docker run --rm \
-            -v openemr-next_sitesvolume:/data \
-            -v "$PWD/snapshots:/backup" \
-            alpine sh -c "tar xzf /backup/sites.tar.gz -C /data"
-
-      - name: Start stack
-        run: docker compose up -d --wait --wait-timeout 1200 openemr auth-facade phpmyadmin
-
-      - name: Set up .NET SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-
-      - name: Restore dependencies
-        run: dotnet restore ${{ env.SOLUTION }}
-
-      - name: Build
-        run: dotnet build ${{ env.SOLUTION }} --configuration Release --no-restore
-
-      - name: Test
-        run: >
-          dotnet test ${{ env.SOLUTION }}
-          --configuration Release
-          --no-build
-          --no-restore
-          --logger "trx;LogFileName=test-results.trx"
-          --results-directory TestResults
-
-      - name: Show compose logs on failure
-        if: failure()
-        run: docker compose logs --tail=200
-
-      - name: Stop stack
-        if: always()
-        run: docker compose down -v
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: TestResults/**/*.trx
-          if-no-files-found: ignore
+          docker compose cp
+          
