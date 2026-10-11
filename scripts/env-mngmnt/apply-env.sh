@@ -27,7 +27,7 @@ sql_quote() {
   printf "'%s'" "$s"
 }
 
-# 1. OpenEMR config: rewrite both password entries in sites/default/sqlconf.php.
+# 1. OpenEMR config: rewrite the password in sites/default/sqlconf.php.
 #    The password is passed as an environment variable, so it never appears in the
 #    script text or the command line. MSYS_NO_PATHCONV stops Git Bash on Windows
 #    from rewriting the container path.
@@ -55,7 +55,7 @@ foreach ($patterns as $re) {
     }
 }
 file_put_contents($file, $content);
-echo "sqlconf.php updated (both password entries)\n";
+echo "sqlconf.php updated\n";
 PHP
 
 # 2. Database: set the app user's password and the AuthFacade client secret.
