@@ -91,7 +91,7 @@ jobs:
             alpine sh -c "tar xzf /backup/sites.tar.gz -C /data"
 
       - name: Start stack
-        run: docker compose up -d --wait --wait-timeout 1200
+        run: docker compose up -d --wait --wait-timeout 1200 openemr auth-facade phpmyadmin
 
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@v4
