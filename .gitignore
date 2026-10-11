@@ -73,3 +73,5 @@ nunit-*.xml
 *.user
 .env.*
 !.env.example
+
+snapshots/

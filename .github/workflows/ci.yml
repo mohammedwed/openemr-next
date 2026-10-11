@@ -7,7 +7,6 @@ on:
   push:
     branches:
       - main
-      - feat/login   # remove after merging
   workflow_dispatch:
 
 permissions:
@@ -82,9 +81,6 @@ jobs:
           docker compose cp create-user.sql mysql:/tmp/create-user.sql
           docker compose exec -T mysql sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" < /tmp/create-user.sql'
 
-      - name: Apply environment values to restored stack
-        run: bash scripts/apply-env.sh
-
       - name: Restore OpenEMR sites
         run: |
           docker volume create openemr-next_sitesvolume
@@ -92,6 +88,9 @@ jobs:
             -v openemr-next_sitesvolume:/data \
             -v "$PWD/snapshots:/backup" \
             alpine sh -c "tar xzf /backup/sites.tar.gz -C /data"
+
+      - name: Apply environment values to restored stack
+        run: bash scripts/apply-env.sh
 
       - name: Start stack
         run: docker compose up -d --build --wait --wait-timeout 1200 openemr auth-facade phpmyadmin
