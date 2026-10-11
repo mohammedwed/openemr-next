@@ -51,33 +51,4 @@ jobs:
             "OE_PASS=$OE_PASS" \
             "JWT_KEY=$JWT_KEY" \
             "AUTHFACADE_CLIENT_SECRET=$AUTHFACADE_CLIENT_SECRET" \
-            "AUTHFACADE_CLIENT_ID=$AUTHFACADE_CLIENT_ID" \
-            "OPENEMR_IMAGE=$OPENEMR_IMAGE" \
-            "MARIADB_IMAGE=$MARIADB_IMAGE" \
-            "PHPMYADMIN_IMAGE=$PHPMYADMIN_IMAGE" > .env
-          # Print variable names only, never values.
-          cut -d= -f1 .env
-
-      - name: Download snapshot
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p snapshots
-          gh release download "$SNAPSHOT_TAG" --dir snapshots --pattern "db.sql" --pattern "sites.tar.gz" --pattern "images.txt"
-
-      - name: Start database
-        run: docker compose up -d mysql --wait
-
-      - name: Restore database
-        env:
-          APP_PASS: ${{ secrets.DB_PASSWORD || 'ci-openemr-password' }}
-        run: |
-          docker compose cp snapshots/db.sql mysql:/tmp/db.sql
-          docker compose exec -T mysql sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" < /tmp/db.sql'
-          printf '%s\n' \
-            "CREATE USER IF NOT EXISTS 'openemr'@'%' IDENTIFIED BY '${APP_PASS}';" \
-            "ALTER USER 'openemr'@'%' IDENTIFIED BY '${APP_PASS}';" \
-            "GRANT ALL PRIVILEGES ON openemr.* TO 'openemr'@'%';" \
-            "FLUSH PRIVILEGES;" > create-user.sql
-          docker compose cp
-          
+            "AUTHFACADE_CLIENT_ID=$AUTHFACADE_CLIENT_ID"
