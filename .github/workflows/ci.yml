@@ -69,11 +69,18 @@ jobs:
         run: docker compose up -d mysql --wait
 
       - name: Restore database
+        env:
+          APP_PASS: ${{ secrets.DB_PASSWORD || 'ci-openemr-password' }}
         run: |
           docker compose cp snapshots/db.sql mysql:/tmp/db.sql
           docker compose exec -T mysql sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" < /tmp/db.sql'
-          # Recreate the app user, since the dump doesn't include it.
-          docker compose exec -T mysql sh -c "mariadb -uroot -p\"\$MYSQL_ROOT_PASSWORD\" -e \"CREATE USER IF NOT EXISTS 'openemr'@'%' IDENTIFIED BY '\$DB_PASSWORD'; GRANT ALL PRIVILEGES ON openemr.* TO 'openemr'@'%'; FLUSH PRIVILEGES;\""
+          printf '%s\n' \
+            "CREATE USER IF NOT EXISTS 'openemr'@'%' IDENTIFIED BY '${APP_PASS}';" \
+            "ALTER USER 'openemr'@'%' IDENTIFIED BY '${APP_PASS}';" \
+            "GRANT ALL PRIVILEGES ON openemr.* TO 'openemr'@'%';" \
+            "FLUSH PRIVILEGES;" > create-user.sql
+          docker compose cp create-user.sql mysql:/tmp/create-user.sql
+          docker compose exec -T mysql sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" < /tmp/create-user.sql'
 
       - name: Restore OpenEMR sites
         run: |
