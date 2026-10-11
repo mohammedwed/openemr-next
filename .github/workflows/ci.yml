@@ -21,7 +21,6 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   SOLUTION: OpenEMR-Next.slnx
-  MARIADB_IMAGE: mariadb:11.4   # keep in sync with MARIADB_IMAGE in .env.example
 
 jobs:
   build-and-test:
@@ -31,7 +30,7 @@ jobs:
 
     services:
       mysql:
-        image: ${{ env.MARIADB_IMAGE }}
+        image: mariadb:11.4   # must be a literal here; env.* isn't allowed in services
         env:
           MYSQL_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD || 'ci-root-password' }}
           MARIADB_DATABASE: openemr
