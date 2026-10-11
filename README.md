@@ -1,44 +1,236 @@
 # OpenEMR Next
 
-An independent modernization project exploring a scalable, maintainable, and
-extensible C# platform inspired by OpenEMR's domain, workflows, and
-interoperability requirements.
+An independent project exploring how an existing healthcare platform, OpenEMR,
+can be moved incrementally toward a modular C# architecture without a
+big-bang rewrite.
 
-> **Status:** Architecture and discovery phase  
-> **This project is not yet intended for production clinical use.**
+> **Status:** Early implementation. The local stack, the database baseline, and
+> the AuthFacade token broker are built and tested. The gateway and domain
+> services are not started.
+> **Not intended for production clinical use.**
 
 OpenEMR Next is not an official OpenEMR rewrite, fork, replacement, or
 affiliated project unless explicitly stated.
 
-## Background
+## Current scope
 
-OpenEMR is a mature electronic medical record platform with extensive clinical,
-administrative, billing, interoperability, and patient-facing functionality.
-Its established codebase and shared legacy architecture provide significant
-business value, but they also make certain changes difficult to isolate, test,
-scale, and deploy independently.
+This is currently a solo project. Its goal is a runnable, tested, and
+documented vertical slice that demonstrates the migration approach. The broader
+research vision below is the long-term direction, not the current deliverable.
 
-This project investigates whether a modular, selectively service-oriented C#
-architecture can address those challenges without requiring a risky big-bang
-rewrite.
+| Piece | Purpose | Status |
+|---|---|---|
+| Local stack | OpenEMR, MariaDB, and AuthFacade in one Docker Compose project | Built |
+| Database baseline | Reproducible schema and seed data from the OpenEMR installer | Built, not yet cleaned |
+| `OpenEmr.Data` | EF Core model scaffolded from the live database | Built |
+| AuthFacade | Token broker: password grant to OpenEMR, then issues its own JWT | Built, hardening in progress |
+| API gateway (YARP) | Single entry point, token validation at the edge | Planned |
+| Patient Management | Registers patients, publishes `PatientRegistered` | Planned |
+| Clinical Care | Creates encounters and records vitals for registered patients | Planned |
 
-The project is guided by real operational goals rather than by microservices as
-an end in themselves.
+## What exists today
 
-## Objectives
+**Local stack.** A single Compose file at the repository root runs MariaDB,
+OpenEMR (pinned to `openemr/openemr:8.0.0.3`), phpMyAdmin, and AuthFacade on one
+network. Services address each other by name. The MariaDB host port is 3307.
+AuthFacade listens on port 7128.
 
-The project will evaluate and develop an architecture that supports:
+**Database baseline.** `src/db/maria-db/baseline.sql` holds the schema and seed
+data, produced by running the real OpenEMR installer against MariaDB 12.3. A
+Dockerfile loads it on first start with an empty volume. A schema-only dump is
+kept as a diff target.
 
-- Clear domain and bounded-context boundaries
-- Maintainable and testable C# services and modules
-- Independent evolution of healthcare capabilities
-- Versioned APIs and integration contracts
-- Improved interoperability with external healthcare systems
-- Consistent authentication, authorization, and auditing
-- Independent scaling where it provides a measurable benefit
-- Better observability and operational diagnostics
-- Safe, incremental migration from the existing OpenEMR platform
-- Continued compatibility with the legacy OpenEMR database during transition
+**Entity model.** `src/OpenEmr.Data` contains EF Core entities and
+`OpenEmrDbContext`, scaffolded from the live database by `scripts/scaffold.ps1`.
+Global aliases resolve the `Version` and `Void` name clashes. This model is a
+stepping stone: each future service should scaffold only its own tables.
+
+**AuthFacade (`src/AuthFacade`).** A minimal ASP.NET Core API:
+
+- `POST /connect/token` accepts a password grant, verifies the login with
+  OpenEMR's OAuth2 server, and returns a facade-issued JWT in a JSON response.
+- `GET /me` requires a valid facade JWT and returns the subject and name.
+- `GET /hello` is a liveness check.
+
+Facade tokens expire after 30 minutes. There is no refresh, revocation, or key
+rotation yet.
+
+## Architecture
+
+```text
+            +-------------------+
+ client --> | AuthFacade (.NET) |  issues its own JWT (Bearer)
+            +---------+---------+
+                      | password grant (OAuth2)
+            +---------v---------+        +-----------+
+            | OpenEMR (legacy)  |<------>| MariaDB   |
+            +-------------------+        +-----------+
+                                               ^
+            seed (one-shot) registers the OAuth client
+```
+
+OpenEMR owns the schema, users, password rules, and the OAuth server. AuthFacade
+is a token broker in front of it. It does not store passwords or user records.
+
+### Authentication boundary
+
+- **Identity stays in OpenEMR.** Users, ACLs, password hashing, MFA, lockout,
+  and expiry are enforced by OpenEMR. AuthFacade delegates to it rather than
+  copying its logic.
+- **Clients never receive OpenEMR's token.** They validate AuthFacade's
+  signature, issuer, and audience only.
+- **Minimal client scopes.** The AuthFacade OAuth client holds authentication
+  scopes only (`openid`, `profile`, `email`, `offline_access`). A leaked
+  AuthFacade secret cannot read patient data through the API.
+- **Browser login is not implemented.** The password grant is used because
+  AuthFacade is the only client and this is a development stand-in. The
+  production target is the authorization-code flow with PKCE, which needs its
+  own design for redirects and consent.
+
+### Known gaps
+
+- No refresh, revocation, or key rotation for facade tokens.
+- `/me` confirms identity only. Authorization for OpenEMR data is not built.
+- The audience check uses a fixed string rather than a registered client.
+- The OAuth client is provisioned by a seed that inserts into `oauth_clients`.
+  The seed updates scope on an existing row but not `grant_types`, so changing
+  those requires a manual edit or a fresh volume.
+- The password grant is deprecated in OAuth 2.1. Retained for this integration
+  only.
+- An upstream OpenEMR defect returns 500 on some wrong-password requests, when
+  its failed-login counter receives an object where a string is expected.
+  AuthFacade cannot prevent this from outside. The strict integration test will
+  fail if it recurs.
+- `ReadJwtToken` reads the `sub` claim without verifying the signature. This is
+  acceptable only because the token arrives directly from OpenEMR over TLS in
+  the same request. Do not reuse this pattern for client-supplied tokens.
+- The development TLS bypass (`DangerousAcceptAnyServerCertificateValidator`)
+  is active only in the `Development` environment and must be replaced with a
+  trusted certificate before any shared use.
+- Data-protection keys are not persisted, so the container logs a warning.
+
+## Legacy database compatibility
+
+The legacy database is a transition constraint, not the target architecture.
+OpenEMR owns the schema and the OAuth tables. The new components read legacy
+data through compatibility adapters. Planned adapters:
+
+- `patient_data`, read by Patient Management
+- `form_encounter`, read by Clinical Care
+
+Writes to legacy tables are not part of the slice unless a decision record
+approves them. The OAuth client row is written by the seed, which is
+environment configuration.
+
+Known problems with the baseline:
+
+- The dump contains development leftovers that must be removed before the
+  repository is shared: the `Administrator` user and its hash (`users`,
+  `users_secure`), rows in `log`, `api_log`, and `log_comment_encrypt`, session
+  rows, and environment-specific `globals` values.
+- Every deployment built from this dump shares the same generated keys and
+  admin hash. For anything beyond local use, the admin should be created from
+  environment variables on first run.
+- The `openemr` database account is not in the dump. Compose creates it from
+  `.env`.
+- Before the dump is shared, confirm it contains no patient rows.
+
+## Repository structure
+
+```text
+/
+├── docker-compose.yml          # one Compose project: openemr-next
+├── .env.example                # placeholders only; .env is gitignored
+├── docker/
+│   └── open-emr-legacy/        # OpenEMR, MariaDB, phpMyAdmin dev stack
+├── src/
+│   ├── AuthFacade/             # token broker (ASP.NET Core minimal API)
+│   ├── OpenEmr.Data/           # EF Core entities and context (scaffolded)
+│   ├── db/
+│   │   └── maria-db/           # Dockerfile, baseline.sql, schema.sql
+│   └── primitve/               # leftover template, to be deleted
+├── tests/
+│   ├── Db.Tests/               # database baseline tests (Testcontainers)
+│   ├── AuthFacade.Integration.Tests/  # black-box tests on the live stack
+│   └── primitve.tests/         # leftover template, to be deleted
+├── tools/
+│   └── Scaffold.Host/          # throwaway startup project for dotnet ef
+├── scripts/
+│   └── scaffold.ps1            # regenerates OpenEmr.Data from the database
+└── TestFacade.ps1              # manual login check through the facade
+```
+
+Planned additions: `src/Gateway`, `src/PatientManagement`, `src/ClinicalCare`,
+and their tests. Each new service gets its own Compose entry, database, and
+slim entity model.
+
+## Local development
+
+> Command names below come from the development changelogs. Confirm each one
+> against the repository before publishing this README.
+
+**Prerequisites:** Docker Desktop (running), .NET 10 SDK, and PowerShell for the
+`.ps1` scripts.
+
+**Configuration.** Copy `.env.example` to `.env` and generate local secrets.
+`.env` is gitignored and must never be committed. Application settings live in
+one root configuration source; the template holds placeholders only.
+
+**Start the stack:**
+
+```bash
+docker compose up -d --build
+```
+
+The first start is slow. OpenEMR performs a recursive permission pass over its
+bind-mounted tree, which is the main cost on Windows.
+
+**Reset the stack.** Init scripts run only on an empty volume. After editing
+`baseline.sql` or changing credentials in `.env`, reset with:
+
+```bash
+docker compose down -v
+```
+
+This deletes all local data.
+
+**Run the tests:**
+
+```bash
+dotnet test tests/Db.Tests                             # starts its own MariaDB
+dotnet test tests/AuthFacade.Integration.Tests         # needs the running stack
+```
+
+The integration suite runs a readiness gate first, which checks the database,
+the seed, OpenEMR, and AuthFacade under one deadline. It is slow and needs
+Docker, so it is not part of a unit-test-only pipeline.
+
+**Check a login by hand:** `./TestFacade.ps1` prompts for the password, logs in
+through the facade, and calls `/me`. It prints status codes and property names,
+never tokens.
+
+**Regenerate the entity model:** `pwsh scripts/scaffold.ps1`, with `-Tables` for a
+subset or `-SkipDocker`. Re-scaffolding overwrites `Entities/` and `Context/`.
+Custom code belongs in partial classes elsewhere.
+
+## Evaluation approach
+
+The project will compare the new components against the legacy baseline.
+Measurement depth matches the current phase.
+
+**Measured now**
+
+- Functional equivalence for registration and encounter creation, on synthetic
+  scenarios (planned with M5)
+- Change-impact scope for representative changes
+- Architecture test results (planned with M6)
+- Security review of the identity bridge (in progress with M1)
+
+**Planned later:** delivery metrics (lead time, deployment frequency, change
+failure rate), reliability (availability, p95/p99 latency, recovery time),
+scalability, token revocation time, and dual-run discrepancy rates.
+
+Results will report both improvements and trade-offs.
 
 ## Research question
 
@@ -47,396 +239,70 @@ The project will evaluate and develop an architecture that supports:
 > extensibility, scalability, and delivery capability while preserving
 > correctness, security, reliability, and clinical continuity?
 
-## Supporting questions
-
-- Which bounded contexts can be identified in the existing OpenEMR domain?
-- Which capabilities should remain modules rather than become independent
-  services?
-- Can new C# components coexist safely with the legacy application and
-  database?
-- Does the new architecture reduce the scope and risk of changes?
-- Can selected workloads scale independently?
-- Does the architecture improve integration delivery and testability?
-- What operational and organizational costs does the new architecture
-  introduce?
-- Which migration patterns are repeatable for additional bounded contexts?
+The current scope answers this for one vertical slice, not for the platform.
 
 ## Architectural direction
 
-The target is a **modular architecture with selectively deployable services**.
+The target is a modular architecture with selectively deployable services. A
+bounded context becomes a separate service only when it gains something
+concrete: independent scaling, independent deployment, separate operational
+ownership, security isolation, a stable integration boundary, or different
+reliability requirements. Otherwise it stays a module or compatibility adapter.
 
-Not every bounded context will automatically become a microservice. A context
-should be deployed independently only when doing so provides a concrete
-benefit, such as:
-
-- Independent scaling
-- Independent deployment
-- Separate operational ownership
-- Strong security isolation
-- A stable external integration boundary
-- Different reliability or performance requirements
-
-A context may initially be implemented as:
-
-- A module within the new application
-- An independently tested package
-- A compatibility adapter
-- A separately deployable service
+Architecture decisions are recorded as ADRs in `docs/architecture/`. The
+decisions recorded in the changelogs are the first candidates.
 
 ## Initial bounded contexts
 
-The following are candidate contexts for investigation:
-
-- Identity and authentication
-- Authorization and access control
-- Patient administration
-- Clinical records
-- Scheduling
-- Billing and claims
-- Documents
-- Notifications
-- Reporting and analytics
-- Interoperability and external integrations
-
-These are initial hypotheses, not final service boundaries. Each context will
-be validated through domain analysis, workflow mapping, stakeholder input, and
-dependency analysis.
-
-## Initial authentication boundary
-
-Authentication is a candidate early migration area because it provides a clear
-security and integration boundary.
-
-The initial authentication capability may include:
-
-- Credential verification
-- MFA verification
-- Account lockout and throttling
-- OAuth2/OIDC token issuance
-- Token validation and revocation
-- Identity claims
-- Authentication audit events
-
-The first version should not automatically own:
-
-- Clinical authorization decisions
-- Facility-specific policy
-- Patient-context access rules
-- All legacy browser session behavior
-- Clinical user-profile management
-- Every existing OpenEMR authentication mode
-
-During the transition, the authentication component may use controlled
-adapters to existing OpenEMR identity and authentication data. Database access
-and write ownership will be explicitly documented.
-
-## Migration strategy
-
-Project contribution, branching, review, and CI requirements are documented in
-[Development Workflow](docs/development-workflow.md).
-Security reports should follow the [Security Policy](SECURITY.md).
-Environment setup and sanitized-data requirements are documented in
-[Development and Test Environments](docs/environments.md).
-
-The migration will follow an incremental strangler approach:
-
-```text
-Existing OpenEMR
-        │
-        │ legacy database and workflows
-        ▼
-Compatibility boundaries
-        │
-        ▼
-New modular C# components
-        │
-        ▼
-Selected independently deployable services
-```
-
-The migration will prioritize:
-
-1. Understanding the existing domain and workflows
-2. Defining bounded contexts and ubiquitous language
-3. Establishing API and event contracts
-4. Building the C# platform foundation
-5. Implementing representative vertical slices
-6. Validating coexistence with the legacy application and database
-7. Measuring outcomes against the legacy baseline
-8. Expanding migration only when the evidence supports it
-
-A full rewrite is intentionally avoided because the existing system contains
-valuable clinical functionality and data that must remain available and
-correct.
-
-## Legacy database compatibility
-
-The legacy OpenEMR database may be used during the transition, but it is not
-intended to become a permanent shared integration mechanism.
-
-For each bounded context, the project will document:
-
-- Tables read
-- Tables written
-- Data ownership
-- Allowed database operations
-- Compatibility assumptions
-- Consistency requirements
-- Migration and rollback procedures
-- Planned path toward independent data ownership
-
-Shared database access will be treated as a migration constraint, not as the
-target architecture.
-
-## Technology direction
-
-The target implementation will use C# and the .NET ecosystem, with technology
-choices evaluated against project needs.
-
-Potential benefits include:
-
-- Strong typing for complex clinical and financial domains
-- Mature API and web development tooling
-- Dependency injection and testing support
-- Health checks and observability integrations
-- Background-processing capabilities
-- Standards-based interoperability support
-- Flexible deployment options
-
-C# is not considered a justification by itself. The technology choice will be
-evaluated together with migration cost, maintainability, team capability,
-operational complexity, and compatibility requirements.
-
-## Evaluation approach
-
-The project will establish a baseline using the existing OpenEMR
-implementation and compare equivalent workloads during migration.
-
-### Maintainability
-
-- Change-impact scope
-- Dependency and coupling measurements
-- Number of bounded contexts affected by a change
-- Developer onboarding effort
-- Code review and implementation time
-
-### Delivery
-
-- Lead time for changes
-- Deployment frequency
-- Deployment duration
-- Change failure rate
-- Rollback frequency
-
-### Reliability
-
-- Availability of critical workflows
-- Error rates
-- p95 and p99 latency
-- Mean time to recovery
-- Regression defects
-
-### Scalability
-
-- Throughput under representative load
-- Concurrent-user capacity
-- CPU and memory usage
-- Database load
-- Independent scaling effectiveness
-
-### Security
-
-- Authentication and authorization correctness
-- MFA behavior
-- Token revocation time
-- Audit-event completeness
-- Key-rotation procedures
-- Security findings and remediation time
-
-### Migration safety
-
-- Functional equivalence
-- Data-consistency results
-- Rollback duration
-- Legacy compatibility
-- Dual-run or contract-test discrepancies
-
-The project will report both improvements and trade-offs. A successful result
-may show that some capabilities benefit from independent services while others
-should remain modular components.
-
-## Success criteria
-
-The architecture will be considered successful only if it demonstrates that:
-
-- Critical workflows remain functionally correct
-- No unauthorized access is introduced
-- Required audit events are preserved
-- New components can coexist with OpenEMR during migration
-- Service and module boundaries are explicit and enforceable
-- Representative changes affect fewer unrelated components
-- Selected workloads meet defined performance and availability targets
-- Deployment and rollback procedures are repeatable
-- The migration approach can be applied to another bounded context
-- Operational complexity remains manageable
+Candidates, not final boundaries: identity and authentication, authorization,
+patient administration, clinical records, scheduling, billing and claims,
+documents, notifications, reporting, and interoperability. In the current scope,
+patient administration and clinical records are under implementation, and
+identity is built. The rest are design only.
 
 ## Non-goals
 
-This project does not initially aim to:
+This project does not aim to:
 
-- Rewrite all of OpenEMR at once
-- Convert every bounded context into a microservice
+- Rewrite all of OpenEMR at once, or convert every context into a service
 - Replace the legacy database immediately
 - Preserve undocumented behavior without analysis
-- Introduce distributed transactions as a default pattern
-- Optimize for technology adoption alone
-- Make production clinical claims before appropriate validation
-- Store or use identifiable patient data in development or evaluation
-  environments
+- Introduce distributed transactions as a default
+- Make production clinical claims before validation
+- Use identifiable patient data in development or evaluation
+- Implement billing, pharmacy, laboratory, decision support, or
+  interoperability in the current scope
 
-## Repository structure
+## Security
 
-The planned repository may use a monorepo structure:
+This project concerns healthcare software and prioritizes confidentiality,
+least privilege, auditability, data integrity, safe failure, and reversible
+migration.
 
-```text
-/
-├── services/
-│   ├── authentication/
-│   └── ...
-├── modules/
-├── contracts/
-├── compatibility/
-├── database/
-├── infrastructure/
-├── tests/
-├── docs/
-│   ├── architecture/
-│   ├── domain/
-│   ├── migration/
-│   └── case-study/
-└── README.md
-```
-
-Services remain independently deployable even when maintained in the same
-repository.
-
-## Local development
-
-The local stack runs OpenEMR, MariaDB, and AuthFacade in Docker, restored from a
-test snapshot. It contains only throwaway test data.
-
-### Prerequisites
-
-- Docker Desktop, running
-- Git for Windows, which provides Git Bash. Use Git Bash for every command in
-  this section, not PowerShell or `cmd`.
-- GitHub CLI (`gh`), logged in with `gh auth login`, for downloading the
-  snapshot
-
-### First-time setup
-
-1. Create your local configuration. This generates secrets and writes `.env`.
-   It never overwrites an existing `.env`.
-
-```bash
-   bash scripts/env-mngmnt/new-env.sh
-```
-
-2. Start the stack from the snapshot. The first run takes several minutes.
-
-```bash
-   bash scripts/env-mngmnt/up.sh --restore
-```
-
-When the command prints `Stack ready`, OpenEMR is available at
-https://localhost:9300 (accept the self-signed certificate warning) and
-AuthFacade at http://localhost:7128.
-
-### Daily use
-
-```bash
-bash scripts/env-mngmnt/up.sh
-```
-
-This starts the existing stack without wiping data.
-
-### Changing credentials
-
-Edit `.env`, then run `bash scripts/env-mngmnt/up.sh`. The script re-applies the
-database password, the OpenEMR configuration, and the AuthFacade client secret.
-
-### Notes
-
-- `.env` holds your local secrets. Never commit it.
-- Run every command from the repository root.
-- The OpenEMR admin password comes from `OE_PASS` in `.env`. Changing it in
-  `.env` alone does not change the stored admin login. Reset it through
-  OpenEMR's administration screens instead.
-- For environment rules, including sanitized-data requirements, see
-  [Development and Test Environments](docs/environments.md).
+- Credentials exposed during development were rotated and replaced with
+  generated values. The old values are treated as compromised.
+- Secrets live in one gitignored file and are never committed.
+- Other development OAuth clients still hold broad `user/*` and `system/*`
+  scopes. Remove them from the baseline before the database is shared.
+- Report security issues following [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
-Architecture and research documentation will include:
+- [Development Workflow](docs/development-workflow.md)
+- [Development and Test Environments](docs/environments.md)
+- [Domain-Driven Design Guide](docs/domain-driven-design.md)
+- ADRs in `docs/architecture/`
+- Changelogs (dated, one per working session)
 
-- Bounded-context definitions
-- Ubiquitous-language glossary
-- Context map
-- Architecture Decision Records
-- API and event contracts
-- Migration plans
-- Database ownership rules
-- Evaluation methodology
-- Baseline and post-migration metrics
-- Security and continuity controls
-- Lessons learned
-
-## Security and clinical continuity
-
-This project concerns healthcare software and must prioritize:
-
-- Confidentiality and least privilege
-- Authentication and authorization correctness
-- Auditability
-- Data integrity
-- Safe failure behavior
-- Controlled access to test data
-- De-identification of datasets
-- Reversible migration
-- Operational monitoring
-- Clinical workflow continuity
-
-No component should be considered production-ready based solely on successful
-compilation or functional demonstrations.
-
-## Current phase
-
-The current phase focuses on:
-
-- Architecture discovery
-- Domain and bounded-context analysis
-- Ubiquitous-language definition
-- Baseline metric identification
-- Migration-risk analysis
-- Authentication and authorization boundary design
-- Selection of an initial vertical slice
-
-Implementation will begin after the target boundary, evaluation criteria, and
-migration safeguards have been reviewed.
-
-See the [project roadmap](ROADMAP.md) for the proposed phases, decision gates,
-and migration workstreams.
-
-The project's DDD approach is documented in
-[Domain-Driven Design Guide](docs/domain-driven-design.md).
+Links to documents that do not yet exist should be created or removed before
+publication.
 
 ## License
 
-OpenEMR Next is licensed under the [Apache License 2.0](LICENSE).
-
-This project is an independent implementation developed from scratch. It
-supports compatibility with selected OpenEMR database structures and workflows
-but does not copy OpenEMR source code.
+OpenEMR Next is licensed under the [Apache License 2.0](LICENSE). It is an
+independent implementation developed from scratch. It supports compatibility
+with selected OpenEMR database structures and workflows but does not copy
+OpenEMR source code.
 
 OpenEMR Next is not affiliated with, sponsored by, or endorsed by the OpenEMR
 project unless explicitly stated.

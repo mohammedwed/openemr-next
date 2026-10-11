@@ -1,314 +1,285 @@
 # OpenEMR Next Roadmap
 
-This roadmap describes the proposed path for evaluating and incrementally
-building OpenEMR Next. It is intentionally evidence-driven: a capability will
-become an independently deployable service only when its boundary, operational
-model, and measurable benefits are understood.
+This roadmap has two layers:
 
-The roadmap is directional rather than a promise of fixed dates. Scope and
-priority may change as domain discovery, stakeholder feedback, security review,
-and migration experiments produce new evidence.
+1. **Current scope:** the milestones for the portfolio vertical slice. Status
+   comes from the dated changelogs, which are the source of truth.
+2. **Long-term phases:** the broader migration vision. These are directional and
+   will be revisited once the slice produces evidence.
+
+The roadmap is evidence-driven. A capability becomes an independently deployable
+service only when its boundary, operational model, and benefits are understood.
+Dates are not promises.
 
 ## Guiding principles
 
 - Preserve clinical continuity and data integrity.
 - Prefer incremental migration over a big-bang rewrite.
-- Establish domain boundaries before extracting services.
-- Treat the legacy database as a compatibility constraint, not the target
-  architecture.
-- Keep authentication, authorization, auditing, and privacy as first-class
-  concerns.
-- Measure the legacy baseline before claiming improvement.
-- Prefer a modular component over a service when independent deployment or
-  scaling does not provide a concrete benefit.
-- Make every migration step observable, testable, and reversible.
+- Treat the legacy database as a compatibility constraint, not the target.
+- Keep authentication, authorization, auditing, and privacy first-class.
+- Prefer a module over a service unless independent deployment or scaling pays
+  off.
+- Use only synthetic or sanitized data in development and evaluation.
+- Make every step observable, testable, and reversible.
 
-## Phase 0: Project foundation
+## Current scope: portfolio vertical slice
 
-**Goal:** Establish the project, governance, and technical foundation.
+**Goal:** One runnable, tested, and documented slice showing patient registration
+and encounter creation, reached through an authenticated gateway, with OpenEMR as
+a compatibility constraint.
 
-### Work
+**Deployable pieces:** AuthFacade, API gateway, Patient Management, Clinical Care.
 
-- Confirm the project scope, stakeholders, and intended users.
-- Document the relationship to OpenEMR and the independent-project status.
-- Establish the Apache-2.0 licensing and third-party attribution process.
-- Set up the C#/.NET solution structure.
-- Define coding standards, branching rules, review requirements, and CI.
-- Add automated formatting, static analysis, unit testing, and dependency
-  scanning.
-- Define security reporting and responsible-disclosure procedures.
-- Establish development, test, and sanitized integration environments.
+**Estimate:** roughly 4–6 months part-time. Re-estimate after M2 and M3.
 
-### Exit criteria
+### Status
 
-- The project builds reproducibly from a clean checkout.
-- CI runs required quality checks for every change.
-- Development and test-data handling rules are documented.
-- Architectural decisions are recorded in version-controlled ADRs.
+| # | Milestone | Status | Evidence |
+|---|---|---|---|
+| M0 | Local stack in one Compose project | Done | Oct 4, Oct 10, Oct 11 |
+| M0a | Database baseline, reproducible and tested | Done (cleanup pending) | Oct 4 |
+| M0b | AuthFacade login through OpenEMR's OAuth server, facade-issued JWT | Done | Oct 10, Oct 11 |
+| M0c | Black-box integration tests with readiness gate | Done | Oct 11 |
+| M1 | Harden the identity bridge | In progress | Oct 10, Oct 11 |
+| M2 | Schema inventory for slice contexts | In progress | Oct 4 (entities scaffolded) |
+| M3 | Gateway and token validation | Not started | — |
+| M4 | Patient Management service | Not started | — |
+| M5 | Clinical Care service | Not started | — |
+| M6 | Portfolio polish | Not started | — |
 
-## Phase 1: Domain discovery and baseline
+**Done beyond the original plan:** a privilege boundary that limits the
+AuthFacade client to authentication scopes, build isolation for the AuthFacade
+container, and a readiness gate that stops integration tests from running
+against a half-started stack.
 
-**Goal:** Understand the existing OpenEMR system before selecting service
-boundaries.
+### M0a: Database baseline (done, cleanup pending)
 
-### Work
+- Schema and seed data from the real OpenEMR installer, dumped from MariaDB 12.3
+- Loaded automatically on first start; schema-only dump kept as a diff target
+- Import test (`Db.Tests`) checks table count and that key seed tables are not
+  empty
 
-- Map major business capabilities and clinical workflows.
-- Identify candidate bounded contexts.
-- Define the ubiquitous-language glossary.
-- Create a context map showing dependencies and integration relationships.
-- Inventory relevant legacy database tables and ownership assumptions.
-- Map authentication, authorization, session, audit, and identity flows.
-- Identify critical workflows and their correctness requirements.
-- Collect baseline metrics for delivery, reliability, performance, security, and
-  operations.
-- Interview or gather feedback from representative clinical, administrative,
-  support, development, and operations stakeholders.
+**Still to do before sharing:** remove the `Administrator` user and hash,
+log and session rows, and environment-specific `globals`; confirm there are no
+patient rows; have the admin created from environment variables on first run.
 
-### Exit criteria
+### M0b: AuthFacade login (done)
 
-- Candidate contexts and their responsibilities are documented.
-- Terms with conflicting meanings are resolved or explicitly scoped by
-  context.
-- Critical workflows have owners and acceptance criteria.
-- Baseline measurements have definitions, collection methods, and time
-  windows.
-- Initial migration risks and non-goals are recorded.
+- `POST /connect/token` verifies credentials through OpenEMR's password grant
+  and returns a facade JWT in the response body
+- `GET /me` validates the facade JWT and returns the subject and name
+- Identity stays in OpenEMR; clients never receive OpenEMR's token
 
-## Phase 2: Platform architecture
+**Decision recorded:** the response is JSON, not a browser redirect. The
+redirect and cookie handling considered earlier are not part of this milestone.
 
-**Goal:** Define the target architecture and the rules that keep it maintainable.
+### M0c: Integration tests (done)
 
-### Work
+- `AuthFacade.Integration.Tests` runs against the live stack and covers the seed,
+  OpenEMR's OAuth server, the password grant, and `/me` signature validation
+- The readiness gate checks four conditions under one deadline before tests run
 
-- Define the modular application structure.
-- Establish service and module dependency rules.
-- Define API, event, error, versioning, and idempotency conventions.
-- Define identity, authorization, audit, and correlation requirements.
-- Select persistence and messaging patterns appropriate to each context.
-- Define configuration, secrets, key management, and environment policies.
-- Establish logging, metrics, tracing, health checks, and alerting standards.
-- Define deployment, rollback, disaster-recovery, and support procedures.
-- Document the coexistence model for legacy OpenEMR and new components.
+### M1: Harden the identity bridge (in progress)
 
-### Exit criteria
+**Done**
 
-- The target architecture is reviewed and recorded in ADRs.
-- Contracts and cross-cutting standards have representative examples.
-- Security and privacy requirements are mapped to technical controls.
-- The team can explain which concerns belong in a module, service, or legacy
-  adapter.
+- Credentials are never stored or logged by AuthFacade
+- Client scopes are minimal
+- Integration tests verify signatures and the subject claim
 
-## Phase 3: First vertical slice
+**Remaining**
 
-**Goal:** Prove the architecture with one bounded, end-to-end capability.
+- Replace the development TLS bypass with a trusted certificate path for any
+  shared environment
+- Fixed audience string replaced by a registered-client check
+- Persist data-protection keys
+- Confirm that request logging does not capture form bodies, with a test
+- Start-up ordering: AuthFacade waits for the database but not for OpenEMR; add a
+  check or retry so early requests fail clearly
+- Decide the refresh and revocation approach, or record that it is deferred
+- ADR: identity bridge design
 
-The first slice should be selected using evidence from Phase 1. Authentication
-and API identity are candidate slices because they have a meaningful security
-boundary and clear integration requirements, but the choice should not be
-automatic.
+**Exit criteria:** The security items above are either done or recorded as
+accepted risks. The ADR is merged.
 
-### Work
+### M2: Schema inventory (in progress)
 
-- Define the slice's use cases and acceptance criteria.
-- Implement the domain, application, infrastructure, and API boundaries.
-- Build a controlled compatibility adapter to the legacy database where
-  required.
-- Add unit, integration, contract, security, and end-to-end tests.
-- Implement audit events and operational telemetry.
-- Document data reads, writes, ownership, and consistency behavior.
-- Exercise failure, timeout, retry, revocation, and rollback scenarios.
+**Done:** EF entities scaffolded from the live database.
 
-### Exit criteria
+**Remaining**
 
-- The slice runs in a production-like test environment.
-- Critical behavior is covered by automated tests.
-- Legacy and new behavior are compared for representative scenarios.
-- Operational dashboards and alerts are available.
-- Rollback is tested and documented.
+- Map every table in the slice's scope to a bounded context
+- List tables written by more than one context
+- List cross-context foreign keys, each with a decision: reference ID, duplicated
+  data, or API call
+- Record legacy anti-patterns as ADR input
 
-## Phase 4: Controlled pilot
+**Time-box:** 3–4 weeks beyond the scaffold. A good-enough inventory is acceptable.
 
-**Goal:** Validate the first slice under limited, observable usage.
+**Decision gate:** Confirm the Patient–Encounter boundary. If the schema forces a
+different split, update the design before writing service code.
 
-### Work
+### M3: Gateway and token validation (not started)
 
-- Select a low-risk pilot population or non-production integration path.
-- Define explicit entry and rollback criteria.
-- Use canary, shadow, or parallel validation where safe.
-- Monitor correctness, security, latency, errors, resource usage, and audit
-  completeness.
-- Record incidents, discrepancies, support feedback, and operational effort.
-- Compare pilot results with the legacy baseline.
+- YARP gateway routing to AuthFacade and to the new services
+- Token validation at the gateway (AuthFacade currently validates its own tokens
+  on `/me` only)
+- Compose entry for the gateway
+- ADR: whether AuthFacade stays as the permanent legacy bridge or is replaced by
+  a dedicated identity service
 
-### Exit criteria
+**Decision gate:** Record the identity architecture in an ADR.
 
-- No unacceptable security, data-integrity, or clinical-continuity issues are
-  identified.
-- Results meet the pre-defined success thresholds.
-- Known limitations and operational procedures are documented.
-- A decision is made to expand, revise, or stop the slice.
+### M4: Patient Management service (not started)
 
-## Phase 5: First production-capable capability
+- Own database and EF Core migrations, with a slim model scaffolded from
+  `patient_data` only
+- `Patient` aggregate and registration use case
+- Read-only anti-corruption adapter for `patient_data`
+- Transactional outbox publishing `PatientRegistered`
+- Unit and integration tests (Testcontainers)
 
-**Goal:** Make one capability independently deployable with appropriate
-operational controls.
+**Exit criteria:** A patient is registered through the gateway. The event is
+published exactly once. Tests pass.
 
-### Work
+### M5: Clinical Care service (not started)
 
-- Harden deployment, secrets, key rotation, backups, and recovery.
-- Establish service ownership and on-call responsibilities.
-- Complete threat modeling and security testing.
-- Validate capacity and failure-isolation assumptions.
-- Define API compatibility and deprecation policies.
-- Formalize data ownership and limit uncontrolled legacy database writes.
-- Publish operational runbooks and support documentation.
+- Own database and migrations, slim model from `form_encounter` and related
+  tables
+- `Encounter` and `Vitals` aggregates
+- Anti-corruption adapter for `form_encounter`
+- Consumes `PatientRegistered` through the outbox
+- Shadow comparison: legacy and new encounter creation match for the synthetic
+  scenarios
 
-### Exit criteria
+**Exit criteria:** An encounter is created for a registered patient and vitals
+are recorded, end to end. The shadow comparison shows no unexplained
+discrepancies.
 
-- The capability meets agreed production-readiness criteria.
-- Security, privacy, and continuity reviews are complete.
-- Deployment and rollback are repeatable.
-- Ownership, monitoring, and incident response are assigned.
-- The legacy application can continue operating safely during rollback.
+### M6: Portfolio polish (not started)
 
-## Phase 6: Expand by bounded context
+- One-command startup for the full slice
+- Architecture tests (ArchUnitNET) enforcing dependency rules
+- Cross-service integration tests
+- ADR index and updated README
+- Demo walkthrough (script or recording)
+- Case study: what worked, what did not, and the trade-offs
 
-**Goal:** Apply the validated approach to additional capabilities selectively.
+**Exit criteria:** A new reader can clone the repository, run the slice, and
+follow the demo in under 15 minutes.
 
-### Candidate order
+## Architecture Decision Records
 
-The order will be chosen using business value, coupling, risk, and measurable
-benefit. Candidate contexts include:
+ADRs are written alongside each milestone. The changelogs already contain the
+reasoning for these decisions, so they should be converted rather than rewritten
+from memory.
 
-1. Authentication and identity
-2. Authorization and access policy
-3. Notifications and background delivery
-4. Scheduling
-5. Patient administration
-6. Interoperability and external integrations
-7. Documents
-8. Billing and claims
-9. Clinical records
-10. Reporting and analytics
+From 4 October:
 
-This is not a fixed extraction order. Clinical records and billing may require
-more extensive consistency and workflow analysis than an early technical
-prototype.
+- Baseline dump produced by the real installer, not hand-written SQL
+- Entity model shared for now; per-service slim models before splitting
 
-### Work for each context
+From 10 October:
 
-- Revisit the context boundary using lessons from previous phases.
-- Define ownership and compatibility requirements.
-- Select a vertical slice rather than migrating the whole context at once.
-- Implement and test the slice.
-- Measure against the baseline.
-- Pilot and review operational impact.
-- Decide whether to retain it as a module or deploy it as a service.
+- OpenIddict dropped in favour of delegating to OpenEMR's OAuth server
+- Direct reads of OpenEMR's `users` table rejected
+- Facade-issued JWTs instead of passing OpenEMR's token to clients
+- Facade as adapter over OpenEMR, with OpenEMR left unmodified
+- OpenEMR run as its own stack, not copied into the project
+- Pinned release image over the development image
+- Client secrets generated, never typed into chat
 
-### Exit criteria
+From 11 October:
 
-- The context has an explicit owner and contract.
-- Migration evidence supports the selected deployment model.
-- Data-consistency and rollback behavior are understood.
-- The capability meets its agreed functional, security, and operational goals.
+- One root Compose file for the whole solution
+- One configuration source, gitignored secrets
+- AuthFacade as a token broker, not an identity provider
+- OAuth client provisioned by an idempotent seed
+- Minimal scopes for the AuthFacade client
+- Black-box integration tests with a readiness gate
+- Build isolation for the AuthFacade container
 
-## Phase 7: Data ownership transition
+## Open questions
 
-**Goal:** Reduce dependence on the shared legacy database.
+- **Browser login:** If users sign in through a web page, AuthFacade needs the
+  authorization-code flow with PKCE, including redirect and consent design. Not
+  yet scheduled.
+- **Ownership of the OAuth client:** OpenEMR owns the row today. If AuthFacade
+  becomes a standalone identity service, ownership and the seed move with it.
+- **Client-registration correctness:** The seed inserts a `oauth_clients` row
+  directly. The 10 October decision noted that secret hashing varies between
+  OpenEMR versions. The seed works with the pinned version, but this is an
+  accepted risk, not a resolved one. Revisit it when the OpenEMR version changes.
+- **Seed contents in images:** The seed holds environment configuration. Decide
+  whether it belongs in build artifacts.
+- **When to split the Compose file:** The trigger is a service that needs its own
+  deployment target, not a service count.
 
-### Work
+## Risks
 
-- Identify authoritative data for each migrated context.
-- Define anti-corruption layers and synchronization rules.
-- Introduce new persistence models where justified.
-- Migrate data using repeatable, auditable procedures.
-- Validate reconciliation and consistency.
-- Move writes before reads only when ownership and rollback are safe.
-- Retire legacy access paths after an observation period.
+- **Upstream OpenEMR defect:** Some wrong-password requests return 500. The
+  integration test will fail if this recurs. Track it upstream.
+- **M2 can expand:** Time-box it and accept a good-enough inventory.
+- **Synthetic data quality:** M4 and M5 tests pass without proving much unless
+  the data includes messy edge cases.
+- **Start-up ordering:** Requests can fail during OpenEMR's start window until
+  M1 adds a proper gate.
+- **Solo capacity:** Each milestone should end in a working, demonstrable state.
+  If time runs short, reduce M5 and M6 rather than leaving M0–M4 half-finished.
+- **Scope creep:** Work outside the four deployable pieces needs an ADR first.
+- **Password grant:** Deprecated in OAuth 2.1. Acceptable here, but it must not
+  become a pattern for browser or third-party clients.
 
-### Exit criteria
+## Long-term phases
 
-- Each migrated context has a clear source of truth.
-- Shared writes are eliminated or formally controlled.
-- Reconciliation and recovery procedures are tested.
-- Legacy database dependencies are documented and shrinking.
+These are not scheduled for the current scope. Each assumes evidence from earlier
+work and will be revisited at decision gates.
 
-## Phase 8: Platform evaluation and next strategy
-
-**Goal:** Determine whether the architecture should be expanded, adjusted, or
-constrained.
-
-### Work
-
-- Compare baseline, pilot, and post-migration metrics.
-- Evaluate maintainability, extensibility, reliability, scalability, security,
-  cost, and operational effort.
-- Document failed hypotheses and unexpected trade-offs.
-- Identify contexts that should remain modular.
-- Review repository and team boundaries as services become independent.
-- Update the long-term migration strategy based on evidence.
-
-### Exit criteria
-
-- Results are reproducible and documented.
-- Benefits and costs are reported honestly.
-- Remaining migration work has evidence-based priorities.
-- The project has a reviewed plan for the next stage.
+- **Phase 0, Foundation:** licensing, CI with formatting, static analysis, tests,
+  and dependency scanning. Partly in place.
+- **Phase 1, Discovery and baseline:** capability and workflow mapping, context
+  map, glossary, legacy inventory, and baseline metrics. The slice's part of this
+  phase is M2. Stakeholder interviews are needed before any production claim.
+- **Phase 2, Platform architecture:** module rules, API and event conventions,
+  identity and audit requirements, and the coexistence model. The slice exercises
+  these in a limited form.
+- **Phase 3, First vertical slice:** the current scope (M0–M6).
+- **Phase 4, Controlled pilot:** canary, shadow, or parallel running with real
+  users in a sanitized environment. Out of scope for the portfolio phase. The M5
+  shadow comparison is the closest equivalent.
+- **Phase 5, Production-capable capability:** hardened deployment, secrets and key
+  rotation, backups, threat modeling, and on-call. Not planned for this scope.
+- **Phase 6, Expand by context:** apply the approach to other contexts, selected
+  by value, coupling, risk, and benefit.
+- **Phase 7, Data ownership transition:** establish authoritative sources, sync
+  rules, reconciliation, and retirement of legacy access paths.
+- **Phase 8, Evaluation:** compare baseline, pilot, and post-migration metrics;
+  record failed hypotheses; set the next strategy from evidence.
 
 ## Cross-cutting workstreams
 
-These workstreams continue throughout every phase:
-
-### Security and privacy
-
-- Threat modeling
-- Dependency and vulnerability management
-- Secrets and key management
-- Least-privilege access
-- Authentication and authorization testing
-- Auditability and incident response
-- De-identified test data
-
-### Clinical safety and continuity
-
-- Critical-workflow validation
-- Safe failure behavior
-- Rollback and downtime procedures
-- Data-integrity checks
-- Stakeholder review of behavior changes
-
-### Observability
-
-- Structured logs
-- Metrics and service-level indicators
-- Distributed tracing
-- Health checks
-- Alerting and runbooks
-- Correlation across legacy and new components
-
-### Documentation
-
-- ADRs
-- Domain glossary
-- Context map
-- API and event contracts
-- Data ownership records
-- Migration runbooks
-- Baseline and outcome reports
+- **Security and privacy:** threat modeling, dependency scanning, secrets,
+  least-privilege access, authentication tests, de-identified data.
+- **Clinical safety:** critical-workflow validation, safe failure, rollback,
+  data-integrity checks.
+- **Observability:** structured logs, health checks, correlation across legacy and
+  new components. Metrics and tracing come later.
+- **Documentation:** ADRs, glossary, context map, contracts, data-ownership
+  records, changelogs, case study.
 
 ## Decision gates
 
-Progression between phases requires an explicit review. A phase may be paused
-or reversed when:
+Work can be paused or reversed when security controls are inadequate, critical
+workflows are not equivalent, data consistency cannot be shown, reliability
+regresses beyond tolerance, operational burden outweighs the benefit, coupling
+becomes excessive, or rollback is impractical.
 
-- Security or privacy controls are inadequate.
-- Critical workflow behavior is not equivalent.
-- Data consistency cannot be demonstrated.
-- Reliability or performance regresses beyond tolerance.
-- Operational burden exceeds the expected benefit.
-- The boundary requires excessive synchronous coupling.
-- Rollback is not practical.
+Named gates in the current scope:
 
-The roadmap is successful when it produces a safer and more maintainable
-platform, not when it produces the maximum number of microservices.
+- After **M2:** confirm the Patient–Encounter boundary.
+- After **M3:** record the identity architecture decision.
+- After **M5:** decide whether the slice meets its success criteria, then proceed
+  to polish or revise the design.
+
+The roadmap succeeds when it produces a safer, more maintainable platform and an
+honest account of what the approach does and does not deliver.
