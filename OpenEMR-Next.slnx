@@ -1,10 +1,9 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/AuthFacade/AuthFacade.csproj" />
+    <Project Path="src/AuthFacade.Service/AuthFacadeService.csproj" />
     <Project Path="src/OpenEmr.Data/OpenEmr.Data.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/AuthFacade.Integration.Tests/AuthFacade.Integration.Tests.csproj" />
-    <Project Path="tests/Db.Tests/Db.Tests.csproj" />
+    <Project Path="tests/AuthFacade.Service.Integration.Tests/AuthFacade.Integration.Tests.csproj" />
   </Folder>
 </Solution>
