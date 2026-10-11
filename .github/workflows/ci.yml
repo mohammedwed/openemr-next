@@ -26,27 +26,31 @@ jobs:
   build-and-test:
     name: Build and test
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
-
-    services:
-      mysql:
-        image: mariadb:11.4   # must be a literal here; env.* isn't allowed in services
-        env:
-          MYSQL_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD || 'ci-root-password' }}
-          MARIADB_DATABASE: openemr
-          MARIADB_USER: openemr
-          MARIADB_PASSWORD: ${{ secrets.DB_PASSWORD || 'ci-openemr-password' }}
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
+    timeout-minutes: 60   # OpenEMR's first start is slow
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Create .env for docker compose
+        env:
+          DB_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD || 'ci-root-password' }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'ci-openemr-password' }}
+          OE_PASS: ${{ secrets.OE_PASS || 'ci-admin-password' }}
+          JWT_KEY: ${{ secrets.JWT_KEY || 'ci-only-jwt-key-change-me-0123456789abcdef' }}
+          AUTHFACADE_CLIENT_SECRET: ${{ secrets.AUTHFACADE_CLIENT_SECRET || 'ci-client-secret' }}
+        run: |
+          cp .env.example .env
+          {
+            echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD"
+            echo "DB_PASSWORD=$DB_PASSWORD"
+            echo "OE_PASS=$OE_PASS"
+            echo "JWT_KEY=$JWT_KEY"
+            echo "AUTHFACADE_CLIENT_SECRET=$AUTHFACADE_CLIENT_SECRET"
+          } >> .env
+
+      - name: Start stack
+        run: docker compose up -d --build --wait --wait-timeout 1200
 
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@v4
@@ -60,8 +64,6 @@ jobs:
         run: dotnet build ${{ env.SOLUTION }} --configuration Release --no-restore
 
       - name: Test
-        env:
-          ConnectionStrings__DefaultConnection: "Server=127.0.0.1;Port=3306;Database=openemr;Uid=openemr;Pwd=${{ secrets.DB_PASSWORD || 'ci-openemr-password' }}"
         run: >
           dotnet test ${{ env.SOLUTION }}
           --configuration Release
@@ -69,6 +71,14 @@ jobs:
           --no-restore
           --logger "trx;LogFileName=test-results.trx"
           --results-directory TestResults
+
+      - name: Show compose logs on failure
+        if: failure()
+        run: docker compose logs --tail=200
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
 
       - name: Upload test results
         if: always()
