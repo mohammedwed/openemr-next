@@ -320,6 +320,61 @@ The planned repository may use a monorepo structure:
 Services remain independently deployable even when maintained in the same
 repository.
 
+## Local development
+
+The local stack runs OpenEMR, MariaDB, and AuthFacade in Docker, restored from a
+test snapshot. It contains only throwaway test data.
+
+### Prerequisites
+
+- Docker Desktop, running
+- Git for Windows, which provides Git Bash. Use Git Bash for every command in
+  this section, not PowerShell or `cmd`.
+- GitHub CLI (`gh`), logged in with `gh auth login`, for downloading the
+  snapshot
+
+### First-time setup
+
+1. Create your local configuration. This generates secrets and writes `.env`.
+   It never overwrites an existing `.env`.
+
+```bash
+   bash scripts/env-mngmnt/new-env.sh
+```
+
+2. Start the stack from the snapshot. The first run takes several minutes.
+
+```bash
+   bash scripts/env-mngmnt/up.sh --restore
+```
+
+When the command prints `Stack ready`, OpenEMR is available at
+https://localhost:9300 (accept the self-signed certificate warning) and
+AuthFacade at http://localhost:7128.
+
+### Daily use
+
+```bash
+bash scripts/env-mngmnt/up.sh
+```
+
+This starts the existing stack without wiping data.
+
+### Changing credentials
+
+Edit `.env`, then run `bash scripts/env-mngmnt/up.sh`. The script re-applies the
+database password, the OpenEMR configuration, and the AuthFacade client secret.
+
+### Notes
+
+- `.env` holds your local secrets. Never commit it.
+- Run every command from the repository root.
+- The OpenEMR admin password comes from `OE_PASS` in `.env`. Changing it in
+  `.env` alone does not change the stored admin login. Reset it through
+  OpenEMR's administration screens instead.
+- For environment rules, including sanitized-data requirements, see
+  [Development and Test Environments](docs/environments.md).
+
 ## Documentation
 
 Architecture and research documentation will include:

@@ -2,13 +2,14 @@
 # One-command local stack: optional snapshot restore, credentials from .env,
 # then start OpenEMR and AuthFacade and wait until both respond.
 #
-#   bash scripts/up.sh            start or resume the stack
-#   bash scripts/up.sh --restore  wipe volumes and rebuild from the snapshot
+#   bash scripts/env-mngmnt/up.sh            start or resume the stack
+#   bash scripts/env-mngmnt/up.sh --restore  wipe volumes and rebuild from the snapshot
 set -euo pipefail
 
 SNAPSHOT_TAG=${SNAPSHOT_TAG:-snapshot-openemr-8.0.0.3-ci}
 SNAPSHOT_DIR=snapshots
 SITES_VOLUME=${SITES_VOLUME:-openemr-next_sitesvolume}
+APPLY_ENV=scripts/env-mngmnt/apply-env.sh
 RESTORE=false
 [[ "${1:-}" == "--restore" ]] && RESTORE=true
 
@@ -28,6 +29,7 @@ sql_quote() {
 [[ -f .env ]] || { echo "Missing .env. Run scripts/env-mngmnt/new-env.sh first." >&2; exit 1; }
 DB_PASS=$(get DB_PASSWORD)
 : "${DB_PASS:?DB_PASSWORD missing from .env}"
+[[ -f "$APPLY_ENV" ]] || { echo "Missing $APPLY_ENV" >&2; exit 1; }
 
 # Docker on Windows needs the Windows form of the current folder for -v.
 HOST_DIR=$(pwd -W 2>/dev/null || pwd)
@@ -69,7 +71,7 @@ else
 fi
 
 echo "==> Applying credentials from .env"
-bash scripts/apply-env.sh
+bash "$APPLY_ENV"
 
 echo "==> Starting OpenEMR and AuthFacade"
 docker compose up -d --build --wait --wait-timeout 1200 openemr auth-facade phpmyadmin
@@ -84,4 +86,8 @@ while true; do
     break
   fi
   if (( $(date +%s) >= deadline )); then
-    echo "Timed out:
+    echo "Timed out: openemr=$oe auth-facade=$af" >&2
+    exit 1
+  fi
+  sleep 15
+done
