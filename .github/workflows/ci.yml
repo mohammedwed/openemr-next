@@ -40,6 +40,10 @@ jobs:
           OE_PASS: ${{ secrets.OE_PASS || 'ci-admin-password' }}
           JWT_KEY: ${{ secrets.JWT_KEY || 'ci-only-jwt-key-change-me-0123456789abcdef' }}
           AUTHFACADE_CLIENT_SECRET: ${{ secrets.AUTHFACADE_CLIENT_SECRET || 'ci-client-secret' }}
+          AUTHFACADE_CLIENT_ID: ${{ vars.AUTHFACADE_CLIENT_ID || 'authfacade' }}
+          OPENEMR_IMAGE: openemr/openemr:8.0.0.3
+          MARIADB_IMAGE: mariadb:12.3.3
+          PHPMYADMIN_IMAGE: phpmyadmin:5.2.3
         run: |
           cp .env.example .env
           {
@@ -48,6 +52,10 @@ jobs:
             echo "OE_PASS=$OE_PASS"
             echo "JWT_KEY=$JWT_KEY"
             echo "AUTHFACADE_CLIENT_SECRET=$AUTHFACADE_CLIENT_SECRET"
+            echo "AUTHFACADE_CLIENT_ID=$AUTHFACADE_CLIENT_ID"
+            echo "OPENEMR_IMAGE=$OPENEMR_IMAGE"
+            echo "MARIADB_IMAGE=$MARIADB_IMAGE"
+            echo "PHPMYADMIN_IMAGE=$PHPMYADMIN_IMAGE"
           } >> .env
 
       - name: Download snapshot
