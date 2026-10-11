@@ -71,3 +71,5 @@ nunit-*.xml
 **/obj/
 **/.vs/
 *.user
+.env.*
+!.env.example

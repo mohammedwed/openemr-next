@@ -69,15 +69,15 @@ services:
       AUTHFACADE_CLIENT_ID: ${AUTHFACADE_CLIENT_ID:?Set AUTHFACADE_CLIENT_ID in .env}
       AUTHFACADE_CLIENT_SECRET: ${AUTHFACADE_CLIENT_SECRET:-}
     volumes:
-      - ./openemr-legacy/scripts/seed-auth-facade-client.sql:/seed/seed-authfacade-client.sql:ro
-      - ./openemr-legacy/scripts/seed-auth-client.sh:/seed/seed.sh:ro
+      - ./scripts/db-seeds/seed-auth-facade-client.sql:/seed/seed-authfacade-client.sql:ro
+      - ./scripts/db-seeds/seed-auth-client.sh:/seed/seed.sh:ro
       
     entrypoint: ["sh", "/seed/seed.sh"]
 
   # ---- AuthFacade (.NET) ----
   auth-facade:
     build:
-      context: src/AuthFacade
+      context: src/AuthFacade.Service
       dockerfile: docker/Dockerfile
     restart: unless-stopped
     depends_on:

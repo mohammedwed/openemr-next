@@ -6,7 +6,7 @@ public static class StackConfig
 
     // In StackConfig.cs
     public static TimeSpan ReadinessTimeout =>
-        TimeSpan.FromMinutes(int.Parse(Get("STACK_READY_TIMEOUT_MINUTES", "20")));
+        TimeSpan.FromMinutes(int.Parse(Get("STACK_READY_TIMEOUT_MINUTES", "3")));
 
     private static string Get(string key, string fallback = "") =>
         Environment.GetEnvironmentVariable(key)
