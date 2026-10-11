@@ -45,18 +45,18 @@ jobs:
           MARIADB_IMAGE: mariadb:12.3.3
           PHPMYADMIN_IMAGE: phpmyadmin:5.2.3
         run: |
-          cp .env.example .env
-          {
-            echo "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD"
-            echo "DB_PASSWORD=$DB_PASSWORD"
-            echo "OE_PASS=$OE_PASS"
-            echo "JWT_KEY=$JWT_KEY"
-            echo "AUTHFACADE_CLIENT_SECRET=$AUTHFACADE_CLIENT_SECRET"
-            echo "AUTHFACADE_CLIENT_ID=$AUTHFACADE_CLIENT_ID"
-            echo "OPENEMR_IMAGE=$OPENEMR_IMAGE"
-            echo "MARIADB_IMAGE=$MARIADB_IMAGE"
-            echo "PHPMYADMIN_IMAGE=$PHPMYADMIN_IMAGE"
-          } >> .env
+          printf '%s\n' \
+            "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" \
+            "DB_PASSWORD=$DB_PASSWORD" \
+            "OE_PASS=$OE_PASS" \
+            "JWT_KEY=$JWT_KEY" \
+            "AUTHFACADE_CLIENT_SECRET=$AUTHFACADE_CLIENT_SECRET" \
+            "AUTHFACADE_CLIENT_ID=$AUTHFACADE_CLIENT_ID" \
+            "OPENEMR_IMAGE=$OPENEMR_IMAGE" \
+            "MARIADB_IMAGE=$MARIADB_IMAGE" \
+            "PHPMYADMIN_IMAGE=$PHPMYADMIN_IMAGE" > .env
+          # Print variable names only, never values.
+          cut -d= -f1 .env
 
       - name: Download snapshot
         env:
