@@ -1,0 +1,6 @@
+@AuthFacade_HostAddress = http://localhost:5050
+
+GET {{AuthFacade_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
