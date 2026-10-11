@@ -17,6 +17,9 @@ public sealed class ReadinessFixture : IAsyncLifetime
 
     private static readonly TimeSpan Poll = TimeSpan.FromSeconds(15);
 
+    // Upper bound for any single check, so one hung request can't stall the round
+    private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(15);
+
     public async Task InitializeAsync()
     {
         var deadline = DateTime.UtcNow + StackConfig.ReadinessTimeout;
@@ -39,7 +42,8 @@ public sealed class ReadinessFixture : IAsyncLifetime
             {
                 try
                 {
-                    return (c.Name, Passed: await c.Check(), Error: (string?)null);
+                    var passed = await c.Check().WaitAsync(CheckTimeout);
+                    return (c.Name, Passed: passed, Error: (string?)null);
                 }
                 catch (MySqlException ex) when (ex.Number == 1045)
                 {
@@ -49,7 +53,7 @@ public sealed class ReadinessFixture : IAsyncLifetime
                 }
                 catch (Exception ex)
                 {
-                    return (c.Name, Passed: false, Error: ex.Message);
+                    return (c.Name, Passed: false, Error: $"{ex.GetType().Name}: {ex.Message}");
                 }
             }));
 
