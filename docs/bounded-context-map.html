@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    .ctx-card { transition: all 0.2s ease; cursor: pointer; }
+    .ctx-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+    .relationship-line { stroke-dasharray: 6 3; animation: dash 20s linear infinite; }
+    @keyframes dash { to { stroke-dashoffset: -200; } }
+    .tooltip { pointer-events: none; opacity: 0; transition: opacity 0.2s; position: absolute; z-index: 50; }
+    .tooltip.visible { opacity: 1; pointer-events: auto; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-6">
+
+  <div class="max-w-7xl mx-auto">
+    <!-- Title -->
+    <div class="text-center mb-6">
+      <h1 class="text-2xl font-bold text-[var(--foreground)]">OpenEMR — Bounded Context Map</h1>
+      <p class="text-[var(--muted-foreground)] text-sm mt-1">Domain-Driven Design for C# Microservices Modernization</p>
+    </div>
+
+    <!-- Legend -->
+    <div class="flex justify-center gap-8 mb-6 text-sm">
+      <div class="flex items-center gap-2">
+        <span class="legend-dot" style="background: #ef4444;"></span>
+        <span class="text-[var(--muted-foreground)]">Core Domain</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="legend-dot" style="background: #eab308;"></span>
+        <span class="text-[var(--muted-foreground)]">Supporting Domain</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="legend-dot" style="background: #3b82f6;"></span>
+        <span class="text-[var(--muted-foreground)]">Generic Domain</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span style="width:24px; border-top: 2px dashed #888;"></span>
+        <span class="text-[var(--muted-foreground)]">Relationship</span>
+      </div>
+    </div>
+
+    <!-- Diagram Container -->
+    <div class="relative" style="min-height: 900px;">
+      <!-- SVG Relationship Lines -->
+      <svg id="lines-svg" class="absolute inset-0 w-full h-full" style="z-index: 0; pointer-events: none;">
+        <!-- Lines drawn by JS -->
+      </svg>
+
+      <!-- CORE DOMAINS ROW -->
+      <div class="mb-3">
+        <div class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-2 px-1" style="color: #ef4444;">Core Domains — Maximum Business Value & Differentiation</div>
+        <div class="grid grid-cols-3 gap-4" id="core-row">
+
+          <!-- Clinical Care -->
+          <div class="ctx-card rounded-xl p-4 border-2" id="ctx-clinical"
+               style="border-color: #ef4444; background: var(--card);"
+               onmouseenter="showTooltip(event, 'clinical')" onmouseleave="hideTooltip('clinical')">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-xs font-bold uppercase tracking-wider" style="color: #ef4444;">Core</div>
+                <h3 class="text-lg font-bold text-[var(--foreground)] mt-1">🏥 Clinical Care</h3>
+                <p class="text-xs text-[var(--muted-foreground)] mt-1">Encounters, clinical documentation, vitals, conditions, immunizations, care plans</p>
+              </div>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-1">
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(239,68,68,0.1); color: #ef4444;">Encounter</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(239,68,68,0.1); color: #ef4444;">Condition</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(239,68,68,0.1); color: #ef4444;">CarePlan</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(239,68,68,0.1); color: #ef4444;">Allergy</span>
+            </div>
+            <div class="text-xs text-[var(--muted-foreground)] mt-2">
+              <strong>C# Service:</strong> OpenEMR.ClinicalCare.Api
+            </div>
+          </div>
+
+          <!-- Patient Management -->
+          <div class="ctx-card rounded-xl p-4 border-2" id="ctx-patient"
+               style="border-color: #ef4444; background: var(--card);"
+               onmouseenter="showTooltip(event, 'patient')" onmouseleave="hideTooltip('patient')">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-xs font-bold uppercase tracking-wider" style="color: #ef4444;">Core</div>
+                <h3 class="text-lg font-bold text-[var(--foreground)] mt-1">👤 Patient Management</h3>
+                <p class="text-xs text-[var(--muted-foreground)] mt-1">Patient identity, demographics, insurance enrollment, documents, portal</p>
+              </div>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-1">
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(239,68,68,0.1); color: #ef4444;">Patient</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(239,68,68,0.1); color: #ef4444;">InsurancePolicy</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(239,68,68,0.1); color: #ef4444;">Document</span>
+            </div>
+            <div class="text-xs text-[var(--muted-foreground)] mt-2">
+              <strong>C# Service:</strong> OpenEMR.PatientManagement.Api
+            </div>
+          </div>
+
+          <!-- Billing & Claims -->
+          <div class="ctx-card rounded-xl p-4 border-2" id="ctx-billing"
+               style="border-color: #ef4444; background: var(--card);"
+               onmouseenter="showTooltip(event, 'billing')" onmouseleave="hideTooltip('billing')">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-xs font-bold uppercase tracking-wider" style="color: #ef4444;">Core</div>
+                <h3 class="text-lg font-bold text-[var(--foreground)] mt-1">💰 Billing & Claims</h3>
+                <p class="text-xs text-[var(--muted-foreground)] mt-1">Claims, EDI 837/835, ERA processing, payments, HCFA 1500, UB-04</p>
+              </div>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-1">
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(239,68,68,0.1); color: #ef4444;">Claim</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(239,68,68,0.1); color: #ef4444;">Payment</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(239,68,68,0.1); color: #ef4444;">BillingBatch</span>
+            </div>
+            <div class="text-xs text-[var(--muted-foreground)] mt-2">
+              <strong>C# Service:</strong> OpenEMR.BillingClaims.Api
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUPPORTING DOMAINS ROW -->
+      <div class="mb-3 mt-8">
+        <div class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-2 px-1" style="color: #eab308;">Supporting Domains — Enable Core, Domain-Specific Logic</div>
+        <div class="grid grid-cols-4 gap-4" id="supporting-row">
+
+          <!-- Scheduling -->
+          <div class="ctx-card rounded-xl p-4 border-2" id="ctx-scheduling"
+               style="border-color: #eab308; background: var(--card);"
+               onmouseenter="showTooltip(event, 'scheduling')" onmouseleave="hideTooltip('scheduling')">
+            <div class="text-xs font-bold uppercase tracking-wider" style="color: #eab308;">Supporting</div>
+            <h3 class="text-base font-bold text-[var(--foreground)] mt-1">📅 Scheduling</h3>
+            <p class="text-xs text-[var(--muted-foreground)] mt-1">Appointments, calendar, patient flow tracking, reminders</p>
+            <div class="mt-2 flex flex-wrap gap-1">
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(234,179,8,0.1); color: #ca8a04;">Appointment</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(234,179,8,0.1); color: #ca8a04;">Schedule</span>
+            </div>
+            <div class="text-xs text-[var(--muted-foreground)] mt-2">
+              <strong>C#:</strong> OpenEMR.Scheduling.Api
+            </div>
+          </div>
+
+          <!-- Pharmacy -->
+          <div class="ctx-card rounded-xl p-4 border-2" id="ctx-pharmacy"
+               style="border-color: #eab308; background: var(--card);"
+               onmouseenter="showTooltip(event, 'pharmacy')" onmouseleave="hideTooltip('pharmacy')">
+            <div class="text-xs font-bold uppercase tracking-wider" style="color: #eab308;">Supporting</div>
+            <h3 class="text-base font-bold text-[var(--foreground)] mt-1">💊 Pharmacy & Rx</h3>
+            <p class="text-xs text-[var(--muted-foreground)] mt-1">Prescriptions, e-prescribing, drug inventory, formulary</p>
+            <div class="mt-2 flex flex-wrap gap-1">
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(234,179,8,0.1); color: #ca8a04;">Prescription</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(234,179,8,0.1); color: #ca8a04;">DrugInventory</span>
+            </div>
+            <div class="text-xs text-[var(--muted-foreground)] mt-2">
+              <strong>C#:</strong> OpenEMR.Pharmacy.Api
+            </div>
+          </div>
+
+          <!-- Lab & Orders -->
+          <div class="ctx-card rounded-xl p-4 border-2" id="ctx-lab"
+               style="border-color: #eab308; background: var(--card);"
+               onmouseenter="showTooltip(event, 'lab')" onmouseleave="hideTooltip('lab')">
+            <div class="text-xs font-bold uppercase tracking-wider" style="color: #eab308;">Supporting</div>
+            <h3 class="text-base font-bold text-[var(--foreground)] mt-1">🔬 Lab & Orders</h3>
+            <p class="text-xs text-[var(--muted-foreground)] mt-1">Procedure orders, lab results, specimens, requisitions</p>
+            <div class="mt-2 flex flex-wrap gap-1">
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(234,179,8,0.1); color: #ca8a04;">ProcedureOrder</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(234,179,8,0.1); color: #ca8a04;">LabResult</span>
+            </div>
+            <div class="text-xs text-[var(--muted-foreground)] mt-2">
+              <strong>C#:</strong> OpenEMR.LabOrders.Api
+            </div>
+          </div>
+
+          <!-- CDS & Quality -->
+          <div class="ctx-card rounded-xl p-4 border-2" id="ctx-cds"
+               style="border-color: #eab308; background: var(--card);"
+               onmouseenter="showTooltip(event, 'cds')" onmouseleave="hideTooltip('cds')">
+            <div class="text-xs font-bold uppercase tracking-wider" style="color: #eab308;">Supporting</div>
+            <h3 class="text-base font-bold text-[var(--foreground)] mt-1">📊 CDS & Quality</h3>
+            <p class="text-xs text-[var(--muted-foreground)] mt-1">Clinical rules, CQM/eCQM, AMC tracking, QRDA reporting</p>
+            <div class="mt-2 flex flex-wrap gap-1">
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(234,179,8,0.1); color: #ca8a04;">ClinicalRule</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(234,179,8,0.1); color: #ca8a04;">QualityMeasure</span>
+            </div>
+            <div class="text-xs text-[var(--muted-foreground)] mt-2">
+              <strong>C#:</strong> OpenEMR.CdsQuality.Api
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GENERIC DOMAINS ROW -->
+      <div class="mt-8">
+        <div class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-2 px-1" style="color: #3b82f6;">Generic Domains — Infrastructure & Standards Compliance</div>
+        <div class="grid grid-cols-3 gap-4" id="generic-row">
+
+          <!-- Identity & Access -->
+          <div class="ctx-card rounded-xl p-4 border-2" id="ctx-identity"
+               style="border-color: #3b82f6; background: var(--card);"
+               onmouseenter="showTooltip(event, 'identity')" onmouseleave="hideTooltip('identity')">
+            <div class="text-xs font-bold uppercase tracking-wider" style="color: #3b82f6;">Generic</div>
+            <h3 class="text-base font-bold text-[var(--foreground)] mt-1">🔐 Identity & Access</h3>
+            <p class="text-xs text-[var(--muted-foreground)] mt-1">OAuth2/OIDC, ACL, MFA, users, roles, audit logging</p>
+            <div class="mt-2 flex flex-wrap gap-1">
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(59,130,246,0.1); color: #3b82f6;">User</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(59,130,246,0.1); color: #3b82f6;">OAuthClient</span>
+            </div>
+            <div class="text-xs text-[var(--muted-foreground)] mt-2">
+              <strong>C#:</strong> OpenEMR.Identity.Api
+            </div>
+          </div>
+
+          <!-- Organization & Practice -->
+          <div class="ctx-card rounded-xl p-4 border-2" id="ctx-org"
+               style="border-color: #3b82f6; background: var(--card);"
+               onmouseenter="showTooltip(event, 'org')" onmouseleave="hideTooltip('org')">
+            <div class="text-xs font-bold uppercase tracking-wider" style="color: #3b82f6;">Generic</div>
+            <h3 class="text-base font-bold text-[var(--foreground)] mt-1">🏢 Organization & Practice</h3>
+            <p class="text-xs text-[var(--muted-foreground)] mt-1">Facilities, insurance companies, code systems, global settings</p>
+            <div class="mt-2 flex flex-wrap gap-1">
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(59,130,246,0.1); color: #3b82f6;">Facility</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(59,130,246,0.1); color: #3b82f6;">InsuranceCo</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(59,130,246,0.1); color: #3b82f6;">CodeSystem</span>
+            </div>
+            <div class="text-xs text-[var(--muted-foreground)] mt-2">
+              <strong>C#:</strong> OpenEMR.Organization.Api
+            </div>
+          </div>
+
+          <!-- Interoperability -->
+          <div class="ctx-card rounded-xl p-4 border-2" id="ctx-interop"
+               style="border-color: #3b82f6; background: var(--card);"
+               onmouseenter="showTooltip(event, 'interop')" onmouseleave="hideTooltip('interop')">
+            <div class="text-xs font-bold uppercase tracking-wider" style="color: #3b82f6;">Generic</div>
+            <h3 class="text-base font-bold text-[var(--foreground)] mt-1">🔗 Interoperability</h3>
+            <p class="text-xs text-[var(--muted-foreground)] mt-1">FHIR R4, CCDA, SMART on FHIR, Direct Messaging, bulk export</p>
+            <div class="mt-2 flex flex-wrap gap-1">
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(59,130,246,0.1); color: #3b82f6;">FhirMapping</span>
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background: rgba(59,130,246,0.1); color: #3b82f6;">ExportJob</span>
+            </div>
+            <div class="text-xs text-[var(--muted-foreground)] mt-2">
+              <strong>C#:</strong> OpenEMR.Interop.Api
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Relationship Labels Overlay -->
+      <div id="rel-labels" class="absolute inset-0 w-full h-full" style="z-index: 5; pointer-events: none;"></div>
+
+    </div>
+
+    <!-- Relationship Legend -->
+    <div class="mt-8 bg-[var(--card)] border border-[var(--border)] rounded-xl p-5">
+      <h3 class="font-bold text-base text-[var(--foreground)] mb-3">Context Relationships</h3>
+      <div class="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+        <div class="flex items-start gap-2">
+          <span class="mt-0.5" style="color: #ef4444;">●</span>
+          <span class="text-[var(--muted-foreground)]"><strong class="text-[var(--foreground)]">Patient → Clinical, Billing, Scheduling</strong> — Customer-Supplier (patient identity shared via events + API)</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="mt-0.5" style="color: #ef4444;">●</span>
+          <span class="text-[var(--muted-foreground)]"><strong class="text-[var(--foreground)]">Clinical → Billing</strong> — Customer-Supplier (encounters trigger claims via <code>EncounterClosed</code>)</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="mt-0.5" style="color: #eab308;">●</span>
+          <span class="text-[var(--muted-foreground)]"><strong class="text-[var(--foreground)]">Clinical ↔ Lab & Pharmacy</strong> — Partnership (bidirectional: orders out, results/Rx back)</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="mt-0.5" style="color: #eab308;">●</span>
+          <span class="text-[var(--muted-foreground)]"><strong class="text-[var(--foreground)]">Clinical → CDS & Quality</strong> — Customer-Supplier (clinical data feeds rule evaluation)</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="mt-0.5" style="color: #eab308;">●</span>
+          <span class="text-[var(--muted-foreground)]"><strong class="text-[var(--foreground)]">Scheduling → Clinical</strong> — Customer-Supplier (check-in triggers encounter creation)</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="mt-0.5" style="color: #3b82f6;">●</span>
+          <span class="text-[var(--muted-foreground)]"><strong class="text-[var(--foreground)]">Identity & Org → All</strong> — Published Language / Shared Kernel (auth + reference data)</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="mt-0.5" style="color: #3b82f6;">●</span>
+          <span class="text-[var(--muted-foreground)]"><strong class="text-[var(--foreground)]">Interop ↔ All</strong> — Anti-Corruption Layer (FHIR/CCDA translation facade)</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="mt-0.5" style="color: #ef4444;">●</span>
+          <span class="text-[var(--muted-foreground)]"><strong class="text-[var(--foreground)]">Billing → Organization</strong> — Conformist (billing conforms to payer/facility master data)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tooltips -->
+    <div id="tooltip-clinical" class="tooltip bg-[var(--card)] border border-[var(--border)] rounded-lg p-4 shadow-xl" style="max-width: 320px;">
+      <h4 class="font-bold text-sm" style="color: #ef4444;">Clinical Care — Aggregates & Events</h4>
+      <div class="mt-2 text-xs text-[var(--muted-foreground)]">
+        <p class="font-semibold text-[var(--foreground)]">Aggregate Roots:</p>
+        <p>Encounter, Condition, AllergyIntolerance, CarePlan</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Key Entities:</p>
+        <p>ClinicalNote, Vitals, Assessment, Immunization, Procedure, CareTeam, Observation</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Domain Events:</p>
+        <p>EncounterCreated, VitalsRecorded, ConditionDiagnosed, ImmunizationAdministered</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Legacy PHP:</p>
+        <p>EncounterService, VitalsService, ConditionService + 35 clinical form types</p>
+      </div>
+    </div>
+    <div id="tooltip-patient" class="tooltip bg-[var(--card)] border border-[var(--border)] rounded-lg p-4 shadow-xl" style="max-width: 320px;">
+      <h4 class="font-bold text-sm" style="color: #ef4444;">Patient Management — Aggregates & Events</h4>
+      <div class="mt-2 text-xs text-[var(--muted-foreground)]">
+        <p class="font-semibold text-[var(--foreground)]">Aggregate Roots:</p>
+        <p>Patient, InsurancePolicy, PatientDocument</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Key Entities:</p>
+        <p>Demographics, Contact, RelatedPerson, Employer, AdvanceDirective, PatientHistory</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Domain Events:</p>
+        <p>PatientRegistered, DemographicsUpdated, InsurancePolicyEnrolled, DocumentUploaded</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Legacy PHP:</p>
+        <p>PatientService (1096 lines), InsuranceService, DocumentService, patient_data table</p>
+      </div>
+    </div>
+    <div id="tooltip-billing" class="tooltip bg-[var(--card)] border border-[var(--border)] rounded-lg p-4 shadow-xl" style="max-width: 320px;">
+      <h4 class="font-bold text-sm" style="color: #ef4444;">Billing & Claims — Aggregates & Events</h4>
+      <div class="mt-2 text-xs text-[var(--muted-foreground)]">
+        <p class="font-semibold text-[var(--foreground)]">Aggregate Roots:</p>
+        <p>Claim, Payment, BillingBatch</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Key Entities:</p>
+        <p>LineItem, Adjustment, ERA, EDITransaction, DaySheet, Copay, PrepaymentBalance</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Domain Events:</p>
+        <p>ClaimCreated, ClaimSubmitted, ERAReceived, PaymentPosted, BatchSubmitted</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Legacy PHP:</p>
+        <p>Claim.php (2440 lines!), BillingProcessor, ParseERA, X12 generators, HCFA1500</p>
+      </div>
+    </div>
+    <div id="tooltip-scheduling" class="tooltip bg-[var(--card)] border border-[var(--border)] rounded-lg p-4 shadow-xl" style="max-width: 320px;">
+      <h4 class="font-bold text-sm" style="color: #eab308;">Scheduling — Aggregates & Events</h4>
+      <div class="mt-2 text-xs text-[var(--muted-foreground)]">
+        <p class="font-semibold text-[var(--foreground)]">Aggregate Roots:</p>
+        <p>Appointment, ProviderSchedule</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Key Entities:</p>
+        <p>CalendarEvent, AppointmentCategory, PatientTracker, Reminder</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Domain Events:</p>
+        <p>AppointmentBooked, PatientCheckedIn, PatientNoShow, ReminderSent</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Legacy PHP:</p>
+        <p>AppointmentService, PostCalendar, PatientTrackerService, openemr_postcalendar_events</p>
+      </div>
+    </div>
+    <div id="tooltip-pharmacy" class="tooltip bg-[var(--card)] border border-[var(--border)] rounded-lg p-4 shadow-xl" style="max-width: 320px;">
+      <h4 class="font-bold text-sm" style="color: #eab308;">Pharmacy & Rx — Aggregates & Events</h4>
+      <div class="mt-2 text-xs text-[var(--muted-foreground)]">
+        <p class="font-semibold text-[var(--foreground)]">Aggregate Roots:</p>
+        <p>Prescription, DrugInventory</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Key Entities:</p>
+        <p>Medication, Drug, Dispensation, Pharmacy, Formulary</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Domain Events:</p>
+        <p>PrescriptionCreated, PrescriptionTransmitted, DrugInteractionDetected</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Legacy PHP:</p>
+        <p>PrescriptionService, DrugService, RxList, oe-module-weno (e-prescribe)</p>
+      </div>
+    </div>
+    <div id="tooltip-lab" class="tooltip bg-[var(--card)] border border-[var(--border)] rounded-lg p-4 shadow-xl" style="max-width: 320px;">
+      <h4 class="font-bold text-sm" style="color: #eab308;">Lab & Orders — Aggregates & Events</h4>
+      <div class="mt-2 text-xs text-[var(--muted-foreground)]">
+        <p class="font-semibold text-[var(--foreground)]">Aggregate Roots:</p>
+        <p>ProcedureOrder, ProcedureProvider</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Key Entities:</p>
+        <p>OrderItem, LabResult, Specimen, Compendium, Requisition</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Domain Events:</p>
+        <p>OrderPlaced, ResultReceived, AbnormalResultFlagged, SpecimenCollected</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Legacy PHP:</p>
+        <p>ProcedureService, ObservationLabService, DornLabEvent, QuestLabTransmitEvent</p>
+      </div>
+    </div>
+    <div id="tooltip-cds" class="tooltip bg-[var(--card)] border border-[var(--border)] rounded-lg p-4 shadow-xl" style="max-width: 320px;">
+      <h4 class="font-bold text-sm" style="color: #eab308;">CDS & Quality — Aggregates & Events</h4>
+      <div class="mt-2 text-xs text-[var(--muted-foreground)]">
+        <p class="font-semibold text-[var(--foreground)]">Aggregate Roots:</p>
+        <p>ClinicalRule, QualityMeasure</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Key Entities:</p>
+        <p>RuleCriteria, RuleAction, CDSAlert, eCQM, QRDA Report, AMCTracker</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Pattern:</p>
+        <p>Event consumer — subscribes to clinical events for rule evaluation and measure calc</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Legacy PHP:</p>
+        <p>ClinicalDecisionRules (55 classes), Cqm/Qdm (80+ QDM types), QrdaReportController</p>
+      </div>
+    </div>
+    <div id="tooltip-identity" class="tooltip bg-[var(--card)] border border-[var(--border)] rounded-lg p-4 shadow-xl" style="max-width: 320px;">
+      <h4 class="font-bold text-sm" style="color: #3b82f6;">Identity & Access — Aggregates & Events</h4>
+      <div class="mt-2 text-xs text-[var(--muted-foreground)]">
+        <p class="font-semibold text-[var(--foreground)]">Aggregate Roots:</p>
+        <p>User, OAuthClient</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Key Entities:</p>
+        <p>Practitioner, Role, ACL, AccessToken, Scope, AuditLog, TrustedUser</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Pattern:</p>
+        <p>Shared Kernel — all services authenticate through this context</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Legacy PHP:</p>
+        <p>OpenIDConnect (44 classes), AuthUtils, MfaUtils, Gacl, UserService</p>
+      </div>
+    </div>
+    <div id="tooltip-org" class="tooltip bg-[var(--card)] border border-[var(--border)] rounded-lg p-4 shadow-xl" style="max-width: 320px;">
+      <h4 class="font-bold text-sm" style="color: #3b82f6;">Organization & Practice — Aggregates & Events</h4>
+      <div class="mt-2 text-xs text-[var(--muted-foreground)]">
+        <p class="font-semibold text-[var(--foreground)]">Aggregate Roots:</p>
+        <p>Facility, InsuranceCompany, CodeSystem</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Key Entities:</p>
+        <p>ListOption, GlobalSetting, Practice, Location, Holiday</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Pattern:</p>
+        <p>Published Language — shared reference data consumed by all contexts</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Legacy PHP:</p>
+        <p>FacilityService, InsuranceCompanyService, ListService, CodeTypesService</p>
+      </div>
+    </div>
+    <div id="tooltip-interop" class="tooltip bg-[var(--card)] border border-[var(--border)] rounded-lg p-4 shadow-xl" style="max-width: 320px;">
+      <h4 class="font-bold text-sm" style="color: #3b82f6;">Interoperability — Aggregates & Events</h4>
+      <div class="mt-2 text-xs text-[var(--muted-foreground)]">
+        <p class="font-semibold text-[var(--foreground)]">Aggregate Roots:</p>
+        <p>FhirResourceMapping, ExportJob</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Standards:</p>
+        <p>FHIR R4 (US Core 3.1), CCDA, SMART on FHIR, Direct Messaging, Bulk FHIR</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Pattern:</p>
+        <p>Anti-Corruption Layer — translates internal models ↔ external standards</p>
+        <p class="font-semibold text-[var(--foreground)] mt-2">Legacy PHP:</p>
+        <p>55+ FHIR services, CCDA service (Node.js), SMART launch, EHI exporter module</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showTooltip(event, id) {
+      const tooltip = document.getElementById('tooltip-' + id);
+      const rect = event.currentTarget.getBoundingClientRect();
+      const containerRect = event.currentTarget.closest('.relative').getBoundingClientRect();
+
+      tooltip.style.left = (rect.left - containerRect.left) + 'px';
+      tooltip.style.top = (rect.bottom - containerRect.top + 8) + 'px';
+      tooltip.classList.add('visible');
+    }
+
+    function hideTooltip(id) {
+      document.getElementById('tooltip-' + id).classList.remove('visible');
+    }
+  </script>
+</body>
+</html>
