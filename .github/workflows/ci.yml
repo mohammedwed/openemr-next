@@ -82,6 +82,9 @@ jobs:
           docker compose cp create-user.sql mysql:/tmp/create-user.sql
           docker compose exec -T mysql sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" < /tmp/create-user.sql'
 
+      - name: Apply environment values to restored stack
+        run: bash scripts/apply-env.sh
+
       - name: Restore OpenEMR sites
         run: |
           docker volume create openemr-next_sitesvolume
