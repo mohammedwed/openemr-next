@@ -1,9 +1,16 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/AuthFacade.Service/AuthFacadeService.csproj" />
     <Project Path="src/OpenEmr.Data/OpenEmr.Data.csproj" />
   </Folder>
+  <Folder Name="/src/AuthFacade/">
+    <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Domain/OpenEmrNext.AuthFacade.Domain.csproj" />
+    <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Application/OpenEmrNext.AuthFacade.Application.csproj" />
+    <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Infrastructure/OpenEmrNext.AuthFacade.Infrastructure.csproj" />
+    <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Api/OpenEmrNext.AuthFacade.Api.csproj" />
+  </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/AuthFacade.Service.Integration.Tests/AuthFacade.Integration.Tests.csproj" />
+    <Project Path="tests/Services/AuthFacade/OpenEmrNext.AuthFacade.UnitTests/OpenEmrNext.AuthFacade.UnitTests.csproj" />
+    <Project Path="tests/Services/AuthFacade/OpenEmrNext.AuthFacade.ArchitectureTests/OpenEmrNext.AuthFacade.ArchitectureTests.csproj" />
+    <Project Path="tests/Services/AuthFacade/OpenEmrNext.AuthFacade.IntegrationTests/OpenEmrNext.AuthFacade.IntegrationTests.csproj" />
   </Folder>
 </Solution>

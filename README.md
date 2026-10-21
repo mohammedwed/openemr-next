@@ -45,7 +45,7 @@ kept as a diff target.
 Global aliases resolve the `Version` and `Void` name clashes. This model is a
 stepping stone: each future service should scaffold only its own tables.
 
-**AuthFacade (`src/AuthFacade`).** A minimal ASP.NET Core API:
+**AuthFacade (`src/Services/AuthFacade`).** A minimal ASP.NET Core API:
 
 - `POST /connect/token` accepts a password grant, verifies the login with
   OpenEMR's OAuth2 server, and returns a facade-issued JWT in a JSON response.
@@ -92,6 +92,20 @@ is a token broker in front of it. It does not store passwords or user records.
 - No refresh, revocation, or key rotation for facade tokens.
 - `/me` confirms identity only. Authorization for OpenEMR data is not built.
 - The audience check uses a fixed string rather than a registered client.
+- No login rate limiting or lockout in AuthFacade. Brute-force protection relies
+  on whatever OpenEMR enforces.
+- Login outcomes and `/me` access are not audit-logged.
+- `Jwt:Key` has only a presence check. A key shorter than 32 bytes is accepted.
+- When OpenEMR rejects a login, its error body is returned to the client
+  unchanged.
+- The service serves plain HTTP on port 8080, with no HTTPS redirect or HSTS.
+- Startup does not wait for OpenEMR, so early requests can fail.
+- Form values are not logged, but no test enforces this yet.
+- Password plaintext has copies in memory that cannot be zeroed. See
+  `docs/architecture/0009-password-plaintext-retrieved-once.md`.
+- Login accepts any username and password within the length limits, so the
+  complexity policy is not enforced anywhere yet. See
+  `docs/architecture/0008-login-credential-rules.md`.
 - The OAuth client is provisioned by a seed that inserts into `oauth_clients`.
   The seed updates scope on an existing row but not `grant_types`, so changing
   those requires a manual edit or a fresh volume.
@@ -144,14 +158,14 @@ Known problems with the baseline:
 ├── docker/
 │   └── open-emr-legacy/        # OpenEMR, MariaDB, phpMyAdmin dev stack
 ├── src/
-│   ├── AuthFacade/             # token broker (ASP.NET Core minimal API)
+│   ├── Services/AuthFacade/    # token broker: Domain, Application, Infrastructure, Api
 │   ├── OpenEmr.Data/           # EF Core entities and context (scaffolded)
 │   ├── db/
 │   │   └── maria-db/           # Dockerfile, baseline.sql, schema.sql
 │   └── primitve/               # leftover template, to be deleted
 ├── tests/
 │   ├── Db.Tests/               # database baseline tests (Testcontainers)
-│   ├── AuthFacade.Integration.Tests/  # black-box tests on the live stack
+│   ├── Services/AuthFacade/    # black-box tests on the live stack
 │   └── primitve.tests/         # leftover template, to be deleted
 ├── tools/
 │   └── Scaffold.Host/          # throwaway startup project for dotnet ef
@@ -198,7 +212,7 @@ This deletes all local data.
 
 ```bash
 dotnet test tests/Db.Tests                             # starts its own MariaDB
-dotnet test tests/AuthFacade.Integration.Tests         # needs the running stack
+dotnet test tests/Services/AuthFacade/OpenEmrNext.AuthFacade.IntegrationTests  # needs the running stack
 ```
 
 The integration suite runs a readiness gate first, which checks the database,
