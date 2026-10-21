@@ -30,6 +30,12 @@ public sealed class ReadinessFixture : IAsyncLifetime
     // Upper bound for any single check, so one hung request can't stall the round
     private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(15);
 
+    /// <summary>
+    /// Waits for the stack to become ready. Runs before the first test in the <c>Stack</c> collection.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The database rejects the app user, or the checks still fail when <see cref="StackConfig.ReadinessTimeout"/> expires.
+    /// </exception>
     public async Task InitializeAsync()
     {
         var deadline = DateTime.UtcNow + StackConfig.ReadinessTimeout;
