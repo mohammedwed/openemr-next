@@ -21,7 +21,6 @@ public static class AuthFacadeApiExtensions
             .AddOpenEmrIdentityProvider(builder.Configuration, builder.Environment)
             .AddServiceJwt(builder.Configuration);
         builder.Services.AddAuthorization();
-
         return builder;
     }
 
@@ -35,11 +34,9 @@ public static class AuthFacadeApiExtensions
     {
         app.UseAuthentication();
         app.UseAuthorization();
-
         app.MapSystemEndpoints();
         app.MapTokenEndpoints();
         app.MapUserEndpoints();
-
         return app;
     }
 }
