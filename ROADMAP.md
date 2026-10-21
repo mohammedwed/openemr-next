@@ -40,7 +40,7 @@ a compatibility constraint.
 | M0a | Database baseline, reproducible and tested | Done (cleanup pending) | Oct 4 |
 | M0b | AuthFacade login through OpenEMR's OAuth server, facade-issued JWT | Done | Oct 10, Oct 11 |
 | M0c | Black-box integration tests with readiness gate | Done | Oct 11 |
-| M1 | Harden the identity bridge | In progress | Oct 10, Oct 11 |
+| M1 | Harden the identity bridge | In progress | Oct 10, Oct 11, Oct 21 |
 | M2 | Schema inventory for slice contexts | In progress | Oct 4 (entities scaffolded) |
 | M3 | Gateway and token validation | Not started | — |
 | M4 | Patient Management service | Not started | — |
@@ -86,6 +86,11 @@ redirect and cookie handling considered earlier are not part of this milestone.
 - Credentials are never stored or logged by AuthFacade
 - Client scopes are minimal
 - Integration tests verify signatures and the subject claim
+- Layer dependency rules enforced by architecture tests (ADR 0007)
+- Login credential rules follow OpenEMR's limits, not a new-account policy (ADR 0008)
+- Malformed OpenEMR success responses return 502 instead of 500
+- Password plaintext is retrieved once and cleared (ADR 0009)
+- Unit tests (71), architecture tests (6) and live integration tests (13) pass
 
 **Remaining**
 
@@ -98,6 +103,19 @@ redirect and cookie handling considered earlier are not part of this milestone.
   check or retry so early requests fail clearly
 - Decide the refresh and revocation approach, or record that it is deferred
 - ADR: identity bridge design
+- Login rate limiting and lockout at the facade, per client address and per
+  username. Today the only protection is OpenEMR's own lockout.
+- Audit log of login outcomes and `/me` access, with no credentials or tokens
+  in the log
+- Minimum length for `Jwt:Key` (32 bytes), enforced at startup
+- Allowlist for the error fields returned to clients when OpenEMR rejects a
+  login, instead of passing its body through unchanged
+- HTTPS for the service itself, with a redirect and HSTS. Required before any
+  shared environment, together with the TLS item above
+- Signing-key rotation for facade tokens. Today one HS256 key signs every token
+  and there is no rotation path.
+- Record the accepted risk of password copies in memory (ADR 0009) and the
+  complexity-policy gap (ADR 0008) in the M1 exit review
 
 **Exit criteria:** The security items above are either done or recorded as
 accepted risks. The ADR is merged.
@@ -189,6 +207,12 @@ From 10 October:
 - Pinned release image over the development image
 - Client secrets generated, never typed into chat
 
+From 21 October:
+
+- Layered AuthFacade structure, with dependency rules enforced by tests
+- Login credential rules follow OpenEMR's limits; complexity policy deferred
+- Password plaintext retrieved once; copies in memory accepted as a limit
+
 From 11 October:
 
 - One root Compose file for the whole solution
@@ -219,6 +243,8 @@ From 11 October:
 
 - **Upstream OpenEMR defect:** Some wrong-password requests return 500. The
   integration test will fail if this recurs. Track it upstream.
+- **Brute force against login:** The facade has no throttling of its own. Until
+  the M1 rate-limiting item is done, the only control is OpenEMR's lockout.
 - **M2 can expand:** Time-box it and accept a good-enough inventory.
 - **Synthetic data quality:** M4 and M5 tests pass without proving much unless
   the data includes messy edge cases.

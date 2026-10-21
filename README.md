@@ -92,6 +92,20 @@ is a token broker in front of it. It does not store passwords or user records.
 - No refresh, revocation, or key rotation for facade tokens.
 - `/me` confirms identity only. Authorization for OpenEMR data is not built.
 - The audience check uses a fixed string rather than a registered client.
+- No login rate limiting or lockout in AuthFacade. Brute-force protection relies
+  on whatever OpenEMR enforces.
+- Login outcomes and `/me` access are not audit-logged.
+- `Jwt:Key` has only a presence check. A key shorter than 32 bytes is accepted.
+- When OpenEMR rejects a login, its error body is returned to the client
+  unchanged.
+- The service serves plain HTTP on port 8080, with no HTTPS redirect or HSTS.
+- Startup does not wait for OpenEMR, so early requests can fail.
+- Form values are not logged, but no test enforces this yet.
+- Password plaintext has copies in memory that cannot be zeroed. See
+  `docs/architecture/0009-password-plaintext-retrieved-once.md`.
+- Login accepts any username and password within the length limits, so the
+  complexity policy is not enforced anywhere yet. See
+  `docs/architecture/0008-login-credential-rules.md`.
 - The OAuth client is provisioned by a seed that inserts into `oauth_clients`.
   The seed updates scope on an existing row but not `grant_types`, so changing
   those requires a manual edit or a fresh volume.
