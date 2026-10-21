@@ -75,7 +75,7 @@ redirect and cookie handling considered earlier are not part of this milestone.
 
 ### M0c: Integration tests (done)
 
-- `AuthFacade.Integration.Tests` runs against the live stack and covers the seed,
+- `OpenEmrNext.AuthFacade.IntegrationTests` runs against the live stack and covers the seed,
   OpenEMR's OAuth server, the password grant, and `/me` signature validation
 - The readiness gate checks four conditions under one deadline before tests run
 

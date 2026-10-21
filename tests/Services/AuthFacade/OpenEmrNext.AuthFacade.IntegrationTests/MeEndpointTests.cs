@@ -4,7 +4,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using Xunit;
 
-namespace AuthFacade.Integration.Tests;
+namespace OpenEmrNext.AuthFacade.IntegrationTests;
 
 [Collection("Stack")]
 [Trait("Category", "Integration")]
@@ -70,5 +70,16 @@ Assert.Equal(expectedSubject, doc.RootElement.GetProperty("subject").GetString()
 
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return doc.RootElement.GetProperty("access_token").GetString()!;
+    }
+
+    [Fact]
+    public async Task Me_rejects_a_malformed_token()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, MeUrl);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "not.a.token");
+
+        using var response = await Http.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 }

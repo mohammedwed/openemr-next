@@ -2,7 +2,7 @@ using System.Net;
 using MySqlConnector;
 using Xunit;
 
-namespace AuthFacade.Integration.Tests;
+namespace OpenEmrNext.AuthFacade.IntegrationTests;
 
 public sealed class ReadinessFixture : IAsyncLifetime
 {

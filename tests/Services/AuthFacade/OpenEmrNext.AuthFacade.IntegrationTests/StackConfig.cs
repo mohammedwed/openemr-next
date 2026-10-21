@@ -1,4 +1,4 @@
-namespace AuthFacade.Integration.Tests;
+namespace OpenEmrNext.AuthFacade.IntegrationTests;
 
 public static class StackConfig
 {

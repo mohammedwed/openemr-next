@@ -2,7 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Xunit;
 
-namespace AuthFacade.Integration.Tests;
+namespace OpenEmrNext.AuthFacade.IntegrationTests;
 [Collection("Stack")]
 
 [Trait("Category", "Integration")]
@@ -23,11 +23,33 @@ public class TokenEndpointTests
     }
 
     [Fact]
-    public async Task Wrong_password_is_rejected()
+    public async Task Wrong_password_passes_through_openemr_rejection()
     {
         using var response = await PostPasswordGrantAsync(StackConfig.LoginUser, "definitely-wrong");
 
-        Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("invalid_grant", doc.RootElement.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task Short_legacy_username_is_decided_by_openemr_not_locally()
+    {
+        using var response = await PostPasswordGrantAsync("a", "x");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("invalid_grant", doc.RootElement.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task Oversized_password_is_rejected_before_reaching_openemr()
+    {
+        using var response = await PostPasswordGrantAsync(StackConfig.LoginUser, new string('x', 1025));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("invalid_request", doc.RootElement.GetProperty("error").GetString());
     }
 
     [Fact]

@@ -77,8 +77,8 @@ services:
   # ---- AuthFacade (.NET) ----
   auth-facade:
     build:
-      context: src/AuthFacade.Service
-      dockerfile: docker/Dockerfile
+      context: src/Services/AuthFacade
+      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       mysql:

@@ -45,7 +45,7 @@ kept as a diff target.
 Global aliases resolve the `Version` and `Void` name clashes. This model is a
 stepping stone: each future service should scaffold only its own tables.
 
-**AuthFacade (`src/AuthFacade`).** A minimal ASP.NET Core API:
+**AuthFacade (`src/Services/AuthFacade`).** A minimal ASP.NET Core API:
 
 - `POST /connect/token` accepts a password grant, verifies the login with
   OpenEMR's OAuth2 server, and returns a facade-issued JWT in a JSON response.
@@ -144,14 +144,14 @@ Known problems with the baseline:
 ├── docker/
 │   └── open-emr-legacy/        # OpenEMR, MariaDB, phpMyAdmin dev stack
 ├── src/
-│   ├── AuthFacade/             # token broker (ASP.NET Core minimal API)
+│   ├── Services/AuthFacade/    # token broker: Domain, Application, Infrastructure, Api
 │   ├── OpenEmr.Data/           # EF Core entities and context (scaffolded)
 │   ├── db/
 │   │   └── maria-db/           # Dockerfile, baseline.sql, schema.sql
 │   └── primitve/               # leftover template, to be deleted
 ├── tests/
 │   ├── Db.Tests/               # database baseline tests (Testcontainers)
-│   ├── AuthFacade.Integration.Tests/  # black-box tests on the live stack
+│   ├── Services/AuthFacade/    # black-box tests on the live stack
 │   └── primitve.tests/         # leftover template, to be deleted
 ├── tools/
 │   └── Scaffold.Host/          # throwaway startup project for dotnet ef
@@ -198,7 +198,7 @@ This deletes all local data.
 
 ```bash
 dotnet test tests/Db.Tests                             # starts its own MariaDB
-dotnet test tests/AuthFacade.Integration.Tests         # needs the running stack
+dotnet test tests/Services/AuthFacade/OpenEmrNext.AuthFacade.IntegrationTests  # needs the running stack
 ```
 
 The integration suite runs a readiness gate first, which checks the database,
