@@ -6,8 +6,14 @@ using OpenEmrNext.AuthFacade.Infrastructure.Security;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Infrastructure;
 
+/// <summary>
+/// Unit tests for the startup checks of <c>AddServiceJwt</c> and <c>AddOpenEmrIdentityProvider</c>.
+/// Each test builds a real host and checks that required settings are enforced at start, not on
+/// the first request.
+/// </summary>
 public class StartupValidationTests
 {
+    /// <summary>A complete, valid set of settings. Tests remove or change one key at a time.</summary>
     private static Dictionary<string, string?> ValidSettings() => new()
     {
         ["Jwt:Key"] = "unit-test-signing-key-at-least-32-bytes-long",
@@ -16,6 +22,7 @@ public class StartupValidationTests
         ["OpenEmr:ClientSecret"] = "facade-secret"
     };
 
+    /// <summary>Builds (but does not start) a host with the JWT and OpenEMR services registered from <paramref name="settings"/>.</summary>
     private static IHost BuildHost(Dictionary<string, string?> settings)
     {
         var builder = Host.CreateApplicationBuilder();

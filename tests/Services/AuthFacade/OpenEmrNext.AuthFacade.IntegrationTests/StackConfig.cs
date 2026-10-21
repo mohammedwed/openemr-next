@@ -1,13 +1,19 @@
 namespace OpenEmrNext.AuthFacade.IntegrationTests;
 
+/// <summary>
+/// Settings for the live integration tests. Each value is read from an environment variable
+/// first, then from the repository's <c>.env</c> file, then from a default that matches the
+/// Docker Compose stack.
+/// </summary>
 public static class StackConfig
 {
     private static readonly Dictionary<string, string> Env = LoadEnvFile();
 
-    // In StackConfig.cs
+    /// <summary>How long <see cref="ReadinessFixture"/> waits for the stack. From <c>STACK_READY_TIMEOUT_MINUTES</c>, default 3.</summary>
     public static TimeSpan ReadinessTimeout =>
         TimeSpan.FromMinutes(int.Parse(Get("STACK_READY_TIMEOUT_MINUTES", "3")));
 
+    /// <summary>Returns the value for <paramref name="key"/>: environment variable, then <c>.env</c>, then <paramref name="fallback"/>.</summary>
     private static string Get(string key, string fallback = "") =>
         Environment.GetEnvironmentVariable(key)
         ?? (Env.TryGetValue(key, out var value) ? value : fallback);
@@ -31,6 +37,11 @@ public static class StackConfig
         $"Server=localhost;Port={Get("WT_MYSQL_PORT", "8320")};Database={Get("DB_NAME", "openemr")};" +
         $"User={Get("DB_USER", "openemr")};Password={Get("DB_PASSWORD")};CharSet=utf8mb4;";
 
+    /// <summary>
+    /// Reads the nearest <c>.env</c> file, searching up from the test binary's directory. Blank
+    /// lines, comments, and lines without <c>=</c> are skipped. Returns an empty dictionary if no
+    /// file is found.
+    /// </summary>
     private static Dictionary<string, string> LoadEnvFile()
     {
         var values = new Dictionary<string, string>();

@@ -23,10 +23,17 @@ internal sealed class TestApi : IAsyncDisposable
         Client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
     }
 
+    /// <summary>The fake OpenEMR identity provider. Tests set its result or exception before a request.</summary>
     public FakeOpenEmrIdentityProvider IdentityProvider { get; }
 
+    /// <summary>An HTTP client whose base address is the running API.</summary>
     public HttpClient Client { get; }
 
+    /// <summary>
+    /// Starts the API on a random loopback port with in-memory settings and a fake OpenEMR
+    /// identity provider. The fake is registered last, so it replaces the real one.
+    /// </summary>
+    /// <returns>A running instance. Dispose it to stop the host.</returns>
     public static async Task<TestApi> StartAsync()
     {
         var identityProvider = new FakeOpenEmrIdentityProvider();

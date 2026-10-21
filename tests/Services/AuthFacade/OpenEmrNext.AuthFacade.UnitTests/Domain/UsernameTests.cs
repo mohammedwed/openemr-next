@@ -2,6 +2,10 @@ using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Domain;
 
+/// <summary>
+/// Unit tests for the <see cref="Username"/> value object. They cover the 1-to-255-character
+/// rule and the control-character rule, and check that OpenEMR-valid names are accepted.
+/// </summary>
 public class UsernameTests
 {
     [Theory]

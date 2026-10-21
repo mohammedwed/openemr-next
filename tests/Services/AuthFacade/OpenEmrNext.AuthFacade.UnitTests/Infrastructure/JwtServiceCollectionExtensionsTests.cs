@@ -8,10 +8,16 @@ using System.Text;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Infrastructure;
 
+/// <summary>
+/// Unit tests for <c>AddServiceJwt</c>. They check the claims, issuer, audience, signature,
+/// and lifetime of tokens that the registered <see cref="IAccessTokenIssuer"/> creates.
+/// </summary>
 public class JwtServiceCollectionExtensionsTests
 {
+    /// <summary>The signing key used by these tests. Long enough for HMAC-SHA256.</summary>
     private const string Key = "unit-test-signing-key-at-least-32-bytes-long";
 
+    /// <summary>Registers the JWT services from configuration and resolves the issuer.</summary>
     private static IAccessTokenIssuer CreateIssuer()
     {
         var configuration = new ConfigurationBuilder()

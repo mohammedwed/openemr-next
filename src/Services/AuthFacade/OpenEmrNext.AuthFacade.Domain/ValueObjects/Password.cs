@@ -16,6 +16,9 @@ public sealed class Password
 
     private char[]? _value;
 
+    /// <summary>Creates a password and keeps a private copy of its characters.</summary>
+    /// <param name="value">The plaintext password.</param>
+    /// <exception cref="ArgumentException">The value is empty or longer than <see cref="MaxLength"/>.</exception>
     public Password(string value)
     {
         if (!IsValid(value))
@@ -42,6 +45,10 @@ public sealed class Password
         return value;
     }
 
+    /// <summary>Parses a password without throwing.</summary>
+    /// <param name="value">The candidate plaintext password. May be null.</param>
+    /// <param name="password">The parsed password when the method returns true; otherwise null.</param>
+    /// <returns>True when the value is between 1 and <see cref="MaxLength"/> characters.</returns>
     public static bool TryParse(string? value, [NotNullWhen(true)] out Password? password)
     {
         if (value is not null && IsValid(value))
@@ -54,8 +61,11 @@ public sealed class Password
         return false;
     }
 
+    /// <summary>Checks the presence and length rules. The content is not checked.</summary>
     private static bool IsValid(string value) => value.Length is >= 1 and <= MaxLength;
 
-    // Never expose the plaintext password through logging or string interpolation.
+    /// <summary>
+    /// Returns a fixed mask so the plaintext never appears in logs or string interpolation.
+    /// </summary>
     public override string ToString() => "********";
 }

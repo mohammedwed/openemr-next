@@ -2,6 +2,10 @@ using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Domain;
 
+/// <summary>
+/// Unit tests for the <see cref="GrantType"/> value object. Only <c>password</c> is supported,
+/// matched case-sensitively with no surrounding whitespace.
+/// </summary>
 public class GrantTypeTests
 {
     [Fact]

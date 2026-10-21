@@ -3,8 +3,15 @@ using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 
 namespace OpenEmrNext.AuthFacade.Api.Endpoints;
 
+/// <summary>The token endpoint, which exchanges a password grant for this service's access token.</summary>
 public static class TokenEndpoints
 {
+    /// <summary>
+    /// Maps <c>POST /connect/token</c>. The endpoint is anonymous because it issues the token,
+    /// and antiforgery is disabled because it accepts a form post from non-browser clients.
+    /// </summary>
+    /// <param name="app">The endpoint route builder.</param>
+    /// <returns>The same builder, for chaining.</returns>
     public static IEndpointRouteBuilder MapTokenEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/connect/token", IssueTokenAsync)
@@ -14,6 +21,14 @@ public static class TokenEndpoints
         return app;
     }
 
+    /// <summary>
+    /// Reads the form body, validates it, and maps the login result to an HTTP response.
+    /// </summary>
+    /// <remarks>
+    /// Responses: 200 with a Bearer token on success; 400 for an unsupported grant type or
+    /// invalid fields; OpenEMR's own status and body on rejection; 503 when OpenEMR is
+    /// unreachable; 502 when OpenEMR answers successfully without a usable token.
+    /// </remarks>
     private static async Task<IResult> IssueTokenAsync(
         HttpRequest request, PasswordLoginHandler login, CancellationToken ct)
     {

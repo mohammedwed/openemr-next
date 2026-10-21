@@ -11,10 +11,16 @@ using OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Infrastructure;
 
+/// <summary>
+/// Unit tests for <see cref="OpenEmrIdentityProvider"/> over a fake HTTP handler. They check
+/// the password-grant request it sends, how it passes OpenEMR's responses through, and how it
+/// maps transport failures and malformed success responses to exceptions.
+/// </summary>
 public class OpenEmrIdentityProviderTests
 {
     private readonly FakeHttpMessageHandler _handler = new();
 
+    /// <summary>Creates a provider wired to the fake handler with the sample client settings.</summary>
     private OpenEmrIdentityProvider CreateProvider()
     {
         var http = new HttpClient(_handler) { BaseAddress = new Uri("https://openemr.test/") };
@@ -29,6 +35,10 @@ public class OpenEmrIdentityProviderTests
         return new OpenEmrIdentityProvider(http, options);
     }
 
+    /// <summary>
+    /// Builds a JWT with the given subject, shaped like an OpenEMR access token. It is signed with a
+    /// throwaway key, which is fine because the provider reads the subject without verifying the signature.
+    /// </summary>
     private static string CreateOpenEmrToken(string subject)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("test-only-key-for-openemr-token-fake-32b"));
@@ -42,6 +52,7 @@ public class OpenEmrIdentityProviderTests
     private static Username Username() => new("alice_01");
     private static Password Password() => new("Passw0rd!");
 
+    /// <summary>Sets the fake handler to return a JSON response with the given status and body.</summary>
     private void RespondWith(HttpStatusCode status, string body)
     {
         _handler.Response = new HttpResponseMessage(status)

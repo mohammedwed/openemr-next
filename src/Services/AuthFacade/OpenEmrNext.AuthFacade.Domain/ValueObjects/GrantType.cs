@@ -9,8 +9,12 @@ namespace OpenEmrNext.AuthFacade.Domain.ValueObjects;
 /// </summary>
 public sealed partial record GrantType
 {
+    /// <summary>The grant type string, exactly as submitted.</summary>
     public string Value { get; }
 
+    /// <summary>Creates a grant type.</summary>
+    /// <param name="value">The grant type string.</param>
+    /// <exception cref="ArgumentException">The value is not a supported grant type.</exception>
     public GrantType(string value)
     {
         if (!GrantTypePattern().IsMatch(value))
@@ -21,6 +25,10 @@ public sealed partial record GrantType
         Value = value;
     }
 
+    /// <summary>Parses a grant type without throwing.</summary>
+    /// <param name="value">The candidate grant type string. May be null.</param>
+    /// <param name="grantType">The parsed grant type when the method returns true; otherwise null.</param>
+    /// <returns>True when the value is a supported grant type.</returns>
     public static bool TryParse(string? value, [NotNullWhen(true)] out GrantType? grantType)
     {
         if (value is not null && GrantTypePattern().IsMatch(value))

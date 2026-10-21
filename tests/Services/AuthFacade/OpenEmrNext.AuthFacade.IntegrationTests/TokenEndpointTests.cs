@@ -3,8 +3,13 @@ using System.Text.Json;
 using Xunit;
 
 namespace OpenEmrNext.AuthFacade.IntegrationTests;
-[Collection("Stack")]
 
+/// <summary>
+/// Live tests of <c>POST /connect/token</c> against the running stack. Each test checks a
+/// status code and error body from a real OpenEMR response, so the expected values follow
+/// OpenEMR's behavior. The unit tests cover the same paths with a fake identity provider.
+/// </summary>
+[Collection("Stack")]
 [Trait("Category", "Integration")]
 public class TokenEndpointTests
 {
@@ -67,8 +72,10 @@ public class TokenEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    /// <summary>The full URL of the AuthFacade token endpoint on the running stack.</summary>
     private static string TokenUrl => StackConfig.AuthFacadeBaseUrl + StackConfig.AuthFacadeTokenPath;
 
+    /// <summary>Posts a form-encoded password grant to the token endpoint and returns the raw response.</summary>
     private static async Task<HttpResponseMessage> PostPasswordGrantAsync(string username, string password)
     {
         using var form = new FormUrlEncodedContent(new Dictionary<string, string>

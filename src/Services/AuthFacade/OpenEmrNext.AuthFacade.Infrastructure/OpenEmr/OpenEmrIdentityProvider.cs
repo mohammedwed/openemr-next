@@ -7,12 +7,19 @@ using Microsoft.Extensions.Options;
 
 namespace OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
 
+/// <summary>
+/// Implements the identity provider by posting an OAuth password grant to OpenEMR's token endpoint.
+/// </summary>
+/// <remarks>
+/// Credentials are never logged. The request is sent over the HTTP client configured in
+/// <c>OpenEmrServiceCollectionExtensions</c>.
+/// </remarks>
 internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrOptions> options)
     : IOpenEmrIdentityProvider
 {
     private readonly OpenEmrOptions _options = options.Value;
 
-    // Credentials are never logged.
+    /// <inheritdoc/>
     public async Task<PasswordGrantResult> PasswordGrantAsync(
         Username username, Password password, CancellationToken ct)
     {
@@ -49,6 +56,14 @@ internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrO
         return new PasswordGrantResult(statusCode, body, ReadSubject(body));
     }
 
+    /// <summary>Extracts the <c>sub</c> claim from the access token in OpenEMR's response body.</summary>
+    /// <remarks>
+    /// The token's signature is not verified. The subject is trusted because the token arrives
+    /// over the TLS connection to OpenEMR, and this service only uses it to name the new token.
+    /// </remarks>
+    /// <param name="body">OpenEMR's successful response body.</param>
+    /// <returns>The subject claim.</returns>
+    /// <exception cref="IdentityProviderResponseException">The body has no usable access token or subject.</exception>
     private static string ReadSubject(string body)
     {
         try
