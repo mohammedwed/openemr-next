@@ -4,6 +4,11 @@ using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Application;
 
+/// <summary>
+/// Unit tests for <see cref="PasswordLoginHandler"/> with a fake identity provider and token
+/// issuer. Each test checks how an OpenEMR outcome maps to a <see cref="LoginResult"/>, and
+/// whether a token was issued.
+/// </summary>
 public class PasswordLoginHandlerTests
 {
     private readonly FakeOpenEmrIdentityProvider _identityProvider = new();
@@ -11,7 +16,10 @@ public class PasswordLoginHandlerTests
 
     private PasswordLoginHandler CreateHandler() => new(_identityProvider, _tokenIssuer);
 
+    /// <summary>A valid sample username, used by most tests.</summary>
     private static Username Username() => new("alice_01");
+
+    /// <summary>A valid sample password, used by most tests.</summary>
     private static Password Password() => new("Passw0rd!");
 
     [Fact]

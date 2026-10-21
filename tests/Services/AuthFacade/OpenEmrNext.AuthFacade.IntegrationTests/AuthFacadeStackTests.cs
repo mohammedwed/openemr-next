@@ -4,6 +4,16 @@ using Xunit;
 
 namespace OpenEmrNext.AuthFacade.IntegrationTests;
 
+/// <summary>
+/// Smoke tests against the running Docker Compose stack (MariaDB, OpenEMR, AuthFacade). They check
+/// the seeded OAuth client, OpenEMR's discovery document and client authentication, and that
+/// the AuthFacade container responds. They do not exercise the login flow.
+/// </summary>
+/// <remarks>
+/// Requires the stack to be up. <see cref="ReadinessFixture"/> waits for it before these tests
+/// run. Run them with <c>dotnet test --filter Category=Integration</c> or with the
+/// integration project directly.
+/// </remarks>
 [Collection("Stack")]
 [Trait("Category", "Integration")]
 public class AuthFacadeStackTests

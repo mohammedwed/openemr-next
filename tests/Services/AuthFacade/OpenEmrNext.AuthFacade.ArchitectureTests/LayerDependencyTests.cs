@@ -7,10 +7,17 @@ using OpenEmrNext.AuthFacade.Infrastructure.Security;
 namespace OpenEmrNext.AuthFacade.ArchitectureTests;
 
 /// <summary>
-/// Enforces the layer rules from docs/domain-driven-design.md: the domain depends on
-/// nothing but the base class library, the application depends only on the domain,
-/// infrastructure implements the application's ports, and only the API hosts everything.
+/// Checks the assembly reference graph against the layer rules in
+/// docs/domain-driven-design.md. Each test reads the compiled assemblies' references, so a
+/// forbidden reference fails the build even if the code never uses it.
 /// </summary>
+/// <remarks>
+/// Rules enforced: the domain references only the base class library; the application
+/// references only the domain, the base class library, and DI abstractions; neither references
+/// infrastructure or the API; infrastructure does not reference the API; the domain and
+/// application do not reference ASP.NET Core, EF Core, or IdentityModel. No test checks that
+/// infrastructure implements the application's interfaces.
+/// </remarks>
 public class LayerDependencyTests
 {
     private const string DomainName = "OpenEmrNext.AuthFacade.Domain";
@@ -23,9 +30,11 @@ public class LayerDependencyTests
     private static readonly Assembly Infrastructure = typeof(JwtOptions).Assembly;
     private static readonly Assembly Api = typeof(AuthFacadeApiExtensions).Assembly;
 
+    /// <summary>Returns the simple names of the assemblies that <paramref name="assembly"/> references.</summary>
     private static IEnumerable<string> References(Assembly assembly) =>
         assembly.GetReferencedAssemblies().Select(name => name.Name!);
 
+    /// <summary>True for <c>netstandard</c> and assemblies whose names start with <c>System.</c>.</summary>
     private static bool IsBaseClassLibrary(string name) =>
         name == "netstandard" || name == "System" || name.StartsWith("System.", StringComparison.Ordinal);
 

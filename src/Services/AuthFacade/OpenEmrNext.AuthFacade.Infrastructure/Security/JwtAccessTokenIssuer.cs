@@ -7,6 +7,10 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace OpenEmrNext.AuthFacade.Infrastructure.Security;
 
+/// <summary>
+/// Issues HMAC-SHA256 signed JWTs for this service. Tokens carry the <c>sub</c> and <c>name</c>
+/// claims and are valid for <see cref="JwtOptions.LifetimeMinutes"/>.
+/// </summary>
 internal sealed class JwtAccessTokenIssuer(IOptions<JwtOptions> options) : IAccessTokenIssuer
 {
     private readonly JwtOptions _options = options.Value;
@@ -14,6 +18,7 @@ internal sealed class JwtAccessTokenIssuer(IOptions<JwtOptions> options) : IAcce
         new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.Value.Key)),
         SecurityAlgorithms.HmacSha256);
 
+    /// <inheritdoc/>
     public IssuedAccessToken Issue(string subject, string name)
     {
         var claims = new[]

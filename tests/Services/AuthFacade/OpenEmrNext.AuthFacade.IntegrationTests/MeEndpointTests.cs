@@ -6,6 +6,11 @@ using Xunit;
 
 namespace OpenEmrNext.AuthFacade.IntegrationTests;
 
+/// <summary>
+/// Live tests of <c>GET /me</c> on the running stack. Tokens come from a real password grant
+/// through <c>/connect/token</c>, so these tests also depend on OpenEMR accepting
+/// <see cref="StackConfig.LoginUser"/> and <see cref="StackConfig.LoginPassword"/>.
+/// </summary>
 [Collection("Stack")]
 [Trait("Category", "Integration")]
 public class MeEndpointTests
@@ -48,6 +53,7 @@ Assert.Equal(expectedSubject, doc.RootElement.GetProperty("subject").GetString()
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    /// <summary>Sends <c>GET /me</c> with the token as a Bearer credential.</summary>
     private static Task<HttpResponseMessage> GetMeAsync(string token)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, MeUrl);
@@ -55,6 +61,7 @@ Assert.Equal(expectedSubject, doc.RootElement.GetProperty("subject").GetString()
         return Http.SendAsync(request);
     }
 
+    /// <summary>Obtains a token through the live password grant. Fails the test if the grant does not succeed.</summary>
     private static async Task<string> GetTokenAsync()
     {
         using var form = new FormUrlEncodedContent(new Dictionary<string, string>

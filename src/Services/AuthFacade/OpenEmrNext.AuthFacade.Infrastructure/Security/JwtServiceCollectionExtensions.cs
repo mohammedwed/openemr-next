@@ -8,8 +8,20 @@ using System.Text;
 
 namespace OpenEmrNext.AuthFacade.Infrastructure.Security;
 
+/// <summary>Registers token issuance and bearer-token validation for this service's JWTs.</summary>
 public static class JwtServiceCollectionExtensions
 {
+    /// <summary>
+    /// Binds and validates <see cref="JwtOptions"/> at startup, registers the access token
+    /// issuer, and configures the JWT bearer scheme to accept only this service's tokens.
+    /// </summary>
+    /// <remarks>
+    /// Validation checks the issuer, audience, signing key, and lifetime. Inbound claims are not
+    /// mapped to legacy names, so <c>sub</c> stays as it is in the token.
+    /// </remarks>
+    /// <param name="services">The service collection to add to.</param>
+    /// <param name="configuration">The configuration that holds the <c>Jwt</c> section.</param>
+    /// <returns>The same collection, for chaining.</returns>
     public static IServiceCollection AddServiceJwt(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddOptions<JwtOptions>()

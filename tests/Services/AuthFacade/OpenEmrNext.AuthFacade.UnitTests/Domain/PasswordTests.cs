@@ -2,6 +2,10 @@ using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Domain;
 
+/// <summary>
+/// Unit tests for the <see cref="Password"/> value object. They cover the presence and length
+/// rules, the one-time <c>TakeValue</c> contract, and that <c>ToString</c> never reveals the plaintext.
+/// </summary>
 public class PasswordTests
 {
     [Theory]

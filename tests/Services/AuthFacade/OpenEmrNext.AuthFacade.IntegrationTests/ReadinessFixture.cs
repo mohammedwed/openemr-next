@@ -4,6 +4,16 @@ using Xunit;
 
 namespace OpenEmrNext.AuthFacade.IntegrationTests;
 
+/// <summary>
+/// Shared fixture for the <c>Stack</c> collection. Before any integration test runs, it polls
+/// four checks until all pass or <see cref="StackConfig.ReadinessTimeout"/> expires:
+/// the database accepts the app user, the AuthFacade client row is seeded, OpenEMR's
+/// <c>/meta/health/readyz</c> returns 200, and AuthFacade's <c>/hello</c> returns 200.
+/// </summary>
+/// <remarks>
+/// Each check has its own timeout. A MySQL access-denied error (1045) fails fast instead of
+/// retrying, because a wrong <c>DB_PASSWORD</c> does not fix itself.
+/// </remarks>
 public sealed class ReadinessFixture : IAsyncLifetime
 {
     private static readonly HttpClient Http = new(new HttpClientHandler
@@ -20,6 +30,12 @@ public sealed class ReadinessFixture : IAsyncLifetime
     // Upper bound for any single check, so one hung request can't stall the round
     private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(15);
 
+    /// <summary>
+    /// Waits for the stack to become ready. Runs before the first test in the <c>Stack</c> collection.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The database rejects the app user, or the checks still fail when <see cref="StackConfig.ReadinessTimeout"/> expires.
+    /// </exception>
     public async Task InitializeAsync()
     {
         var deadline = DateTime.UtcNow + StackConfig.ReadinessTimeout;
@@ -76,8 +92,10 @@ public sealed class ReadinessFixture : IAsyncLifetime
         }
     }
 
+    /// <summary>No teardown. The stack is managed outside the test run.</summary>
     public Task DisposeAsync() => Task.CompletedTask;
 
+    /// <summary>Runs <c>SELECT 1</c> against the app database.</summary>
     private static async Task<bool> CheckDatabaseAsync()
     {
         await using var conn = new MySqlConnection(StackConfig.DbConnectionString);
@@ -86,6 +104,7 @@ public sealed class ReadinessFixture : IAsyncLifetime
         return Convert.ToInt32(await cmd.ExecuteScalarAsync()) == 1;
     }
 
+    /// <summary>Checks that exactly one <c>oauth_clients</c> row exists for the AuthFacade client ID.</summary>
     private static async Task<bool> CheckSeedAsync()
     {
         await using var conn = new MySqlConnection(StackConfig.DbConnectionString);
@@ -96,12 +115,14 @@ public sealed class ReadinessFixture : IAsyncLifetime
         return Convert.ToInt64(await cmd.ExecuteScalarAsync()) == 1;
     }
 
+    /// <summary>Checks that OpenEMR's readiness endpoint returns 200.</summary>
     private static async Task<bool> CheckOpenEmrAsync()
     {
         var response = await Http.GetAsync(StackConfig.OpenEmrBaseUrl + "/meta/health/readyz");
         return response.StatusCode == HttpStatusCode.OK;
     }
 
+    /// <summary>Checks that AuthFacade's <c>/hello</c> endpoint returns 200.</summary>
     private static async Task<bool> CheckAuthFacadeAsync()
     {
         var response = await Http.GetAsync(StackConfig.AuthFacadeBaseUrl + "/hello");
@@ -109,5 +130,9 @@ public sealed class ReadinessFixture : IAsyncLifetime
     }
 }
 
+/// <summary>
+/// Defines the <c>Stack</c> xUnit collection. Tests that carry <c>[Collection("Stack")]</c> share
+/// one <see cref="ReadinessFixture"/> and run one after another, not in parallel.
+/// </summary>
 [CollectionDefinition("Stack")]
 public class StackCollection : ICollectionFixture<ReadinessFixture> { }

@@ -6,8 +6,14 @@ using OpenEmrNext.AuthFacade.UnitTests.Application;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Api;
 
+/// <summary>
+/// Tests the HTTP surface (<c>/hello</c>, <c>/connect/token</c>, <c>/me</c>) in-process through
+/// <see cref="TestApi"/>. Login tests set the fake identity provider's result or exception first,
+/// then check the status code and body the API returns. No Docker stack is needed.
+/// </summary>
 public class ApiEndpointTests
 {
+    /// <summary>Builds a form-encoded password grant body.</summary>
     private static FormUrlEncodedContent PasswordGrant(string username, string password) => new(new Dictionary<string, string>
     {
         ["grant_type"] = "password",
@@ -15,6 +21,7 @@ public class ApiEndpointTests
         ["password"] = password
     });
 
+    /// <summary>Parses the response body as JSON. The caller disposes the returned document.</summary>
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response) =>
         JsonDocument.Parse(await response.Content.ReadAsStringAsync());
 

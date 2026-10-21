@@ -10,8 +10,12 @@ namespace OpenEmrNext.AuthFacade.Domain.ValueObjects;
 /// </summary>
 public sealed partial record Username
 {
+    /// <summary>The login name, exactly as submitted.</summary>
     public string Value { get; }
 
+    /// <summary>Creates a login name.</summary>
+    /// <param name="value">The login name.</param>
+    /// <exception cref="ArgumentException">The value is not 1 to 255 characters or contains a control character.</exception>
     public Username(string value)
     {
         if (!UsernamePattern().IsMatch(value))
@@ -24,6 +28,10 @@ public sealed partial record Username
         Value = value;
     }
 
+    /// <summary>Parses a login name without throwing.</summary>
+    /// <param name="value">The candidate login name. May be null.</param>
+    /// <param name="username">The parsed login name when the method returns true; otherwise null.</param>
+    /// <returns>True when the value passes the length and control-character rules.</returns>
     public static bool TryParse(string? value, [NotNullWhen(true)] out Username? username)
     {
         if (value is not null && UsernamePattern().IsMatch(value))
