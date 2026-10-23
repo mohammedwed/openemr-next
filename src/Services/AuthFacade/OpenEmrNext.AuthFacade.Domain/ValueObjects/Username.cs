@@ -18,7 +18,7 @@ public sealed partial record Username
     /// <exception cref="ArgumentException">The value is not 1 to 255 characters or contains a control character.</exception>
     public Username(string value)
     {
-        if (!UsernamePattern().IsMatch(value))
+        if (!IsValid(value))
         {
             throw new ArgumentException(
                 "Username must be 1 to 255 characters and contain no control characters.",
@@ -34,7 +34,7 @@ public sealed partial record Username
     /// <returns>True when the value passes the length and control-character rules.</returns>
     public static bool TryParse(string? value, [NotNullWhen(true)] out Username? username)
     {
-        if (value is not null && UsernamePattern().IsMatch(value))
+        if (IsValid(value))
         {
             username = new Username(value);
             return true;
@@ -43,6 +43,10 @@ public sealed partial record Username
         username = null;
         return false;
     }
+
+    /// <summary>The single place that defines which login names are accepted.</summary>
+    private static bool IsValid([NotNullWhen(true)] string? value) =>
+        value is not null && UsernamePattern().IsMatch(value);
 
     [GeneratedRegex(@"\A[^\p{Cc}]{1,255}\z")]
     private static partial Regex UsernamePattern();

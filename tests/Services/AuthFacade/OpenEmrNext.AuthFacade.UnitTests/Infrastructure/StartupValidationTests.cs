@@ -7,7 +7,7 @@ using OpenEmrNext.AuthFacade.Infrastructure.Security;
 namespace OpenEmrNext.AuthFacade.UnitTests.Infrastructure;
 
 /// <summary>
-/// Unit tests for the startup checks of <c>AddServiceJwt</c> and <c>AddOpenEmrIdentityProvider</c>.
+/// Unit tests for the startup checks of <c>AddJwtAuthentication</c> and <c>AddOpenEmrIdentityProvider</c>.
 /// Each test builds a real host and checks that required settings are enforced at start, not on
 /// the first request.
 /// </summary>
@@ -17,6 +17,9 @@ public class StartupValidationTests
     private static Dictionary<string, string?> ValidSettings() => new()
     {
         ["Jwt:Key"] = "unit-test-signing-key-at-least-32-bytes-long",
+        ["Jwt:Issuer"] = "openemr-next",
+        ["Jwt:Audience"] = "openemr-next-api",
+        ["Jwt:LifetimeMinutes"] = "30",
         ["OpenEmr:BaseUrl"] = "https://openemr.test",
         ["OpenEmr:ClientId"] = "facade-client",
         ["OpenEmr:ClientSecret"] = "facade-secret"
@@ -26,8 +29,11 @@ public class StartupValidationTests
     private static IHost BuildHost(Dictionary<string, string?> settings)
     {
         var builder = Host.CreateApplicationBuilder();
+        // Drop the default sources, which include the appsettings.json copied from the API project,
+        // so each test sees only the settings it sets.
+        builder.Configuration.Sources.Clear();
         builder.Configuration.AddInMemoryCollection(settings);
-        builder.Services.AddServiceJwt(builder.Configuration);
+        builder.Services.AddJwtAuthentication(builder.Configuration);
         builder.Services.AddOpenEmrIdentityProvider(builder.Configuration, builder.Environment);
         return builder.Build();
     }
@@ -43,6 +49,9 @@ public class StartupValidationTests
 
     [Theory]
     [InlineData("Jwt:Key")]
+    [InlineData("Jwt:Issuer")]
+    [InlineData("Jwt:Audience")]
+    [InlineData("Jwt:LifetimeMinutes")]
     [InlineData("OpenEmr:BaseUrl")]
     [InlineData("OpenEmr:ClientId")]
     [InlineData("OpenEmr:ClientSecret")]

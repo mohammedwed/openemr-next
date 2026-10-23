@@ -17,7 +17,7 @@ public sealed partial record GrantType
     /// <exception cref="ArgumentException">The value is not a supported grant type.</exception>
     public GrantType(string value)
     {
-        if (!GrantTypePattern().IsMatch(value))
+        if (!IsSupported(value))
         {
             throw new ArgumentException("Unsupported grant type.", nameof(value));
         }
@@ -31,7 +31,7 @@ public sealed partial record GrantType
     /// <returns>True when the value is a supported grant type.</returns>
     public static bool TryParse(string? value, [NotNullWhen(true)] out GrantType? grantType)
     {
-        if (value is not null && GrantTypePattern().IsMatch(value))
+        if (IsSupported(value))
         {
             grantType = new GrantType(value);
             return true;
@@ -40,6 +40,10 @@ public sealed partial record GrantType
         grantType = null;
         return false;
     }
+
+    /// <summary>The single place that defines which grant types are supported.</summary>
+    private static bool IsSupported([NotNullWhen(true)] string? value) =>
+        value is not null && GrantTypePattern().IsMatch(value);
 
     [GeneratedRegex(@"\A(password)\z")]
     private static partial Regex GrantTypePattern();

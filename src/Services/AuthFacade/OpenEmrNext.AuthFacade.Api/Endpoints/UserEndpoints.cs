@@ -18,7 +18,8 @@ public static class UserEndpoints
         {
             Subject = user.FindFirst(JwtRegisteredClaimNames.Sub)?.Value,
             Name = user.FindFirst(JwtRegisteredClaimNames.Name)?.Value
-        })).RequireAuthorization();
+        }))
+        .RequireAuthorization();
 
         return app;
     }

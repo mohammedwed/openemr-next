@@ -5,7 +5,7 @@ using System.Text;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using OpenEmrNext.AuthFacade.Application.Abstractions;
+using OpenEmrNext.AuthFacade.Application.Ports;
 using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 using OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
 
