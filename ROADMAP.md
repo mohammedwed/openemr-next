@@ -103,8 +103,9 @@ redirect and cookie handling considered earlier are not part of this milestone.
   check or retry so early requests fail clearly
 - Decide the refresh and revocation approach, or record that it is deferred
 - ADR: identity bridge design
-- Login rate limiting and lockout at the facade, per client address and per
-  username. Today the only protection is OpenEMR's own lockout.
+- Login rate limiting per client address: done, see ADR 0018
+- Login rate limiting per username and lockout at the facade. Open: today only
+  the per-address limit and OpenEMR's own lockout apply.
 - Audit log of login outcomes and `/me` access, with no credentials or tokens
   in the log
 - HTTPS for the service itself, with a redirect and HSTS. Required before any
@@ -238,8 +239,10 @@ From 11 October:
 
 - **Upstream OpenEMR defect:** Some wrong-password requests return 500. The
   integration test will fail if this recurs. Track it upstream.
-- **Brute force against login:** The facade has no throttling of its own. Until
-  the M1 rate-limiting item is done, the only control is OpenEMR's lockout.
+- **Brute force against login:** The facade limits each client address to 10
+  login requests a minute (ADR 0018). A distributed attack across many addresses
+  against one account is not limited until the per-username item is done, so
+  OpenEMR's lockout remains the only control for that case.
 - **M2 can expand:** Time-box it and accept a good-enough inventory.
 - **Synthetic data quality:** M4 and M5 tests pass without proving much unless
   the data includes messy edge cases.

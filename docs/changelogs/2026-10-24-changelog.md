@@ -13,6 +13,11 @@ AuthFacade returns its own token response on login instead of OpenEMR's body, an
   - Thresholds come from `OpenEmr:CircuitBreaker` (`FailureRatio`, `SamplingDuration`, `MinimumThroughput`, `BreakDuration`). The defaults are 50%, at least 5 calls in 30 seconds, and a 30-second break. Startup refuses out-of-range values.
 - **`TokenResponse`** contract in the API project, with `access_token`, `token_type`, and `expires_in` and `refresh_token` when known.
 - **`OpenEmrToken`** port type, carrying the four fields the provider reads from OpenEMR's success response.
+- **Per-address rate limit on `POST /connect/token`.** See ADR 0018.
+  - Each client IP gets 10 requests a minute by default, counting successful and failed requests alike.
+  - Over the limit, the endpoint returns 429 `too_many_requests` with `Retry-After`, and OpenEMR is not called.
+  - Settings are bound from `LoginRateLimit` (`PermitLimit`, `Window`). Startup refuses a permit limit below 1 or a window under one second.
+  - `/me` is not limited.
 
 ## Changed
 
@@ -26,3 +31,4 @@ AuthFacade returns its own token response on login instead of OpenEMR's body, an
 ## Tests
 
 - Unit tests: 122 pass, up from 91. Integration tests: 13 pass against the rebuilt stack. New tests cover the decorator's failure rules, the timeout mapping, the 400 and 502 mappings, `TokenResponse`'s field names and optional fields, and the provider's token parsing.
+- Unit tests after the rate limit: 127 pass. The five new tests cover the 429 response and `Retry-After`, a refused login under the limit, `/me` staying unlimited, and startup refusing invalid limits. Architecture tests: 12 pass. Integration tests were not rerun for the rate limit.
