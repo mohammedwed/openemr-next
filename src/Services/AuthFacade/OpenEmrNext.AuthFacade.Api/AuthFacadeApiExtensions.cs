@@ -1,7 +1,5 @@
-using OpenEmrNext.AuthFacade.Api.Endpoints;
-using OpenEmrNext.AuthFacade.Application;
-using OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
-using OpenEmrNext.AuthFacade.Infrastructure.Security;
+using OpenEmrNext.AuthFacade.Api.Authentication;
+using OpenEmrNext.AuthFacade.Composition;
 
 namespace OpenEmrNext.AuthFacade.Api;
 
@@ -9,35 +7,30 @@ namespace OpenEmrNext.AuthFacade.Api;
 public static class AuthFacadeApiExtensions
 {
     /// <summary>
-    /// Registers the application services, the OpenEMR identity provider, service JWT
-    /// issuance and validation, and authorization. Must run before the app is built.
+    /// Registers the shared composition root, then the HTTP-only bearer validation and authorization.
+    /// Must run before the app is built.
     /// </summary>
     /// <param name="builder">The host builder to configure.</param>
     /// <returns>The same builder, for chaining.</returns>
-    public static WebApplicationBuilder AddAuthFacadeApi(this WebApplicationBuilder builder)
+    public static WebApplicationBuilder AddAuthFacadeHttpDependencies(this WebApplicationBuilder builder)
     {
         builder.Services
-            .AddApplication()
-            .AddOpenEmrIdentityProvider(builder.Configuration, builder.Environment)
-            .AddJwtAuthentication(builder.Configuration)
+            .AddAuthFacade(builder.Configuration)
+            .AddBearerAuthentication()
             .AddAuthorization();
-
         return builder;
     }
 
     /// <summary>
-    /// Adds the authentication and authorization middleware, then maps the system, token
-    /// and user endpoints. Authentication runs before the endpoints are reached.
+    /// Adds the authentication and authorization middleware. Endpoints are mapped separately
+    /// with <c>MapAuthFacadeEndpoints</c>.
     /// </summary>
     /// <param name="app">The built application.</param>
     /// <returns>The same application, for chaining.</returns>
-    public static WebApplication UseAuthFacadeApi(this WebApplication app)
+    public static WebApplication UseAuthFacadeHttpMiddleware(this WebApplication app)
     {
         app.UseAuthentication();
         app.UseAuthorization();
-        app.MapSystemEndpoints();
-        app.MapTokenEndpoints();
-        app.MapUserEndpoints();
         return app;
     }
 }

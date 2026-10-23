@@ -1,10 +1,12 @@
 using OpenEmrNext.AuthFacade.Api;
+using OpenEmrNext.AuthFacade.Api.Endpoints;
 
-// Composition root: services are registered on the builder, then the middleware and
+// Composition root: dependencies are registered on the builder, then the middleware and
 // endpoints are mapped on the built app. Configuration is read from appsettings and the
 // environment (OpenEmr:*, Jwt:*).
 var builder = WebApplication.CreateBuilder(args);
-builder.AddAuthFacadeApi();
+builder.AddAuthFacadeHttpDependencies();
 var app = builder.Build();
-app.UseAuthFacadeApi();
+app.UseAuthFacadeHttpMiddleware();
+app.MapAuthFacadeEndpoints();
 app.Run();

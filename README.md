@@ -119,8 +119,9 @@ is a token broker in front of it. It does not store passwords or user records.
   acceptable only because the token arrives directly from OpenEMR over TLS in
   the same request. Do not reuse this pattern for client-supplied tokens.
 - The development TLS bypass (`DangerousAcceptAnyServerCertificateValidator`)
-  is active only in the `Development` environment and must be replaced with a
-  trusted certificate before any shared use.
+  is enabled only by `OpenEmr:AcceptAnyServerCertificate`, which defaults to
+  `false` and is set in `appsettings.Development.json`. It must be replaced with
+  a trusted certificate before any shared use.
 - Data-protection keys are not persisted, so the container logs a warning.
 
 ## Legacy database compatibility

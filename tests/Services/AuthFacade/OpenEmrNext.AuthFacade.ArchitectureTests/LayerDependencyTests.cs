@@ -1,5 +1,6 @@
 using System.Reflection;
 using OpenEmrNext.AuthFacade.Api;
+using OpenEmrNext.AuthFacade.Composition;
 using OpenEmrNext.AuthFacade.Application.Authentication;
 using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 using OpenEmrNext.AuthFacade.Infrastructure.Security;
@@ -18,7 +19,8 @@ namespace OpenEmrNext.AuthFacade.ArchitectureTests;
 /// the base class library, and DI abstractions; neither references infrastructure or the API;
 /// infrastructure does not reference the API or the application, and reaches the ports directly;
 /// the domain, ports and application do not reference ASP.NET Core, EF Core, or IdentityModel;
-/// the domain references no ports.
+/// the domain references no ports; infrastructure and composition do not reference ASP.NET Core;
+/// composition does not reference the API; only hosts reference composition.
 /// No test checks that infrastructure implements the application's interfaces.
 /// </remarks>
 public class LayerDependencyTests
@@ -28,12 +30,14 @@ public class LayerDependencyTests
     private const string ApplicationName = "OpenEmrNext.AuthFacade.Application";
     private const string InfrastructureName = "OpenEmrNext.AuthFacade.Infrastructure";
     private const string ApiName = "OpenEmrNext.AuthFacade.Api";
+    private const string CompositionName = "OpenEmrNext.AuthFacade.Composition";
 
     private static readonly Assembly Domain = typeof(Username).Assembly;
     private static readonly Assembly Ports = typeof(IOpenEmrIdentityProvider).Assembly;
     private static readonly Assembly Application = typeof(PasswordLoginHandler).Assembly;
     private static readonly Assembly Infrastructure = typeof(JwtOptions).Assembly;
     private static readonly Assembly Api = typeof(AuthFacadeApiExtensions).Assembly;
+    private static readonly Assembly Composition = typeof(CompositionServiceCollectionExtensions).Assembly;
 
     /// <summary>Returns the simple names of the assemblies that <paramref name="assembly"/> references.</summary>
     private static IEnumerable<string> References(Assembly assembly) =>
@@ -108,7 +112,7 @@ public class LayerDependencyTests
     [Fact]
     public void Nothing_references_the_api_except_the_api_itself()
     {
-        var referencing = new[] { Domain, Ports, Application, Infrastructure }
+        var referencing = new[] { Domain, Ports, Application, Infrastructure, Composition }
             .Where(assembly => References(assembly).Contains(ApiName))
             .Select(assembly => assembly.GetName().Name);
 
@@ -119,5 +123,35 @@ public class LayerDependencyTests
     public void Domain_does_not_reference_ports()
     {
         Assert.DoesNotContain(PortsName, References(Domain));
+    }
+
+    [Fact]
+    public void Infrastructure_does_not_reference_aspnetcore()
+    {
+        var aspNet = References(Infrastructure)
+            .Where(name => name.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.Empty(aspNet);
+    }
+
+    [Fact]
+    public void Composition_does_not_reference_the_api_or_aspnetcore()
+    {
+        var forbidden = References(Composition)
+            .Where(name => name == ApiName || name.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.Empty(forbidden);
+    }
+
+    [Fact]
+    public void Only_hosts_reference_composition()
+    {
+        var referencing = new[] { Domain, Ports, Application, Infrastructure }
+            .Where(assembly => References(assembly).Contains(CompositionName))
+            .Select(assembly => assembly.GetName().Name);
+
+        Assert.Empty(referencing);
     }
 }

@@ -16,3 +16,4 @@ old one's status is updated to point to it.
 | [0008](0008-login-credential-rules.md) | Login accepts any credentials OpenEMR could hold; OpenEMR decides correctness | Proposed | 2026-10-21 |
 | [0009](0009-password-plaintext-retrieved-once.md) | The password plaintext is retrieved once and cleared | Proposed | 2026-10-21 |
 | [0010](0010-separate-contracts-project.md) | AuthFacade HTTP contracts live in the API project; ports live in their own project | Proposed | 2026-10-23 |
+| [0011](0011-host-neutral-composition-root.md) | Each host composes AuthFacade through a host-neutral composition root | Accepted | 2026-10-23 |

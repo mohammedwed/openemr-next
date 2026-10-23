@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OpenEmrNext.AuthFacade.Api;
+using OpenEmrNext.AuthFacade.Api.Endpoints;
 using OpenEmrNext.AuthFacade.Application.Ports;
 using OpenEmrNext.AuthFacade.UnitTests.Application;
 
@@ -56,12 +57,13 @@ internal sealed class TestApi : IAsyncDisposable
             ["OpenEmr:ClientSecret"] = "facade-secret"
         });
 
-        builder.AddAuthFacadeApi();
+        builder.AddAuthFacadeHttpDependencies();
         // Registered last, so it replaces the real OpenEMR client.
         builder.Services.AddSingleton<IOpenEmrIdentityProvider>(identityProvider);
 
         var app = builder.Build();
-        app.UseAuthFacadeApi();
+        app.UseAuthFacadeHttpMiddleware();
+        app.MapAuthFacadeEndpoints();
         await app.StartAsync();
 
         return new TestApi(app, identityProvider);

@@ -22,4 +22,10 @@ public sealed class OpenEmrOptions
 
     /// <summary>The OAuth scope requested in the password grant. Defaults to <c>openid api:oemr</c>.</summary>
     public string Scope { get; set; } = "openid api:oemr";
+
+    /// <summary>
+    /// Accepts any OpenEMR server certificate. Off by default. Set only in development settings,
+    /// because OpenEMR's development certificate is self-signed.
+    /// </summary>
+    public bool AcceptAnyServerCertificate { get; set; }
 }

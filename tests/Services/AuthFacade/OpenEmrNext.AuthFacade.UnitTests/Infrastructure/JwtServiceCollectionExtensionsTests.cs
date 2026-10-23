@@ -9,7 +9,7 @@ using OpenEmrNext.AuthFacade.Infrastructure.Security;
 namespace OpenEmrNext.AuthFacade.UnitTests.Infrastructure;
 
 /// <summary>
-/// Unit tests for <c>AddJwtAuthentication</c>. They check the claims, issuer, audience, signature,
+/// Unit tests for <c>AddJwtTokenIssuance</c>. They check the claims, issuer, audience, signature,
 /// and lifetime of tokens that the registered <see cref="IAccessTokenIssuer"/> creates.
 /// </summary>
 public class JwtServiceCollectionExtensionsTests
@@ -31,7 +31,9 @@ public class JwtServiceCollectionExtensionsTests
             .Build();
 
         var services = new ServiceCollection();
-        services.AddJwtAuthentication(configuration);
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection(JwtOptions.SectionName));
+        services.AddJwtTokenIssuance();
 
         return services.BuildServiceProvider().GetRequiredService<IAccessTokenIssuer>();
     }

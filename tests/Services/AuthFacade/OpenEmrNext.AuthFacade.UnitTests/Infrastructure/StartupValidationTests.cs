@@ -1,13 +1,14 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using OpenEmrNext.AuthFacade.Composition;
 using OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
 using OpenEmrNext.AuthFacade.Infrastructure.Security;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Infrastructure;
 
 /// <summary>
-/// Unit tests for the startup checks of <c>AddJwtAuthentication</c> and <c>AddOpenEmrIdentityProvider</c>.
+/// Unit tests for the startup checks that <c>AddAuthFacade</c> applies to the <c>OpenEmr</c> and <c>Jwt</c> options.
 /// Each test builds a real host and checks that required settings are enforced at start, not on
 /// the first request.
 /// </summary>
@@ -33,8 +34,7 @@ public class StartupValidationTests
         // so each test sees only the settings it sets.
         builder.Configuration.Sources.Clear();
         builder.Configuration.AddInMemoryCollection(settings);
-        builder.Services.AddJwtAuthentication(builder.Configuration);
-        builder.Services.AddOpenEmrIdentityProvider(builder.Configuration, builder.Environment);
+        builder.Services.AddAuthFacade(builder.Configuration);
         return builder.Build();
     }
 
