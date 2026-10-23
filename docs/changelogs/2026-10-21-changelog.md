@@ -8,7 +8,7 @@ Restructured AuthFacade into layered projects, loosened the login credential rul
 
 - **Layered AuthFacade projects** under `src/Services/AuthFacade/`:
   - `OpenEmrNext.AuthFacade.Domain`: value objects `Username`, `Password`, `GrantType`.
-  - `OpenEmrNext.AuthFacade.Application`: ports (`IOpenEmrIdentityProvider`, `IAccessTokenIssuer`), `PasswordLoginHandler`, and `AddApplication`.
+  - `OpenEmrNext.AuthFacade.Application`: ports (`IIdentityProvider`, `IAccessTokenIssuer`), `PasswordLoginHandler`, and `AddApplication`.
   - `OpenEmrNext.AuthFacade.Infrastructure`: `OpenEmrIdentityProvider` (OpenEMR client), `JwtAccessTokenIssuer`, and options classes.
   - `OpenEmrNext.AuthFacade.Composition`: `AddAuthFacade`, the composition root every host calls. It binds and validates the `OpenEmr` and `Jwt` options and references no ASP.NET package. See ADR 0011.
   - `OpenEmrNext.AuthFacade.Api`: endpoints, `MapAuthFacadeEndpoints`, and the HTTP-only `AddAuthFacadeHttpDependencies` / `UseAuthFacadeHttpMiddleware` extension methods. `Program.cs` only calls these.

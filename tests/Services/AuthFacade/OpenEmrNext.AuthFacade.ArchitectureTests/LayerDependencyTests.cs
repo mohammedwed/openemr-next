@@ -33,7 +33,7 @@ public class LayerDependencyTests
     private const string CompositionName = "OpenEmrNext.AuthFacade.Composition";
 
     private static readonly Assembly Domain = typeof(Username).Assembly;
-    private static readonly Assembly Ports = typeof(IOpenEmrIdentityProvider).Assembly;
+    private static readonly Assembly Ports = typeof(IIdentityProvider).Assembly;
     private static readonly Assembly Application = typeof(PasswordLoginHandler).Assembly;
     private static readonly Assembly Infrastructure = typeof(JwtOptions).Assembly;
     private static readonly Assembly Api = typeof(AuthFacadeApiExtensions).Assembly;

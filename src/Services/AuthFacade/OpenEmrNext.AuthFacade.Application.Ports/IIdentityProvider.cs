@@ -3,7 +3,7 @@ using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 namespace OpenEmrNext.AuthFacade.Application.Ports;
 
 /// <summary>Verifies credentials against the legacy OpenEMR identity server.</summary>
-public interface IOpenEmrIdentityProvider
+public interface IIdentityProvider
 {
     /// <summary>Submits a password grant to OpenEMR and reports whether it accepted the credentials.</summary>
     /// <param name="username">The login name to verify.</param>

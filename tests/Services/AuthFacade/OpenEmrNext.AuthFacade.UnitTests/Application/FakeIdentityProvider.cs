@@ -4,11 +4,11 @@ using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 namespace OpenEmrNext.AuthFacade.UnitTests.Application;
 
 /// <summary>
-/// Test double for <see cref="IOpenEmrIdentityProvider"/>. Tests configure it with either a
+/// Test double for <see cref="IIdentityProvider"/>. Tests configure it with either a
 /// <see cref="Result"/> or an <see cref="Exception"/>. The exception takes precedence and is
 /// thrown from the call.
 /// </summary>
-internal sealed class FakeOpenEmrIdentityProvider : IOpenEmrIdentityProvider
+internal sealed class FakeIdentityProvider : IIdentityProvider
 {
     /// <summary>The value returned from <see cref="PasswordGrantAsync"/>. Must be set when no exception is.</summary>
     public PasswordGrantResult? Result { get; set; }

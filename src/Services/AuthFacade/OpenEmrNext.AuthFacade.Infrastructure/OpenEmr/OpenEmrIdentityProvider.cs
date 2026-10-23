@@ -14,7 +14,7 @@ namespace OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
 /// <c>OpenEmrServiceCollectionExtensions</c>.
 /// </remarks>
 internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrOptions> options)
-    : IOpenEmrIdentityProvider
+    : IIdentityProvider
 {
     private const string TokenPath = "oauth2/default/token";
     private const int Status200OK = 200;

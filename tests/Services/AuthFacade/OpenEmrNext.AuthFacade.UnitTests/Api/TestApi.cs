@@ -17,7 +17,7 @@ internal sealed class TestApi : IAsyncDisposable
 {
     private readonly WebApplication _app;
 
-    private TestApi(WebApplication app, FakeOpenEmrIdentityProvider identityProvider)
+    private TestApi(WebApplication app, FakeIdentityProvider identityProvider)
     {
         _app = app;
         IdentityProvider = identityProvider;
@@ -25,7 +25,7 @@ internal sealed class TestApi : IAsyncDisposable
     }
 
     /// <summary>The fake OpenEMR identity provider. Tests set its result or exception before a request.</summary>
-    public FakeOpenEmrIdentityProvider IdentityProvider { get; }
+    public FakeIdentityProvider IdentityProvider { get; }
 
     /// <summary>An HTTP client whose base address is the running API.</summary>
     public HttpClient Client { get; }
@@ -37,7 +37,7 @@ internal sealed class TestApi : IAsyncDisposable
     /// <returns>A running instance. Dispose it to stop the host.</returns>
     public static async Task<TestApi> StartAsync()
     {
-        var identityProvider = new FakeOpenEmrIdentityProvider();
+        var identityProvider = new FakeIdentityProvider();
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -59,7 +59,7 @@ internal sealed class TestApi : IAsyncDisposable
 
         builder.AddAuthFacadeHttpDependencies();
         // Registered last, so it replaces the real OpenEMR client.
-        builder.Services.AddSingleton<IOpenEmrIdentityProvider>(identityProvider);
+        builder.Services.AddSingleton<IIdentityProvider>(identityProvider);
 
         var app = builder.Build();
         app.UseAuthFacadeHttpMiddleware();

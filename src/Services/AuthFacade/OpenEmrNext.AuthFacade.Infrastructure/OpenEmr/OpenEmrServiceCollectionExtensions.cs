@@ -11,7 +11,7 @@ public static class OpenEmrServiceCollectionExtensions
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
 
     /// <summary>
-    /// Registers <see cref="IOpenEmrIdentityProvider"/> with a typed HTTP client. The client reads
+    /// Registers <see cref="IIdentityProvider"/> with a typed HTTP client. The client reads
     /// <see cref="OpenEmrOptions"/>, which the composition root binds and validates.
     /// </summary>
     /// <remarks>
@@ -22,7 +22,7 @@ public static class OpenEmrServiceCollectionExtensions
     /// <returns>The same collection, for chaining.</returns>
     internal static IServiceCollection AddOpenEmrIdentityProvider(this IServiceCollection services)
     {
-        services.AddHttpClient<IOpenEmrIdentityProvider, OpenEmrIdentityProvider>((sp, client) =>
+        services.AddHttpClient<IIdentityProvider, OpenEmrIdentityProvider>((sp, client) =>
         {
             var options = sp.GetRequiredService<IOptions<OpenEmrOptions>>().Value;
             client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");

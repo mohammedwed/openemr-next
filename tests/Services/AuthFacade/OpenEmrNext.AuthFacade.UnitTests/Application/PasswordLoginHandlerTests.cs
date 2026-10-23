@@ -11,7 +11,7 @@ namespace OpenEmrNext.AuthFacade.UnitTests.Application;
 /// </summary>
 public class PasswordLoginHandlerTests
 {
-    private readonly FakeOpenEmrIdentityProvider _identityProvider = new();
+    private readonly FakeIdentityProvider _identityProvider = new();
     private readonly FakeAccessTokenIssuer _tokenIssuer = new();
 
     private PasswordLoginHandler CreateHandler() => new(_identityProvider, _tokenIssuer);
