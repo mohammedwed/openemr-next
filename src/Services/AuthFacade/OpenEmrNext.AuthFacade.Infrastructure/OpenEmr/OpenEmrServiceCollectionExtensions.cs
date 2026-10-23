@@ -19,7 +19,7 @@ public static class OpenEmrServiceCollectionExtensions
     /// </summary>
     /// <remarks>
     /// The client uses a 15-second timeout. It accepts any server certificate only when
-    /// <c>OpenEmr:AcceptAnyServerCertificate</c> is <c>true</c>, which is set only in development settings.
+    /// <c>OpenEmr:AcceptAnyServerCertificate</c> is <c>true</c>. The API host refuses that value outside Development.
     /// </remarks>
     /// <param name="services">The service collection to add to.</param>
     /// <returns>The same collection, for chaining.</returns>

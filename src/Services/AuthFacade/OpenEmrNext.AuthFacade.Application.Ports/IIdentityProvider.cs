@@ -9,7 +9,7 @@ public interface IIdentityProvider
     /// <param name="username">The login name to verify.</param>
     /// <param name="password">The password to verify. Its plaintext is consumed by the call.</param>
     /// <param name="ct">Cancels the request.</param>
-    /// <returns>OpenEMR's status and body, plus the subject when the grant succeeded.</returns>
+    /// <returns>OpenEMR's status and body, unchanged, plus the access token when OpenEMR accepted the grant.</returns>
     /// <exception cref="IdentityProviderUnavailableException">OpenEMR could not be reached.</exception>
     /// <exception cref="IdentityProviderResponseException">OpenEMR succeeded but returned no usable token.</exception>
     Task<PasswordGrantResult> PasswordGrantAsync(Username username, Password password, CancellationToken ct);
@@ -17,9 +17,9 @@ public interface IIdentityProvider
 
 /// <summary>The outcome of a password grant sent to OpenEMR.</summary>
 /// <param name="StatusCode">HTTP status returned by OpenEMR.</param>
-/// <param name="Body">OpenEMR's response body, passed through unchanged on rejection.</param>
-/// <param name="Subject">The authenticated subject; set only when OpenEMR accepted the credentials.</param>
-public sealed record PasswordGrantResult(int StatusCode, string Body, string? Subject);
+/// <param name="Body">OpenEMR's response body. It is returned to the caller unchanged.</param>
+/// <param name="AccessToken">The <c>access_token</c> from a successful response. Null otherwise. It must be verified before use.</param>
+public sealed record PasswordGrantResult(int StatusCode, string Body, string? AccessToken = null);
 
 /// <summary>Raised when the identity provider cannot be reached.</summary>
 public sealed class IdentityProviderUnavailableException(Exception innerException)

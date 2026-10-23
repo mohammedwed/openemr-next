@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using OpenEmrNext.AuthFacade.Application;
 using OpenEmrNext.AuthFacade.Infrastructure;
 using OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
-using OpenEmrNext.AuthFacade.Infrastructure.Security;
 
 namespace OpenEmrNext.AuthFacade.Composition;
 
@@ -18,18 +17,13 @@ public static class CompositionServiceCollectionExtensions
     /// validation and transport on top.
     /// </summary>
     /// <param name="services">The service collection to add to.</param>
-    /// <param name="configuration">The configuration that holds the <c>OpenEmr</c> and <c>Jwt</c> sections.</param>
+    /// <param name="configuration">The configuration that holds the <c>OpenEmr</c> section.</param>
     /// <returns>The same collection, for chaining.</returns>
     public static IServiceCollection AddAuthFacade(
         this IServiceCollection services, IConfiguration configuration)
     {
         services.AddOptions<OpenEmrOptions>()
             .Bind(configuration.GetSection(OpenEmrOptions.SectionName))
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-
-        services.AddOptions<JwtOptions>()
-            .Bind(configuration.GetSection(JwtOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
 

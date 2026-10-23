@@ -58,11 +58,26 @@ Added a host-neutral composition root, moved configuration reading into it, and 
 
 ## Known limitations and follow-ups
 
-- **Exchanged tokens have an empty `name`.** See ADR 0012.
-- **No scope check on the exchange.** A token without `api:oemr` is accepted.
+- **OpenEMR tokens have no `name` claim.** `/me` returns a null name until OpenEMR supplies one. See ADR 0012 and ADR 0013.
+- **No scope check on bearer tokens.** A token without `api:oemr` is accepted by `/me`.
 - **Readiness window is two minutes.** `ReadinessFixture` should wait longer, or the stack should be given time to start before the tests run.
 - **Public API is not tracked.** `PublicApiAnalyzers` and XML documentation output have not been added to the layer projects.
 - **ADR 0010 still names `IOpenEmrIdentityProvider`.** It is a historical record, and the README and the consumption guide use the current name.
 - **OpenAPI and Scalar are Development only.** Exposing them elsewhere needs a separate decision.
 - **Password copies remain in memory.** See ADR 0009.
 - **The JWKS endpoint path is fixed to the `default` realm** in `OpenEmrTokenVerifier`.
+
+## Changed: AuthFacade passes OpenEMR's tokens through
+
+Decided after the token exchange work above. See ADR 0013, which supersedes ADRs 0002 and 0012.
+
+- **Login returns OpenEMR's token response unchanged.** `POST /connect/token` with a password grant returns OpenEMR's body on success, including `refresh_token` when issued. AuthFacade checks only that the body has a non-empty `access_token`.
+- **AuthFacade issues no tokens.** `IAccessTokenIssuer`, `JwtAccessTokenIssuer`, `JwtOptions` and the HS256 signing key are removed, along with the `Jwt` configuration section, `Jwt__Key` in `docker-compose.yml`, and `JWT_KEY` in the environment template, CI and `new-env.sh`.
+- **`/me` verifies OpenEMR's tokens.** The `JwtBearer` scheme is replaced by `OpenEmrBearerHandler`, which calls `IExternalTokenVerifier`. The verifier checks RS256, the signature against OpenEMR's JWKS, issuer, audience and lifetime.
+- **Token exchange is removed.** The `urn:ietf:params:oauth:grant-type:token-exchange` grant, `TokenExchangeHandler`, `TokenExchangeResponse` and the `subject_token` fields are gone. `GrantType` now supports only `password`.
+- **`IExternalTokenVerifier` returns the `name` claim** as well as `sub`, when OpenEMR supplies one.
+- **Certificate bypass refused outside Development.** `AddAuthFacadeHttpDependencies` validates `OpenEmr:AcceptAnyServerCertificate` at startup, so the API host fails to start if it is `true` outside the Development environment. The README and the composition guide now describe the setting accurately. Three unit tests cover this.
+- **Login verifies OpenEMR's access token before returning it.** `PasswordLoginHandler` passes the token to `IExternalTokenVerifier`. A token that fails verification returns 502, and unreachable keys return 503. `PasswordGrantResult` carries the access token. See ADR 0013.
+- **ADR 0014** records that OpenEMR's password grant does not check the client secret. **ADR 0015** records that the certificate bypass is refused outside Development.
+- **README and ROADMAP** no longer say clients never receive OpenEMR's token, and no longer describe the client secret as protecting login.
+- **Tests.** The whole solution passes in Release: 91 unit, 12 architecture and 13 integration tests. The integration tests ran against the rebuilt auth-facade container.

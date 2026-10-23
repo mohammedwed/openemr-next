@@ -1,46 +1,25 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
-using OpenEmrNext.AuthFacade.Infrastructure.Security;
 
 namespace OpenEmrNext.AuthFacade.Api.Authentication;
 
-/// <summary>Registers the HTTP bearer scheme that validates this service's own tokens.</summary>
+/// <summary>Registers the HTTP bearer scheme that accepts OpenEMR-issued tokens.</summary>
 public static class BearerAuthenticationServiceCollectionExtensions
 {
+    /// <summary>The name of the bearer scheme, which <c>/me</c> requires.</summary>
+    public const string BearerScheme = "Bearer";
+
     /// <summary>
-    /// Configures the JWT bearer scheme, which validates this service's own tokens (used by <c>/me</c>).
-    /// Only the issuer, audience, signing key, and lifetime are checked.
+    /// Registers the bearer scheme. A bearer token is verified against OpenEMR's keys, so only tokens
+    /// that OpenEMR issued for this client are accepted.
     /// </summary>
     /// <param name="services">The service collection to add to.</param>
     /// <returns>The same collection, for chaining.</returns>
     public static IServiceCollection AddBearerAuthentication(this IServiceCollection services)
     {
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
-
-        services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
-            .Configure<IOptions<JwtOptions>, SymmetricSecurityKey>((bearer, jwtOptions, signingKey) =>
-            {
-                bearer.MapInboundClaims = false;
-                bearer.TokenValidationParameters = CreateValidationParameters(jwtOptions.Value, signingKey);
-            });
+        services.AddAuthentication(BearerScheme)
+            .AddScheme<AuthenticationSchemeOptions, OpenEmrBearerHandler>(BearerScheme, _ => { });
 
         return services;
-    }
-
-    /// <summary>Builds the token checks that the bearer scheme applies to inbound tokens.</summary>
-    private static TokenValidationParameters CreateValidationParameters(JwtOptions jwtOptions, SymmetricSecurityKey signingKey)
-    {
-        return new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = jwtOptions.Issuer,
-            ValidateAudience = true,
-            ValidAudience = jwtOptions.Audience,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = signingKey,
-            ValidateLifetime = true
-        };
     }
 }

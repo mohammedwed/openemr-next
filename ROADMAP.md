@@ -66,9 +66,9 @@ patient rows; have the admin created from environment variables on first run.
 ### M0b: AuthFacade login (done)
 
 - `POST /connect/token` verifies credentials through OpenEMR's password grant
-  and returns a facade JWT in the response body
-- `GET /me` validates the facade JWT and returns the subject and name
-- Identity stays in OpenEMR; clients never receive OpenEMR's token
+  and returns a facade JWT in the response body (superseded: see ADR 0013, which returns OpenEMR's token response)
+- `GET /me` validates the facade JWT and returns the subject and name (superseded: `/me` now validates OpenEMR's token)
+- Identity stays in OpenEMR; clients receive OpenEMR's token, verified before it is returned (ADR 0013)
 
 **Decision recorded:** the response is JSON, not a browser redirect. The
 redirect and cookie handling considered earlier are not part of this milestone.
@@ -107,13 +107,10 @@ redirect and cookie handling considered earlier are not part of this milestone.
   username. Today the only protection is OpenEMR's own lockout.
 - Audit log of login outcomes and `/me` access, with no credentials or tokens
   in the log
-- Minimum length for `Jwt:Key` (32 bytes), enforced at startup
 - Allowlist for the error fields returned to clients when OpenEMR rejects a
   login, instead of passing its body through unchanged
 - HTTPS for the service itself, with a redirect and HSTS. Required before any
   shared environment, together with the TLS item above
-- Signing-key rotation for facade tokens. Today one HS256 key signs every token
-  and there is no rotation path.
 - Record the accepted risk of password copies in memory (ADR 0009) and the
   complexity-policy gap (ADR 0008) in the M1 exit review
 

@@ -3,7 +3,7 @@ using OpenEmrNext.AuthFacade.Api;
 using OpenEmrNext.AuthFacade.Composition;
 using OpenEmrNext.AuthFacade.Application.Authentication;
 using OpenEmrNext.AuthFacade.Domain.ValueObjects;
-using OpenEmrNext.AuthFacade.Infrastructure.Security;
+using OpenEmrNext.AuthFacade.Infrastructure;
 using OpenEmrNext.AuthFacade.Application.Ports;
 
 namespace OpenEmrNext.AuthFacade.ArchitectureTests;
@@ -35,7 +35,7 @@ public class LayerDependencyTests
     private static readonly Assembly Domain = typeof(Username).Assembly;
     private static readonly Assembly Ports = typeof(IIdentityProvider).Assembly;
     private static readonly Assembly Application = typeof(PasswordLoginHandler).Assembly;
-    private static readonly Assembly Infrastructure = typeof(JwtOptions).Assembly;
+    private static readonly Assembly Infrastructure = typeof(InfrastructureServiceCollectionExtensions).Assembly;
     private static readonly Assembly Api = typeof(AuthFacadeApiExtensions).Assembly;
     private static readonly Assembly Composition = typeof(CompositionServiceCollectionExtensions).Assembly;
 

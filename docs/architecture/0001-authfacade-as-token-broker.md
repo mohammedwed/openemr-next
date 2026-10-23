@@ -26,4 +26,6 @@ AuthFacade takes a username and password, performs an OAuth2 password grant agai
 
 ## Related decisions
 
+[0013](0013-pass-openemr-tokens-through.md) supersedes the statement above that AuthFacade issues its own short-lived JWT and that OpenEMR's token never leaves the service boundary. AuthFacade now returns OpenEMR's token response unchanged.
+
 [0012](0012-accept-openemr-tokens-by-token-exchange.md) adds a second adapter to OpenEMR, `OpenEmrTokenVerifier`, which verifies OpenEMR-issued tokens against its JWKS for the token exchange path. OpenEMR's token still does not leave the service boundary.

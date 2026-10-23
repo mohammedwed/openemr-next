@@ -1,6 +1,6 @@
 # 0002. AuthFacade issues its own tokens
 
-- **Status:** Accepted
+- **Status:** Superseded by [0013](0013-pass-openemr-tokens-through.md)
 - **Date:** 2026-10-10
 - **Source:** Converted from `docs/changelogs/2026-10-10-changelog.md` (decision 3, and the security notes)
 

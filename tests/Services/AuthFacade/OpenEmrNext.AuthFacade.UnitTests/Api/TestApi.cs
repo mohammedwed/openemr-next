@@ -28,7 +28,7 @@ internal sealed class TestApi : IAsyncDisposable
     /// <summary>The fake OpenEMR identity provider. Tests set its result or exception before a request.</summary>
     public FakeIdentityProvider IdentityProvider { get; }
 
-    /// <summary>The fake verifier for OpenEMR-issued JWTs. Tests set its result or exception before a token exchange.</summary>
+    /// <summary>The fake verifier for OpenEMR-issued tokens. Tests set its result before a request to <c>/me</c>.</summary>
     public FakeExternalTokenVerifier TokenVerifier { get; }
 
     /// <summary>An HTTP client whose base address is the running API.</summary>
@@ -53,10 +53,6 @@ internal sealed class TestApi : IAsyncDisposable
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Jwt:Key"] = "unit-test-signing-key-at-least-32-bytes-long",
-            ["Jwt:Issuer"] = "openemr-next",
-            ["Jwt:Audience"] = "openemr-next-api",
-            ["Jwt:LifetimeMinutes"] = "30",
             ["OpenEmr:BaseUrl"] = "https://openemr.test",
             ["OpenEmr:Issuer"] = "https://openemr.test/oauth2/default",
             ["OpenEmr:ClientId"] = "facade-client",

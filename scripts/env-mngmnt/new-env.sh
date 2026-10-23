@@ -30,7 +30,6 @@ set_value() {
 
 set_value DB_ROOT_PASSWORD "$(secret)"
 set_value DB_PASSWORD "$(secret)"
-set_value JWT_KEY "$(secret)$(secret)"
 set_value AUTHFACADE_CLIENT_SECRET "$(secret)"
 set_value AUTHFACADE_CLIENT_ID "authfacade"
 

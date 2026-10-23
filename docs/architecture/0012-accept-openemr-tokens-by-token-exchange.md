@@ -1,6 +1,6 @@
 # 0012. AuthFacade accepts OpenEMR-issued JWTs through RFC 8693 token exchange
 
-- **Status:** Accepted
+- **Status:** Superseded by [0013](0013-pass-openemr-tokens-through.md). The token exchange grant is removed; the JWKS verification in points 2 and 3 is kept and now serves bearer validation.
 - **Date:** 2026-10-23
 
 ## Context
