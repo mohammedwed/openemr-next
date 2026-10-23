@@ -47,8 +47,12 @@ stepping stone: each future service should scaffold only its own tables.
 
 **AuthFacade (`src/Services/AuthFacade`).** A minimal ASP.NET Core API:
 
-- `POST /connect/token` accepts a password grant, verifies the login with
-  OpenEMR's OAuth2 server, and returns a facade-issued JWT in a JSON response.
+- `POST /connect/token` accepts two grants and returns a facade-issued JWT in a
+  JSON response:
+  - a password grant, which verifies the login with OpenEMR's OAuth2 server;
+  - an RFC 8693 token exchange, which verifies an OpenEMR-issued JWT against
+    OpenEMR's JWKS and returns a facade token for the same subject. See
+    [ADR 0012](docs/architecture/0012-accept-openemr-tokens-by-token-exchange.md).
 - `GET /me` requires a valid facade JWT and returns the subject and name.
 - `GET /hello` is a liveness check.
 
@@ -119,8 +123,9 @@ is a token broker in front of it. It does not store passwords or user records.
   acceptable only because the token arrives directly from OpenEMR over TLS in
   the same request. Do not reuse this pattern for client-supplied tokens.
 - The development TLS bypass (`DangerousAcceptAnyServerCertificateValidator`)
-  is active only in the `Development` environment and must be replaced with a
-  trusted certificate before any shared use.
+  is enabled only by `OpenEmr:AcceptAnyServerCertificate`, which defaults to
+  `false` and is set in `appsettings.Development.json`. It must be replaced with
+  a trusted certificate before any shared use.
 - Data-protection keys are not persisted, so the container logs a warning.
 
 ## Legacy database compatibility

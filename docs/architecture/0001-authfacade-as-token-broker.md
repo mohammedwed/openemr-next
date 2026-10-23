@@ -23,3 +23,7 @@ AuthFacade takes a username and password, performs an OAuth2 password grant agai
 
 - **OpenIddict server.** Dropped. It requires EF Core stores in the OpenEMR database, which the project chose not to change.
 - **Direct verification of hashes in OpenEMR's `users` table.** Rejected. See [0003](0003-delegate-credential-verification-to-openemr.md).
+
+## Related decisions
+
+[0012](0012-accept-openemr-tokens-by-token-exchange.md) adds a second adapter to OpenEMR, `OpenEmrTokenVerifier`, which verifies OpenEMR-issued tokens against its JWKS for the token exchange path. OpenEMR's token still does not leave the service boundary.

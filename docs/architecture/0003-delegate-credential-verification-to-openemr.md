@@ -22,3 +22,7 @@ AuthFacade does not read user tables or verify password hashes. It forwards the 
 ## Alternatives considered
 
 - **Verify hashes in the facade.** Rejected. It duplicates login logic without MFA, lockout or expiry, and it creates a second credential store.
+
+## Related decisions
+
+[0012](0012-accept-openemr-tokens-by-token-exchange.md) verifies OpenEMR-issued tokens locally, for the token exchange path. That is token verification, not credential verification, so this decision still holds: passwords are checked only by OpenEMR.

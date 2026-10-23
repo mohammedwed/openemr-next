@@ -1,13 +1,14 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using OpenEmrNext.AuthFacade.Composition;
 using OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
 using OpenEmrNext.AuthFacade.Infrastructure.Security;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Infrastructure;
 
 /// <summary>
-/// Unit tests for the startup checks of <c>AddJwtAuthentication</c> and <c>AddOpenEmrIdentityProvider</c>.
+/// Unit tests for the startup checks that <c>AddAuthFacade</c> applies to the <c>OpenEmr</c> and <c>Jwt</c> options.
 /// Each test builds a real host and checks that required settings are enforced at start, not on
 /// the first request.
 /// </summary>
@@ -21,6 +22,7 @@ public class StartupValidationTests
         ["Jwt:Audience"] = "openemr-next-api",
         ["Jwt:LifetimeMinutes"] = "30",
         ["OpenEmr:BaseUrl"] = "https://openemr.test",
+        ["OpenEmr:Issuer"] = "https://openemr.test/oauth2/default",
         ["OpenEmr:ClientId"] = "facade-client",
         ["OpenEmr:ClientSecret"] = "facade-secret"
     };
@@ -33,8 +35,7 @@ public class StartupValidationTests
         // so each test sees only the settings it sets.
         builder.Configuration.Sources.Clear();
         builder.Configuration.AddInMemoryCollection(settings);
-        builder.Services.AddJwtAuthentication(builder.Configuration);
-        builder.Services.AddOpenEmrIdentityProvider(builder.Configuration, builder.Environment);
+        builder.Services.AddAuthFacade(builder.Configuration);
         return builder.Build();
     }
 
@@ -53,6 +54,7 @@ public class StartupValidationTests
     [InlineData("Jwt:Audience")]
     [InlineData("Jwt:LifetimeMinutes")]
     [InlineData("OpenEmr:BaseUrl")]
+    [InlineData("OpenEmr:Issuer")]
     [InlineData("OpenEmr:ClientId")]
     [InlineData("OpenEmr:ClientSecret")]
     public async Task Host_refuses_to_start_when_a_required_setting_is_missing(string missingKey)

@@ -7,7 +7,7 @@ namespace OpenEmrNext.AuthFacade.Application.Authentication;
 /// Handles a password login: verifies the credentials with OpenEMR and, on success, issues
 /// this service's own access token.
 /// </summary>
-public sealed class PasswordLoginHandler(IOpenEmrIdentityProvider identityProvider, IAccessTokenIssuer tokenIssuer)
+public sealed class PasswordLoginHandler(IIdentityProvider identityProvider, IAccessTokenIssuer tokenIssuer)
 {
     /// <summary>Attempts a password login.</summary>
     /// <param name="username">The validated login name.</param>

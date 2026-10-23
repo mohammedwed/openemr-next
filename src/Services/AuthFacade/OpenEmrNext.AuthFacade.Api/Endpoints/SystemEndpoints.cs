@@ -1,3 +1,5 @@
+using OpenEmrNext.AuthFacade.Api.Contracts.Responses;
+
 namespace OpenEmrNext.AuthFacade.Api.Endpoints;
 
 /// <summary>Unauthenticated health and smoke-test endpoints.</summary>
@@ -8,7 +10,7 @@ public static class SystemEndpoints
     /// <returns>The same builder, for chaining.</returns>
     public static IEndpointRouteBuilder MapSystemEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/hello", () => Results.Ok(new { message = "Hello from AuthFacade" }))
+        app.MapGet("/hello", () => Results.Ok(new HelloResponse("Hello from AuthFacade")))
             .AllowAnonymous();
         return app;
     }

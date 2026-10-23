@@ -1,6 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using OpenEmrNext.AuthFacade.Application.Ports;
 using OpenEmrNext.AuthFacade.Domain.ValueObjects;
@@ -15,10 +14,10 @@ namespace OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
 /// <c>OpenEmrServiceCollectionExtensions</c>.
 /// </remarks>
 internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrOptions> options)
-    : IOpenEmrIdentityProvider
+    : IIdentityProvider
 {
     private const string TokenPath = "oauth2/default/token";
-
+    private const int Status200OK = 200;
     private readonly OpenEmrOptions _options = options.Value;
 
     /// <inheritdoc/>
@@ -38,7 +37,7 @@ internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrO
 
         var (statusCode, body) = await PostGrantAsync(form, ct);
 
-        if (statusCode != StatusCodes.Status200OK)
+        if (statusCode != Status200OK)
         {
             return new PasswordGrantResult(statusCode, body, null);
         }

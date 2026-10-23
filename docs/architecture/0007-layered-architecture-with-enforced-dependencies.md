@@ -1,6 +1,6 @@
 # 0007. AuthFacade is split into layered projects with enforced dependency rules
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-21
 
 ## Context
@@ -17,6 +17,8 @@ The service is four projects under `src/Services/AuthFacade/`, named `OpenEmrNex
 | `Application` | Ports, the login handler, `AddApplication` | `Domain`, DI abstractions |
 | `Infrastructure` | OpenEMR client, JWT issuer and validation | `Application` |
 | `Api` | Endpoints, `Program.cs`, composition | `Application`, `Infrastructure` |
+
+> **Note (2026-10-23):** ADR 0010 moves the ports from `Application` into a new `Application.Ports` project. The HTTP shapes live in the API project. ADR 0011 adds a host-neutral `Composition` project and moves bearer validation into the API. The table above is the layout before that change.
 
 Rules are enforced by `OpenEmrNext.AuthFacade.ArchitectureTests`, which reads each assembly's referenced assemblies and fails the build on a violation. The roadmap names ArchUnitNET. This project uses reflection instead, to avoid a new package. The rules can move to ArchUnitNET later without changing what they check.
 

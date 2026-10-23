@@ -90,6 +90,7 @@ services:
       ConnectionStrings__DefaultConnection: "Server=mysql;Port=3306;Database=${DB_NAME:-openemr};Uid=${DB_USER:-openemr};Pwd=${DB_PASSWORD:?Set DB_PASSWORD in .env}"
       Jwt__Key: ${JWT_KEY:?Set JWT_KEY in .env}
       OpenEmr__BaseUrl: "http://openemr:80"
+      OpenEmr__Issuer: "https://localhost:${WT_HTTPS_PORT:-9300}/oauth2/default"
       OpenEmr__ClientId: ${AUTHFACADE_CLIENT_ID:?Set AUTHFACADE_CLIENT_ID in .env}
       OpenEmr__ClientSecret: ${AUTHFACADE_CLIENT_SECRET:?Set AUTHFACADE_CLIENT_SECRET in .env}
       OpenEmr__Scope: openid profile email offline_access

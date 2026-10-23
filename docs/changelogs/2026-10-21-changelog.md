@@ -8,12 +8,13 @@ Restructured AuthFacade into layered projects, loosened the login credential rul
 
 - **Layered AuthFacade projects** under `src/Services/AuthFacade/`:
   - `OpenEmrNext.AuthFacade.Domain`: value objects `Username`, `Password`, `GrantType`.
-  - `OpenEmrNext.AuthFacade.Application`: ports (`IOpenEmrIdentityProvider`, `IAccessTokenIssuer`), `PasswordLoginHandler`, and `AddApplication`.
+  - `OpenEmrNext.AuthFacade.Application`: ports (`IIdentityProvider`, `IAccessTokenIssuer`), `PasswordLoginHandler`, and `AddApplication`.
   - `OpenEmrNext.AuthFacade.Infrastructure`: `OpenEmrIdentityProvider` (OpenEMR client), `JwtAccessTokenIssuer`, and options classes.
-  - `OpenEmrNext.AuthFacade.Api`: endpoints and `AddAuthFacadeApi` / `UseAuthFacadeApi` extension methods. `Program.cs` only calls these.
+  - `OpenEmrNext.AuthFacade.Composition`: `AddAuthFacade`, the composition root every host calls. It binds and validates the `OpenEmr` and `Jwt` options and references no ASP.NET package. See ADR 0011.
+  - `OpenEmrNext.AuthFacade.Api`: endpoints, `MapAuthFacadeEndpoints`, and the HTTP-only `AddAuthFacadeHttpDependencies` / `UseAuthFacadeHttpMiddleware` extension methods. `Program.cs` only calls these.
 - **Test projects** under `tests/Services/AuthFacade/`:
-  - `OpenEmrNext.AuthFacade.UnitTests` (71 tests): value objects, the login handler, the OpenEMR client with a fake HTTP handler, the JWT issuer, startup validation, and endpoints run in-process on a random local port.
-  - `OpenEmrNext.AuthFacade.ArchitectureTests` (6 tests): layer dependency rules, checked from each assembly's references.
+  - `OpenEmrNext.AuthFacade.UnitTests` (79 tests): value objects, the login handler, the OpenEMR client with a fake HTTP handler, the JWT issuer, startup validation, and endpoints run in-process on a random local port.
+  - `OpenEmrNext.AuthFacade.ArchitectureTests` (12 tests): layer dependency rules, checked from each assembly's references.
   - `OpenEmrNext.AuthFacade.IntegrationTests` (13 tests): run against the live stack. Added wrong-password passthrough, short legacy username, oversized password, and malformed `/me` token.
 - **`docs/architecture/`**: ADRs 0001 to 0009 and an index.
 - **`Password.TakeValue()`**: returns the plaintext once and clears its buffer. Later calls throw.
@@ -23,8 +24,10 @@ Restructured AuthFacade into layered projects, loosened the login credential rul
 
 - **Login credential rules are loosened.** Username accepts 1 to 255 characters with no control characters, matching `users.username`. Password accepts 1 to 1024 characters. The complexity policy (8 to 128 characters, mixed classes) that was briefly in the code is removed; it would have rejected existing accounts. See ADR 0008.
 - **`GrantType` validates the grant on `/connect/token`** through `TryParse`, alongside `Username` and `Password`.
+- **Configuration is read only in the composition root.** `AddAuthFacade` binds and validates `OpenEmrOptions` and `JwtOptions`. `AddInfrastructure` takes no configuration and reads the bound options.
+- **The development certificate bypass is configuration, not environment.** `OpenEmr:AcceptAnyServerCertificate` defaults to `false` and is set only in `appsettings.Development.json`. Infrastructure and Composition no longer take `IHostEnvironment`, and Infrastructure no longer references `Microsoft.Extensions.Hosting.Abstractions`.
 - **Configuration is bound and validated at startup.** Missing `OpenEmr:BaseUrl`, `OpenEmr:ClientId`, `OpenEmr:ClientSecret` or `Jwt:Key` now stops the host. Previously the first two failed on the first request. `Jwt:Issuer`, `Jwt:Audience` and `Jwt:LifetimeMinutes` are configurable, with the old values as defaults.
-- **Compose and Docker.** `docker-compose.yml` builds from `src/Services/AuthFacade` with the `Dockerfile` there. The image restores all four projects and runs `OpenEmrNext.AuthFacade.Api.dll`.
+- **Compose and Docker.** `docker-compose.yml` builds from `src/Services/AuthFacade` with the `Dockerfile` there. The image restores the Api and the five projects it references, including Composition, and runs `OpenEmrNext.AuthFacade.Api.dll`.
 - **`OpenEMR-Next.slnx`** lists the new projects under `/src/AuthFacade/` and `/tests/`.
 - **`OpenEmr.AuthFacade.Api.http`** (now `OpenEmrNext.AuthFacade.Api.http`) calls the real endpoints. It previously called a template `/weatherforecast` route.
 - **README and ROADMAP** point to the new paths and test project names. Dated changelogs are left as written.
@@ -42,8 +45,8 @@ Restructured AuthFacade into layered projects, loosened the login credential rul
 
 ## Verified
 
-- The solution builds with 0 warnings. `dotnet format --verify-no-changes` passes for the service and test projects.
-- Full Release test run: 71 unit, 6 architecture and 13 integration tests, all passing. The integration run used the Docker stack restored from the CI snapshot, with the AuthFacade container rebuilt from this code.
+- After the composition-root changes, the solution builds with 0 warnings and 0 errors, and the unit (79) and architecture (12) tests pass.
+- The 13 integration tests were last run before the composition-root changes. They have not been repeated since.
 - The AuthFacade image builds with the new Dockerfile. `docker compose config` validates with `.env.example`.
 
 ## Findings
