@@ -1,6 +1,7 @@
 using OpenEmrNext.AuthFacade.Application.Authentication;
 using OpenEmrNext.AuthFacade.Api.Contracts.Requests;
 using OpenEmrNext.AuthFacade.Api.Contracts.Responses;
+using OpenEmrNext.AuthFacade.Api.RateLimiting;
 using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 
 namespace OpenEmrNext.AuthFacade.Api.Endpoints;
@@ -10,7 +11,8 @@ public static class TokenEndpoints
 {
     /// <summary>
     /// Maps <c>POST /connect/token</c>. The endpoint is anonymous because it issues the token,
-    /// and antiforgery is disabled because it accepts a form post from non-browser clients.
+    /// and antiforgery is disabled because it accepts a form post from non-browser clients. The endpoint is
+    /// rate limited per client address, which slows password guessing.
     /// </summary>
     /// <param name="app">The endpoint route builder.</param>
     /// <returns>The same builder, for chaining.</returns>
@@ -18,7 +20,8 @@ public static class TokenEndpoints
     {
         app.MapPost("/connect/token", IssueTokenAsync)
             .AllowAnonymous()
-            .DisableAntiforgery();
+            .DisableAntiforgery()
+            .RequireRateLimiting(RateLimitingServiceCollectionExtensions.LoginPolicy);
 
         return app;
     }
@@ -31,7 +34,8 @@ public static class TokenEndpoints
     /// Responses: 200 with a <see cref="TokenResponse"/> on success; 400 <c>invalid_grant</c> when OpenEMR
     /// refuses the credentials; 400 for an unsupported grant type or invalid fields; 503 when OpenEMR is
     /// unreachable; 502 when OpenEMR fails, answers successfully without a usable token, or issues one
-    /// that does not verify.
+    /// that does not verify; 429 <c>too_many_requests</c> with <c>Retry-After</c> when the client address
+    /// is over its limit.
     /// </remarks>
     private static async Task<IResult> IssueTokenAsync(HttpRequest request, PasswordLoginHandler login, CancellationToken ct)
     {
