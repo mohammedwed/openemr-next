@@ -23,3 +23,4 @@ old one's status is updated to point to it.
 | [0015](0015-development-certificate-bypass-only-in-development.md) | The development certificate bypass is refused outside Development | Accepted | 2026-10-23 |
 | [0016](0016-facade-token-response-shape.md) | AuthFacade returns its own token response shape on login | Accepted | 2026-10-24 |
 | [0017](0017-circuit-breakers-guard-openemr-calls.md) | Circuit breakers guard calls to OpenEMR | Accepted | 2026-10-24 |
+| [0018](0018-rate-limit-the-login-endpoint-per-client-address.md) | The login endpoint is rate limited per client address | Accepted | 2026-10-24 |
