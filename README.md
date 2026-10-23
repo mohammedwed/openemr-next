@@ -85,6 +85,9 @@ is a token broker in front of it. It does not store passwords or user records.
   it (ADR 0013), and returns only the four token fields (ADR 0016).
 - **Calls to OpenEMR are guarded by circuit breakers.** While OpenEMR is failing,
   logins and token checks fail fast instead of waiting for timeouts (ADR 0017).
+- **Login is rate limited per client address.** `POST /connect/token` returns
+  429 `too_many_requests` when one address exceeds its limit, before OpenEMR is
+  called (ADR 0018).
 - **Minimal client scopes.** The AuthFacade OAuth client holds authentication
   scopes only (`openid`, `profile`, `email`, `offline_access`). The client
   secret does not protect the password grant, because OpenEMR does not check it
@@ -99,8 +102,9 @@ is a token broker in front of it. It does not store passwords or user records.
 
 - `/me` confirms identity only. Authorization for OpenEMR data is not built.
 - The audience check uses a fixed string rather than a registered client.
-- No login rate limiting or lockout in AuthFacade. Brute-force protection relies
-  on whatever OpenEMR enforces.
+- Login is rate limited per client address (10 requests a minute by default,
+  ADR 0018), but not per username. A distributed attack against one account is
+  limited only by OpenEMR's lockout.
 - Login outcomes and `/me` access are not audit-logged.
 - The service serves plain HTTP on port 8080, with no HTTPS redirect or HSTS.
 - Startup does not wait for OpenEMR, so early requests can fail.
