@@ -1,6 +1,6 @@
 # 0010. AuthFacade HTTP contracts live in the API project; ports live in their own project
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-23
 
 ## Context

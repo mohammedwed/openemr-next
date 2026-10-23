@@ -1,6 +1,6 @@
 # 0009. The password plaintext is retrieved once and cleared
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-21
 
 ## Context

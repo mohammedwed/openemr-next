@@ -1,6 +1,6 @@
 # 0007. AuthFacade is split into layered projects with enforced dependency rules
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-21
 
 ## Context

@@ -1,6 +1,6 @@
 # 0008. Login accepts any credentials OpenEMR could hold; OpenEMR decides correctness
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-21
 
 ## Context

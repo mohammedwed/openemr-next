@@ -17,15 +17,19 @@ internal sealed class TestApi : IAsyncDisposable
 {
     private readonly WebApplication _app;
 
-    private TestApi(WebApplication app, FakeIdentityProvider identityProvider)
+    private TestApi(WebApplication app, FakeIdentityProvider identityProvider, FakeExternalTokenVerifier tokenVerifier)
     {
         _app = app;
         IdentityProvider = identityProvider;
+        TokenVerifier = tokenVerifier;
         Client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
     }
 
     /// <summary>The fake OpenEMR identity provider. Tests set its result or exception before a request.</summary>
     public FakeIdentityProvider IdentityProvider { get; }
+
+    /// <summary>The fake verifier for OpenEMR-issued JWTs. Tests set its result or exception before a token exchange.</summary>
+    public FakeExternalTokenVerifier TokenVerifier { get; }
 
     /// <summary>An HTTP client whose base address is the running API.</summary>
     public HttpClient Client { get; }
@@ -38,6 +42,7 @@ internal sealed class TestApi : IAsyncDisposable
     public static async Task<TestApi> StartAsync()
     {
         var identityProvider = new FakeIdentityProvider();
+        var tokenVerifier = new FakeExternalTokenVerifier();
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -53,6 +58,7 @@ internal sealed class TestApi : IAsyncDisposable
             ["Jwt:Audience"] = "openemr-next-api",
             ["Jwt:LifetimeMinutes"] = "30",
             ["OpenEmr:BaseUrl"] = "https://openemr.test",
+            ["OpenEmr:Issuer"] = "https://openemr.test/oauth2/default",
             ["OpenEmr:ClientId"] = "facade-client",
             ["OpenEmr:ClientSecret"] = "facade-secret"
         });
@@ -60,13 +66,14 @@ internal sealed class TestApi : IAsyncDisposable
         builder.AddAuthFacadeHttpDependencies();
         // Registered last, so it replaces the real OpenEMR client.
         builder.Services.AddSingleton<IIdentityProvider>(identityProvider);
+        builder.Services.AddSingleton<IExternalTokenVerifier>(tokenVerifier);
 
         var app = builder.Build();
         app.UseAuthFacadeHttpMiddleware();
         app.MapAuthFacadeEndpoints();
         await app.StartAsync();
 
-        return new TestApi(app, identityProvider);
+        return new TestApi(app, identityProvider, tokenVerifier);
     }
 
     public async ValueTask DisposeAsync()

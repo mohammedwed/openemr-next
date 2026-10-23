@@ -47,8 +47,12 @@ stepping stone: each future service should scaffold only its own tables.
 
 **AuthFacade (`src/Services/AuthFacade`).** A minimal ASP.NET Core API:
 
-- `POST /connect/token` accepts a password grant, verifies the login with
-  OpenEMR's OAuth2 server, and returns a facade-issued JWT in a JSON response.
+- `POST /connect/token` accepts two grants and returns a facade-issued JWT in a
+  JSON response:
+  - a password grant, which verifies the login with OpenEMR's OAuth2 server;
+  - an RFC 8693 token exchange, which verifies an OpenEMR-issued JWT against
+    OpenEMR's JWKS and returns a facade token for the same subject. See
+    [ADR 0012](docs/architecture/0012-accept-openemr-tokens-by-token-exchange.md).
 - `GET /me` requires a valid facade JWT and returns the subject and name.
 - `GET /hello` is a liveness check.
 

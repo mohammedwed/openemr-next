@@ -17,6 +17,7 @@ public static class InfrastructureServiceCollectionExtensions
     {
         return services
             .AddOpenEmrIdentityProvider()
+            .AddOpenEmrTokenVerifier()
             .AddJwtTokenIssuance();
     }
 }

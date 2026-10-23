@@ -22,6 +22,7 @@ public class StartupValidationTests
         ["Jwt:Audience"] = "openemr-next-api",
         ["Jwt:LifetimeMinutes"] = "30",
         ["OpenEmr:BaseUrl"] = "https://openemr.test",
+        ["OpenEmr:Issuer"] = "https://openemr.test/oauth2/default",
         ["OpenEmr:ClientId"] = "facade-client",
         ["OpenEmr:ClientSecret"] = "facade-secret"
     };
@@ -53,6 +54,7 @@ public class StartupValidationTests
     [InlineData("Jwt:Audience")]
     [InlineData("Jwt:LifetimeMinutes")]
     [InlineData("OpenEmr:BaseUrl")]
+    [InlineData("OpenEmr:Issuer")]
     [InlineData("OpenEmr:ClientId")]
     [InlineData("OpenEmr:ClientSecret")]
     public async Task Host_refuses_to_start_when_a_required_setting_is_missing(string missingKey)

@@ -1,5 +1,6 @@
 using OpenEmrNext.AuthFacade.Api;
 using OpenEmrNext.AuthFacade.Api.Endpoints;
+using Scalar.AspNetCore;
 
 // Composition root: dependencies are registered on the builder, then the middleware and
 // endpoints are mapped on the built app. Configuration is read from appsettings and the
@@ -9,4 +10,12 @@ builder.AddAuthFacadeHttpDependencies();
 var app = builder.Build();
 app.UseAuthFacadeHttpMiddleware();
 app.MapAuthFacadeEndpoints();
+
+// The OpenAPI document and Scalar UI are for development only.
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.MapScalarApiReference();
+}
+
 app.Run();

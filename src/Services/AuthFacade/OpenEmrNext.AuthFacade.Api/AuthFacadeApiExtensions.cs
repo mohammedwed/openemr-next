@@ -7,7 +7,7 @@ namespace OpenEmrNext.AuthFacade.Api;
 public static class AuthFacadeApiExtensions
 {
     /// <summary>
-    /// Registers the shared composition root, then the HTTP-only bearer validation and authorization.
+    /// Registers the shared composition root, then the HTTP-only bearer validation, authorization and OpenAPI document generation.
     /// Must run before the app is built.
     /// </summary>
     /// <param name="builder">The host builder to configure.</param>
@@ -17,7 +17,8 @@ public static class AuthFacadeApiExtensions
         builder.Services
             .AddAuthFacade(builder.Configuration)
             .AddBearerAuthentication()
-            .AddAuthorization();
+            .AddAuthorization()
+            .AddOpenApi();
         return builder;
     }
 

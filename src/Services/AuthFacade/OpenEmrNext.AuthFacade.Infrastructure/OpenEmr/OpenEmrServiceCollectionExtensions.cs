@@ -10,6 +10,9 @@ public static class OpenEmrServiceCollectionExtensions
     /// <summary>How long a request to OpenEMR may take before it fails.</summary>
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
 
+    /// <summary>The name of the HTTP client that fetches OpenEMR's JWKS.</summary>
+    private const string JwksClientName = "OpenEmrJwks";
+
     /// <summary>
     /// Registers <see cref="IIdentityProvider"/> with a typed HTTP client. The client reads
     /// <see cref="OpenEmrOptions"/>, which the composition root binds and validates.
@@ -28,14 +31,35 @@ public static class OpenEmrServiceCollectionExtensions
             client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
             client.Timeout = RequestTimeout;
         })
-        .ConfigurePrimaryHttpMessageHandler(sp =>
+        .UseOpenEmrTls();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the verifier for OpenEMR-issued JWTs. It fetches keys from OpenEMR's JWKS endpoint
+    /// through its own HTTP client, with the same TLS setting as the identity provider.
+    /// </summary>
+    /// <param name="services">The service collection to add to.</param>
+    /// <returns>The same collection, for chaining.</returns>
+    internal static IServiceCollection AddOpenEmrTokenVerifier(this IServiceCollection services)
+    {
+        services.AddHttpClient(JwksClientName).UseOpenEmrTls();
+
+        services.AddSingleton<IExternalTokenVerifier>(sp => new OpenEmrTokenVerifier(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient(JwksClientName),
+            sp.GetRequiredService<IOptions<OpenEmrOptions>>()));
+
+        return services;
+    }
+
+    /// <summary>Sets the primary handler from <c>OpenEmr:AcceptAnyServerCertificate</c>, read when the handler is built.</summary>
+    private static IHttpClientBuilder UseOpenEmrTls(this IHttpClientBuilder builder) =>
+        builder.ConfigurePrimaryHttpMessageHandler(sp =>
         {
             var options = sp.GetRequiredService<IOptions<OpenEmrOptions>>().Value;
             return CreateHandler(options.AcceptAnyServerCertificate);
         });
-
-        return services;
-    }
 
     /// <summary>Creates the primary handler. It accepts any certificate only when the option is set.</summary>
     private static HttpClientHandler CreateHandler(bool acceptAnyCertificate)

@@ -18,7 +18,6 @@ internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrO
 {
     private const string TokenPath = "oauth2/default/token";
     private const int Status200OK = 200;
-
     private readonly OpenEmrOptions _options = options.Value;
 
     /// <inheritdoc/>
