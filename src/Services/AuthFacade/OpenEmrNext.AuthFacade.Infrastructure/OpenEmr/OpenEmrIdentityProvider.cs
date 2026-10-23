@@ -16,6 +16,7 @@ internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrO
     : IIdentityProvider
 {
     private const string TokenPath = "oauth2/default/token";
+    private const string DefaultTokenType = "Bearer";
     private const int Status200OK = 200;
     private readonly OpenEmrOptions _options = options.Value;
 
@@ -37,12 +38,12 @@ internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrO
         var (statusCode, body) = await PostGrantAsync(form, ct);
 
         return statusCode == Status200OK
-            ? new PasswordGrantResult(statusCode, body, ReadAccessToken(body))
-            : new PasswordGrantResult(statusCode, body);
+            ? new PasswordGrantResult(statusCode, ReadToken(body))
+            : new PasswordGrantResult(statusCode);
     }
 
     /// <summary>Sends the form to OpenEMR's token endpoint and returns its status and body.</summary>
-    /// <exception cref="IdentityProviderUnavailableException">OpenEMR could not be reached.</exception>
+    /// <exception cref="IdentityProviderUnavailableException">OpenEMR could not be reached, or it timed out.</exception>
     private async Task<(int StatusCode, string Body)> PostGrantAsync(FormUrlEncodedContent form, CancellationToken ct)
     {
         try
@@ -55,33 +56,63 @@ internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrO
         {
             throw new IdentityProviderUnavailableException(ex);
         }
+        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            // The client's own timeout fired. The caller did not cancel, so OpenEMR did not answer in time.
+            throw new IdentityProviderUnavailableException(ex);
+        }
     }
 
     /// <summary>
-    /// Reads the non-empty string <c>access_token</c> from OpenEMR's success body. The token is not
-    /// verified here; the login handler verifies it before anything is returned.
+    /// Reads the token fields from OpenEMR's success body. The access token is not verified here;
+    /// the login handler verifies it before anything is returned.
     /// </summary>
     /// <param name="body">OpenEMR's successful response body.</param>
-    /// <returns>The access token.</returns>
+    /// <returns>The token fields. <c>token_type</c> defaults to <c>Bearer</c> when OpenEMR omits it.</returns>
     /// <exception cref="IdentityProviderResponseException">The body is not JSON or has no usable <c>access_token</c>.</exception>
-    private static string ReadAccessToken(string body)
+    private static OpenEmrToken ReadToken(string body)
     {
+        JsonDocument doc;
         try
         {
-            using var doc = JsonDocument.Parse(body);
-            if (doc.RootElement.TryGetProperty("access_token", out var token) &&
-                token.ValueKind == JsonValueKind.String &&
-                token.GetString() is { } value &&
-                !string.IsNullOrWhiteSpace(value))
-            {
-                return value;
-            }
+            doc = JsonDocument.Parse(body);
         }
         catch (JsonException ex)
         {
             throw new IdentityProviderResponseException("OpenEMR returned an unreadable body.", ex);
         }
 
-        throw new IdentityProviderResponseException("OpenEMR response has no access_token.");
+        using (doc)
+        {
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("access_token", out var accessElement) ||
+                accessElement.ValueKind != JsonValueKind.String ||
+                accessElement.GetString() is not { } accessToken ||
+                string.IsNullOrWhiteSpace(accessToken))
+            {
+                throw new IdentityProviderResponseException("OpenEMR response has no access_token.");
+            }
+
+            var tokenType = root.TryGetProperty("token_type", out var typeElement) &&
+                            typeElement.ValueKind == JsonValueKind.String &&
+                            !string.IsNullOrWhiteSpace(typeElement.GetString())
+                ? typeElement.GetString()!
+                : DefaultTokenType;
+
+            int? expiresIn = root.TryGetProperty("expires_in", out var expiryElement) &&
+                             expiryElement.ValueKind == JsonValueKind.Number &&
+                             expiryElement.TryGetInt32(out var seconds)
+                ? seconds
+                : null;
+
+            var refreshToken = root.TryGetProperty("refresh_token", out var refreshElement) &&
+                               refreshElement.ValueKind == JsonValueKind.String &&
+                               !string.IsNullOrWhiteSpace(refreshElement.GetString())
+                ? refreshElement.GetString()
+                : null;
+
+            return new OpenEmrToken(accessToken, tokenType, expiresIn, refreshToken);
+        }
     }
 }

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.Extensions.Options;
 
 namespace OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
 
@@ -36,4 +37,11 @@ public sealed class OpenEmrOptions
     /// this set outside the Development environment.
     /// </summary>
     public bool AcceptAnyServerCertificate { get; set; }
+
+    /// <summary>
+    /// Settings for the circuit breakers that guard calls to OpenEMR. The defaults open after half of at
+    /// least five calls in 30 seconds fail, and keep the circuit open for 30 seconds.
+    /// </summary>
+    [ValidateObjectMembers]
+    public CircuitBreakerOptions CircuitBreaker { get; set; } = new();
 }

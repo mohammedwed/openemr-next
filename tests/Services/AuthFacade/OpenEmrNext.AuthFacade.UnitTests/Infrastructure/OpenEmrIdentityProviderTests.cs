@@ -10,8 +10,8 @@ namespace OpenEmrNext.AuthFacade.UnitTests.Infrastructure;
 
 /// <summary>
 /// Unit tests for <see cref="OpenEmrIdentityProvider"/> over a fake HTTP handler. They check
-/// the password-grant request it sends, how it passes OpenEMR's responses through unchanged, and how it
-/// maps transport failures and unusable success responses to exceptions.
+/// the password-grant request it sends, how it reads the token fields from OpenEMR's success response, and how it
+/// maps transport failures, timeouts and unusable success responses to exceptions.
 /// </summary>
 public class OpenEmrIdentityProviderTests
 {
@@ -53,8 +53,22 @@ public class OpenEmrIdentityProviderTests
         var result = await CreateProvider().PasswordGrantAsync(Username(), Password(), CancellationToken.None);
 
         Assert.Equal(200, result.StatusCode);
-        Assert.Equal(body, result.Body);
-        Assert.Equal("not-a-jwt-to-this-provider", result.AccessToken);
+        Assert.Equal("not-a-jwt-to-this-provider", result.Token!.AccessToken);
+        Assert.Equal("Bearer", result.Token.TokenType);
+        Assert.Equal(3600, result.Token.ExpiresIn);
+        Assert.Equal("r-1", result.Token.RefreshToken);
+    }
+
+    [Fact]
+    public async Task Success_without_token_type_defaults_to_bearer_and_omits_optional_fields()
+    {
+        RespondWith(HttpStatusCode.OK, "{\"access_token\":\"t\"}");
+
+        var result = await CreateProvider().PasswordGrantAsync(Username(), Password(), CancellationToken.None);
+
+        Assert.Equal("Bearer", result.Token!.TokenType);
+        Assert.Null(result.Token.ExpiresIn);
+        Assert.Null(result.Token.RefreshToken);
     }
 
     [Fact]
@@ -92,13 +106,12 @@ public class OpenEmrIdentityProviderTests
     [Fact]
     public async Task Rejected_credentials_pass_through_openemr_status_and_body()
     {
-        const string body = "{\"error\":\"invalid_grant\"}";
-        RespondWith(HttpStatusCode.Unauthorized, body);
+        RespondWith(HttpStatusCode.BadRequest, "{\"error\":\"invalid_grant\"}");
 
         var result = await CreateProvider().PasswordGrantAsync(Username(), Password(), CancellationToken.None);
 
-        Assert.Equal(401, result.StatusCode);
-        Assert.Equal(body, result.Body);
+        Assert.Equal(400, result.StatusCode);
+        Assert.Null(result.Token);
     }
 
     [Fact]
@@ -110,6 +123,17 @@ public class OpenEmrIdentityProviderTests
             () => CreateProvider().PasswordGrantAsync(Username(), Password(), CancellationToken.None));
 
         Assert.IsType<HttpRequestException>(ex.InnerException);
+    }
+
+    [Fact]
+    public async Task Client_timeout_throws_identity_provider_unavailable()
+    {
+        _handler.Exception = new TaskCanceledException("request timed out", new TimeoutException());
+
+        var ex = await Assert.ThrowsAsync<IdentityProviderUnavailableException>(
+            () => CreateProvider().PasswordGrantAsync(Username(), Password(), CancellationToken.None));
+
+        Assert.IsType<TaskCanceledException>(ex.InnerException);
     }
 
     [Fact]

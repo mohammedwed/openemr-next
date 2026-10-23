@@ -18,6 +18,8 @@ old one's status is updated to point to it.
 | [0010](0010-separate-contracts-project.md) | AuthFacade HTTP contracts live in the API project; ports live in their own project | Accepted | 2026-10-23 |
 | [0011](0011-host-neutral-composition-root.md) | Each host composes AuthFacade through a host-neutral composition root | Accepted | 2026-10-23 |
 | [0012](0012-accept-openemr-tokens-by-token-exchange.md) | AuthFacade accepts OpenEMR-issued JWTs through RFC 8693 token exchange | Superseded by 0013 | 2026-10-23 |
-| [0013](0013-pass-openemr-tokens-through.md) | AuthFacade passes OpenEMR's token response through unchanged | Accepted | 2026-10-23 |
+| [0013](0013-pass-openemr-tokens-through.md) | AuthFacade passes OpenEMR's token response through unchanged | Point 1 superseded by 0016 | 2026-10-23 |
 | [0014](0014-password-grant-does-not-check-client-secret.md) | OpenEMR's password grant does not check the client secret | Accepted | 2026-10-23 |
 | [0015](0015-development-certificate-bypass-only-in-development.md) | The development certificate bypass is refused outside Development | Accepted | 2026-10-23 |
+| [0016](0016-facade-token-response-shape.md) | AuthFacade returns its own token response shape on login | Accepted | 2026-10-24 |
+| [0017](0017-circuit-breakers-guard-openemr-calls.md) | Circuit breakers guard calls to OpenEMR | Accepted | 2026-10-24 |

@@ -68,10 +68,10 @@ var result = await login.HandleAsync(username, password, cancellationToken);
 switch (result)
 {
     case LoginSucceeded success:
-        // success.Body is OpenEMR's token response, unchanged
+        // success.Token holds the verified OpenEMR token fields: AccessToken, TokenType, ExpiresIn, RefreshToken
         break;
-    case LoginRejected rejected:
-        // rejected.StatusCode and rejected.Body come from OpenEMR; pass them through unchanged
+    case LoginRejected:
+        // OpenEMR refused the credentials. Return your own error, such as 400 invalid_grant; do not forward OpenEMR's body
         break;
     case LoginUnavailable:
         // OpenEMR could not be reached
