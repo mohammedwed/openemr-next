@@ -1,4 +1,6 @@
 using OpenEmrNext.AuthFacade.Application.Authentication;
+using OpenEmrNext.AuthFacade.Api.Contracts.Requests;
+using OpenEmrNext.AuthFacade.Api.Contracts.Responses;
 using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 
 namespace OpenEmrNext.AuthFacade.Api.Endpoints;
@@ -35,12 +37,12 @@ public static class TokenEndpoints
         var form = await request.ReadFormAsync(ct);
 
         // The only supported grant is "password", so the parsed value is not needed here.
-        if (!GrantType.TryParse(form["grant_type"].ToString(), out _))
-            return Results.BadRequest(new { error = "unsupported_grant_type" });
+        if (!GrantType.TryParse(form[TokenRequestFields.GrantType].ToString(), out _))
+            return Results.BadRequest(new ErrorResponse("unsupported_grant_type"));
 
-        if (!Username.TryParse(form["username"].ToString(), out var username) ||
-            !Password.TryParse(form["password"].ToString(), out var password))
-            return Results.BadRequest(new { error = "invalid_request" });
+        if (!Username.TryParse(form[TokenRequestFields.Username].ToString(), out var username) ||
+            !Password.TryParse(form[TokenRequestFields.Password].ToString(), out var password))
+            return Results.BadRequest(new ErrorResponse("invalid_request"));
 
         var result = await login.HandleAsync(username, password, ct);
         return ToHttpResult(result);
@@ -49,12 +51,8 @@ public static class TokenEndpoints
     /// <summary>Maps a login outcome to the HTTP response the client receives.</summary>
     private static IResult ToHttpResult(LoginResult result) => result switch
     {
-        LoginSucceeded success => Results.Ok(new
-        {
-            access_token = success.Token.AccessToken,
-            token_type = "Bearer",
-            expires_in = success.Token.ExpiresInSeconds
-        }),
+        LoginSucceeded success => Results.Ok(new TokenResponse(
+            success.Token.AccessToken, "Bearer", success.Token.ExpiresInSeconds)),
         LoginRejected rejected => Results.Content(rejected.Body, "application/json", statusCode: rejected.StatusCode),
         LoginUnavailable => ServerError("OpenEMR is unreachable.", StatusCodes.Status503ServiceUnavailable),
         LoginUpstreamError => ServerError("OpenEMR returned an unexpected response.", StatusCodes.Status502BadGateway),
@@ -63,5 +61,5 @@ public static class TokenEndpoints
 
     /// <summary>Builds an OAuth-style <c>server_error</c> response with the given description and status.</summary>
     private static IResult ServerError(string description, int statusCode) =>
-        Results.Json(new { error = "server_error", error_description = description }, statusCode: statusCode);
+        Results.Json(new ErrorResponse("server_error", description), statusCode: statusCode);
 }

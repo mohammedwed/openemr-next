@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenEmrNext.AuthFacade.Domain\OpenEmrNext.AuthFacade.Domain.csproj" />
+    <ProjectReference Include="..\OpenEmrNext.AuthFacade.Application.Ports\OpenEmrNext.AuthFacade.Application.Ports.csproj" />
   </ItemGroup>
 
 </Project>

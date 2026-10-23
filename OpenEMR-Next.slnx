@@ -6,6 +6,7 @@
     <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Domain/OpenEmrNext.AuthFacade.Domain.csproj" />
     <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Application/OpenEmrNext.AuthFacade.Application.csproj" />
     <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Infrastructure/OpenEmrNext.AuthFacade.Infrastructure.csproj" />
+    <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Application.Ports/OpenEmrNext.AuthFacade.Application.Ports.csproj" />
     <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Api/OpenEmrNext.AuthFacade.Api.csproj" />
   </Folder>
   <Folder Name="/tests/">
