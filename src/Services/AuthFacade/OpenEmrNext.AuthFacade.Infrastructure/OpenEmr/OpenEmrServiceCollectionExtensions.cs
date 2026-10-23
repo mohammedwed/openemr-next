@@ -1,15 +1,18 @@
+using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System.Net.Http;
-using OpenEmrNext.AuthFacade.Application.Abstractions;
 using Microsoft.Extensions.Options;
+using OpenEmrNext.AuthFacade.Application.Ports;
 
 namespace OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
 
 /// <summary>Registers the OpenEMR identity provider and its options.</summary>
 public static class OpenEmrServiceCollectionExtensions
 {
+    /// <summary>How long a request to OpenEMR may take before it fails.</summary>
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
+
     /// <summary>
     /// Binds and validates <see cref="OpenEmrOptions"/> at startup, then registers
     /// <see cref="IOpenEmrIdentityProvider"/> with a typed HTTP client.
@@ -35,20 +38,24 @@ public static class OpenEmrServiceCollectionExtensions
         {
             var options = sp.GetRequiredService<IOptions<OpenEmrOptions>>().Value;
             client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
-            client.Timeout = TimeSpan.FromSeconds(15);
+            client.Timeout = RequestTimeout;
         })
-        .ConfigurePrimaryHttpMessageHandler(() =>
-        {
-            var handler = new HttpClientHandler();
-            if (environment.IsDevelopment())
-            {
-                // OpenEMR's dev certificate is self-signed. Development only.
-                handler.ServerCertificateCustomValidationCallback =
-                    HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
-            }
-            return handler;
-        });
+        .ConfigurePrimaryHttpMessageHandler(() => CreateHandler(environment));
 
         return services;
+    }
+
+    /// <summary>Creates the primary handler. Only the Development environment accepts any certificate.</summary>
+    private static HttpClientHandler CreateHandler(IHostEnvironment environment)
+    {
+        var handler = new HttpClientHandler();
+        if (environment.IsDevelopment())
+        {
+            // OpenEMR's dev certificate is self-signed. Development only.
+            handler.ServerCertificateCustomValidationCallback =
+                HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+        }
+
+        return handler;
     }
 }

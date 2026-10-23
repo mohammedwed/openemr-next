@@ -1,15 +1,15 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
-using OpenEmrNext.AuthFacade.Application.Abstractions;
+using OpenEmrNext.AuthFacade.Application.Ports;
 using OpenEmrNext.AuthFacade.Infrastructure.Security;
-using System.Text;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Infrastructure;
 
 /// <summary>
-/// Unit tests for <c>AddServiceJwt</c>. They check the claims, issuer, audience, signature,
+/// Unit tests for <c>AddJwtAuthentication</c>. They check the claims, issuer, audience, signature,
 /// and lifetime of tokens that the registered <see cref="IAccessTokenIssuer"/> creates.
 /// </summary>
 public class JwtServiceCollectionExtensionsTests
@@ -21,11 +21,17 @@ public class JwtServiceCollectionExtensionsTests
     private static IAccessTokenIssuer CreateIssuer()
     {
         var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["Jwt:Key"] = Key })
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Jwt:Key"] = Key,
+                ["Jwt:Issuer"] = "openemr-next",
+                ["Jwt:Audience"] = "openemr-next-api",
+                ["Jwt:LifetimeMinutes"] = "30"
+            })
             .Build();
 
         var services = new ServiceCollection();
-        services.AddServiceJwt(configuration);
+        services.AddJwtAuthentication(configuration);
 
         return services.BuildServiceProvider().GetRequiredService<IAccessTokenIssuer>();
     }

@@ -1,9 +1,9 @@
-using Microsoft.AspNetCore.Http;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
-using OpenEmrNext.AuthFacade.Application.Abstractions;
-using OpenEmrNext.AuthFacade.Domain.ValueObjects;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
+using OpenEmrNext.AuthFacade.Application.Ports;
+using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 
 namespace OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
 
@@ -17,6 +17,8 @@ namespace OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
 internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrOptions> options)
     : IOpenEmrIdentityProvider
 {
+    private const string TokenPath = "oauth2/default/token";
+
     private readonly OpenEmrOptions _options = options.Value;
 
     /// <inheritdoc/>
@@ -34,18 +36,7 @@ internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrO
             ["scope"] = _options.Scope
         });
 
-        string body;
-        int statusCode;
-        try
-        {
-            using var response = await http.PostAsync("oauth2/default/token", form, ct);
-            body = await response.Content.ReadAsStringAsync(ct);
-            statusCode = (int)response.StatusCode;
-        }
-        catch (HttpRequestException ex)
-        {
-            throw new IdentityProviderUnavailableException(ex);
-        }
+        var (statusCode, body) = await PostGrantAsync(form, ct);
 
         if (statusCode != StatusCodes.Status200OK)
         {
@@ -54,6 +45,22 @@ internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrO
 
         // Read the subject from OpenEMR's token (received over TLS).
         return new PasswordGrantResult(statusCode, body, ReadSubject(body));
+    }
+
+    /// <summary>Sends the form to OpenEMR's token endpoint and returns its status and body.</summary>
+    /// <exception cref="IdentityProviderUnavailableException">OpenEMR could not be reached.</exception>
+    private async Task<(int StatusCode, string Body)> PostGrantAsync(FormUrlEncodedContent form, CancellationToken ct)
+    {
+        try
+        {
+            using var response = await http.PostAsync(TokenPath, form, ct);
+            var body = await response.Content.ReadAsStringAsync(ct);
+            return ((int)response.StatusCode, body);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new IdentityProviderUnavailableException(ex);
+        }
     }
 
     /// <summary>Extracts the <c>sub</c> claim from the access token in OpenEMR's response body.</summary>
@@ -68,14 +75,7 @@ internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrO
     {
         try
         {
-            using var doc = JsonDocument.Parse(body);
-            if (!doc.RootElement.TryGetProperty("access_token", out var tokenElement) ||
-                tokenElement.ValueKind != JsonValueKind.String)
-            {
-                throw new IdentityProviderResponseException("OpenEMR response has no access_token.");
-            }
-
-            var subject = new JwtSecurityTokenHandler().ReadJwtToken(tokenElement.GetString()!).Subject;
+            var subject = new JwtSecurityTokenHandler().ReadJwtToken(ReadAccessToken(body)).Subject;
             if (string.IsNullOrWhiteSpace(subject))
             {
                 throw new IdentityProviderResponseException("OpenEMR access_token has no subject.");
@@ -87,5 +87,19 @@ internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrO
         {
             throw new IdentityProviderResponseException("OpenEMR returned an unreadable token.", ex);
         }
+    }
+
+    /// <summary>Returns the <c>access_token</c> string from OpenEMR's response body.</summary>
+    /// <exception cref="IdentityProviderResponseException">The body has no string <c>access_token</c>.</exception>
+    private static string ReadAccessToken(string body)
+    {
+        using var doc = JsonDocument.Parse(body);
+        if (!doc.RootElement.TryGetProperty("access_token", out var tokenElement) ||
+            tokenElement.ValueKind != JsonValueKind.String)
+        {
+            throw new IdentityProviderResponseException("OpenEMR response has no access_token.");
+        }
+
+        return tokenElement.GetString()!;
     }
 }

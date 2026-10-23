@@ -34,6 +34,7 @@ public static class TokenEndpoints
     {
         var form = await request.ReadFormAsync(ct);
 
+        // The only supported grant is "password", so the parsed value is not needed here.
         if (!GrantType.TryParse(form["grant_type"].ToString(), out _))
             return Results.BadRequest(new { error = "unsupported_grant_type" });
 
@@ -42,27 +43,25 @@ public static class TokenEndpoints
             return Results.BadRequest(new { error = "invalid_request" });
 
         var result = await login.HandleAsync(username, password, ct);
-
-        return result switch
-        {
-            LoginSucceeded success => Results.Ok(new
-            {
-                access_token = success.Token.AccessToken,
-                token_type = "Bearer",
-                expires_in = success.Token.ExpiresInSeconds
-            }),
-            LoginRejected rejected => Results.Content(rejected.Body, "application/json", statusCode: rejected.StatusCode),
-            LoginUnavailable => Results.Json(new
-            {
-                error = "server_error",
-                error_description = "OpenEMR is unreachable."
-            }, statusCode: StatusCodes.Status503ServiceUnavailable),
-            LoginUpstreamError => Results.Json(new
-            {
-                error = "server_error",
-                error_description = "OpenEMR returned an unexpected response."
-            }, statusCode: StatusCodes.Status502BadGateway),
-            _ => throw new InvalidOperationException("Unhandled login result.")
-        };
+        return ToHttpResult(result);
     }
+
+    /// <summary>Maps a login outcome to the HTTP response the client receives.</summary>
+    private static IResult ToHttpResult(LoginResult result) => result switch
+    {
+        LoginSucceeded success => Results.Ok(new
+        {
+            access_token = success.Token.AccessToken,
+            token_type = "Bearer",
+            expires_in = success.Token.ExpiresInSeconds
+        }),
+        LoginRejected rejected => Results.Content(rejected.Body, "application/json", statusCode: rejected.StatusCode),
+        LoginUnavailable => ServerError("OpenEMR is unreachable.", StatusCodes.Status503ServiceUnavailable),
+        LoginUpstreamError => ServerError("OpenEMR returned an unexpected response.", StatusCodes.Status502BadGateway),
+        _ => throw new InvalidOperationException("Unhandled login result.")
+    };
+
+    /// <summary>Builds an OAuth-style <c>server_error</c> response with the given description and status.</summary>
+    private static IResult ServerError(string description, int statusCode) =>
+        Results.Json(new { error = "server_error", error_description = description }, statusCode: statusCode);
 }

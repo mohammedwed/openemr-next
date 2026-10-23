@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
-using OpenEmrNext.AuthFacade.Application.Abstractions;
+using OpenEmrNext.AuthFacade.Application.Ports;
 using OpenEmrNext.AuthFacade.UnitTests.Application;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Api;

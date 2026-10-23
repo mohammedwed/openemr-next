@@ -1,4 +1,4 @@
-using OpenEmrNext.AuthFacade.Application.Abstractions;
+using OpenEmrNext.AuthFacade.Application.Ports;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Application;
 

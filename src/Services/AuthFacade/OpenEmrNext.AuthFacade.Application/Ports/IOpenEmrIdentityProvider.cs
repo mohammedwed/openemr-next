@@ -1,6 +1,6 @@
 using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 
-namespace OpenEmrNext.AuthFacade.Application.Abstractions;
+namespace OpenEmrNext.AuthFacade.Application.Ports;
 
 /// <summary>Verifies credentials against the legacy OpenEMR identity server.</summary>
 public interface IOpenEmrIdentityProvider

@@ -1,4 +1,4 @@
-namespace OpenEmrNext.AuthFacade.Application.Abstractions;
+namespace OpenEmrNext.AuthFacade.Application.Ports;
 
 /// <summary>Issues this service's own access tokens.</summary>
 public interface IAccessTokenIssuer

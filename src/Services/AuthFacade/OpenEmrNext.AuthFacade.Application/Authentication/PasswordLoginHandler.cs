@@ -1,4 +1,4 @@
-using OpenEmrNext.AuthFacade.Application.Abstractions;
+using OpenEmrNext.AuthFacade.Application.Ports;
 using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 
 namespace OpenEmrNext.AuthFacade.Application.Authentication;
@@ -34,13 +34,14 @@ public sealed class PasswordLoginHandler(IOpenEmrIdentityProvider identityProvid
             return new LoginUpstreamError();
         }
 
-        if (grant.Subject is null)
+        // A subject is present only when OpenEMR accepted the credentials.
+        if (grant.Subject is not { } subject)
         {
             return new LoginRejected(grant.StatusCode, grant.Body);
         }
 
         // OpenEMR accepted the login. Issue this service's own short-lived token;
         // OpenEMR's token is not returned to the caller.
-        return new LoginSucceeded(tokenIssuer.Issue(grant.Subject, username.Value));
+        return new LoginSucceeded(tokenIssuer.Issue(subject, username.Value));
     }
 }

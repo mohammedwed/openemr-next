@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OpenEmrNext.AuthFacade.Api;
-using OpenEmrNext.AuthFacade.Application.Abstractions;
+using OpenEmrNext.AuthFacade.Application.Ports;
 using OpenEmrNext.AuthFacade.UnitTests.Application;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Api;
@@ -48,6 +48,9 @@ internal sealed class TestApi : IAsyncDisposable
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Jwt:Key"] = "unit-test-signing-key-at-least-32-bytes-long",
+            ["Jwt:Issuer"] = "openemr-next",
+            ["Jwt:Audience"] = "openemr-next-api",
+            ["Jwt:LifetimeMinutes"] = "30",
             ["OpenEmr:BaseUrl"] = "https://openemr.test",
             ["OpenEmr:ClientId"] = "facade-client",
             ["OpenEmr:ClientSecret"] = "facade-secret"
