@@ -1,5 +1,6 @@
 using OpenEmrNext.AuthFacade.Api.Authentication;
 using OpenEmrNext.AuthFacade.Composition;
+using OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
 
 namespace OpenEmrNext.AuthFacade.Api;
 
@@ -19,6 +20,14 @@ public static class AuthFacadeApiExtensions
             .AddBearerAuthentication()
             .AddAuthorization()
             .AddOpenApi();
+
+        // The API host knows its environment, so it refuses the development TLS bypass anywhere else.
+        builder.Services.AddOptions<OpenEmrOptions>()
+            .Validate(
+                options => !options.AcceptAnyServerCertificate || builder.Environment.IsDevelopment(),
+                "OpenEmr:AcceptAnyServerCertificate can be true only in the Development environment.")
+            .ValidateOnStart();
+
         return builder;
     }
 

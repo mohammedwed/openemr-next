@@ -55,13 +55,20 @@ public class OpenEmrTokenVerifierTests : IDisposable
         string audience = ClientId,
         DateTime? expires = null,
         string subject = "subject-1",
+        string? name = null,
         SigningCredentials? credentials = null)
     {
         var expiresAt = expires ?? DateTime.UtcNow.AddMinutes(10);
+        var claims = new List<Claim> { new(JwtRegisteredClaimNames.Sub, subject) };
+        if (name is not null)
+        {
+            claims.Add(new Claim(JwtRegisteredClaimNames.Name, name));
+        }
+
         var token = new JwtSecurityToken(
             issuer: issuer,
             audience: audience,
-            claims: [new Claim(JwtRegisteredClaimNames.Sub, subject)],
+            claims: claims,
             notBefore: expiresAt.AddMinutes(-60),
             expires: expiresAt,
             signingCredentials: credentials ?? new SigningCredentials(new RsaSecurityKey(_rsa), SecurityAlgorithms.RsaSha256));
@@ -77,6 +84,26 @@ public class OpenEmrTokenVerifierTests : IDisposable
         var result = await verifier.VerifyAsync(Sign(subject: "subject-1"), CancellationToken.None);
 
         Assert.Equal("subject-1", result?.Subject);
+    }
+
+    [Fact]
+    public async Task Name_claim_is_returned_when_the_token_has_one()
+    {
+        var verifier = CreateVerifier();
+
+        var result = await verifier.VerifyAsync(Sign(name: "alice_01"), CancellationToken.None);
+
+        Assert.Equal("alice_01", result?.Name);
+    }
+
+    [Fact]
+    public async Task Name_is_null_when_the_token_has_no_name_claim()
+    {
+        var verifier = CreateVerifier();
+
+        var result = await verifier.VerifyAsync(Sign(), CancellationToken.None);
+
+        Assert.Null(result?.Name);
     }
 
     [Fact]

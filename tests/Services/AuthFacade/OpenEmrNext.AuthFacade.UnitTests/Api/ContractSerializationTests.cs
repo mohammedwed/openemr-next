@@ -20,16 +20,6 @@ public class ContractSerializationTests
     }
 
     [Fact]
-    public void Token_response_uses_snake_case_oauth_names()
-    {
-        var json = Serialize(new TokenResponse("jwt", "Bearer", 1800));
-
-        Assert.Equal("jwt", json.GetProperty("access_token").GetString());
-        Assert.Equal("Bearer", json.GetProperty("token_type").GetString());
-        Assert.Equal(1800, json.GetProperty("expires_in").GetInt32());
-    }
-
-    [Fact]
     public void Error_response_omits_error_description_when_it_is_null()
     {
         var json = Serialize(new ErrorResponse("invalid_request"));

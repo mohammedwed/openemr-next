@@ -4,7 +4,7 @@ using Scalar.AspNetCore;
 
 // Composition root: dependencies are registered on the builder, then the middleware and
 // endpoints are mapped on the built app. Configuration is read from appsettings and the
-// environment (OpenEmr:*, Jwt:*).
+// environment (OpenEmr:*).
 var builder = WebApplication.CreateBuilder(args);
 builder.AddAuthFacadeHttpDependencies();
 var app = builder.Build();

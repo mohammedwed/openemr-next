@@ -48,9 +48,6 @@ public sealed partial record GrantType
     /// <summary>The password grant, which verifies a username and password with OpenEMR.</summary>
     public const string Password = "password";
 
-    /// <summary>The RFC 8693 token exchange grant, which trades an OpenEMR JWT for this service's token.</summary>
-    public const string TokenExchange = "urn:ietf:params:oauth:grant-type:token-exchange";
-
-    [GeneratedRegex(@"\A(password|urn:ietf:params:oauth:grant-type:token-exchange)\z")]
+    [GeneratedRegex(@"\Apassword\z")]
     private static partial Regex GrantTypePattern();
 }

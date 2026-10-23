@@ -52,7 +52,11 @@ internal sealed class OpenEmrTokenVerifier(HttpClient http, IOptions<OpenEmrOpti
             return null;
         }
 
-        return new VerifiedToken(value);
+        var name = result.Claims.TryGetValue("name", out var claimName) && claimName is string nameValue && nameValue.Length > 0
+            ? nameValue
+            : null;
+
+        return new VerifiedToken(value, name);
     }
 
     /// <summary>Checks every rule the token must satisfy: RS256 only, signature, issuer, audience and lifetime.</summary>

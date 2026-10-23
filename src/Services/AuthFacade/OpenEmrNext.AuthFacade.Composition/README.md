@@ -17,7 +17,7 @@ using OpenEmrNext.AuthFacade.Composition;
 services.AddAuthFacade(configuration);
 ```
 
-`AddAuthFacade` binds and validates the `OpenEmr` and `Jwt` sections, so the host fails at
+`AddAuthFacade` binds and validates the `OpenEmr` section, so the host fails at
 startup when a required value is missing. It also registers the login use case
 (`PasswordLoginHandler`, scoped).
 
@@ -28,8 +28,7 @@ Required settings:
 | `OpenEmr:BaseUrl`, `OpenEmr:ClientId`, `OpenEmr:ClientSecret` | Required. `BaseUrl` is where AuthFacade reaches OpenEMR, and `ClientId` is also the expected token audience |
 | `OpenEmr:Issuer` | Required. The issuer string OpenEMR writes into its tokens, for example `https://localhost:9300/oauth2/default`. It can differ from `BaseUrl` inside a Docker network |
 | `OpenEmr:Scope` | Optional, defaults to `openid api:oemr` |
-| `OpenEmr:AcceptAnyServerCertificate` | Defaults to `false`. Development only, because OpenEMR's dev certificate is self-signed |
-| `Jwt:Key`, `Jwt:Issuer`, `Jwt:Audience`, `Jwt:LifetimeMinutes` | Required. Keep `Jwt:Key` in user secrets or environment variables |
+| `OpenEmr:AcceptAnyServerCertificate` | Defaults to `false`. Development only, because OpenEMR's dev certificate is self-signed. The API host refuses `true` outside Development; other hosts must add the same check |
 
 Your host supplies these however it likes: appsettings, environment variables or user secrets.
 
@@ -69,7 +68,7 @@ var result = await login.HandleAsync(username, password, cancellationToken);
 switch (result)
 {
     case LoginSucceeded success:
-        // success.Token.AccessToken, success.Token.ExpiresInSeconds
+        // success.Body is OpenEMR's token response, unchanged
         break;
     case LoginRejected rejected:
         // rejected.StatusCode and rejected.Body come from OpenEMR; pass them through unchanged
@@ -97,4 +96,4 @@ four cases explicitly, and do not add a catch-all that hides a new outcome.
 
 - Do not read configuration in the layers. Only Composition reads it.
 - Do not reference the Api project from a non-HTTP host.
-- Do not log the password or the issued token.
+- Do not log the password or the token response.

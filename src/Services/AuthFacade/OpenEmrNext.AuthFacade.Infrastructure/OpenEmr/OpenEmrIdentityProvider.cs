@@ -1,4 +1,3 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using OpenEmrNext.AuthFacade.Application.Ports;
@@ -37,13 +36,9 @@ internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrO
 
         var (statusCode, body) = await PostGrantAsync(form, ct);
 
-        if (statusCode != Status200OK)
-        {
-            return new PasswordGrantResult(statusCode, body, null);
-        }
-
-        // Read the subject from OpenEMR's token (received over TLS).
-        return new PasswordGrantResult(statusCode, body, ReadSubject(body));
+        return statusCode == Status200OK
+            ? new PasswordGrantResult(statusCode, body, ReadAccessToken(body))
+            : new PasswordGrantResult(statusCode, body);
     }
 
     /// <summary>Sends the form to OpenEMR's token endpoint and returns its status and body.</summary>
@@ -62,43 +57,31 @@ internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrO
         }
     }
 
-    /// <summary>Extracts the <c>sub</c> claim from the access token in OpenEMR's response body.</summary>
-    /// <remarks>
-    /// The token's signature is not verified. The subject is trusted because the token arrives
-    /// over the TLS connection to OpenEMR, and this service only uses it to name the new token.
-    /// </remarks>
+    /// <summary>
+    /// Reads the non-empty string <c>access_token</c> from OpenEMR's success body. The token is not
+    /// verified here; the login handler verifies it before anything is returned.
+    /// </summary>
     /// <param name="body">OpenEMR's successful response body.</param>
-    /// <returns>The subject claim.</returns>
-    /// <exception cref="IdentityProviderResponseException">The body has no usable access token or subject.</exception>
-    private static string ReadSubject(string body)
+    /// <returns>The access token.</returns>
+    /// <exception cref="IdentityProviderResponseException">The body is not JSON or has no usable <c>access_token</c>.</exception>
+    private static string ReadAccessToken(string body)
     {
         try
         {
-            var subject = new JwtSecurityTokenHandler().ReadJwtToken(ReadAccessToken(body)).Subject;
-            if (string.IsNullOrWhiteSpace(subject))
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("access_token", out var token) &&
+                token.ValueKind == JsonValueKind.String &&
+                token.GetString() is { } value &&
+                !string.IsNullOrWhiteSpace(value))
             {
-                throw new IdentityProviderResponseException("OpenEMR access_token has no subject.");
+                return value;
             }
-
-            return subject;
         }
-        catch (Exception ex) when (ex is JsonException or ArgumentException or InvalidOperationException)
+        catch (JsonException ex)
         {
-            throw new IdentityProviderResponseException("OpenEMR returned an unreadable token.", ex);
-        }
-    }
-
-    /// <summary>Returns the <c>access_token</c> string from OpenEMR's response body.</summary>
-    /// <exception cref="IdentityProviderResponseException">The body has no string <c>access_token</c>.</exception>
-    private static string ReadAccessToken(string body)
-    {
-        using var doc = JsonDocument.Parse(body);
-        if (!doc.RootElement.TryGetProperty("access_token", out var tokenElement) ||
-            tokenElement.ValueKind != JsonValueKind.String)
-        {
-            throw new IdentityProviderResponseException("OpenEMR response has no access_token.");
+            throw new IdentityProviderResponseException("OpenEMR returned an unreadable body.", ex);
         }
 
-        return tokenElement.GetString()!;
+        throw new IdentityProviderResponseException("OpenEMR response has no access_token.");
     }
 }

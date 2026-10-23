@@ -37,7 +37,6 @@ jobs:
           DB_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD || 'ci-root-password' }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'ci-openemr-password' }}
           OE_PASS: ${{ secrets.OE_PASS || 'ci-admin-password' }}
-          JWT_KEY: ${{ secrets.JWT_KEY || 'ci-only-jwt-key-change-me-0123456789abcdef' }}
           AUTHFACADE_CLIENT_SECRET: ${{ secrets.AUTHFACADE_CLIENT_SECRET || 'ci-client-secret' }}
           AUTHFACADE_CLIENT_ID: ${{ vars.AUTHFACADE_CLIENT_ID || 'authfacade' }}
           OPENEMR_IMAGE: openemr/openemr:8.0.0.3
@@ -48,7 +47,6 @@ jobs:
             "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" \
             "DB_PASSWORD=$DB_PASSWORD" \
             "OE_PASS=$OE_PASS" \
-            "JWT_KEY=$JWT_KEY" \
             "AUTHFACADE_CLIENT_SECRET=$AUTHFACADE_CLIENT_SECRET" \
             "AUTHFACADE_CLIENT_ID=$AUTHFACADE_CLIENT_ID" \
             "OPENEMR_IMAGE=$OPENEMR_IMAGE" \

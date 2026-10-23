@@ -6,8 +6,8 @@ namespace OpenEmrNext.AuthFacade.IntegrationTests;
 
 /// <summary>
 /// Live tests of <c>POST /connect/token</c> against the running stack. Each test checks a
-/// status code and error body from a real OpenEMR response, so the expected values follow
-/// OpenEMR's behavior. The unit tests cover the same paths with a fake identity provider.
+/// status code and body from a real OpenEMR response, so the expected values follow
+/// OpenEMR's behavior. Successful bodies are OpenEMR's token response, passed through unchanged. The unit tests cover the same paths with a fake identity provider.
 /// </summary>
 [Collection("Stack")]
 [Trait("Category", "Integration")]
@@ -16,7 +16,7 @@ public class TokenEndpointTests
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
 
     [Fact]
-    public async Task Valid_credentials_return_an_AuthFacade_token()
+    public async Task Valid_credentials_return_the_openemr_token_response()
     {
         using var response = await PostPasswordGrantAsync(StackConfig.LoginUser, StackConfig.LoginPassword);
 

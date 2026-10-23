@@ -32,7 +32,8 @@ public sealed class OpenEmrOptions
 
     /// <summary>
     /// Accepts any OpenEMR server certificate. Off by default. Set only in development settings,
-    /// because OpenEMR's development certificate is self-signed.
+    /// because OpenEMR's development certificate is self-signed. The API host refuses to start with
+    /// this set outside the Development environment.
     /// </summary>
     public bool AcceptAnyServerCertificate { get; set; }
 }

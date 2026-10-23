@@ -23,7 +23,7 @@ research vision below is the long-term direction, not the current deliverable.
 | Local stack | OpenEMR, MariaDB, and AuthFacade in one Docker Compose project | Built |
 | Database baseline | Reproducible schema and seed data from the OpenEMR installer | Built, not yet cleaned |
 | `OpenEmr.Data` | EF Core model scaffolded from the live database | Built |
-| AuthFacade | Token broker: password grant to OpenEMR, then issues its own JWT | Built, hardening in progress |
+| AuthFacade | Token broker: password grant to OpenEMR, returns OpenEMR's token response | Built, hardening in progress |
 | API gateway (YARP) | Single entry point, token validation at the edge | Planned |
 | Patient Management | Registers patients, publishes `PatientRegistered` | Planned |
 | Clinical Care | Creates encounters and records vitals for registered patients | Planned |
@@ -47,23 +47,19 @@ stepping stone: each future service should scaffold only its own tables.
 
 **AuthFacade (`src/Services/AuthFacade`).** A minimal ASP.NET Core API:
 
-- `POST /connect/token` accepts two grants and returns a facade-issued JWT in a
-  JSON response:
-  - a password grant, which verifies the login with OpenEMR's OAuth2 server;
-  - an RFC 8693 token exchange, which verifies an OpenEMR-issued JWT against
-    OpenEMR's JWKS and returns a facade token for the same subject. See
-    [ADR 0012](docs/architecture/0012-accept-openemr-tokens-by-token-exchange.md).
-- `GET /me` requires a valid facade JWT and returns the subject and name.
+- `POST /connect/token` accepts the password grant. It verifies the login with
+  OpenEMR's OAuth2 server and returns OpenEMR's token response unchanged,
+  including `refresh_token` when OpenEMR issues one. AuthFacade issues no token
+  of its own. See [ADR 0013](docs/architecture/0013-pass-openemr-tokens-through.md).
+- `GET /me` requires an OpenEMR-issued bearer token. The token is verified
+  against OpenEMR's JWKS, and `/me` returns the subject and name.
 - `GET /hello` is a liveness check.
-
-Facade tokens expire after 30 minutes. There is no refresh, revocation, or key
-rotation yet.
 
 ## Architecture
 
 ```text
             +-------------------+
- client --> | AuthFacade (.NET) |  issues its own JWT (Bearer)
+ client --> | AuthFacade (.NET) |  passes OpenEMR's tokens through
             +---------+---------+
                       | password grant (OAuth2)
             +---------v---------+        +-----------+
@@ -81,11 +77,13 @@ is a token broker in front of it. It does not store passwords or user records.
 - **Identity stays in OpenEMR.** Users, ACLs, password hashing, MFA, lockout,
   and expiry are enforced by OpenEMR. AuthFacade delegates to it rather than
   copying its logic.
-- **Clients never receive OpenEMR's token.** They validate AuthFacade's
-  signature, issuer, and audience only.
+- **Clients receive OpenEMR's token response, unchanged.** AuthFacade verifies
+  the access token against OpenEMR's JWKS before returning it (ADR 0013).
 - **Minimal client scopes.** The AuthFacade OAuth client holds authentication
-  scopes only (`openid`, `profile`, `email`, `offline_access`). A leaked
-  AuthFacade secret cannot read patient data through the API.
+  scopes only (`openid`, `profile`, `email`, `offline_access`). The client
+  secret does not protect the password grant, because OpenEMR does not check it
+  there (ADR 0014). Only the client ID's registration and the scopes limit what
+  the client can do.
 - **Browser login is not implemented.** The password grant is used because
   AuthFacade is the only client and this is a development stand-in. The
   production target is the authorization-code flow with PKCE, which needs its
@@ -93,13 +91,11 @@ is a token broker in front of it. It does not store passwords or user records.
 
 ### Known gaps
 
-- No refresh, revocation, or key rotation for facade tokens.
 - `/me` confirms identity only. Authorization for OpenEMR data is not built.
 - The audience check uses a fixed string rather than a registered client.
 - No login rate limiting or lockout in AuthFacade. Brute-force protection relies
   on whatever OpenEMR enforces.
 - Login outcomes and `/me` access are not audit-logged.
-- `Jwt:Key` has only a presence check. A key shorter than 32 bytes is accepted.
 - When OpenEMR rejects a login, its error body is returned to the client
   unchanged.
 - The service serves plain HTTP on port 8080, with no HTTPS redirect or HSTS.
@@ -119,13 +115,13 @@ is a token broker in front of it. It does not store passwords or user records.
   its failed-login counter receives an object where a string is expected.
   AuthFacade cannot prevent this from outside. The strict integration test will
   fail if it recurs.
-- `ReadJwtToken` reads the `sub` claim without verifying the signature. This is
-  acceptable only because the token arrives directly from OpenEMR over TLS in
-  the same request. Do not reuse this pattern for client-supplied tokens.
 - The development TLS bypass (`DangerousAcceptAnyServerCertificateValidator`)
-  is enabled only by `OpenEmr:AcceptAnyServerCertificate`, which defaults to
-  `false` and is set in `appsettings.Development.json`. It must be replaced with
-  a trusted certificate before any shared use.
+  is enabled by `OpenEmr:AcceptAnyServerCertificate`. The setting defaults to
+  `false` and is `true` in `appsettings.Development.json`, which the Compose
+  stack loads. The API host refuses to start with it set outside Development.
+  The Compose stack reaches OpenEMR over plain HTTP inside the Docker network,
+  so the bypass has no effect there today. It must be replaced with a trusted
+  certificate before any shared use.
 - Data-protection keys are not persisted, so the container logs a warning.
 
 ## Legacy database compatibility
