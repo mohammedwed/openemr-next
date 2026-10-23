@@ -48,9 +48,12 @@ stepping stone: each future service should scaffold only its own tables.
 **AuthFacade (`src/Services/AuthFacade`).** A minimal ASP.NET Core API:
 
 - `POST /connect/token` accepts the password grant. It verifies the login with
-  OpenEMR's OAuth2 server and returns OpenEMR's token response unchanged,
-  including `refresh_token` when OpenEMR issues one. AuthFacade issues no token
-  of its own. See [ADR 0013](docs/architecture/0013-pass-openemr-tokens-through.md).
+  OpenEMR's OAuth2 server and returns a token response with `access_token`,
+  `token_type`, `expires_in`, and `refresh_token` when OpenEMR issues one. The
+  access token is verified before it is returned. A refused login returns 400
+  `invalid_grant`. AuthFacade issues no token of its own. See
+  [ADR 0013](docs/architecture/0013-pass-openemr-tokens-through.md) and
+  [ADR 0016](docs/architecture/0016-facade-token-response-shape.md).
 - `GET /me` requires an OpenEMR-issued bearer token. The token is verified
   against OpenEMR's JWKS, and `/me` returns the subject and name.
 - `GET /hello` is a liveness check.
@@ -77,8 +80,11 @@ is a token broker in front of it. It does not store passwords or user records.
 - **Identity stays in OpenEMR.** Users, ACLs, password hashing, MFA, lockout,
   and expiry are enforced by OpenEMR. AuthFacade delegates to it rather than
   copying its logic.
-- **Clients receive OpenEMR's token response, unchanged.** AuthFacade verifies
-  the access token against OpenEMR's JWKS before returning it (ADR 0013).
+- **Clients receive OpenEMR's tokens in AuthFacade's own response shape.**
+  AuthFacade verifies the access token against OpenEMR's JWKS before returning
+  it (ADR 0013), and returns only the four token fields (ADR 0016).
+- **Calls to OpenEMR are guarded by circuit breakers.** While OpenEMR is failing,
+  logins and token checks fail fast instead of waiting for timeouts (ADR 0017).
 - **Minimal client scopes.** The AuthFacade OAuth client holds authentication
   scopes only (`openid`, `profile`, `email`, `offline_access`). The client
   secret does not protect the password grant, because OpenEMR does not check it
@@ -96,8 +102,6 @@ is a token broker in front of it. It does not store passwords or user records.
 - No login rate limiting or lockout in AuthFacade. Brute-force protection relies
   on whatever OpenEMR enforces.
 - Login outcomes and `/me` access are not audit-logged.
-- When OpenEMR rejects a login, its error body is returned to the client
-  unchanged.
 - The service serves plain HTTP on port 8080, with no HTTPS redirect or HSTS.
 - Startup does not wait for OpenEMR, so early requests can fail.
 - Form values are not logged, but no test enforces this yet.

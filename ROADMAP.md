@@ -107,8 +107,6 @@ redirect and cookie handling considered earlier are not part of this milestone.
   username. Today the only protection is OpenEMR's own lockout.
 - Audit log of login outcomes and `/me` access, with no credentials or tokens
   in the log
-- Allowlist for the error fields returned to clients when OpenEMR rejects a
-  login, instead of passing its body through unchanged
 - HTTPS for the service itself, with a redirect and HSTS. Required before any
   shared environment, together with the TLS item above
 - Record the accepted risk of password copies in memory (ADR 0009) and the

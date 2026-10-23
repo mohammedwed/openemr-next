@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using OpenEmrNext.AuthFacade.Application.Ports;
 using OpenEmrNext.AuthFacade.Composition;
 using OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
 
@@ -57,4 +59,28 @@ public class StartupValidationTests
         await Assert.ThrowsAsync<OptionsValidationException>(() => host.StartAsync());
     }
 
+    [Theory]
+    [InlineData("OpenEmr:CircuitBreaker:FailureRatio", "0")]
+    [InlineData("OpenEmr:CircuitBreaker:FailureRatio", "1.5")]
+    [InlineData("OpenEmr:CircuitBreaker:MinimumThroughput", "0")]
+    [InlineData("OpenEmr:CircuitBreaker:SamplingDuration", "00:00:00.100")]
+    [InlineData("OpenEmr:CircuitBreaker:BreakDuration", "00:00:00.100")]
+    public async Task Host_refuses_to_start_when_a_circuit_breaker_setting_is_out_of_range(string key, string value)
+    {
+        var settings = ValidSettings();
+        settings[key] = value;
+        using var host = BuildHost(settings);
+
+        await Assert.ThrowsAsync<OptionsValidationException>(() => host.StartAsync());
+    }
+
+    [Fact]
+    public void Token_verifier_is_wrapped_in_its_circuit_breaker()
+    {
+        using var host = BuildHost(ValidSettings());
+
+        var verifier = host.Services.GetRequiredService<IExternalTokenVerifier>();
+
+        Assert.IsType<CircuitBreakingTokenVerifier>(verifier);
+    }
 }

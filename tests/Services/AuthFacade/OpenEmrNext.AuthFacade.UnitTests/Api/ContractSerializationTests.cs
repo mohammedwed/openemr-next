@@ -37,6 +37,26 @@ public class ContractSerializationTests
     }
 
     [Fact]
+    public void Token_response_uses_snake_case_names()
+    {
+        var json = Serialize(new TokenResponse("openemr-token", "Bearer", 3600, "r-1"));
+
+        Assert.Equal("openemr-token", json.GetProperty("access_token").GetString());
+        Assert.Equal("Bearer", json.GetProperty("token_type").GetString());
+        Assert.Equal(3600, json.GetProperty("expires_in").GetInt32());
+        Assert.Equal("r-1", json.GetProperty("refresh_token").GetString());
+    }
+
+    [Fact]
+    public void Token_response_omits_expires_in_and_refresh_token_when_null()
+    {
+        var json = Serialize(new TokenResponse("openemr-token", "Bearer", null, null));
+
+        Assert.False(json.TryGetProperty("expires_in", out _));
+        Assert.False(json.TryGetProperty("refresh_token", out _));
+    }
+
+    [Fact]
     public void Me_response_uses_camel_case_names()
     {
         var json = Serialize(new MeResponse("subject-1", "alice_01"));

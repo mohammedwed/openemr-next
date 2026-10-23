@@ -24,13 +24,14 @@ public static class TokenEndpoints
     }
 
     /// <summary>
-    /// Reads the form body and checks the grant type. Only the password grant is supported; OpenEMR
-    /// verifies the credentials and its token response is returned unchanged.
+    /// Reads the form body and checks the grant type. Only the password grant is supported. OpenEMR
+    /// verifies the credentials, and the token it issues is returned in AuthFacade's token response.
     /// </summary>
     /// <remarks>
-    /// Responses: OpenEMR's own status and body on success or rejection; 400 for an unsupported grant
-    /// type or invalid fields; 503 when OpenEMR is unreachable; 502 when OpenEMR answers successfully
-    /// without a usable token.
+    /// Responses: 200 with a <see cref="TokenResponse"/> on success; 400 <c>invalid_grant</c> when OpenEMR
+    /// refuses the credentials; 400 for an unsupported grant type or invalid fields; 503 when OpenEMR is
+    /// unreachable; 502 when OpenEMR fails, answers successfully without a usable token, or issues one
+    /// that does not verify.
     /// </remarks>
     private static async Task<IResult> IssueTokenAsync(HttpRequest request, PasswordLoginHandler login, CancellationToken ct)
     {
@@ -50,8 +51,12 @@ public static class TokenEndpoints
     /// <summary>Maps a login outcome to the HTTP response the client receives.</summary>
     private static IResult ToHttpResult(LoginResult result) => result switch
     {
-        LoginSucceeded success => Results.Content(success.Body, "application/json", statusCode: StatusCodes.Status200OK),
-        LoginRejected rejected => Results.Content(rejected.Body, "application/json", statusCode: rejected.StatusCode),
+        LoginSucceeded success => Results.Json(
+            new TokenResponse(success.Token.AccessToken, success.Token.TokenType, success.Token.ExpiresIn, success.Token.RefreshToken),
+            statusCode: StatusCodes.Status200OK),
+        LoginRejected => Results.Json(
+            new ErrorResponse("invalid_grant", "The username or password is incorrect."),
+            statusCode: StatusCodes.Status400BadRequest),
         LoginUnavailable => ServerError("OpenEMR is unreachable.", StatusCodes.Status503ServiceUnavailable),
         LoginUpstreamError => ServerError("OpenEMR returned an unexpected response.", StatusCodes.Status502BadGateway),
         _ => throw new InvalidOperationException("Unhandled login result.")

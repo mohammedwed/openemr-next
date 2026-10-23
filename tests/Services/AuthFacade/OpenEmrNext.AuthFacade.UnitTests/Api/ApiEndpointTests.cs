@@ -22,9 +22,8 @@ public class ApiEndpointTests
         ["password"] = password
     });
 
-    /// <summary>The token response OpenEMR returns for an accepted login. The facade must return it unchanged.</summary>
-    private const string OpenEmrTokenResponse =
-        "{\"access_token\":\"openemr-token\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"refresh_token\":\"r-1\"}";
+    /// <summary>The token OpenEMR issues for an accepted login. The facade returns these fields in its own response.</summary>
+    private static readonly OpenEmrToken OpenEmrTokenFields = new("openemr-token", "Bearer", 3600, "r-1");
 
     /// <summary>Parses the response body as JSON. The caller disposes the returned document.</summary>
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response) =>
@@ -41,23 +40,43 @@ public class ApiEndpointTests
     }
 
     [Fact]
-    public async Task Accepted_login_returns_the_openemr_token_response_unchanged()
+    public async Task Accepted_login_returns_the_facade_token_response_with_the_four_fields()
     {
         await using var api = await TestApi.StartAsync();
-        api.IdentityProvider.Result = new PasswordGrantResult(200, OpenEmrTokenResponse, "openemr-token");
+        api.IdentityProvider.Result = new PasswordGrantResult(200, OpenEmrTokenFields);
         api.TokenVerifier.Result = new VerifiedToken("subject-1", null);
 
         using var response = await api.Client.PostAsync("/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(OpenEmrTokenResponse, await response.Content.ReadAsStringAsync());
+        using var body = await ReadJsonAsync(response);
+        var fields = body.RootElement.EnumerateObject().Select(p => p.Name).OrderBy(n => n).ToArray();
+        Assert.Equal(new[] { "access_token", "expires_in", "refresh_token", "token_type" }, fields);
+        Assert.Equal("openemr-token", body.RootElement.GetProperty("access_token").GetString());
+        Assert.Equal("Bearer", body.RootElement.GetProperty("token_type").GetString());
+        Assert.Equal(3600, body.RootElement.GetProperty("expires_in").GetInt32());
+        Assert.Equal("r-1", body.RootElement.GetProperty("refresh_token").GetString());
+    }
+
+    [Fact]
+    public async Task Omits_expires_in_and_refresh_token_when_openemr_does_not_return_them()
+    {
+        await using var api = await TestApi.StartAsync();
+        api.IdentityProvider.Result = new PasswordGrantResult(200, new OpenEmrToken("openemr-token", "Bearer", null, null));
+        api.TokenVerifier.Result = new VerifiedToken("subject-1", null);
+
+        using var response = await api.Client.PostAsync("/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
+
+        using var body = await ReadJsonAsync(response);
+        Assert.False(body.RootElement.TryGetProperty("expires_in", out _));
+        Assert.False(body.RootElement.TryGetProperty("refresh_token", out _));
     }
 
     [Fact]
     public async Task Token_from_login_is_verified_on_me_and_identifies_the_subject()
     {
         await using var api = await TestApi.StartAsync();
-        api.IdentityProvider.Result = new PasswordGrantResult(200, OpenEmrTokenResponse, "openemr-token");
+        api.IdentityProvider.Result = new PasswordGrantResult(200, OpenEmrTokenFields);
         api.TokenVerifier.Result = new VerifiedToken("subject-1", "alice_01");
 
         using var login = await api.Client.PostAsync("/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
@@ -159,25 +178,38 @@ public class ApiEndpointTests
     public async Task Short_legacy_username_reaches_openemr_instead_of_being_rejected_locally()
     {
         await using var api = await TestApi.StartAsync();
-        api.IdentityProvider.Result = new PasswordGrantResult(401, "{\"error\":\"invalid_grant\"}");
+        api.IdentityProvider.Result = new PasswordGrantResult(400);
 
         using var response = await api.Client.PostAsync("/connect/token", PasswordGrant("a", "x"));
 
         Assert.Equal("a", api.IdentityProvider.ReceivedUsername!.Value);
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
-    public async Task OpenEmr_rejection_passes_through_status_and_body()
+    public async Task OpenEmr_rejection_returns_invalid_grant_without_openemr_body()
     {
         await using var api = await TestApi.StartAsync();
-        const string body = "{\"error\":\"invalid_grant\",\"error_description\":\"bad\"}";
-        api.IdentityProvider.Result = new PasswordGrantResult(401, body);
+        api.IdentityProvider.Result = new PasswordGrantResult(400);
 
         using var response = await api.Client.PostAsync("/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        Assert.Equal(body, await response.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var body = await ReadJsonAsync(response);
+        Assert.Equal("invalid_grant", body.RootElement.GetProperty("error").GetString());
+        Assert.Equal("The username or password is incorrect.", body.RootElement.GetProperty("error_description").GetString());
+        Assert.False(body.RootElement.TryGetProperty("access_token", out _));
+    }
+
+    [Fact]
+    public async Task OpenEmr_server_error_returns_502_not_openemr_status()
+    {
+        await using var api = await TestApi.StartAsync();
+        api.IdentityProvider.Result = new PasswordGrantResult(500);
+
+        using var response = await api.Client.PostAsync("/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
     }
 
     [Fact]
@@ -197,7 +229,7 @@ public class ApiEndpointTests
     public async Task OpenEmr_token_that_fails_verification_returns_502()
     {
         await using var api = await TestApi.StartAsync();
-        api.IdentityProvider.Result = new PasswordGrantResult(200, OpenEmrTokenResponse, "openemr-token");
+        api.IdentityProvider.Result = new PasswordGrantResult(200, OpenEmrTokenFields);
         api.TokenVerifier.Result = null;
 
         using var response = await api.Client.PostAsync("/connect/token", PasswordGrant("alice_01", "Passw0rd!"));

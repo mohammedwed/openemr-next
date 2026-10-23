@@ -1,6 +1,6 @@
 # 0013. AuthFacade passes OpenEMR's token response through unchanged
 
-- **Status:** Accepted
+- **Status:** Accepted, except point 1, which is superseded by [0016](0016-facade-token-response-shape.md)
 - **Date:** 2026-10-23
 - **Supersedes:** [0002](0002-facade-issued-tokens.md), and the token exchange in [0012](0012-accept-openemr-tokens-by-token-exchange.md)
 

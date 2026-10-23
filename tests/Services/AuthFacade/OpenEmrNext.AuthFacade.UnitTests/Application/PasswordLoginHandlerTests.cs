@@ -11,8 +11,9 @@ namespace OpenEmrNext.AuthFacade.UnitTests.Application;
 /// </summary>
 public class PasswordLoginHandlerTests
 {
-    private const string OpenEmrToken = "openemr-token";
-    private const string OpenEmrBody = "{\"access_token\":\"openemr-token\",\"token_type\":\"Bearer\"}";
+    private const string OpenEmrAccessToken = "openemr-token";
+
+    private static readonly OpenEmrToken Token = new(OpenEmrAccessToken, "Bearer", 3600, "r-1");
 
     private readonly FakeIdentityProvider _identityProvider = new();
     private readonly FakeExternalTokenVerifier _verifier = new();
@@ -26,32 +27,32 @@ public class PasswordLoginHandlerTests
     private static Password Password() => new("Passw0rd!");
 
     [Fact]
-    public async Task Accepted_credentials_with_a_verified_token_return_openemr_token_response_unchanged()
+    public async Task Accepted_credentials_with_a_verified_token_return_the_openemr_token_fields()
     {
-        _identityProvider.Result = new PasswordGrantResult(200, OpenEmrBody, OpenEmrToken);
+        _identityProvider.Result = new PasswordGrantResult(200, Token);
         _verifier.Result = new VerifiedToken("subject-1", null);
 
         var result = await CreateHandler().HandleAsync(Username(), Password(), CancellationToken.None);
 
         var success = Assert.IsType<LoginSucceeded>(result);
-        Assert.Equal(OpenEmrBody, success.Body);
+        Assert.Equal(Token, success.Token);
     }
 
     [Fact]
     public async Task The_openemr_access_token_is_verified_before_the_login_succeeds()
     {
-        _identityProvider.Result = new PasswordGrantResult(200, OpenEmrBody, OpenEmrToken);
+        _identityProvider.Result = new PasswordGrantResult(200, Token);
         _verifier.Result = new VerifiedToken("subject-1", null);
 
         await CreateHandler().HandleAsync(Username(), Password(), CancellationToken.None);
 
-        Assert.Equal(OpenEmrToken, _verifier.ReceivedToken);
+        Assert.Equal(OpenEmrAccessToken, _verifier.ReceivedToken);
     }
 
     [Fact]
     public async Task Token_that_fails_verification_returns_upstream_error()
     {
-        _identityProvider.Result = new PasswordGrantResult(200, OpenEmrBody, OpenEmrToken);
+        _identityProvider.Result = new PasswordGrantResult(200, Token);
         _verifier.Result = null;
 
         var result = await CreateHandler().HandleAsync(Username(), Password(), CancellationToken.None);
@@ -62,7 +63,7 @@ public class PasswordLoginHandlerTests
     [Fact]
     public async Task Verifier_without_reachable_keys_returns_unavailable()
     {
-        _identityProvider.Result = new PasswordGrantResult(200, OpenEmrBody, OpenEmrToken);
+        _identityProvider.Result = new PasswordGrantResult(200, Token);
         _verifier.Exception = new TokenVerifierUnavailableException(new HttpRequestException());
 
         var result = await CreateHandler().HandleAsync(Username(), Password(), CancellationToken.None);
@@ -71,9 +72,9 @@ public class PasswordLoginHandlerTests
     }
 
     [Fact]
-    public async Task Success_without_an_access_token_returns_upstream_error_without_verifying()
+    public async Task Success_without_a_token_returns_upstream_error_without_verifying()
     {
-        _identityProvider.Result = new PasswordGrantResult(200, "{}", null);
+        _identityProvider.Result = new PasswordGrantResult(200, null);
 
         var result = await CreateHandler().HandleAsync(Username(), Password(), CancellationToken.None);
 
@@ -81,17 +82,31 @@ public class PasswordLoginHandlerTests
         Assert.Null(_verifier.ReceivedToken);
     }
 
-    [Fact]
-    public async Task Rejected_credentials_return_openemr_status_and_body_without_verifying()
+    [Theory]
+    [InlineData(400)]
+    [InlineData(401)]
+    [InlineData(403)]
+    public async Task Client_error_from_openemr_returns_rejected_without_verifying(int status)
     {
-        const string body = "{\"error\":\"invalid_grant\"}";
-        _identityProvider.Result = new PasswordGrantResult(401, body);
+        _identityProvider.Result = new PasswordGrantResult(status);
 
         var result = await CreateHandler().HandleAsync(Username(), Password(), CancellationToken.None);
 
-        var rejected = Assert.IsType<LoginRejected>(result);
-        Assert.Equal(401, rejected.StatusCode);
-        Assert.Equal(body, rejected.Body);
+        Assert.IsType<LoginRejected>(result);
+        Assert.Null(_verifier.ReceivedToken);
+    }
+
+    [Theory]
+    [InlineData(500)]
+    [InlineData(503)]
+    [InlineData(408)]
+    public async Task Server_or_timeout_status_from_openemr_returns_upstream_error(int status)
+    {
+        _identityProvider.Result = new PasswordGrantResult(status);
+
+        var result = await CreateHandler().HandleAsync(Username(), Password(), CancellationToken.None);
+
+        Assert.IsType<LoginUpstreamError>(result);
         Assert.Null(_verifier.ReceivedToken);
     }
 
@@ -110,7 +125,7 @@ public class PasswordLoginHandlerTests
     {
         var username = Username();
         var password = Password();
-        _identityProvider.Result = new PasswordGrantResult(401, "{}");
+        _identityProvider.Result = new PasswordGrantResult(401);
 
         await CreateHandler().HandleAsync(username, password, CancellationToken.None);
 
@@ -122,7 +137,7 @@ public class PasswordLoginHandlerTests
     public async Task Handler_does_not_consume_the_password()
     {
         var password = Password();
-        _identityProvider.Result = new PasswordGrantResult(401, "{}");
+        _identityProvider.Result = new PasswordGrantResult(401);
 
         await CreateHandler().HandleAsync(Username(), password, CancellationToken.None);
 
