@@ -21,8 +21,8 @@ public static class StackConfig
     /// <summary>The base URL of the AuthFacade container on localhost. From <c>FACADE_HTTP_PORT</c>, default 7128.</summary>
     public static string AuthFacadeBaseUrl => $"http://localhost:{Get("FACADE_HTTP_PORT", "7128")}";
 
-    /// <summary>The path of AuthFacade's token endpoint. From <c>AUTHFACADE_TOKEN_PATH</c>, default <c>/connect/token</c>.</summary>
-    public static string AuthFacadeTokenPath => Get("AUTHFACADE_TOKEN_PATH", "/connect/token");
+    /// <summary>The path of AuthFacade's token endpoint. From <c>AUTHFACADE_TOKEN_PATH</c>, default <c>/api/v1/connect/token</c>.</summary>
+    public static string AuthFacadeTokenPath => Get("AUTHFACADE_TOKEN_PATH", "/api/v1/connect/token");
 
     /// <summary>The redirect URI registered for the AuthFacade OAuth client. Defaults to the AuthFacade base URL plus <c>/callback</c>.</summary>
     public static string AuthFacadeRedirectUri => Get("AUTHFACADE_REDIRECT_URI", $"{AuthFacadeBaseUrl}/callback");

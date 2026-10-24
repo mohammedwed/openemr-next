@@ -1,6 +1,6 @@
 namespace OpenEmrNext.AuthFacade.Api.Contracts.Requests;
 
-/// <summary>Form field names accepted by <c>POST /connect/token</c>.</summary>
+/// <summary>Form field names accepted by <c>POST /api/v1/connect/token</c>.</summary>
 public static class TokenRequestFields
 {
     /// <summary>The grant type. Must be <c>password</c>.</summary>

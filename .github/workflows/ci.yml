@@ -96,7 +96,7 @@ jobs:
       - name: Probe endpoints
         if: always()
         run: |
-          for url in https://localhost:9300/meta/health/readyz http://localhost:7128/hello; do
+          for url in https://localhost:9300/meta/health/readyz http://localhost:7128/api/health; do
             code=$(curl -k -s -o /dev/null --max-time 10 -w "%{http_code}" "$url" || true)
             echo "$url -> ${code:-no response}"
           done

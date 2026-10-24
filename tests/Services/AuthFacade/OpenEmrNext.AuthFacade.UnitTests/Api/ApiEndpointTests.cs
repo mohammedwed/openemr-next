@@ -7,9 +7,9 @@ using OpenEmrNext.AuthFacade.UnitTests.Application;
 namespace OpenEmrNext.AuthFacade.UnitTests.Api;
 
 /// <summary>
-/// Tests the HTTP surface (<c>/hello</c>, <c>/connect/token</c>, <c>/me</c>) in-process through
+/// Tests the HTTP surface (<c>/api/health</c>, <c>/api/v1/connect/token</c>, <c>/api/v1/me</c>) in-process through
 /// <see cref="TestApi"/>. Login tests set the fake identity provider's result or exception first,
-/// then check the status code and body the API returns. <c>/me</c> tests set the fake verifier's result.
+/// then check the status code and body the API returns. <c>/api/v1/me</c> tests set the fake verifier's result.
 /// No Docker stack is needed.
 /// </summary>
 public class ApiEndpointTests
@@ -34,7 +34,7 @@ public class ApiEndpointTests
     {
         await using var api = await TestApi.StartAsync();
 
-        using var response = await api.Client.GetAsync("/hello");
+        using var response = await api.Client.GetAsync("/api/health");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -46,7 +46,7 @@ public class ApiEndpointTests
         api.IdentityProvider.Result = new PasswordGrantResult(200, OpenEmrTokenFields);
         api.TokenVerifier.Result = new VerifiedToken("subject-1", null);
 
-        using var response = await api.Client.PostAsync("/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
+        using var response = await api.Client.PostAsync("/api/v1/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var body = await ReadJsonAsync(response);
@@ -65,7 +65,7 @@ public class ApiEndpointTests
         api.IdentityProvider.Result = new PasswordGrantResult(200, new OpenEmrToken("openemr-token", "Bearer", null, null));
         api.TokenVerifier.Result = new VerifiedToken("subject-1", null);
 
-        using var response = await api.Client.PostAsync("/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
+        using var response = await api.Client.PostAsync("/api/v1/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
 
         using var body = await ReadJsonAsync(response);
         Assert.False(body.RootElement.TryGetProperty("expires_in", out _));
@@ -79,11 +79,11 @@ public class ApiEndpointTests
         api.IdentityProvider.Result = new PasswordGrantResult(200, OpenEmrTokenFields);
         api.TokenVerifier.Result = new VerifiedToken("subject-1", "alice_01");
 
-        using var login = await api.Client.PostAsync("/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
+        using var login = await api.Client.PostAsync("/api/v1/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
         using var loginBody = await ReadJsonAsync(login);
         var token = loginBody.RootElement.GetProperty("access_token").GetString();
 
-        var request = new HttpRequestMessage(HttpMethod.Get, "/me");
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/me");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         using var me = await api.Client.SendAsync(request);
 
@@ -99,7 +99,7 @@ public class ApiEndpointTests
     {
         await using var api = await TestApi.StartAsync();
         api.TokenVerifier.Result = new VerifiedToken("subject-1", null);
-        var request = new HttpRequestMessage(HttpMethod.Get, "/me");
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/me");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "openemr-token");
 
         using var me = await api.Client.SendAsync(request);
@@ -114,7 +114,7 @@ public class ApiEndpointTests
     {
         await using var api = await TestApi.StartAsync();
 
-        using var response = await api.Client.GetAsync("/me");
+        using var response = await api.Client.GetAsync("/api/v1/me");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -123,7 +123,7 @@ public class ApiEndpointTests
     public async Task Me_rejects_a_token_the_verifier_refuses()
     {
         await using var api = await TestApi.StartAsync();
-        var request = new HttpRequestMessage(HttpMethod.Get, "/me");
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/me");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "not.a.token");
 
         using var response = await api.Client.SendAsync(request);
@@ -136,7 +136,7 @@ public class ApiEndpointTests
     {
         await using var api = await TestApi.StartAsync();
         api.TokenVerifier.Exception = new TokenVerifierUnavailableException(new HttpRequestException());
-        var request = new HttpRequestMessage(HttpMethod.Get, "/me");
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/me");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "openemr-token");
 
         using var response = await api.Client.SendAsync(request);
@@ -155,7 +155,7 @@ public class ApiEndpointTests
             ["password"] = "Passw0rd!"
         });
 
-        using var response = await api.Client.PostAsync("/connect/token", form);
+        using var response = await api.Client.PostAsync("/api/v1/connect/token", form);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var body = await ReadJsonAsync(response);
@@ -167,7 +167,7 @@ public class ApiEndpointTests
     {
         await using var api = await TestApi.StartAsync();
 
-        using var response = await api.Client.PostAsync("/connect/token", PasswordGrant("", "Passw0rd!"));
+        using var response = await api.Client.PostAsync("/api/v1/connect/token", PasswordGrant("", "Passw0rd!"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var body = await ReadJsonAsync(response);
@@ -180,7 +180,7 @@ public class ApiEndpointTests
         await using var api = await TestApi.StartAsync();
         api.IdentityProvider.Result = new PasswordGrantResult(400);
 
-        using var response = await api.Client.PostAsync("/connect/token", PasswordGrant("a", "x"));
+        using var response = await api.Client.PostAsync("/api/v1/connect/token", PasswordGrant("a", "x"));
 
         Assert.Equal("a", api.IdentityProvider.ReceivedUsername!.Value);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -192,7 +192,7 @@ public class ApiEndpointTests
         await using var api = await TestApi.StartAsync();
         api.IdentityProvider.Result = new PasswordGrantResult(400);
 
-        using var response = await api.Client.PostAsync("/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
+        using var response = await api.Client.PostAsync("/api/v1/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var body = await ReadJsonAsync(response);
@@ -207,7 +207,7 @@ public class ApiEndpointTests
         await using var api = await TestApi.StartAsync();
         api.IdentityProvider.Result = new PasswordGrantResult(500);
 
-        using var response = await api.Client.PostAsync("/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
+        using var response = await api.Client.PostAsync("/api/v1/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
 
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
     }
@@ -218,7 +218,7 @@ public class ApiEndpointTests
         await using var api = await TestApi.StartAsync();
         api.IdentityProvider.Exception = new IdentityProviderUnavailableException(new HttpRequestException());
 
-        using var response = await api.Client.PostAsync("/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
+        using var response = await api.Client.PostAsync("/api/v1/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         using var body = await ReadJsonAsync(response);
@@ -232,7 +232,7 @@ public class ApiEndpointTests
         api.IdentityProvider.Result = new PasswordGrantResult(200, OpenEmrTokenFields);
         api.TokenVerifier.Result = null;
 
-        using var response = await api.Client.PostAsync("/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
+        using var response = await api.Client.PostAsync("/api/v1/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
 
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
     }
@@ -243,7 +243,7 @@ public class ApiEndpointTests
         await using var api = await TestApi.StartAsync();
         api.IdentityProvider.Exception = new IdentityProviderResponseException("no token");
 
-        using var response = await api.Client.PostAsync("/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
+        using var response = await api.Client.PostAsync("/api/v1/connect/token", PasswordGrant("alice_01", "Passw0rd!"));
 
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
         using var body = await ReadJsonAsync(response);

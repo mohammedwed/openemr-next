@@ -7,8 +7,8 @@ using Xunit;
 namespace OpenEmrNext.AuthFacade.IntegrationTests;
 
 /// <summary>
-/// Live tests of <c>GET /me</c> on the running stack. Tokens come from a real password grant
-/// through <c>/connect/token</c>, so these tests also depend on OpenEMR accepting
+/// Live tests of <c>GET /api/v1/me</c> on the running stack. Tokens come from a real password grant
+/// through <c>/api/v1/connect/token</c>, so these tests also depend on OpenEMR accepting
 /// <see cref="StackConfig.LoginUser"/> and <see cref="StackConfig.LoginPassword"/>.
 /// </summary>
 [Collection("Stack")]
@@ -17,7 +17,7 @@ public class MeEndpointTests
 {
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
 
-    private static string MeUrl => StackConfig.AuthFacadeBaseUrl + "/me";
+    private static string MeUrl => StackConfig.AuthFacadeBaseUrl + "/api/v1/me";
 
     [Fact]
     public async Task Me_rejects_requests_without_a_token()
@@ -53,7 +53,7 @@ Assert.Equal(expectedSubject, doc.RootElement.GetProperty("subject").GetString()
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    /// <summary>Sends <c>GET /me</c> with the token as a Bearer credential.</summary>
+    /// <summary>Sends <c>GET /api/v1/me</c> with the token as a Bearer credential.</summary>
     private static Task<HttpResponseMessage> GetMeAsync(string token)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, MeUrl);

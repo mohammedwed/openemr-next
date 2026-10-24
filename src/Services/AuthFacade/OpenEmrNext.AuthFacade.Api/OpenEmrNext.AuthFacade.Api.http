@@ -1,15 +1,15 @@
 @AuthFacade_HostAddress = http://localhost:5050
 
 ### Health check
-GET {{AuthFacade_HostAddress}}/hello
+GET {{AuthFacade_HostAddress}}/api/health
 Accept: application/json
 
 ### Password grant (replace the placeholders with a real OpenEMR user)
-POST {{AuthFacade_HostAddress}}/connect/token
+POST {{AuthFacade_HostAddress}}/api/v1/connect/token
 Content-Type: application/x-www-form-urlencoded
 
 grant_type=password&username=your-username&password=your-password
 
 ### Current identity (paste the access_token from the request above)
-GET {{AuthFacade_HostAddress}}/me
+GET {{AuthFacade_HostAddress}}/api/v1/me
 Authorization: Bearer your-access-token

@@ -5,7 +5,7 @@ using Xunit;
 namespace OpenEmrNext.AuthFacade.IntegrationTests;
 
 /// <summary>
-/// Live tests of <c>POST /connect/token</c> against the running stack. Each test checks a
+/// Live tests of <c>POST /api/v1/connect/token</c> against the running stack. Each test checks a
 /// status code and body from a real OpenEMR response, so the expected values follow
 /// OpenEMR's behavior. Successful bodies are AuthFacade's token response, built from OpenEMR's verified token. The unit tests cover the same paths with a fake identity provider.
 /// </summary>
