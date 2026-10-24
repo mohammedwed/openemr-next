@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace OpenEmrNext.AuthFacade.Api.RateLimiting;
 
 /// <summary>
-/// Limits how many requests one client address may send to <c>POST /connect/token</c> in a window,
+/// Limits how many requests one client address may send to <c>POST /api/v1/connect/token</c> in a window,
 /// bound from <c>LoginRateLimit</c>. Every request counts, successful or not, so a password guess
 /// cannot be retried faster than the limit allows.
 /// </summary>

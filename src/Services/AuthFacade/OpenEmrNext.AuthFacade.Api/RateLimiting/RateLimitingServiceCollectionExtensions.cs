@@ -10,7 +10,7 @@ namespace OpenEmrNext.AuthFacade.Api.RateLimiting;
 /// <summary>Registers the rate limiter that guards the token endpoint against password guessing.</summary>
 public static class RateLimitingServiceCollectionExtensions
 {
-    /// <summary>The policy name that <c>POST /connect/token</c> requires.</summary>
+    /// <summary>The policy name that <c>POST /api/v1/connect/token</c> requires.</summary>
     public const string LoginPolicy = "login";
 
     /// <summary>

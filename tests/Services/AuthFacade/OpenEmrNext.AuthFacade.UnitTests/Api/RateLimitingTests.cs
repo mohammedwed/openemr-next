@@ -13,7 +13,7 @@ using OpenEmrNext.AuthFacade.UnitTests.Application;
 namespace OpenEmrNext.AuthFacade.UnitTests.Api;
 
 /// <summary>
-/// Tests the login rate limit on <c>POST /connect/token</c>. The default policy allows 10 requests a
+/// Tests the login rate limit on <c>POST /api/v1/connect/token</c>. The default policy allows 10 requests a
 /// minute per client address, and every test client shares one loopback address, so the first 10
 /// requests in a test pass and the 11th is refused.
 /// </summary>
@@ -62,11 +62,11 @@ public class RateLimitingTests
 
         for (var i = 0; i < 10; i++)
         {
-            using var attempt = await api.Client.PostAsync("/connect/token", PasswordGrant());
+            using var attempt = await api.Client.PostAsync("/api/v1/connect/token", PasswordGrant());
             Assert.NotEqual(HttpStatusCode.TooManyRequests, attempt.StatusCode);
         }
 
-        using var refused = await api.Client.PostAsync("/connect/token", PasswordGrant());
+        using var refused = await api.Client.PostAsync("/api/v1/connect/token", PasswordGrant());
 
         Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);
         Assert.NotNull(refused.Headers.RetryAfter);
@@ -80,7 +80,7 @@ public class RateLimitingTests
         await using var api = await TestApi.StartAsync();
         api.IdentityProvider.Result = new PasswordGrantResult(400, null);
 
-        using var response = await api.Client.PostAsync("/connect/token", PasswordGrant());
+        using var response = await api.Client.PostAsync("/api/v1/connect/token", PasswordGrant());
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -95,7 +95,7 @@ public class RateLimitingTests
 
         for (var i = 0; i < 15; i++)
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, "/me");
+            var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/me");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "openemr-token");
             using var me = await api.Client.SendAsync(request);
 

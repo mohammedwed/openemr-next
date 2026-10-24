@@ -28,7 +28,7 @@ internal sealed class TestApi : IAsyncDisposable
     /// <summary>The fake OpenEMR identity provider. Tests set its result or exception before a request.</summary>
     public FakeIdentityProvider IdentityProvider { get; }
 
-    /// <summary>The fake verifier for OpenEMR-issued tokens. Tests set its result before a request to <c>/me</c>.</summary>
+    /// <summary>The fake verifier for OpenEMR-issued tokens. Tests set its result before a request to <c>/api/v1/me</c>.</summary>
     public FakeExternalTokenVerifier TokenVerifier { get; }
 
     /// <summary>An HTTP client whose base address is the running API.</summary>

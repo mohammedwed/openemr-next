@@ -8,7 +8,7 @@ namespace OpenEmrNext.AuthFacade.Api.Endpoints;
 public static class UserEndpoints
 {
     /// <summary>
-    /// Maps <c>GET /me</c>, which returns the subject and name claims of the bearer token.
+    /// Maps <c>GET /api/v1/me</c>, which returns the subject and name claims of the bearer token.
     /// Requires authorization.
     /// </summary>
     /// <param name="app">The endpoint route builder.</param>

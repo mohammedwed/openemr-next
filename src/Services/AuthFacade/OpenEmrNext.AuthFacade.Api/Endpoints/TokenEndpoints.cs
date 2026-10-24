@@ -10,7 +10,7 @@ namespace OpenEmrNext.AuthFacade.Api.Endpoints;
 public static class TokenEndpoints
 {
     /// <summary>
-    /// Maps <c>POST /connect/token</c>. The endpoint is anonymous because it issues the token,
+    /// Maps <c>POST /api/v1/connect/token</c>. The endpoint is anonymous because it issues the token,
     /// and antiforgery is disabled because it accepts a form post from non-browser clients. The endpoint is
     /// rate limited per client address, which slows password guessing.
     /// </summary>

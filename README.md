@@ -47,16 +47,16 @@ stepping stone: each future service should scaffold only its own tables.
 
 **AuthFacade (`src/Services/AuthFacade`).** A minimal ASP.NET Core API:
 
-- `POST /connect/token` accepts the password grant. It verifies the login with
+- `POST /api/v1/connect/token` accepts the password grant. It verifies the login with
   OpenEMR's OAuth2 server and returns a token response with `access_token`,
   `token_type`, `expires_in`, and `refresh_token` when OpenEMR issues one. The
   access token is verified before it is returned. A refused login returns 400
   `invalid_grant`. AuthFacade issues no token of its own. See
   [ADR 0013](docs/architecture/0013-pass-openemr-tokens-through.md) and
   [ADR 0016](docs/architecture/0016-facade-token-response-shape.md).
-- `GET /me` requires an OpenEMR-issued bearer token. The token is verified
-  against OpenEMR's JWKS, and `/me` returns the subject and name.
-- `GET /hello` is a liveness check.
+- `GET /api/v1/me` requires an OpenEMR-issued bearer token. The token is verified
+  against OpenEMR's JWKS, and `/api/v1/me` returns the subject and name.
+- `GET /api/health` is a liveness check.
 
 ## Architecture
 
@@ -85,7 +85,7 @@ is a token broker in front of it. It does not store passwords or user records.
   it (ADR 0013), and returns only the four token fields (ADR 0016).
 - **Calls to OpenEMR are guarded by circuit breakers.** While OpenEMR is failing,
   logins and token checks fail fast instead of waiting for timeouts (ADR 0017).
-- **Login is rate limited per client address.** `POST /connect/token` returns
+- **Login is rate limited per client address.** `POST /api/v1/connect/token` returns
   429 `too_many_requests` when one address exceeds its limit, before OpenEMR is
   called (ADR 0018).
 - **Minimal client scopes.** The AuthFacade OAuth client holds authentication
@@ -100,12 +100,12 @@ is a token broker in front of it. It does not store passwords or user records.
 
 ### Known gaps
 
-- `/me` confirms identity only. Authorization for OpenEMR data is not built.
+- `/api/v1/me` confirms identity only. Authorization for OpenEMR data is not built.
 - The audience check uses a fixed string rather than a registered client.
 - Login is rate limited per client address (10 requests a minute by default,
   ADR 0018), but not per username. A distributed attack against one account is
   limited only by OpenEMR's lockout.
-- Login outcomes and `/me` access are not audit-logged.
+- Login outcomes and `/api/v1/me` access are not audit-logged.
 - The service serves plain HTTP on port 8080, with no HTTPS redirect or HSTS.
 - Startup does not wait for OpenEMR, so early requests can fail.
 - Form values are not logged, but no test enforces this yet.
@@ -229,7 +229,7 @@ the seed, OpenEMR, and AuthFacade under one deadline. It is slow and needs
 Docker, so it is not part of a unit-test-only pipeline.
 
 **Check a login by hand:** `./TestFacade.ps1` prompts for the password, logs in
-through the facade, and calls `/me`. It prints status codes and property names,
+through the facade, and calls `/api/v1/me`. It prints status codes and property names,
 never tokens.
 
 **Regenerate the entity model:** `pwsh scripts/scaffold.ps1`, with `-Tables` for a

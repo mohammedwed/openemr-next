@@ -6,7 +6,7 @@ namespace OpenEmrNext.AuthFacade.Api.Authentication;
 /// <summary>Registers the HTTP bearer scheme that accepts OpenEMR-issued tokens.</summary>
 public static class BearerAuthenticationServiceCollectionExtensions
 {
-    /// <summary>The name of the bearer scheme, which <c>/me</c> requires.</summary>
+    /// <summary>The name of the bearer scheme, which <c>/api/v1/me</c> requires.</summary>
     public const string BearerScheme = "Bearer";
 
     /// <summary>
