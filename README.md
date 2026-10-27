@@ -41,7 +41,7 @@ directory and published as a release asset. `scripts/env-management/up.sh --rest
 rebuilds the stack from it.
 
 **Entity model.** `src/OpenEmr.Data` contains EF Core entities and
-`OpenEmrDbContext`, scaffolded from the live database by `scripts/scaffold.ps1`.
+`OpenEmrDbContext`, scaffolded from the live database.
 Global aliases resolve the `Version` and `Void` name clashes. This model is a
 stepping stone: each future service should scaffold only its own tables.
 
@@ -164,21 +164,17 @@ Known problems with the baseline:
 /
 ├── docker-compose.yml          # one Compose project: openemr-next
 ├── .env.example                # placeholders only; .env is gitignored
-├── docker/
-│   └── open-emr-legacy/        # OpenEMR, MariaDB, phpMyAdmin dev stack
+├── .github/workflows/ci.yml    # build, restore snapshot, run tests
+├── docs/                       # ADRs, changelogs, design notes
 ├── src/
 │   ├── Services/AuthFacade/    # token broker: Domain, Application, Infrastructure, Api
-│   ├── OpenEmr.Data/           # EF Core entities and context (scaffolded)
-│   └── primitve/               # leftover template, to be deleted
+│   └── OpenEmr.Data/           # EF Core entities and context (scaffolded)
 ├── tests/
-│   ├── Db.Tests/               # database baseline tests (Testcontainers)
-│   ├── Services/AuthFacade/    # black-box tests on the live stack
-│   └── primitve.tests/         # leftover template, to be deleted
-├── tools/
-│   └── Scaffold.Host/          # throwaway startup project for dotnet ef
-├── scripts/
-│   └── scaffold.ps1            # regenerates OpenEmr.Data from the database
-└── TestFacade.ps1              # manual login check through the facade
+│   └── Services/AuthFacade/    # unit, architecture, and black-box integration tests
+└── scripts/
+    ├── env-management/         # new-env, apply-env, up (--restore)
+    ├── db-seeds/               # OAuth client seeding
+    └── snapshot.ps1, restore.ps1
 ```
 
 Planned additions: `src/Gateway`, `src/PatientManagement`, `src/ClinicalCare`,
@@ -218,21 +214,12 @@ This deletes all local data.
 **Run the tests:**
 
 ```bash
-dotnet test tests/Db.Tests                             # starts its own MariaDB
 dotnet test tests/Services/AuthFacade/OpenEmrNext.AuthFacade.IntegrationTests  # needs the running stack
 ```
 
 The integration suite runs a readiness gate first, which checks the database,
 the seed, OpenEMR, and AuthFacade under one deadline. It is slow and needs
 Docker, so it is not part of a unit-test-only pipeline.
-
-**Check a login by hand:** `./TestFacade.ps1` prompts for the password, logs in
-through the facade, and calls `/api/v1/me`. It prints status codes and property names,
-never tokens.
-
-**Regenerate the entity model:** `pwsh scripts/scaffold.ps1`, with `-Tables` for a
-subset or `-SkipDocker`. Re-scaffolding overwrites `Entities/` and `Context/`.
-Custom code belongs in partial classes elsewhere.
 
 ## Evaluation approach
 
