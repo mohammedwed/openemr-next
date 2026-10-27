@@ -35,10 +35,10 @@ OpenEMR (pinned to `openemr/openemr:8.0.0.3`), phpMyAdmin, and AuthFacade on one
 network. Services address each other by name. The MariaDB host port is 3307.
 AuthFacade listens on port 7128.
 
-**Database baseline.** `src/db/maria-db/baseline.sql` holds the schema and seed
-data, produced by running the real OpenEMR installer against MariaDB 12.3. A
-Dockerfile loads it on first start with an empty volume. A schema-only dump is
-kept as a diff target.
+**Database snapshot.** The stack restores its database from a snapshot
+(`db.sql`, `sites.tar.gz`, `images.txt`) kept in the git-ignored `snapshots/`
+directory and published as a release asset. `scripts/env-management/up.sh --restore`
+rebuilds the stack from it.
 
 **Entity model.** `src/OpenEmr.Data` contains EF Core entities and
 `OpenEmrDbContext`, scaffolded from the live database by `scripts/scaffold.ps1`.
@@ -169,8 +169,6 @@ Known problems with the baseline:
 ├── src/
 │   ├── Services/AuthFacade/    # token broker: Domain, Application, Infrastructure, Api
 │   ├── OpenEmr.Data/           # EF Core entities and context (scaffolded)
-│   ├── db/
-│   │   └── maria-db/           # Dockerfile, baseline.sql, schema.sql
 │   └── primitve/               # leftover template, to be deleted
 ├── tests/
 │   ├── Db.Tests/               # database baseline tests (Testcontainers)
@@ -208,8 +206,8 @@ docker compose up -d --build
 The first start is slow. OpenEMR performs a recursive permission pass over its
 bind-mounted tree, which is the main cost on Windows.
 
-**Reset the stack.** Init scripts run only on an empty volume. After editing
-`baseline.sql` or changing credentials in `.env`, reset with:
+**Reset the stack.** Init scripts run only on an empty volume. After restoring a
+new snapshot or changing credentials in `.env`, reset with:
 
 ```bash
 docker compose down -v
