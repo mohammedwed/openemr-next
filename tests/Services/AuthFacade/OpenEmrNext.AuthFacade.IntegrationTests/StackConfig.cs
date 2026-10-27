@@ -27,9 +27,6 @@ public static class StackConfig
     /// <summary>The redirect URI registered for the AuthFacade OAuth client. Defaults to the AuthFacade base URL plus <c>/callback</c>.</summary>
     public static string AuthFacadeRedirectUri => Get("AUTHFACADE_REDIRECT_URI", $"{AuthFacadeBaseUrl}/callback");
 
-    /// <summary>The path of AuthFacade's login page. From <c>AUTHFACADE_LOGIN_PATH</c>, default <c>/login</c>.</summary>
-    public static string AuthFacadeLoginPath => Get("AUTHFACADE_LOGIN_PATH", "/login");
-
     /// <summary>The base URL of the OpenEMR container on localhost. From <c>WT_HTTPS_PORT</c>, default 9300.</summary>
     public static string OpenEmrBaseUrl => $"https://localhost:{Get("WT_HTTPS_PORT", "9300")}";
 

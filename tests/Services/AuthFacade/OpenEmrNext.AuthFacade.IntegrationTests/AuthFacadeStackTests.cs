@@ -49,7 +49,7 @@ public class AuthFacadeStackTests
     public async Task OpenEmr_publishes_its_OIDC_discovery_document()
     {
         var json = await Http.GetStringAsync(
-            $"{StackConfig.OpenEmrBaseUrl}/oauth2/default/.well-known/openid-configuration");
+            $"{StackConfig.OpenEmrBaseUrl}{StackConfig.OpenEmrDiscoveryPath}");
 
         using var doc = JsonDocument.Parse(json);
         Assert.True(doc.RootElement.TryGetProperty("token_endpoint", out _));
@@ -70,7 +70,7 @@ public class AuthFacadeStackTests
         });
 
         var response = await Http.PostAsync(
-            $"{StackConfig.OpenEmrBaseUrl}/oauth2/default/token", form);
+            $"{StackConfig.OpenEmrBaseUrl}{StackConfig.OpenEmrTokenPath}", form);
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.DoesNotContain("invalid_client", body);
