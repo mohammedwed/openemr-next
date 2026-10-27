@@ -13,21 +13,13 @@ APPLY_ENV=scripts/env-management/apply-env.sh
 RESTORE=false
 [[ "${1:-}" == "--restore" ]] && RESTORE=true
 
-# Read a value from .env, dropping quotes and Windows line endings.
-get() {
-  grep -E "^$1=" .env | head -n1 | cut -d= -f2- | tr -d '\r' | sed -e 's/^"//' -e 's/"$//'
-}
-
-# Quote a value as a MariaDB string literal.
-sql_quote() {
-  local s=$1
-  s=${s//\\/\\\\}
-  s=${s//\'/\'\'}
-  printf "'%s'" "$s"
-}
+source "$(dirname "${BASH_SOURCE[0]}")/env-lib.sh"
 
 [[ -f .env ]] || { echo "Missing .env. Run scripts/env-management/new-env.sh first." >&2; exit 1; }
-DB_PASS=$(get DB_PASSWORD)
+DB_PASS=$(env_get DB_PASSWORD)
+DB_USER=$(env_get DB_USER openemr)
+OE_PORT=$(env_get WT_HTTPS_PORT 9300)
+FACADE_PORT=$(env_get FACADE_HTTP_PORT 7128)
 : "${DB_PASS:?DB_PASSWORD missing from .env}"
 [[ -f "$APPLY_ENV" ]] || { echo "Missing $APPLY_ENV" >&2; exit 1; }
 
@@ -54,8 +46,8 @@ if $RESTORE; then
 
   # The dump has no application user, so create it before apply-env changes its password.
   printf '%s\n' \
-    "CREATE USER IF NOT EXISTS 'openemr'@'%' IDENTIFIED BY $(sql_quote "$DB_PASS");" \
-    "GRANT ALL PRIVILEGES ON openemr.* TO 'openemr'@'%';" \
+    "CREATE USER IF NOT EXISTS $(sql_quote "$DB_USER")@'%' IDENTIFIED BY $(sql_quote "$DB_PASS");" \
+    "GRANT ALL PRIVILEGES ON \`$(env_get DB_NAME openemr)\`.* TO $(sql_quote "$DB_USER")@'%';" \
     "FLUSH PRIVILEGES;" \
     | docker compose exec -T mysql sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD"'
 
@@ -79,10 +71,10 @@ docker compose up -d --build --wait --wait-timeout 1200 openemr auth-facade phpm
 echo "==> Waiting for both endpoints"
 deadline=$(( $(date +%s) + 1200 ))
 while true; do
-  oe=$(curl -k -s -o /dev/null --max-time 10 -w "%{http_code}" https://localhost:9300/meta/health/readyz || true)
-  af=$(curl -s -o /dev/null --max-time 10 -w "%{http_code}" http://localhost:7128/api/health || true)
+  oe=$(curl -k -s -o /dev/null --max-time 10 -w "%{http_code}" https://localhost:$OE_PORT/meta/health/readyz || true)
+  af=$(curl -s -o /dev/null --max-time 10 -w "%{http_code}" http://localhost:$FACADE_PORT/api/health || true)
   if [[ "$oe" == 200 && "$af" == 200 ]]; then
-    echo "Stack ready: OpenEMR https://localhost:9300  AuthFacade http://localhost:7128"
+    echo "Stack ready: OpenEMR https://localhost:$OE_PORT  AuthFacade http://localhost:$FACADE_PORT"
     break
   fi
   if (( $(date +%s) >= deadline )); then

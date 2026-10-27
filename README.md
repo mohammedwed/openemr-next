@@ -189,9 +189,11 @@ slim entity model.
 **Prerequisites:** Docker Desktop (running), .NET 10 SDK, and PowerShell for the
 `.ps1` scripts.
 
-**Configuration.** Copy `.env.example` to `.env` and generate local secrets.
-`.env` is gitignored and must never be committed. Application settings live in
-one root configuration source; the template holds placeholders only.
+**Configuration.** Run `bash scripts/env-management/new-env.sh` to create `.env`
+from `.env.example` with generated secrets. `.env` is gitignored and must never be
+committed. It is the single source for ports, images, and credentials: Compose, the
+scripts, CI, and the integration tests all read it, so change a value there and
+nowhere else. `scripts/env-management/env-lib.sh` holds the shared shell helpers.
 
 **Start the stack:**
 

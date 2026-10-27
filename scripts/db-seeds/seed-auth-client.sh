@@ -5,6 +5,7 @@ set -eu
 : "${DB_USER:?Set DB_USER in .env}"
 : "${DB_NAME:?Set DB_NAME in .env}"
 : "${AUTHFACADE_CLIENT_ID:?Set AUTHFACADE_CLIENT_ID in .env}"
+: "${AUTHFACADE_REDIRECT_URI:?Set AUTHFACADE_REDIRECT_URI in the seed service environment}"
 
 DB_HOST="${DB_HOST:-mysql}"
 client="mariadb -h $DB_HOST -u$DB_USER $DB_NAME"
@@ -36,6 +37,7 @@ fi
 {
   printf 'SET @CLIENT_ID = %s;\n' "$(sql_quote "$AUTHFACADE_CLIENT_ID")"
   printf 'SET @CLIENT_SECRET = %s;\n' "$secret_sql"
+  printf 'SET @REDIRECT_URI = %s;\n' "$(sql_quote "$AUTHFACADE_REDIRECT_URI")"
   cat /seed/seed-authfacade-client.sql
 } | $client
 

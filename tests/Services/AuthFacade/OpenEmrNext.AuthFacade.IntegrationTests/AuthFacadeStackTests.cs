@@ -64,7 +64,7 @@ public class AuthFacadeStackTests
         {
             ["grant_type"] = "authorization_code",
             ["code"] = "invalid-test-code",
-            ["redirect_uri"] = "http://localhost:7128/callback",
+            ["redirect_uri"] = StackConfig.AuthFacadeRedirectUri,
             ["client_id"] = StackConfig.ClientId,
             ["client_secret"] = StackConfig.ClientSecret
         });

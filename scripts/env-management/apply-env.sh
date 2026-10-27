@@ -3,29 +3,21 @@
 # Run after the database and sites volume are restored, and before the stack starts.
 set -euo pipefail
 
-# Read a value from .env, dropping quotes, Windows line endings, and surrounding spaces.
-get() {
-  grep -E "^$1=" .env | head -n1 | cut -d= -f2- | tr -d '\r' | sed -e 's/^"//' -e 's/"$//'
-}
+source "$(dirname "${BASH_SOURCE[0]}")/env-lib.sh"
 
-DB_PASS=$(get DB_PASSWORD)
-CLIENT_SECRET=$(get AUTHFACADE_CLIENT_SECRET)
-CLIENT_ID=$(get AUTHFACADE_CLIENT_ID)
-OPENEMR_IMAGE=$(get OPENEMR_IMAGE)
+DB_PASS=$(env_get DB_PASSWORD)
+CLIENT_SECRET=$(env_get AUTHFACADE_CLIENT_SECRET)
+CLIENT_ID=$(env_get AUTHFACADE_CLIENT_ID)
+DB_USER=$(env_get DB_USER openemr)
+DB_NAME=$(env_get DB_NAME openemr)
+REDIRECT_URI="http://localhost:$(env_get FACADE_HTTP_PORT 7128)/callback"
+OPENEMR_IMAGE=$(env_get OPENEMR_IMAGE)
 SITES_VOLUME=${SITES_VOLUME:-openemr-next_sitesvolume}
 
 : "${DB_PASS:?DB_PASSWORD missing from .env}"
 : "${CLIENT_SECRET:?AUTHFACADE_CLIENT_SECRET missing from .env}"
 : "${CLIENT_ID:?AUTHFACADE_CLIENT_ID missing from .env}"
 : "${OPENEMR_IMAGE:?OPENEMR_IMAGE missing from .env}"
-
-# Quote a value as a MariaDB string literal: escape backslashes, then single quotes.
-sql_quote() {
-  local s=$1
-  s=${s//\\/\\\\}
-  s=${s//\'/\'\'}
-  printf "'%s'" "$s"
-}
 
 # 1. OpenEMR config: rewrite the password in sites/default/sqlconf.php.
 #    The password is passed as an environment variable, so it never appears in the
@@ -60,9 +52,9 @@ PHP
 
 # 2. Database: set the app user's password and the AuthFacade client secret.
 printf '%s\n' \
-  "ALTER USER 'openemr'@'%' IDENTIFIED BY $(sql_quote "$DB_PASS");" \
+  "ALTER USER $(sql_quote "$DB_USER")@'%' IDENTIFIED BY $(sql_quote "$DB_PASS");" \
   "FLUSH PRIVILEGES;" \
-  "UPDATE oauth_clients SET client_secret = $(sql_quote "$CLIENT_SECRET") WHERE client_id = $(sql_quote "$CLIENT_ID");" \
-  | docker compose exec -T mysql sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" openemr'
+  "UPDATE oauth_clients SET client_secret = $(sql_quote "$CLIENT_SECRET"), redirect_uri = $(sql_quote "$REDIRECT_URI") WHERE client_id = $(sql_quote "$CLIENT_ID");" \
+  | docker compose exec -T mysql sh -c "mariadb -uroot -p\"\$MYSQL_ROOT_PASSWORD\" $(printf '%q' "$DB_NAME")"
 
-echo "Applied DB password to sqlconf.php and database, and AuthFacade client secret from .env"
+echo "Applied DB password to sqlconf.php and database, and AuthFacade client secret and redirect URI from .env"

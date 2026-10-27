@@ -61,7 +61,7 @@ public static class StackConfig
 
     /// <summary>
     /// Reads the nearest <c>.env</c> file, searching up from the test binary's directory. Blank
-    /// lines, comments, and lines without <c>=</c> are skipped. Returns an empty dictionary if no
+    /// lines, comments, and lines without <c>=</c> are skipped, and surrounding double quotes are removed from values. Returns an empty dictionary if no
     /// file is found.
     /// </summary>
     private static Dictionary<string, string> LoadEnvFile()
@@ -77,7 +77,7 @@ public static class StackConfig
             var trimmed = line.Trim();
             if (trimmed.Length == 0 || trimmed.StartsWith('#') || !trimmed.Contains('=')) continue;
             var parts = trimmed.Split('=', 2);
-            values[parts[0].Trim()] = parts[1].Trim();
+            values[parts[0].Trim()] = parts[1].Trim().Trim('"');
         }
         return values;
     }
