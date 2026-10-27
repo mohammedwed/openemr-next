@@ -2,14 +2,14 @@
 # One-command local stack: optional snapshot restore, credentials from .env,
 # then start OpenEMR and AuthFacade and wait until both respond.
 #
-#   bash scripts/env-mngmnt/up.sh            start or resume the stack
-#   bash scripts/env-mngmnt/up.sh --restore  wipe volumes and rebuild from the snapshot
+#   bash scripts/env-management/up.sh            start or resume the stack
+#   bash scripts/env-management/up.sh --restore  wipe volumes and rebuild from the snapshot
 set -euo pipefail
 
 SNAPSHOT_TAG=${SNAPSHOT_TAG:-snapshot-openemr-8.0.0.3-ci}
 SNAPSHOT_DIR=snapshots
 SITES_VOLUME=${SITES_VOLUME:-openemr-next_sitesvolume}
-APPLY_ENV=scripts/env-mngmnt/apply-env.sh
+APPLY_ENV=scripts/env-management/apply-env.sh
 RESTORE=false
 [[ "${1:-}" == "--restore" ]] && RESTORE=true
 
@@ -26,7 +26,7 @@ sql_quote() {
   printf "'%s'" "$s"
 }
 
-[[ -f .env ]] || { echo "Missing .env. Run scripts/env-mngmnt/new-env.sh first." >&2; exit 1; }
+[[ -f .env ]] || { echo "Missing .env. Run scripts/env-management/new-env.sh first." >&2; exit 1; }
 DB_PASS=$(get DB_PASSWORD)
 : "${DB_PASS:?DB_PASSWORD missing from .env}"
 [[ -f "$APPLY_ENV" ]] || { echo "Missing $APPLY_ENV" >&2; exit 1; }

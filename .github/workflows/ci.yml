@@ -88,7 +88,7 @@ jobs:
             alpine sh -c "tar xzf /backup/sites.tar.gz -C /data"
 
       - name: Apply environment values to restored stack
-        run: bash scripts/env-mngmnt/apply-env.sh
+        run: bash scripts/env-management/apply-env.sh
 
       - name: Start stack
         run: docker compose up -d --build --wait --wait-timeout 1200 openemr auth-facade phpmyadmin
