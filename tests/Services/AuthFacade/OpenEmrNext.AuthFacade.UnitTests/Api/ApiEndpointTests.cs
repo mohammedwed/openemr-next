@@ -145,7 +145,7 @@ public class ApiEndpointTests
     }
 
     [Fact]
-    public async Task Unsupported_grant_type_returns_400()
+    public async Task Unsupported_grant_type_returns_invalid_request()
     {
         await using var api = await TestApi.StartAsync();
         using var form = new FormUrlEncodedContent(new Dictionary<string, string>
@@ -159,7 +159,35 @@ public class ApiEndpointTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var body = await ReadJsonAsync(response);
-        Assert.Equal("unsupported_grant_type", body.RootElement.GetProperty("error").GetString());
+        Assert.Equal("invalid_request", body.RootElement.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task Missing_grant_type_returns_invalid_request()
+    {
+        await using var api = await TestApi.StartAsync();
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["username"] = "alice_01",
+            ["password"] = "Passw0rd!"
+        });
+
+        using var response = await api.Client.PostAsync("/api/v1/connect/token", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var body = await ReadJsonAsync(response);
+        Assert.Equal("invalid_request", body.RootElement.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task Non_form_request_returns_415()
+    {
+        await using var api = await TestApi.StartAsync();
+        using var json = new StringContent("{\"username\":\"alice_01\"}", System.Text.Encoding.UTF8, "application/json");
+
+        using var response = await api.Client.PostAsync("/api/v1/connect/token", json);
+
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
     }
 
     [Fact]

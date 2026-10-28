@@ -9,7 +9,8 @@ public static class UserEndpoints
 {
     /// <summary>
     /// Maps <c>GET /api/v1/me</c>, which returns the subject and name claims of the bearer token.
-    /// Requires authorization.
+    /// Requires authorization. The endpoint is named <c>GetCurrentUser</c>, which becomes its OpenAPI
+    /// <c>operationId</c>.
     /// </summary>
     /// <param name="app">The endpoint route builder.</param>
     /// <returns>The same builder, for chaining.</returns>
@@ -18,7 +19,8 @@ public static class UserEndpoints
         app.MapGet("/me", (ClaimsPrincipal user) => Results.Ok(new MeResponse(
             user.FindFirst(JwtRegisteredClaimNames.Sub)?.Value,
             user.FindFirst(JwtRegisteredClaimNames.Name)?.Value)))
-        .RequireAuthorization();
+            .WithName("GetCurrentUser")
+            .RequireAuthorization();
 
         return app;
     }
