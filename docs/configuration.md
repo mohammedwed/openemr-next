@@ -56,7 +56,7 @@ Naming: `OPENEMR_*` is the OpenEMR container, `AUTHFACADE_*` is the AuthFacade s
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `AUTHFACADE_ENVIRONMENT` | `Production` | ASP.NET Core environment of the AuthFacade container. `Development` adds the OpenAPI document and Scalar UI (`/scalar`), the developer exception page and debug logging, so use it only on your own machine. |
+| `AUTHFACADE_ENVIRONMENT` | `Production` | ASP.NET Core environment of the AuthFacade container. `Development` adds the OpenAPI document and Scalar UI (`/scalar/v1`), the developer exception page and debug logging, so use it only on your own machine. |
 
 ### AuthFacade OAuth client
 

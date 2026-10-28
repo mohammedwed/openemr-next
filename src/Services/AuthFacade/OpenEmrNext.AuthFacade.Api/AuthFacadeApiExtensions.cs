@@ -24,7 +24,7 @@ public static class AuthFacadeApiExtensions
             .AddLoginRateLimiting()
             .AddOAuthErrorBodies()
             .AddAuthorization()
-            .AddOpenApi(options => options.DescribeFormFieldsAsStrings());
+            .AddOpenApi(options => options.ConfigureAuthFacade());
 
         // The API host knows its environment, so it refuses the development TLS bypass anywhere else.
         builder.Services.AddOptions<OpenEmrOptions>()

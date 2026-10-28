@@ -44,6 +44,18 @@ public static class TokenEndpoints
             return ToHttpResult(result);
         })
             .WithName("IssueToken")
+            .WithTags("Authentication")
+            .WithSummary("Log in with an OpenEMR username and password")
+            .WithDescription(
+                "Verifies the password grant with OpenEMR and returns the access token OpenEMR issues. " +
+                "400 is invalid_grant when OpenEMR refuses the credentials and invalid_request when a form field " +
+                "is missing or invalid, including an unsupported grant type.")
+            .Produces<TokenResponse>(StatusCodes.Status200OK)
+            .Produces<ErrorResponse>(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status415UnsupportedMediaType)
+            .Produces<ErrorResponse>(StatusCodes.Status429TooManyRequests)
+            .Produces<ErrorResponse>(StatusCodes.Status502BadGateway)
+            .Produces<ErrorResponse>(StatusCodes.Status503ServiceUnavailable)
             .AsPublicTokenEndpoint();
 
         return app;
