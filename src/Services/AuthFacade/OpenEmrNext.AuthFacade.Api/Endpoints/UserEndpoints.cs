@@ -20,6 +20,10 @@ public static class UserEndpoints
             user.FindFirst(JwtRegisteredClaimNames.Sub)?.Value,
             user.FindFirst(JwtRegisteredClaimNames.Name)?.Value)))
             .WithName("GetCurrentUser")
+            .WithTags("Identity")
+            .WithSummary("Get the subject and name of the bearer token")
+            .Produces<MeResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
             .RequireAuthorization();
 
         return app;

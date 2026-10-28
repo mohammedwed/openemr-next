@@ -29,6 +29,12 @@ Cleaned up the repository, made `.env` the single source for configuration, reor
 - **`scripts/lib/env.sh`**, shared shell helpers (`env_get`, `env_set`, `sql_quote`, `env_warn_legacy`) used by the scripts and CI.
 - **`scripts/snapshot/create.sh`**, the bash snapshot script.
 
+- **A fuller OpenAPI document.** Only in Development, as before.
+  - The title, description, summaries and the `Authentication` and `Identity` tags describe the API.
+  - A `Bearer` security scheme is declared, and `GET /api/v1/me` is marked as secured, so the Scalar UI offers an Authorize field.
+  - Every response is documented with its body: 200, 400, 415, 429, 502 and 503 for the token endpoint, and 200 and 401 for `/me`. `TokenResponse`, `ErrorResponse` and `MeResponse` are now schemas.
+  - The token operation lists only `application/x-www-form-urlencoded`. It listed `multipart/form-data` first, which is what Scalar sent.
+
 ## Changed
 
 - **`.env` is the single source.** Ports, the database user and name, and the OAuth redirect URI come from `.env` in the scripts, seed SQL, tests and CI. Before, they were hardcoded as 9300, 7128 and `openemr`.
@@ -49,6 +55,7 @@ Cleaned up the repository, made `.env` the single source for configuration, reor
 
 ## Fixed
 
+- **The OpenAPI document described the token endpoint's form fields as objects.** The generator reflected the value-object types, so `username` was an object with a `value` property and `password` had no properties. The Scalar UI sent those fields in a form the endpoint did not read as plain text, and logins failed with `invalid_grant`. A schema transformer now describes `PasswordGrant`, `Username` and `Password` as strings with their length limits, and `Password` as `format: password`.
 - **Snapshot creation on a restored stack.** `create.sh` streams the dump to the host, so a root-owned `/tmp/db.sql` left by the restore no longer blocks it. It hands the archive back to the invoking user and restarts the apps even when a step fails.
 - **MariaDB and phpMyAdmin were reachable from the local network.** They now bind to `127.0.0.1` by default.
 

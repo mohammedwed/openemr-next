@@ -67,6 +67,7 @@ internal sealed class TestApi : IAsyncDisposable
         var app = builder.Build();
         app.UseAuthFacadeHttpMiddleware();
         app.MapAuthFacadeEndpoints();
+        app.MapOpenApi();
         await app.StartAsync();
 
         return new TestApi(app, identityProvider, tokenVerifier);

@@ -1,5 +1,6 @@
 using OpenEmrNext.AuthFacade.Api.Authentication;
 using OpenEmrNext.AuthFacade.Api.Endpoints;
+using OpenEmrNext.AuthFacade.Api.OpenApi;
 using OpenEmrNext.AuthFacade.Api.RateLimiting;
 using OpenEmrNext.AuthFacade.Composition;
 using OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
@@ -23,7 +24,7 @@ public static class AuthFacadeApiExtensions
             .AddLoginRateLimiting()
             .AddOAuthErrorBodies()
             .AddAuthorization()
-            .AddOpenApi();
+            .AddOpenApi(options => options.ConfigureAuthFacade());
 
         // The API host knows its environment, so it refuses the development TLS bypass anywhere else.
         builder.Services.AddOptions<OpenEmrOptions>()
