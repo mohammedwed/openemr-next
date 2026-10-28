@@ -7,7 +7,7 @@ Run everything from the repository root.
 | `setup/new-env.sh` | you, once | Create `.env` from `.env.example` with generated secrets. Never overwrites an existing `.env`. |
 | `stack/up.sh` | you | Start or resume the stack. With `--restore`, wipe the volumes and rebuild from the snapshot in `snapshots/` (downloaded from the release if missing). |
 | `stack/apply-credentials.sh` | `up.sh`, CI | Write the `.env` credentials into a restored stack: the database password, OpenEMR's `sqlconf.php`, and the AuthFacade client secret and redirect URI. |
-| `snapshot/create.sh` | you | Dump the database and sites volume into `snapshots/`. Stops `openemr` and `auth-facade` while it runs. `create.ps1` is the PowerShell equivalent. |
+| `snapshot/create.sh` | you | Dump the database and sites volume into `snapshots/`. Stops `openemr` and `auth-facade` while it runs. |
 | `seeds/authfacade-client.*` | the `seed` Compose service | Register the AuthFacade OAuth client in OpenEMR. Mounted into the container, not run directly. |
 | `lib/env.sh` | other scripts, CI | Sourced helpers: `env_get`, `env_set`, `sql_quote`, `env_warn_legacy`. |
 
@@ -19,7 +19,6 @@ Run everything from the repository root.
 | `bash` (Git Bash on Windows) and `curl` | `stack/up.sh`, `stack/apply-credentials.sh` |
 | `openssl` | `setup/new-env.sh` |
 | GitHub CLI `gh`, logged in | `stack/up.sh --restore` when `snapshots/` is empty |
-| PowerShell (optional) | `snapshot/create.ps1`, the PowerShell equivalent of `create.sh` |
 
 ## Optional environment variables
 
