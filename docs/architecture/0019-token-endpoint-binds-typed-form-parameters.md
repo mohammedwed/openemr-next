@@ -28,6 +28,7 @@ ASP.NET Core can do the binding. A parameter marked `[FromForm]` is parsed from 
 - A non-form request now gets a bare 415. Before, it got a 400 with a body.
 - The behaviour depends on how ASP.NET Core reports binding failures. The tests pin the responses, so a framework change that alters them fails the suite.
 - The framework logs a failed binding at Debug level with the submitted value. For a password that happens only when it is empty or over 1024 characters.
+- The OpenAPI generator describes a parameter by its C# type, so the value objects appeared as objects (`username` with a `value` property, `password` with none). Clients built from the document, including the Scalar UI, then sent something the endpoint did not parse as a username, and logins failed with `invalid_grant`. A schema transformer (`DescribeFormFieldsAsStrings`) describes `PasswordGrant`, `Username` and `Password` as strings, with their length limits and `format: password`, and tests pin the schemas.
 - Each new grant type needs its own parameter shape. When the form grows, `BindAsync` on a request type is the next step, because it controls the snake case names and the errors.
 
 ## Alternatives considered

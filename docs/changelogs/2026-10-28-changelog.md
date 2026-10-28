@@ -49,6 +49,7 @@ Cleaned up the repository, made `.env` the single source for configuration, reor
 
 ## Fixed
 
+- **The OpenAPI document described the token endpoint's form fields as objects.** The generator reflected the value-object types, so `username` was an object with a `value` property and `password` had no properties. The Scalar UI sent those fields in a form the endpoint did not read as plain text, and logins failed with `invalid_grant`. A schema transformer now describes `PasswordGrant`, `Username` and `Password` as strings with their length limits, and `Password` as `format: password`.
 - **Snapshot creation on a restored stack.** `create.sh` streams the dump to the host, so a root-owned `/tmp/db.sql` left by the restore no longer blocks it. It hands the archive back to the invoking user and restarts the apps even when a step fails.
 - **MariaDB and phpMyAdmin were reachable from the local network.** They now bind to `127.0.0.1` by default.
 
