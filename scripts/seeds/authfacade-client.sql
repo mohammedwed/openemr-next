@@ -1,4 +1,4 @@
--- DEV ONLY. Registers the AuthFacade OAuth client and keeps its scope in sync.
+-- DEV ONLY. Registers the AuthFacade OAuth client and keeps its scope and redirect URI in sync.
 -- @CLIENT_ID, @CLIENT_SECRET and @REDIRECT_URI are set by authfacade-client.sh.
 INSERT INTO oauth_clients
   (client_id, client_name, client_role, client_secret, redirect_uri, grant_types,

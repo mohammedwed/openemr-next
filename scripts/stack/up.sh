@@ -4,6 +4,19 @@
 #
 #   bash scripts/stack/up.sh            start or resume the stack
 #   bash scripts/stack/up.sh --restore  wipe volumes and rebuild from the snapshot
+#
+# WARNING: --restore runs `docker compose down -v`, which DELETES the database and OpenEMR
+#          sites volumes, including any local changes. Take a snapshot first if you need them.
+#
+# Needs:   docker compose, curl, and a .env (see scripts/setup/new-env.sh).
+#          With --restore and no files in snapshots/, also the GitHub CLI (`gh`), logged in
+#          with access to this repository's releases.
+# Reads:   .env (see docs/configuration.md), plus these optional environment variables:
+#            SNAPSHOT_TAG   release to download the snapshot from
+#                           (default snapshot-openemr-8.0.0.3-ci)
+#            SITES_VOLUME   name of the OpenEMR sites volume
+#                           (default openemr-next_sitesvolume, i.e. <compose project>_sitesvolume)
+# Exits 1: if .env is missing, or the stack is not healthy within 20 minutes.
 set -euo pipefail
 
 SNAPSHOT_TAG=${SNAPSHOT_TAG:-snapshot-openemr-8.0.0.3-ci}

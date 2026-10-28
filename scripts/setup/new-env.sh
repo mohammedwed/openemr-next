@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # Creates .env from .env.example with freshly generated secrets.
 # Never overwrites an existing .env.
+#
+#   bash scripts/setup/new-env.sh
+#
+# Needs:   openssl, and .env.example in the repository root.
+# Sets:    DB_ROOT_PASSWORD, DB_PASSWORD and AUTHFACADE_CLIENT_SECRET to random values, and
+#          OPENEMR_ADMIN_PASSWORD to the snapshot's fixed admin password.
+# Exits 1: if .env already exists, or .env.example is missing.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."

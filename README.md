@@ -185,11 +185,9 @@ slim entity model.
 
 ## Local development
 
-> Command names below come from the development changelogs. Confirm each one
-> against the repository before publishing this README.
-
-**Prerequisites:** Docker Desktop (running), .NET 10 SDK, and PowerShell for the
-`.ps1` scripts.
+**Prerequisites:** Docker Desktop (running), .NET 10 SDK, Bash (Git Bash on Windows),
+the GitHub CLI for downloading snapshots, and PowerShell for `snapshot/create.ps1`.
+Each script's requirements are listed in [`scripts/README.md`](scripts/README.md).
 
 **Configuration.** Run `bash scripts/setup/new-env.sh` to create `.env`
 from `.env.example` with generated secrets. `.env` is gitignored and must never be
@@ -201,8 +199,12 @@ nowhere else. `scripts/lib/env.sh` holds the shared shell helpers. Every variabl
 **Start the stack:**
 
 ```bash
-docker compose up -d --build
+bash scripts/stack/up.sh --restore   # first run: restores the snapshot, applies .env credentials
+bash scripts/stack/up.sh             # later runs: resume the stack
 ```
+
+`--restore` deletes local data. Plain `docker compose up -d --build` also works, but it
+installs a fresh OpenEMR instead of restoring the snapshot, which takes much longer.
 
 The first start is slow. OpenEMR performs a recursive permission pass over its
 bind-mounted tree, which is the main cost on Windows.

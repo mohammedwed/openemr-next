@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 # Re-applies credentials from .env to a restored OpenEMR stack.
 # Run after the database and sites volume are restored, and before the stack starts.
+# stack/up.sh and CI call it; you rarely need to.
+#
+#   bash scripts/stack/apply-credentials.sh
+#
+# Changes: the `sites/default/sqlconf.php` password in the sites volume; the database user's
+#          password; and the AuthFacade OAuth client's secret and redirect URI.
+# Needs:   docker compose with the `mysql` service running, and the OpenEMR image from .env.
+# Reads:   .env, plus the optional SITES_VOLUME (default openemr-next_sitesvolume).
+# Order:   it is not atomic. It updates sqlconf.php first, then the database. If the database
+#          step fails, rerun the script; both steps are safe to repeat.
+# Exits 1: if a required value is missing from .env, or sqlconf.php cannot be rewritten.
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/env.sh"
