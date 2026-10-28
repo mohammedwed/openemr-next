@@ -18,4 +18,6 @@ WORKDIR /app
 COPY --from=build /app/publish .
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
+# The image ships a non-root "app" user (APP_UID). Port 8080 needs no privileges.
+USER $APP_UID
 ENTRYPOINT ["dotnet", "OpenEmrNext.AuthFacade.Api.dll"]
