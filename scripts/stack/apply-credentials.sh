@@ -11,7 +11,7 @@
 # Reads:   .env, plus the optional SITES_VOLUME (default openemr-next_sitesvolume).
 # Order:   it is not atomic. It updates sqlconf.php first, then the database. If the database
 #          step fails, rerun the script; both steps are safe to repeat.
-# Exits 1: if a required value is missing from .env, or sqlconf.php cannot be rewritten.
+# Exits non-zero: if a required value is missing from .env, or sqlconf.php cannot be rewritten.
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/env.sh"

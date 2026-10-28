@@ -9,7 +9,7 @@
 # Optional:
 #   DB_HOST                   database host (default mysql)
 #   AUTHFACADE_CLIENT_SECRET  client secret; the client gets a NULL secret if unset
-# Exits 1: if a required variable is missing or OpenEMR's tables do not appear within 15 minutes.
+# Exits non-zero: if a required variable is missing (status 2 under sh), or OpenEMR's tables do not appear within 15 minutes.
 set -eu
 
 : "${DB_USER:?Set DB_USER in .env}"
