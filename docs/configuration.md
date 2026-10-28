@@ -29,6 +29,7 @@ Naming: `OPENEMR_*` is the OpenEMR container, `AUTHFACADE_*` is the AuthFacade s
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
+| `HOST_BIND_ADDRESS` | `127.0.0.1` | Address every published port binds to. The default keeps the database, phpMyAdmin and the apps off your network. Set `0.0.0.0` only to expose the stack on purpose; the default credentials are well known. |
 | `OPENEMR_HTTP_PORT` | `8300` | OpenEMR over HTTP. |
 | `OPENEMR_HTTPS_PORT` | `9300` | OpenEMR over HTTPS. Also forms the token issuer URL `https://localhost:<port>/oauth2/default`. |
 | `DB_PORT` | `8320` | MariaDB. |
@@ -50,6 +51,12 @@ Naming: `OPENEMR_*` is the OpenEMR container, `AUTHFACADE_*` is the AuthFacade s
 | --- | --- | --- | --- |
 | `OPENEMR_ADMIN_USER` | `admin` | no | Admin login. Passed to the image as `OE_USER`. Also used by the live login tests. |
 | `OPENEMR_ADMIN_PASSWORD` | none, required | yes | Admin password. Passed to the image as `OE_PASS`. A restored snapshot only accepts `ci-admin-password`. |
+
+### AuthFacade runtime
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `AUTHFACADE_ENVIRONMENT` | `Production` | ASP.NET Core environment of the AuthFacade container. `Development` adds the OpenAPI document and Scalar UI (`/scalar`), the developer exception page and debug logging, so use it only on your own machine. |
 
 ### AuthFacade OAuth client
 

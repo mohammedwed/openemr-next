@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using OpenEmrNext.AuthFacade.Application.Ports;
 
 namespace OpenEmrNext.AuthFacade.Api.Contracts.Responses;
 
@@ -14,4 +15,10 @@ public sealed record TokenResponse(
     [property: JsonPropertyName("access_token")] string AccessToken,
     [property: JsonPropertyName("token_type")] string TokenType,
     [property: JsonPropertyName("expires_in"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? ExpiresIn,
-    [property: JsonPropertyName("refresh_token"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RefreshToken);
+    [property: JsonPropertyName("refresh_token"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? RefreshToken)
+{
+    /// <summary>Builds the response from the token OpenEMR issued.</summary>
+    /// <param name="token">The verified OpenEMR token.</param>
+    public static TokenResponse From(OpenEmrToken token) =>
+        new(token.AccessToken, token.TokenType, token.ExpiresIn, token.RefreshToken);
+}

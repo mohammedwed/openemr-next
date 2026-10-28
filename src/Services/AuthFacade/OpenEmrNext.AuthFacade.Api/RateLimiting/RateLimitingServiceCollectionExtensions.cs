@@ -40,7 +40,7 @@ public static class RateLimitingServiceCollectionExtensions
                 }
 
                 await context.HttpContext.Response.WriteAsJsonAsync(
-                    new ErrorResponse("too_many_requests", "Too many login attempts. Try again later."),
+                    ErrorResponse.TooManyRequests(),
                     cancellationToken);
             };
 
