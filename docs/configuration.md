@@ -9,7 +9,7 @@ Configuration has three layers. Each setting is defined in one place and read fr
 | Application | `appsettings*.json`, or `Section__Key` environment variables | AuthFacade behaviour |
 
 `.env` is the single source for anything shared between services, scripts, CI and tests (ADR 0004).
-Run `bash scripts/env-management/new-env.sh` to create it with generated secrets. `up.sh`
+Run `bash scripts/setup/new-env.sh` to create it with generated secrets. `up.sh`
 warns if `.env` still uses a renamed variable (see [Renamed variables](#renamed-variables)).
 
 ## Stack variables (`.env`)
@@ -42,7 +42,7 @@ Naming: `OPENEMR_*` is the OpenEMR container, `AUTHFACADE_*` is the AuthFacade s
 | `DB_NAME` | `openemr` | no | Database name. |
 | `DB_USER` | `openemr` | no | Application user. Created on restore. |
 | `DB_ROOT_PASSWORD` | none, required | yes | MariaDB root password. |
-| `DB_PASSWORD` | none, required | yes | Password for `DB_USER`. `apply-env.sh` writes it to OpenEMR's `sqlconf.php`. |
+| `DB_PASSWORD` | none, required | yes | Password for `DB_USER`. `apply-credentials.sh` writes it to OpenEMR's `sqlconf.php`. |
 
 ### OpenEMR admin account
 
@@ -56,7 +56,7 @@ Naming: `OPENEMR_*` is the OpenEMR container, `AUTHFACADE_*` is the AuthFacade s
 | Variable | Default | Secret | Meaning |
 | --- | --- | --- | --- |
 | `AUTHFACADE_CLIENT_ID` | none, required | no | Client ID the seed service registers in OpenEMR. Becomes `OpenEmr__ClientId`. |
-| `AUTHFACADE_CLIENT_SECRET` | none, required | yes | Client secret. Becomes `OpenEmr__ClientSecret`; `apply-env.sh` writes it to OpenEMR. |
+| `AUTHFACADE_CLIENT_SECRET` | none, required | yes | Client secret. Becomes `OpenEmr__ClientSecret`; `apply-credentials.sh` writes it to OpenEMR. |
 
 ### Integration tests
 

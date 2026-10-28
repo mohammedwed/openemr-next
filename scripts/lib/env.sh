@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Shared helpers for the env-management scripts and CI. Source this file; run from the repo root.
+# Shared helpers for the scripts and CI. Source this file; run from the repo root.
 #
-#   source scripts/env-management/env-lib.sh
+#   source scripts/lib/env.sh
 #   env_get KEY [DEFAULT]   read a value from .env
 #   env_set KEY VALUE       replace a value in .env, or append it
 #   sql_quote VALUE         quote a value as a MariaDB string literal

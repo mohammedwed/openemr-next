@@ -2,20 +2,20 @@
 # One-command local stack: optional snapshot restore, credentials from .env,
 # then start OpenEMR and AuthFacade and wait until both respond.
 #
-#   bash scripts/env-management/up.sh            start or resume the stack
-#   bash scripts/env-management/up.sh --restore  wipe volumes and rebuild from the snapshot
+#   bash scripts/stack/up.sh            start or resume the stack
+#   bash scripts/stack/up.sh --restore  wipe volumes and rebuild from the snapshot
 set -euo pipefail
 
 SNAPSHOT_TAG=${SNAPSHOT_TAG:-snapshot-openemr-8.0.0.3-ci}
 SNAPSHOT_DIR=snapshots
 SITES_VOLUME=${SITES_VOLUME:-openemr-next_sitesvolume}
-APPLY_ENV=scripts/env-management/apply-env.sh
+APPLY_ENV=scripts/stack/apply-credentials.sh
 RESTORE=false
 [[ "${1:-}" == "--restore" ]] && RESTORE=true
 
-source "$(dirname "${BASH_SOURCE[0]}")/env-lib.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/env.sh"
 
-[[ -f .env ]] || { echo "Missing .env. Run scripts/env-management/new-env.sh first." >&2; exit 1; }
+[[ -f .env ]] || { echo "Missing .env. Run scripts/setup/new-env.sh first." >&2; exit 1; }
 env_warn_legacy
 DB_PASS=$(env_get DB_PASSWORD)
 DB_USER=$(env_get DB_USER openemr)
@@ -45,7 +45,7 @@ if $RESTORE; then
   docker compose cp "$SNAPSHOT_DIR/db.sql" mysql:/tmp/db.sql
   docker compose exec -T mysql sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" < /tmp/db.sql'
 
-  # The dump has no application user, so create it before apply-env changes its password.
+  # The dump has no application user, so create it before apply-credentials.sh changes its password.
   printf '%s\n' \
     "CREATE USER IF NOT EXISTS $(sql_quote "$DB_USER")@'%' IDENTIFIED BY $(sql_quote "$DB_PASS");" \
     "GRANT ALL PRIVILEGES ON \`$(env_get DB_NAME openemr)\`.* TO $(sql_quote "$DB_USER")@'%';" \

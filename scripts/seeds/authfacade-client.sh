@@ -38,7 +38,7 @@ fi
   printf 'SET @CLIENT_ID = %s;\n' "$(sql_quote "$AUTHFACADE_CLIENT_ID")"
   printf 'SET @CLIENT_SECRET = %s;\n' "$secret_sql"
   printf 'SET @REDIRECT_URI = %s;\n' "$(sql_quote "$AUTHFACADE_REDIRECT_URI")"
-  cat /seed/seed-authfacade-client.sql
+  cat /seed/authfacade-client.sql
 } | $client
 
 echo "AuthFacade seed complete"

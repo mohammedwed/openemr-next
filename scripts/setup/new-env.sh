@@ -18,7 +18,7 @@ secret() { openssl rand -hex 24; }
 
 cp .env.example .env
 
-source scripts/env-management/env-lib.sh
+source scripts/lib/env.sh
 
 env_set DB_ROOT_PASSWORD "$(secret)"
 env_set DB_PASSWORD "$(secret)"

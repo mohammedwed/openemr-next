@@ -41,7 +41,7 @@ jobs:
           AUTHFACADE_CLIENT_ID: ${{ vars.AUTHFACADE_CLIENT_ID || 'authfacade' }}
         run: |
           cp .env.example .env
-          source scripts/env-management/env-lib.sh
+          source scripts/lib/env.sh
           env_set DB_ROOT_PASSWORD "$DB_ROOT_PASSWORD"
           env_set DB_PASSWORD "$DB_PASSWORD"
           env_set OPENEMR_ADMIN_PASSWORD "$OPENEMR_ADMIN_PASSWORD"
@@ -63,7 +63,7 @@ jobs:
 
       - name: Restore database
         run: |
-          source scripts/env-management/env-lib.sh
+          source scripts/lib/env.sh
           app_user=$(sql_quote "$(env_get DB_USER openemr)")
           app_pass=$(sql_quote "$(env_get DB_PASSWORD)")
           docker compose cp snapshots/db.sql mysql:/tmp/db.sql
@@ -85,7 +85,7 @@ jobs:
             alpine sh -c "tar xzf /backup/sites.tar.gz -C /data"
 
       - name: Apply environment values to restored stack
-        run: bash scripts/env-management/apply-env.sh
+        run: bash scripts/stack/apply-credentials.sh
 
       - name: Start stack
         run: docker compose up -d --build --wait --wait-timeout 1200 openemr auth-facade phpmyadmin
@@ -93,7 +93,7 @@ jobs:
       - name: Probe endpoints
         if: always()
         run: |
-          source scripts/env-management/env-lib.sh
+          source scripts/lib/env.sh
           oe_port=$(env_get OPENEMR_HTTPS_PORT 9300)
           facade_port=$(env_get AUTHFACADE_HTTP_PORT 7128)
           for url in "https://localhost:$oe_port/meta/health/readyz" "http://localhost:$facade_port/api/health"; do

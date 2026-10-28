@@ -37,7 +37,7 @@ AuthFacade listens on port 7128.
 
 **Database snapshot.** The stack restores its database from a snapshot
 (`db.sql`, `sites.tar.gz`, `images.txt`) kept in the git-ignored `snapshots/`
-directory and published as a release asset. `scripts/env-management/up.sh --restore`
+directory and published as a release asset. `scripts/stack/up.sh --restore`
 rebuilds the stack from it.
 
 **Entity model.** `src/OpenEmr.Data` contains EF Core entities and
@@ -172,9 +172,11 @@ Known problems with the baseline:
 ├── tests/
 │   └── Services/AuthFacade/    # unit, architecture, and black-box integration tests
 └── scripts/
-    ├── env-management/         # new-env, apply-env, up (--restore)
-    ├── db-seeds/               # OAuth client seeding
-    └── snapshot.ps1, restore.ps1
+    ├── setup/new-env.sh        # create .env with generated secrets
+    ├── stack/                  # up.sh (--restore), apply-credentials.sh
+    ├── snapshot/create.ps1     # write a snapshot to snapshots/
+    ├── seeds/                  # AuthFacade OAuth client, run by the seed service
+    └── lib/env.sh              # shared shell helpers (sourced, not run)
 ```
 
 Planned additions: `src/Gateway`, `src/PatientManagement`, `src/ClinicalCare`,
@@ -189,11 +191,11 @@ slim entity model.
 **Prerequisites:** Docker Desktop (running), .NET 10 SDK, and PowerShell for the
 `.ps1` scripts.
 
-**Configuration.** Run `bash scripts/env-management/new-env.sh` to create `.env`
+**Configuration.** Run `bash scripts/setup/new-env.sh` to create `.env`
 from `.env.example` with generated secrets. `.env` is gitignored and must never be
 committed. It is the single source for ports, images, and credentials: Compose, the
 scripts, CI, and the integration tests all read it, so change a value there and
-nowhere else. `scripts/env-management/env-lib.sh` holds the shared shell helpers. Every variable is described in
+nowhere else. `scripts/lib/env.sh` holds the shared shell helpers. Every variable is described in
 [`docs/configuration.md`](docs/configuration.md).
 
 **Start the stack:**

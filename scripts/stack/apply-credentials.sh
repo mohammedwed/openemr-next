@@ -3,7 +3,7 @@
 # Run after the database and sites volume are restored, and before the stack starts.
 set -euo pipefail
 
-source "$(dirname "${BASH_SOURCE[0]}")/env-lib.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/env.sh"
 
 DB_PASS=$(env_get DB_PASSWORD)
 CLIENT_SECRET=$(env_get AUTHFACADE_CLIENT_SECRET)

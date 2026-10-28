@@ -70,8 +70,8 @@ services:
       AUTHFACADE_CLIENT_SECRET: ${AUTHFACADE_CLIENT_SECRET:-}
       AUTHFACADE_REDIRECT_URI: http://localhost:${AUTHFACADE_HTTP_PORT:-7128}/callback
     volumes:
-      - ./scripts/db-seeds/seed-auth-facade-client.sql:/seed/seed-authfacade-client.sql:ro
-      - ./scripts/db-seeds/seed-auth-client.sh:/seed/seed.sh:ro
+      - ./scripts/seeds/authfacade-client.sql:/seed/authfacade-client.sql:ro
+      - ./scripts/seeds/authfacade-client.sh:/seed/seed.sh:ro
       
     entrypoint: ["sh", "/seed/seed.sh"]
 
