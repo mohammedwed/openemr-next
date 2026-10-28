@@ -1,0 +1,61 @@
+# Scripts
+
+Run everything from the repository root.
+
+| Script | Run by | Purpose |
+| --- | --- | --- |
+| `setup/new-env.sh` | you, once | Create `.env` from `.env.example` with generated secrets. Never overwrites an existing `.env`. |
+| `stack/up.sh` | you | Start or resume the stack. With `--restore`, wipe the volumes and rebuild from the snapshot in `snapshots/` (downloaded from the release if missing). |
+| `stack/apply-credentials.sh` | `up.sh`, CI | Write the `.env` credentials into a restored stack: the database password, OpenEMR's `sqlconf.php`, and the AuthFacade client secret and redirect URI. |
+| `snapshot/create.sh` | you | Dump the database and sites volume into `snapshots/`. Stops `openemr` and `auth-facade` while it runs. `create.ps1` is the PowerShell equivalent. |
+| `seeds/authfacade-client.*` | the `seed` Compose service | Register the AuthFacade OAuth client in OpenEMR. Mounted into the container, not run directly. |
+| `lib/env.sh` | other scripts, CI | Sourced helpers: `env_get`, `env_set`, `sql_quote`, `env_warn_legacy`. |
+
+## Requirements
+
+| Tool | Needed by |
+| --- | --- |
+| Docker with `docker compose` | everything except `setup/new-env.sh` |
+| `bash` (Git Bash on Windows) and `curl` | `stack/up.sh`, `stack/apply-credentials.sh` |
+| `openssl` | `setup/new-env.sh` |
+| GitHub CLI `gh`, logged in | `stack/up.sh --restore` when `snapshots/` is empty |
+| PowerShell (optional) | `snapshot/create.ps1`, the PowerShell equivalent of `create.sh` |
+
+## Optional environment variables
+
+| Variable | Default | Read by |
+| --- | --- | --- |
+| `SNAPSHOT_TAG` | `snapshot-openemr-8.0.0.3-ci` | `stack/up.sh`. CI sets the same tag in `ci.yml`; change both together. |
+| `SITES_VOLUME` | `openemr-next_sitesvolume` | `stack/up.sh`, `stack/apply-credentials.sh`. This is `<compose project>_sitesvolume`; set it if the project name changes. |
+
+## Typical first run
+
+```bash
+bash scripts/setup/new-env.sh
+bash scripts/stack/up.sh --restore
+```
+
+`--restore` deletes the local database and OpenEMR volumes. To start or resume without
+restoring, run `bash scripts/stack/up.sh`.
+
+## Snapshots
+
+A snapshot is the database dump, the OpenEMR sites archive and an image list. CI and
+`up.sh --restore` download them from the GitHub release named by `SNAPSHOT_TAG`.
+
+1. Bring the stack to the state you want, then run `bash scripts/snapshot/create.sh`.
+2. Check that `snapshots/` holds no real patient data.
+3. Upload the files to the release. These commands are a suggestion, not something the repo
+   runs, so check them before relying on them:
+
+   ```bash
+   gh release upload "$SNAPSHOT_TAG" snapshots/db.sql snapshots/sites.tar.gz snapshots/images.txt --clobber
+   ```
+
+   Use `gh release create` first if the tag does not exist. If the OpenEMR version changes,
+   make a new tag and update `SNAPSHOT_TAG` in `up.sh` and `.github/workflows/ci.yml`.
+
+Restoring a snapshot replaces the admin password hash, so `OPENEMR_ADMIN_PASSWORD` must match
+the snapshot (`ci-admin-password` for the current one).
+
+Variables are described in [`docs/configuration.md`](../docs/configuration.md).

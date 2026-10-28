@@ -49,7 +49,7 @@ public class AuthFacadeStackTests
     public async Task OpenEmr_publishes_its_OIDC_discovery_document()
     {
         var json = await Http.GetStringAsync(
-            $"{StackConfig.OpenEmrBaseUrl}/oauth2/default/.well-known/openid-configuration");
+            $"{StackConfig.OpenEmrBaseUrl}{StackConfig.OpenEmrDiscoveryPath}");
 
         using var doc = JsonDocument.Parse(json);
         Assert.True(doc.RootElement.TryGetProperty("token_endpoint", out _));
@@ -64,13 +64,13 @@ public class AuthFacadeStackTests
         {
             ["grant_type"] = "authorization_code",
             ["code"] = "invalid-test-code",
-            ["redirect_uri"] = "http://localhost:7128/callback",
+            ["redirect_uri"] = StackConfig.AuthFacadeRedirectUri,
             ["client_id"] = StackConfig.ClientId,
             ["client_secret"] = StackConfig.ClientSecret
         });
 
         var response = await Http.PostAsync(
-            $"{StackConfig.OpenEmrBaseUrl}/oauth2/default/token", form);
+            $"{StackConfig.OpenEmrBaseUrl}{StackConfig.OpenEmrTokenPath}", form);
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.DoesNotContain("invalid_client", body);

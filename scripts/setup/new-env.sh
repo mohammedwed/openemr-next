@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # Creates .env from .env.example with freshly generated secrets.
 # Never overwrites an existing .env.
+#
+#   bash scripts/setup/new-env.sh
+#
+# Needs:   openssl, and .env.example in the repository root.
+# Sets:    DB_ROOT_PASSWORD, DB_PASSWORD and AUTHFACADE_CLIENT_SECRET to random values, and
+#          OPENEMR_ADMIN_PASSWORD to the snapshot's fixed admin password.
+# Exits 1: if .env already exists, or .env.example is missing.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
@@ -18,23 +25,14 @@ secret() { openssl rand -hex 24; }
 
 cp .env.example .env
 
-set_value() {
-  local key=$1 value=$2
-  # Replace the line if it exists, otherwise append it.
-  if grep -q "^${key}=" .env; then
-    sed -i "s|^${key}=.*|${key}=${value}|" .env
-  else
-    printf '%s=%s\n' "$key" "$value" >> .env
-  fi
-}
+source scripts/lib/env.sh
 
-set_value DB_ROOT_PASSWORD "$(secret)"
-set_value DB_PASSWORD "$(secret)"
-set_value AUTHFACADE_CLIENT_SECRET "$(secret)"
-set_value AUTHFACADE_CLIENT_ID "authfacade"
+env_set DB_ROOT_PASSWORD "$(secret)"
+env_set DB_PASSWORD "$(secret)"
+env_set AUTHFACADE_CLIENT_SECRET "$(secret)"
 
 # The snapshot's admin hash matches this password, so it must not be generated.
-set_value OE_PASS "ci-admin-password"
+env_set OPENEMR_ADMIN_PASSWORD "ci-admin-password"
 
 echo "Created .env with generated secrets."
-echo "OE_PASS is set to the snapshot's admin password (ci-admin-password)."
+echo "OPENEMR_ADMIN_PASSWORD is set to the snapshot's admin password (ci-admin-password)."

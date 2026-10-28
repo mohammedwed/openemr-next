@@ -12,7 +12,7 @@ public sealed class LoginRateLimitOptions : IValidatableObject
     /// <summary>The configuration section these options are bound from.</summary>
     public const string SectionName = "LoginRateLimit";
 
-    /// <summary>The fewest requests one client address may send in a window. Must be at least 1.</summary>
+    /// <summary>The most requests one client address may send in a window. Must be at least 1.</summary>
     public int PermitLimit { get; set; } = 10;
 
     /// <summary>The length of one fixed window. At least one second.</summary>

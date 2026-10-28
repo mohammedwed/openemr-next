@@ -35,13 +35,13 @@ OpenEMR (pinned to `openemr/openemr:8.0.0.3`), phpMyAdmin, and AuthFacade on one
 network. Services address each other by name. The MariaDB host port is 3307.
 AuthFacade listens on port 7128.
 
-**Database baseline.** `src/db/maria-db/baseline.sql` holds the schema and seed
-data, produced by running the real OpenEMR installer against MariaDB 12.3. A
-Dockerfile loads it on first start with an empty volume. A schema-only dump is
-kept as a diff target.
+**Database snapshot.** The stack restores its database from a snapshot
+(`db.sql`, `sites.tar.gz`, `images.txt`) kept in the git-ignored `snapshots/`
+directory and published as a release asset. `scripts/stack/up.sh --restore`
+rebuilds the stack from it.
 
 **Entity model.** `src/OpenEmr.Data` contains EF Core entities and
-`OpenEmrDbContext`, scaffolded from the live database by `scripts/scaffold.ps1`.
+`OpenEmrDbContext`, scaffolded from the live database.
 Global aliases resolve the `Version` and `Void` name clashes. This model is a
 stepping stone: each future service should scaffold only its own tables.
 
@@ -164,23 +164,19 @@ Known problems with the baseline:
 /
 ├── docker-compose.yml          # one Compose project: openemr-next
 ├── .env.example                # placeholders only; .env is gitignored
-├── docker/
-│   └── open-emr-legacy/        # OpenEMR, MariaDB, phpMyAdmin dev stack
+├── .github/workflows/ci.yml    # build, restore snapshot, run tests
+├── docs/                       # ADRs, changelogs, design notes
 ├── src/
 │   ├── Services/AuthFacade/    # token broker: Domain, Application, Infrastructure, Api
-│   ├── OpenEmr.Data/           # EF Core entities and context (scaffolded)
-│   ├── db/
-│   │   └── maria-db/           # Dockerfile, baseline.sql, schema.sql
-│   └── primitve/               # leftover template, to be deleted
+│   └── OpenEmr.Data/           # EF Core entities and context (scaffolded)
 ├── tests/
-│   ├── Db.Tests/               # database baseline tests (Testcontainers)
-│   ├── Services/AuthFacade/    # black-box tests on the live stack
-│   └── primitve.tests/         # leftover template, to be deleted
-├── tools/
-│   └── Scaffold.Host/          # throwaway startup project for dotnet ef
-├── scripts/
-│   └── scaffold.ps1            # regenerates OpenEmr.Data from the database
-└── TestFacade.ps1              # manual login check through the facade
+│   └── Services/AuthFacade/    # unit, architecture, and black-box integration tests
+└── scripts/
+    ├── setup/new-env.sh        # create .env with generated secrets
+    ├── stack/                  # up.sh (--restore), apply-credentials.sh
+    ├── snapshot/create.sh      # write a snapshot to snapshots/ (create.ps1 for PowerShell)
+    ├── seeds/                  # AuthFacade OAuth client, run by the seed service
+    └── lib/env.sh              # shared shell helpers (sourced, not run)
 ```
 
 Planned additions: `src/Gateway`, `src/PatientManagement`, `src/ClinicalCare`,
@@ -189,27 +185,32 @@ slim entity model.
 
 ## Local development
 
-> Command names below come from the development changelogs. Confirm each one
-> against the repository before publishing this README.
+**Prerequisites:** Docker Desktop (running), .NET 10 SDK, Bash (Git Bash on Windows),
+and the GitHub CLI for downloading snapshots. PowerShell is optional (`snapshot/create.ps1`).
+Each script's requirements are listed in [`scripts/README.md`](scripts/README.md).
 
-**Prerequisites:** Docker Desktop (running), .NET 10 SDK, and PowerShell for the
-`.ps1` scripts.
-
-**Configuration.** Copy `.env.example` to `.env` and generate local secrets.
-`.env` is gitignored and must never be committed. Application settings live in
-one root configuration source; the template holds placeholders only.
+**Configuration.** Run `bash scripts/setup/new-env.sh` to create `.env`
+from `.env.example` with generated secrets. `.env` is gitignored and must never be
+committed. It is the single source for ports, images, and credentials: Compose, the
+scripts, CI, and the integration tests all read it, so change a value there and
+nowhere else. `scripts/lib/env.sh` holds the shared shell helpers. Every variable is described in
+[`docs/configuration.md`](docs/configuration.md).
 
 **Start the stack:**
 
 ```bash
-docker compose up -d --build
+bash scripts/stack/up.sh --restore   # first run: restores the snapshot, applies .env credentials
+bash scripts/stack/up.sh             # later runs: resume the stack
 ```
+
+`--restore` deletes local data. Plain `docker compose up -d --build` also works, but it
+installs a fresh OpenEMR instead of restoring the snapshot, which takes much longer.
 
 The first start is slow. OpenEMR performs a recursive permission pass over its
 bind-mounted tree, which is the main cost on Windows.
 
-**Reset the stack.** Init scripts run only on an empty volume. After editing
-`baseline.sql` or changing credentials in `.env`, reset with:
+**Reset the stack.** Init scripts run only on an empty volume. After restoring a
+new snapshot or changing credentials in `.env`, reset with:
 
 ```bash
 docker compose down -v
@@ -220,21 +221,12 @@ This deletes all local data.
 **Run the tests:**
 
 ```bash
-dotnet test tests/Db.Tests                             # starts its own MariaDB
 dotnet test tests/Services/AuthFacade/OpenEmrNext.AuthFacade.IntegrationTests  # needs the running stack
 ```
 
 The integration suite runs a readiness gate first, which checks the database,
 the seed, OpenEMR, and AuthFacade under one deadline. It is slow and needs
 Docker, so it is not part of a unit-test-only pipeline.
-
-**Check a login by hand:** `./TestFacade.ps1` prompts for the password, logs in
-through the facade, and calls `/api/v1/me`. It prints status codes and property names,
-never tokens.
-
-**Regenerate the entity model:** `pwsh scripts/scaffold.ps1`, with `-Tables` for a
-subset or `-SkipDocker`. Re-scaffolding overwrites `Entities/` and `Context/`.
-Custom code belongs in partial classes elsewhere.
 
 ## Evaluation approach
 

@@ -1,3 +1,19 @@
+<#
+.SYNOPSIS
+  Writes a snapshot of the running stack to snapshots/.
+.DESCRIPTION
+  The bash equivalent is create.sh; keep the two in step.
+  Produces the three files that `stack/up.sh --restore` and CI restore from:
+    db.sql          full database dump
+    sites.tar.gz    OpenEMR sites volume (config, DB credentials, encryption keys)
+    images.txt      images that produced the snapshot
+  Run from the repository root with the stack up. It STOPS `openemr` and `auth-facade` while it
+  works so the files are consistent, and starts them again at the end. The database stays up.
+  Before sharing a snapshot, confirm it contains no real patient data.
+  Publishing is manual: see "Snapshots" in scripts/README.md.
+.EXAMPLE
+  pwsh scripts/snapshot/create.ps1
+#>
 $ErrorActionPreference = "Stop"
 $out = "snapshots"
 New-Item -ItemType Directory -Force $out | Out-Null

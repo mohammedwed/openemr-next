@@ -36,22 +36,18 @@ jobs:
         env:
           DB_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD || 'ci-root-password' }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'ci-openemr-password' }}
-          OE_PASS: ${{ secrets.OE_PASS || 'ci-admin-password' }}
+          OPENEMR_ADMIN_PASSWORD: ${{ secrets.OE_PASS || 'ci-admin-password' }}
           AUTHFACADE_CLIENT_SECRET: ${{ secrets.AUTHFACADE_CLIENT_SECRET || 'ci-client-secret' }}
           AUTHFACADE_CLIENT_ID: ${{ vars.AUTHFACADE_CLIENT_ID || 'authfacade' }}
-          OPENEMR_IMAGE: openemr/openemr:8.0.0.3
-          MARIADB_IMAGE: mariadb:12.3.3
-          PHPMYADMIN_IMAGE: phpmyadmin:5.2.3
         run: |
-          printf '%s\n' \
-            "DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD" \
-            "DB_PASSWORD=$DB_PASSWORD" \
-            "OE_PASS=$OE_PASS" \
-            "AUTHFACADE_CLIENT_SECRET=$AUTHFACADE_CLIENT_SECRET" \
-            "AUTHFACADE_CLIENT_ID=$AUTHFACADE_CLIENT_ID" \
-            "OPENEMR_IMAGE=$OPENEMR_IMAGE" \
-            "MARIADB_IMAGE=$MARIADB_IMAGE" \
-            "PHPMYADMIN_IMAGE=$PHPMYADMIN_IMAGE" > .env
+          cp .env.example .env
+          source scripts/lib/env.sh
+          env_set DB_ROOT_PASSWORD "$DB_ROOT_PASSWORD"
+          env_set DB_PASSWORD "$DB_PASSWORD"
+          env_set OPENEMR_ADMIN_PASSWORD "$OPENEMR_ADMIN_PASSWORD"
+          env_set AUTHFACADE_CLIENT_SECRET "$AUTHFACADE_CLIENT_SECRET"
+          env_set AUTHFACADE_CLIENT_ID "$AUTHFACADE_CLIENT_ID"
+          env_set STACK_READY_TIMEOUT_MINUTES 3
           # Print variable names only, never values.
           cut -d= -f1 .env
 
@@ -66,15 +62,16 @@ jobs:
         run: docker compose up -d mysql --wait
 
       - name: Restore database
-        env:
-          APP_PASS: ${{ secrets.DB_PASSWORD || 'ci-openemr-password' }}
         run: |
+          source scripts/lib/env.sh
+          app_user=$(sql_quote "$(env_get DB_USER openemr)")
+          app_pass=$(sql_quote "$(env_get DB_PASSWORD)")
           docker compose cp snapshots/db.sql mysql:/tmp/db.sql
           docker compose exec -T mysql sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" < /tmp/db.sql'
           printf '%s\n' \
-            "CREATE USER IF NOT EXISTS 'openemr'@'%' IDENTIFIED BY '${APP_PASS}';" \
-            "ALTER USER 'openemr'@'%' IDENTIFIED BY '${APP_PASS}';" \
-            "GRANT ALL PRIVILEGES ON openemr.* TO 'openemr'@'%';" \
+            "CREATE USER IF NOT EXISTS ${app_user}@'%' IDENTIFIED BY ${app_pass};" \
+            "ALTER USER ${app_user}@'%' IDENTIFIED BY ${app_pass};" \
+            "GRANT ALL PRIVILEGES ON \`$(env_get DB_NAME openemr)\`.* TO ${app_user}@'%';" \
             "FLUSH PRIVILEGES;" > create-user.sql
           docker compose cp create-user.sql mysql:/tmp/create-user.sql
           docker compose exec -T mysql sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" < /tmp/create-user.sql'
@@ -88,7 +85,7 @@ jobs:
             alpine sh -c "tar xzf /backup/sites.tar.gz -C /data"
 
       - name: Apply environment values to restored stack
-        run: bash scripts/env-mngmnt/apply-env.sh
+        run: bash scripts/stack/apply-credentials.sh
 
       - name: Start stack
         run: docker compose up -d --build --wait --wait-timeout 1200 openemr auth-facade phpmyadmin
@@ -96,7 +93,10 @@ jobs:
       - name: Probe endpoints
         if: always()
         run: |
-          for url in https://localhost:9300/meta/health/readyz http://localhost:7128/api/health; do
+          source scripts/lib/env.sh
+          oe_port=$(env_get OPENEMR_HTTPS_PORT 9300)
+          facade_port=$(env_get AUTHFACADE_HTTP_PORT 7128)
+          for url in "https://localhost:$oe_port/meta/health/readyz" "http://localhost:$facade_port/api/health"; do
             code=$(curl -k -s -o /dev/null --max-time 10 -w "%{http_code}" "$url" || true)
             echo "$url -> ${code:-no response}"
           done

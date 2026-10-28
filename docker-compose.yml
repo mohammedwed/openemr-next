@@ -6,7 +6,7 @@ services:
     image: ${MARIADB_IMAGE}
     restart: unless-stopped
     ports:
-      - "${WT_MYSQL_PORT:-8320}:3306"
+      - "${DB_PORT:-8320}:3306"
     volumes:
       - databasevolume:/var/lib/mysql
     environment:
@@ -26,8 +26,8 @@ services:
       mysql:
         condition: service_healthy
     ports:
-      - "${WT_HTTP_PORT:-8300}:80"
-      - "${WT_HTTPS_PORT:-9300}:443"
+      - "${OPENEMR_HTTP_PORT:-8300}:80"
+      - "${OPENEMR_HTTPS_PORT:-9300}:443"
     volumes:
       - sitesvolume:/var/www/localhost/htdocs/openemr/sites
     environment:
@@ -35,9 +35,9 @@ services:
       MYSQL_ROOT_PASS: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
       MYSQL_USER: ${DB_USER:-openemr}
       MYSQL_PASS: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
-      OE_USER: ${OE_USER:-admin}
-      OE_PASS: ${OE_PASS:?Set OE_PASS in .env}
-      OPENEMR_SETTING_site_addr_oath: "https://localhost:${WT_HTTPS_PORT:-9300}"
+      OE_USER: ${OPENEMR_ADMIN_USER:-admin}
+      OE_PASS: ${OPENEMR_ADMIN_PASSWORD:?Set OPENEMR_ADMIN_PASSWORD in .env}
+      OPENEMR_SETTING_site_addr_oath: "https://localhost:${OPENEMR_HTTPS_PORT:-9300}"
       OPENEMR_SETTING_oauth_password_grant: 3
       OPENEMR_SETTING_rest_api: 1
       OPENEMR_SETTING_rest_fhir_api: 1
@@ -47,7 +47,7 @@ services:
     image: ${PHPMYADMIN_IMAGE}
     restart: unless-stopped
     ports:
-      - "${WT_PMA_PORT:-8310}:80"
+      - "${PHPMYADMIN_PORT:-8310}:80"
     environment:
       PMA_HOSTS: mysql
     depends_on:
@@ -68,9 +68,10 @@ services:
       MYSQL_PWD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
       AUTHFACADE_CLIENT_ID: ${AUTHFACADE_CLIENT_ID:?Set AUTHFACADE_CLIENT_ID in .env}
       AUTHFACADE_CLIENT_SECRET: ${AUTHFACADE_CLIENT_SECRET:-}
+      AUTHFACADE_REDIRECT_URI: http://localhost:${AUTHFACADE_HTTP_PORT:-7128}/callback
     volumes:
-      - ./scripts/db-seeds/seed-auth-facade-client.sql:/seed/seed-authfacade-client.sql:ro
-      - ./scripts/db-seeds/seed-auth-client.sh:/seed/seed.sh:ro
+      - ./scripts/seeds/authfacade-client.sql:/seed/authfacade-client.sql:ro
+      - ./scripts/seeds/authfacade-client.sh:/seed/seed.sh:ro
       
     entrypoint: ["sh", "/seed/seed.sh"]
 
@@ -80,16 +81,17 @@ services:
       context: src/Services/AuthFacade
       dockerfile: Dockerfile
     restart: unless-stopped
+    # Needs OpenEMR (not the database) at request time. It does not need OpenEMR to be healthy to
+    # start: /api/health is static and calls to OpenEMR go through circuit breakers.
     depends_on:
-      mysql:
-        condition: service_healthy
+      openemr:
+        condition: service_started
     ports:
-      - "${FACADE_HTTP_PORT:-7128}:8080"
+      - "${AUTHFACADE_HTTP_PORT:-7128}:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DefaultConnection: "Server=mysql;Port=3306;Database=${DB_NAME:-openemr};Uid=${DB_USER:-openemr};Pwd=${DB_PASSWORD:?Set DB_PASSWORD in .env}"
       OpenEmr__BaseUrl: "http://openemr:80"
-      OpenEmr__Issuer: "https://localhost:${WT_HTTPS_PORT:-9300}/oauth2/default"
+      OpenEmr__Issuer: "https://localhost:${OPENEMR_HTTPS_PORT:-9300}/oauth2/default"
       OpenEmr__ClientId: ${AUTHFACADE_CLIENT_ID:?Set AUTHFACADE_CLIENT_ID in .env}
       OpenEmr__ClientSecret: ${AUTHFACADE_CLIENT_SECRET:?Set AUTHFACADE_CLIENT_SECRET in .env}
       OpenEmr__Scope: openid profile email offline_access
