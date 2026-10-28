@@ -7,7 +7,7 @@ using OpenEmrNext.AuthFacade.UnitTests.Application;
 namespace OpenEmrNext.AuthFacade.UnitTests.Api;
 
 /// <summary>
-/// Tests the HTTP surface (<c>/api/health</c>, <c>/api/v1/connect/token</c>, <c>/api/v1/me</c>) in-process through
+/// Tests the HTTP surface (<c>/health</c>, <c>/api/v1/connect/token</c>, <c>/api/v1/me</c>) in-process through
 /// <see cref="TestApi"/>. Login tests set the fake identity provider's result or exception first,
 /// then check the status code and body the API returns. <c>/api/v1/me</c> tests set the fake verifier's result.
 /// No Docker stack is needed.
@@ -34,9 +34,19 @@ public class ApiEndpointTests
     {
         await using var api = await TestApi.StartAsync();
 
-        using var response = await api.Client.GetAsync("/api/health");
+        using var response = await api.Client.GetAsync("/health");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Health_is_no_longer_served_under_api()
+    {
+        await using var api = await TestApi.StartAsync();
+
+        using var response = await api.Client.GetAsync("/api/health");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]

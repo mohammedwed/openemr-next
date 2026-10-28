@@ -1,7 +1,7 @@
 @AuthFacade_HostAddress = http://localhost:5050
 
 ### Health check
-GET {{AuthFacade_HostAddress}}/api/health
+GET {{AuthFacade_HostAddress}}/health
 Accept: application/json
 
 ### Password grant (replace the placeholders with a real OpenEMR user)

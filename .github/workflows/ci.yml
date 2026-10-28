@@ -96,7 +96,7 @@ jobs:
           source scripts/lib/env.sh
           oe_port=$(env_get OPENEMR_HTTPS_PORT 9300)
           facade_port=$(env_get AUTHFACADE_HTTP_PORT 7128)
-          for url in "https://localhost:$oe_port/meta/health/readyz" "http://localhost:$facade_port/api/health"; do
+          for url in "https://localhost:$oe_port/meta/health/readyz" "http://localhost:$facade_port/health"; do
             code=$(curl -k -s -o /dev/null --max-time 10 -w "%{http_code}" "$url" || true)
             echo "$url -> ${code:-no response}"
           done

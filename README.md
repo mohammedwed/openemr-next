@@ -56,7 +56,7 @@ stepping stone: each future service should scaffold only its own tables.
   [ADR 0016](docs/architecture/0016-facade-token-response-shape.md).
 - `GET /api/v1/me` requires an OpenEMR-issued bearer token. The token is verified
   against OpenEMR's JWKS, and `/api/v1/me` returns the subject and name.
-- `GET /api/health` is a liveness check.
+- `GET /health` is a liveness check.
 
 ## Architecture
 

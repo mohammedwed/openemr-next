@@ -8,7 +8,7 @@ namespace OpenEmrNext.AuthFacade.IntegrationTests;
 /// Shared fixture for the <c>Stack</c> collection. Before any integration test runs, it polls
 /// four checks until all pass or <see cref="StackConfig.ReadinessTimeout"/> expires:
 /// the database accepts the app user, the AuthFacade client row is seeded, OpenEMR's
-/// <c>/meta/health/readyz</c> returns 200, and AuthFacade's <c>/api/health</c> returns 200.
+/// <c>/meta/health/readyz</c> returns 200, and AuthFacade's <c>/health</c> returns 200.
 /// </summary>
 /// <remarks>
 /// Each check has its own timeout. A MySQL access-denied error (1045) fails fast instead of
@@ -45,7 +45,7 @@ public sealed class ReadinessFixture : IAsyncLifetime
             ("database accepts the app user", CheckDatabaseAsync),
             ("AuthFacade client is registered", CheckSeedAsync),
             ("OpenEMR readiness endpoint returns 200", CheckOpenEmrAsync),
-            ("AuthFacade responds on /api/health", CheckAuthFacadeAsync),
+            ("AuthFacade responds on /health", CheckAuthFacadeAsync),
         };
 
         // Poll all checks together until they pass or the single deadline passes
@@ -122,10 +122,10 @@ public sealed class ReadinessFixture : IAsyncLifetime
         return response.StatusCode == HttpStatusCode.OK;
     }
 
-    /// <summary>Checks that AuthFacade's <c>/api/health</c> endpoint returns 200.</summary>
+    /// <summary>Checks that AuthFacade's <c>/health</c> endpoint returns 200.</summary>
     private static async Task<bool> CheckAuthFacadeAsync()
     {
-        var response = await Http.GetAsync(StackConfig.AuthFacadeBaseUrl + "/api/health");
+        var response = await Http.GetAsync(StackConfig.AuthFacadeBaseUrl + "/health");
         return response.StatusCode == HttpStatusCode.OK;
     }
 }

@@ -82,7 +82,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     # Needs OpenEMR (not the database) at request time. It does not need OpenEMR to be healthy to
-    # start: /api/health is static and calls to OpenEMR go through circuit breakers.
+    # start: /health is static and calls to OpenEMR go through circuit breakers.
     depends_on:
       openemr:
         condition: service_started

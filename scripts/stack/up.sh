@@ -86,7 +86,7 @@ echo "==> Waiting for both endpoints"
 deadline=$(( $(date +%s) + 1200 ))
 while true; do
   oe=$(curl -k -s -o /dev/null --max-time 10 -w "%{http_code}" https://localhost:$OE_PORT/meta/health/readyz || true)
-  af=$(curl -s -o /dev/null --max-time 10 -w "%{http_code}" http://localhost:$FACADE_PORT/api/health || true)
+  af=$(curl -s -o /dev/null --max-time 10 -w "%{http_code}" http://localhost:$FACADE_PORT/health || true)
   if [[ "$oe" == 200 && "$af" == 200 ]]; then
     echo "Stack ready: OpenEMR https://localhost:$OE_PORT  AuthFacade http://localhost:$FACADE_PORT"
     break
