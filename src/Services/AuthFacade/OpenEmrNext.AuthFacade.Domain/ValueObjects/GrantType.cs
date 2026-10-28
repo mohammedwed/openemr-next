@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 
 namespace OpenEmrNext.AuthFacade.Domain.ValueObjects;
@@ -25,24 +24,8 @@ public sealed partial record GrantType
         Value = value;
     }
 
-    /// <summary>Parses a grant type without throwing.</summary>
-    /// <param name="value">The candidate grant type string. May be null.</param>
-    /// <param name="grantType">The parsed grant type when the method returns true; otherwise null.</param>
-    /// <returns>True when the value is a supported grant type.</returns>
-    public static bool TryParse(string? value, [NotNullWhen(true)] out GrantType? grantType)
-    {
-        if (IsSupported(value))
-        {
-            grantType = new GrantType(value);
-            return true;
-        }
-
-        grantType = null;
-        return false;
-    }
-
     /// <summary>The single place that defines which grant types are supported.</summary>
-    private static bool IsSupported([NotNullWhen(true)] string? value) =>
+    private static bool IsSupported(string? value) =>
         value is not null && GrantTypePattern().IsMatch(value);
 
     /// <summary>The password grant, which verifies a username and password with OpenEMR.</summary>

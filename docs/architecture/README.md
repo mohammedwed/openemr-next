@@ -24,5 +24,6 @@ old one's status is updated to point to it.
 | [0016](0016-facade-token-response-shape.md) | AuthFacade returns its own token response shape on login | Point 4 (grant type code) superseded by 0019 | 2026-10-24 |
 | [0017](0017-circuit-breakers-guard-openemr-calls.md) | Circuit breakers guard calls to OpenEMR | Accepted | 2026-10-24 |
 | [0018](0018-rate-limit-the-login-endpoint-per-client-address.md) | The login endpoint is rate limited per client address | Accepted | 2026-10-24 |
-| [0019](0019-token-endpoint-binds-typed-form-parameters.md) | The token endpoint binds typed form parameters; binding failures are `invalid_request` | Accepted | 2026-10-28 |
+| [0019](0019-token-endpoint-binds-typed-form-parameters.md) | The token endpoint binds typed form parameters; binding failures are `invalid_request` | Accepted; point 1 superseded by 0021 | 2026-10-28 |
+| [0021](0021-token-form-is-a-request-dto-with-attribute-validation.md) | The token form binds to a request DTO that validates its properties with attributes | Accepted | 2026-10-28 |
 | [0020](0020-local-stack-defaults-are-conservative.md) | The local stack is conservative by default: Production, loopback ports, non-root | Accepted | 2026-10-28 |

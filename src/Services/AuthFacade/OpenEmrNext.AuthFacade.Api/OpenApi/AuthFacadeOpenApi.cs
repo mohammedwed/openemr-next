@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
+using OpenEmrNext.AuthFacade.Api.Contracts.Requests;
 
 namespace OpenEmrNext.AuthFacade.Api.OpenApi;
 
@@ -61,11 +62,57 @@ public static class AuthFacadeOpenApi
                 {
                     content.Remove(contentType);
                 }
+
+                if (content.TryGetValue(FormUrlEncoded, out var form))
+                {
+                    FlattenForm(form);
+                }
             }
 
             return Task.CompletedTask;
         });
 
-        return options.DescribeFormFieldsAsStrings();
+        return options;
+    }
+
+    /// <summary>
+    /// Merges the form described by <c>[AsParameters]</c>, which the generator emits as one schema per field inside
+    /// <c>allOf</c>, into a single object. It lists the required fields and marks the password as a password, so
+    /// clients built from the document send the form the endpoint expects.
+    /// </summary>
+    /// <param name="form">The form media type. Its schema is replaced when it has the per-field <c>allOf</c> shape.</param>
+    private static void FlattenForm(OpenApiMediaType form)
+    {
+        if (form.Schema is not OpenApiSchema { AllOf.Count: > 0 } schema)
+        {
+            return;
+        }
+
+        var flat = new OpenApiSchema
+        {
+            Type = JsonSchemaType.Object,
+            Properties = new Dictionary<string, IOpenApiSchema>(),
+            Required = new HashSet<string>
+            {
+                TokenRequestFields.GrantType,
+                TokenRequestFields.Username,
+                TokenRequestFields.Password
+            }
+        };
+
+        foreach (var part in schema.AllOf.OfType<OpenApiSchema>())
+        {
+            foreach (var (name, property) in part.Properties ?? new Dictionary<string, IOpenApiSchema>())
+            {
+                flat.Properties[name] = property;
+            }
+        }
+
+        if (flat.Properties.TryGetValue(TokenRequestFields.Password, out var password) && password is OpenApiSchema passwordSchema)
+        {
+            passwordSchema.Format = "password";
+        }
+
+        form.Schema = flat;
     }
 }

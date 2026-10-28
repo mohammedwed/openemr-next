@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Mvc;
 using OpenEmrNext.AuthFacade.Api.Contracts.Requests;
 using OpenEmrNext.AuthFacade.Api.Contracts.Responses;
 using OpenEmrNext.AuthFacade.Application.Authentication;
@@ -15,8 +14,8 @@ public static class TokenEndpoints
     /// <c>IssueToken</c>, which becomes its OpenAPI <c>operationId</c> and the method name in generated clients.
     /// </summary>
     /// <remarks>
-    /// The form fields are typed parameters, so ASP.NET Core parses them with the types' <c>TryParse</c> methods
-    /// before the handler runs. The route conventions come from <see cref="PublicTokenEndpointExtensions.AsPublicTokenEndpoint"/>.
+    /// The form fields bind to <see cref="PasswordLoginRequest"/>, whose properties carry their validation rules.
+    /// <see cref="RequestValidationExtensions.WithRequestValidation{TRequest}"/> checks them before the handler runs. The route conventions come from <see cref="PublicTokenEndpointExtensions.AsPublicTokenEndpoint"/>.
     /// <para>Responses:</para>
     /// <list type="bullet">
     /// <item>200 with a <see cref="TokenResponse"/> on success.</item>
@@ -34,15 +33,14 @@ public static class TokenEndpoints
     public static IEndpointRouteBuilder MapTokenEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/connect/token", async (
-            [FromForm(Name = TokenRequestFields.GrantType)] PasswordGrant _,
-            [FromForm(Name = TokenRequestFields.Username)] Username username,
-            [FromForm(Name = TokenRequestFields.Password)] Password password,
+            [AsParameters] PasswordLoginRequest request,
             PasswordLoginHandler login,
             CancellationToken ct) =>
-        {
-            var result = await login.HandleAsync(username, password, ct);
-            return ToHttpResult(result);
-        })
+                    {
+                        var result = await login.HandleAsync(new Username(request.Username!), new Password(request.Password!), ct);
+                        return ToHttpResult(result);
+                    })
+            .WithRequestValidation<PasswordLoginRequest>()
             .WithName("IssueToken")
             .WithTags("Authentication")
             .WithSummary("Log in with an OpenEMR username and password")

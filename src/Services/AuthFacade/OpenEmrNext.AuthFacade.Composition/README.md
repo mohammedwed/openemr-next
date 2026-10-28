@@ -44,19 +44,24 @@ var login = scope.ServiceProvider.GetRequiredService<PasswordLoginHandler>();
 
 An HTTP host gets a request scope automatically.
 
-## 4. Build the inputs with `TryParse`
+## 4. Build the inputs with the constructors
 
 ```csharp
 using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 
-if (!Username.TryParse(rawUsername, out var username) ||
-    !Password.TryParse(rawPassword, out var password))
+try
+{
+    var username = new Username(rawUsername);
+    var password = new Password(rawPassword);
+    // Call the use case with username and password.
+}
+catch (ArgumentException)
 {
     // Your host decides what this means: an HTTP 400, a usage message, and so on.
 }
 ```
 
-Use `TryParse` rather than the constructors, as the token endpoint does.
+Each constructor rejects invalid input with an `ArgumentException`. The token endpoint checks the same rules on its request DTO first, so it never reaches these constructors with invalid input.
 
 ## 5. Call the use case and handle all four outcomes
 

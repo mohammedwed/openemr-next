@@ -14,18 +14,18 @@ public class OpenApiDocumentTests
         return JsonDocument.Parse(await api.Client.GetStringAsync("/openapi/v1.json"));
     }
 
-    [Theory]
-    [InlineData("PasswordGrant")]
-    [InlineData("Username")]
-    [InlineData("Password")]
-    public async Task Form_field_value_objects_are_described_as_strings(string schemaName)
+    [Fact]
+    public async Task Token_form_fields_are_described_as_strings_with_their_limits()
     {
         using var document = await ReadDocumentAsync();
 
-        var schema = document.RootElement.GetProperty("components").GetProperty("schemas").GetProperty(schemaName);
+        var properties = FormSchema(document).GetProperty("properties");
 
-        Assert.Equal("string", schema.GetProperty("type").GetString());
-        Assert.False(schema.TryGetProperty("properties", out _));
+        Assert.Equal("string", properties.GetProperty("grant_type").GetProperty("type").GetString());
+        Assert.Equal("string", properties.GetProperty("username").GetProperty("type").GetString());
+        Assert.Equal(255, properties.GetProperty("username").GetProperty("maxLength").GetInt32());
+        Assert.Equal("string", properties.GetProperty("password").GetProperty("type").GetString());
+        Assert.Equal(1024, properties.GetProperty("password").GetProperty("maxLength").GetInt32());
     }
 
     [Fact]
@@ -33,9 +33,9 @@ public class OpenApiDocumentTests
     {
         using var document = await ReadDocumentAsync();
 
-        var schema = document.RootElement.GetProperty("components").GetProperty("schemas").GetProperty("Password");
+        var password = FormSchema(document).GetProperty("properties").GetProperty("password");
 
-        Assert.Equal("password", schema.GetProperty("format").GetString());
+        Assert.Equal("password", password.GetProperty("format").GetString());
     }
 
     [Fact]
@@ -43,12 +43,20 @@ public class OpenApiDocumentTests
     {
         using var document = await ReadDocumentAsync();
 
-        var body = document.RootElement.GetProperty("paths").GetProperty("/api/v1/connect/token")
-            .GetProperty("post").GetProperty("requestBody").GetProperty("content")
-            .GetProperty("application/x-www-form-urlencoded").GetProperty("schema");
-        var required = body.GetProperty("required").EnumerateArray().Select(e => e.GetString()).ToList();
+        var required = FormSchema(document).GetProperty("required").EnumerateArray().Select(e => e.GetString()).ToList();
 
         Assert.Equal(["grant_type", "username", "password"], required);
+    }
+
+    /// <summary>The schema of the token endpoint's form body, which must be one object rather than a list of parts.</summary>
+    private static JsonElement FormSchema(JsonDocument document)
+    {
+        var schema = document.RootElement.GetProperty("paths").GetProperty("/api/v1/connect/token")
+            .GetProperty("post").GetProperty("requestBody").GetProperty("content")
+            .GetProperty("application/x-www-form-urlencoded").GetProperty("schema");
+        Assert.Equal("object", schema.GetProperty("type").GetString());
+        Assert.False(schema.TryGetProperty("allOf", out _));
+        return schema;
     }
 
     private static JsonElement Operation(JsonDocument document, string path, string method) =>

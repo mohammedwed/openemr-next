@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 
 namespace OpenEmrNext.AuthFacade.Domain.ValueObjects;
@@ -28,24 +27,8 @@ public sealed partial record Username
         Value = value;
     }
 
-    /// <summary>Parses a login name without throwing.</summary>
-    /// <param name="value">The candidate login name. May be null.</param>
-    /// <param name="username">The parsed login name when the method returns true; otherwise null.</param>
-    /// <returns>True when the value passes the length and control-character rules.</returns>
-    public static bool TryParse(string? value, [NotNullWhen(true)] out Username? username)
-    {
-        if (IsValid(value))
-        {
-            username = new Username(value);
-            return true;
-        }
-
-        username = null;
-        return false;
-    }
-
     /// <summary>The single place that defines which login names are accepted.</summary>
-    private static bool IsValid([NotNullWhen(true)] string? value) =>
+    private static bool IsValid(string? value) =>
         value is not null && UsernamePattern().IsMatch(value);
 
     [GeneratedRegex(@"\A[^\p{Cc}]{1,255}\z")]
