@@ -36,7 +36,7 @@ jobs:
         env:
           DB_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD || 'ci-root-password' }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'ci-openemr-password' }}
-          OE_PASS: ${{ secrets.OE_PASS || 'ci-admin-password' }}
+          OPENEMR_ADMIN_PASSWORD: ${{ secrets.OE_PASS || 'ci-admin-password' }}
           AUTHFACADE_CLIENT_SECRET: ${{ secrets.AUTHFACADE_CLIENT_SECRET || 'ci-client-secret' }}
           AUTHFACADE_CLIENT_ID: ${{ vars.AUTHFACADE_CLIENT_ID || 'authfacade' }}
         run: |
@@ -44,7 +44,7 @@ jobs:
           source scripts/env-management/env-lib.sh
           env_set DB_ROOT_PASSWORD "$DB_ROOT_PASSWORD"
           env_set DB_PASSWORD "$DB_PASSWORD"
-          env_set OE_PASS "$OE_PASS"
+          env_set OPENEMR_ADMIN_PASSWORD "$OPENEMR_ADMIN_PASSWORD"
           env_set AUTHFACADE_CLIENT_SECRET "$AUTHFACADE_CLIENT_SECRET"
           env_set AUTHFACADE_CLIENT_ID "$AUTHFACADE_CLIENT_ID"
           env_set STACK_READY_TIMEOUT_MINUTES 3
@@ -94,8 +94,8 @@ jobs:
         if: always()
         run: |
           source scripts/env-management/env-lib.sh
-          oe_port=$(env_get WT_HTTPS_PORT 9300)
-          facade_port=$(env_get FACADE_HTTP_PORT 7128)
+          oe_port=$(env_get OPENEMR_HTTPS_PORT 9300)
+          facade_port=$(env_get AUTHFACADE_HTTP_PORT 7128)
           for url in "https://localhost:$oe_port/meta/health/readyz" "http://localhost:$facade_port/api/health"; do
             code=$(curl -k -s -o /dev/null --max-time 10 -w "%{http_code}" "$url" || true)
             echo "$url -> ${code:-no response}"

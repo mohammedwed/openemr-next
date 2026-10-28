@@ -25,7 +25,7 @@ env_set DB_PASSWORD "$(secret)"
 env_set AUTHFACADE_CLIENT_SECRET "$(secret)"
 
 # The snapshot's admin hash matches this password, so it must not be generated.
-env_set OE_PASS "ci-admin-password"
+env_set OPENEMR_ADMIN_PASSWORD "ci-admin-password"
 
 echo "Created .env with generated secrets."
-echo "OE_PASS is set to the snapshot's admin password (ci-admin-password)."
+echo "OPENEMR_ADMIN_PASSWORD is set to the snapshot's admin password (ci-admin-password)."

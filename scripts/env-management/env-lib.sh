@@ -5,6 +5,7 @@
 #   env_get KEY [DEFAULT]   read a value from .env
 #   env_set KEY VALUE       replace a value in .env, or append it
 #   sql_quote VALUE         quote a value as a MariaDB string literal
+#   env_warn_legacy         warn about variable names that were renamed
 
 # Read a value from .env, dropping quotes and Windows line endings.
 # Prints DEFAULT (or nothing) when the key is missing or empty.
@@ -35,4 +36,19 @@ sql_quote() {
   s=${s//\\/\\\\}
   s=${s//\'/\'\'}
   printf "'%s'" "$s"
+}
+
+# Warn when .env still uses a variable name that has been renamed.
+env_warn_legacy() {
+  local pair old new
+  for pair in WT_HTTP_PORT:OPENEMR_HTTP_PORT WT_HTTPS_PORT:OPENEMR_HTTPS_PORT \
+              WT_MYSQL_PORT:DB_PORT WT_PMA_PORT:PHPMYADMIN_PORT \
+              FACADE_HTTP_PORT:AUTHFACADE_HTTP_PORT \
+              OE_USER:OPENEMR_ADMIN_USER OE_PASS:OPENEMR_ADMIN_PASSWORD; do
+    old=${pair%%:*}
+    new=${pair##*:}
+    if grep -q "^$old=" .env; then
+      echo "WARNING: .env sets $old, which is ignored. Rename it to $new." >&2
+    fi
+  done
 }

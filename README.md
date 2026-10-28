@@ -193,7 +193,8 @@ slim entity model.
 from `.env.example` with generated secrets. `.env` is gitignored and must never be
 committed. It is the single source for ports, images, and credentials: Compose, the
 scripts, CI, and the integration tests all read it, so change a value there and
-nowhere else. `scripts/env-management/env-lib.sh` holds the shared shell helpers.
+nowhere else. `scripts/env-management/env-lib.sh` holds the shared shell helpers. Every variable is described in
+[`docs/configuration.md`](docs/configuration.md).
 
 **Start the stack:**
 

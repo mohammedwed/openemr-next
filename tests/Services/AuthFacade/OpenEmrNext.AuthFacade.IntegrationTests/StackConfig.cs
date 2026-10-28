@@ -18,8 +18,8 @@ public static class StackConfig
         Environment.GetEnvironmentVariable(key)
         ?? (Env.TryGetValue(key, out var value) ? value : fallback);
 
-    /// <summary>The base URL of the AuthFacade container on localhost. From <c>FACADE_HTTP_PORT</c>, default 7128.</summary>
-    public static string AuthFacadeBaseUrl => $"http://localhost:{Get("FACADE_HTTP_PORT", "7128")}";
+    /// <summary>The base URL of the AuthFacade container on localhost. From <c>AUTHFACADE_HTTP_PORT</c>, default 7128.</summary>
+    public static string AuthFacadeBaseUrl => $"http://localhost:{Get("AUTHFACADE_HTTP_PORT", "7128")}";
 
     /// <summary>The path of AuthFacade's token endpoint. From <c>AUTHFACADE_TOKEN_PATH</c>, default <c>/api/v1/connect/token</c>.</summary>
     public static string AuthFacadeTokenPath => Get("AUTHFACADE_TOKEN_PATH", "/api/v1/connect/token");
@@ -27,8 +27,8 @@ public static class StackConfig
     /// <summary>The redirect URI registered for the AuthFacade OAuth client. Defaults to the AuthFacade base URL plus <c>/callback</c>.</summary>
     public static string AuthFacadeRedirectUri => Get("AUTHFACADE_REDIRECT_URI", $"{AuthFacadeBaseUrl}/callback");
 
-    /// <summary>The base URL of the OpenEMR container on localhost. From <c>WT_HTTPS_PORT</c>, default 9300.</summary>
-    public static string OpenEmrBaseUrl => $"https://localhost:{Get("WT_HTTPS_PORT", "9300")}";
+    /// <summary>The base URL of the OpenEMR container on localhost. From <c>OPENEMR_HTTPS_PORT</c>, default 9300.</summary>
+    public static string OpenEmrBaseUrl => $"https://localhost:{Get("OPENEMR_HTTPS_PORT", "9300")}";
 
     /// <summary>The path of OpenEMR's OIDC discovery document. From <c>OPENEMR_DISCOVERY_PATH</c>.</summary>
     public static string OpenEmrDiscoveryPath => Get("OPENEMR_DISCOVERY_PATH", "/oauth2/default/.well-known/openid-configuration");
@@ -42,18 +42,18 @@ public static class StackConfig
     /// <summary>The OAuth client secret that AuthFacade uses with OpenEMR. From <c>AUTHFACADE_CLIENT_SECRET</c>. Empty if unset.</summary>
     public static string ClientSecret => Get("AUTHFACADE_CLIENT_SECRET");
 
-    /// <summary>The OpenEMR account used for live password-grant tests. From <c>OE_USER</c>, default <c>admin</c>.</summary>
-    public static string LoginUser => Get("OE_USER", "admin");
+    /// <summary>The OpenEMR account used for live password-grant tests. From <c>OPENEMR_ADMIN_USER</c>, default <c>admin</c>.</summary>
+    public static string LoginUser => Get("OPENEMR_ADMIN_USER", "admin");
 
-    /// <summary>The password for <see cref="LoginUser"/>. From <c>OE_PASS</c>. Empty if unset, so login tests fail.</summary>
-    public static string LoginPassword => Get("OE_PASS");
+    /// <summary>The password for <see cref="LoginUser"/>. From <c>OPENEMR_ADMIN_PASSWORD</c>. Empty if unset, so login tests fail.</summary>
+    public static string LoginPassword => Get("OPENEMR_ADMIN_PASSWORD");
 
     /// <summary>
-    /// The MySQL connection string for the app database on localhost. Built from <c>WT_MYSQL_PORT</c>,
+    /// The MariaDB connection string for the app database on localhost. Built from <c>DB_PORT</c>,
     /// <c>DB_NAME</c>, <c>DB_USER</c>, and <c>DB_PASSWORD</c>.
     /// </summary>
     public static string DbConnectionString =>
-        $"Server=localhost;Port={Get("WT_MYSQL_PORT", "8320")};Database={Get("DB_NAME", "openemr")};" +
+        $"Server=localhost;Port={Get("DB_PORT", "8320")};Database={Get("DB_NAME", "openemr")};" +
         $"User={Get("DB_USER", "openemr")};Password={Get("DB_PASSWORD")};CharSet=utf8mb4;";
 
     /// <summary>

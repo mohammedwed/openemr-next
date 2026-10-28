@@ -10,7 +10,7 @@ CLIENT_SECRET=$(env_get AUTHFACADE_CLIENT_SECRET)
 CLIENT_ID=$(env_get AUTHFACADE_CLIENT_ID)
 DB_USER=$(env_get DB_USER openemr)
 DB_NAME=$(env_get DB_NAME openemr)
-REDIRECT_URI="http://localhost:$(env_get FACADE_HTTP_PORT 7128)/callback"
+REDIRECT_URI="http://localhost:$(env_get AUTHFACADE_HTTP_PORT 7128)/callback"
 OPENEMR_IMAGE=$(env_get OPENEMR_IMAGE)
 SITES_VOLUME=${SITES_VOLUME:-openemr-next_sitesvolume}
 

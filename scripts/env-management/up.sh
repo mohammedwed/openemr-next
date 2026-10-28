@@ -16,10 +16,11 @@ RESTORE=false
 source "$(dirname "${BASH_SOURCE[0]}")/env-lib.sh"
 
 [[ -f .env ]] || { echo "Missing .env. Run scripts/env-management/new-env.sh first." >&2; exit 1; }
+env_warn_legacy
 DB_PASS=$(env_get DB_PASSWORD)
 DB_USER=$(env_get DB_USER openemr)
-OE_PORT=$(env_get WT_HTTPS_PORT 9300)
-FACADE_PORT=$(env_get FACADE_HTTP_PORT 7128)
+OE_PORT=$(env_get OPENEMR_HTTPS_PORT 9300)
+FACADE_PORT=$(env_get AUTHFACADE_HTTP_PORT 7128)
 : "${DB_PASS:?DB_PASSWORD missing from .env}"
 [[ -f "$APPLY_ENV" ]] || { echo "Missing $APPLY_ENV" >&2; exit 1; }
 
