@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 
 namespace OpenEmrNext.AuthFacade.Domain.ValueObjects;
@@ -45,24 +44,8 @@ public sealed class Password
         return value;
     }
 
-    /// <summary>Parses a password without throwing.</summary>
-    /// <param name="value">The candidate plaintext password. May be null.</param>
-    /// <param name="password">The parsed password when the method returns true; otherwise null.</param>
-    /// <returns>True when the value is between 1 and <see cref="MaxLength"/> characters.</returns>
-    public static bool TryParse(string? value, [NotNullWhen(true)] out Password? password)
-    {
-        if (value is not null && IsValid(value))
-        {
-            password = new Password(value);
-            return true;
-        }
-
-        password = null;
-        return false;
-    }
-
     /// <summary>Checks the presence and length rules. The content is not checked.</summary>
-    private static bool IsValid(string value) => value.Length is >= 1 and <= MaxLength;
+    private static bool IsValid(string? value) => value is not null && value.Length is >= 1 and <= MaxLength;
 
     /// <summary>
     /// Returns a fixed mask so the plaintext never appears in logs or string interpolation.

@@ -66,17 +66,17 @@ public class PasswordTests
         Assert.Contains("already been retrieved", ex.Message);
     }
 
-    [Fact]
-    public void TryParse_returns_false_for_null_or_empty_input()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void Constructor_rejects_null_and_empty_input(string? value)
     {
-        Assert.False(Password.TryParse(null, out _));
-        Assert.False(Password.TryParse("", out _));
+        Assert.Throws<ArgumentException>(() => new Password(value!));
     }
 
     [Fact]
-    public void TryParse_accepts_short_passwords()
+    public void Constructor_accepts_short_passwords()
     {
-        Assert.True(Password.TryParse("x", out var password));
-        Assert.Equal("x", password!.TakeValue());
+        Assert.Equal("x", new Password("x").TakeValue());
     }
 }

@@ -9,10 +9,9 @@ namespace OpenEmrNext.AuthFacade.UnitTests.Domain;
 public class GrantTypeTests
 {
     [Fact]
-    public void TryParse_accepts_password()
+    public void Constructor_accepts_password()
     {
-        Assert.True(GrantType.TryParse("password", out var grantType));
-        Assert.Equal("password", grantType!.Value);
+        Assert.Equal("password", new GrantType("password").Value);
     }
 
     [Theory]
@@ -21,16 +20,10 @@ public class GrantTypeTests
     [InlineData("client_credentials")]
     [InlineData("authorization_code")]
     [InlineData("")]
-    public void TryParse_rejects_unsupported_grant_types(string value)
+    [InlineData(null)]
+    public void Constructor_rejects_unsupported_grant_types(string? value)
     {
-        Assert.False(GrantType.TryParse(value, out var grantType));
-        Assert.Null(grantType);
-    }
-
-    [Fact]
-    public void TryParse_rejects_null()
-    {
-        Assert.False(GrantType.TryParse(null, out _));
+        Assert.Throws<ArgumentException>(() => new GrantType(value!));
     }
 
     [Fact]

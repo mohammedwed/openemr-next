@@ -45,16 +45,14 @@ public class UsernameTests
     }
 
     [Fact]
-    public void TryParse_returns_false_for_null()
+    public void Constructor_rejects_null()
     {
-        Assert.False(Username.TryParse(null, out var username));
-        Assert.Null(username);
+        Assert.Throws<ArgumentException>(() => new Username(null!));
     }
 
     [Fact]
-    public void TryParse_returns_the_value_object_for_valid_input()
+    public void Constructor_accepts_a_valid_username()
     {
-        Assert.True(Username.TryParse("alice", out var username));
-        Assert.Equal("alice", username!.Value);
+        Assert.Equal("alice", new Username("alice").Value);
     }
 }
