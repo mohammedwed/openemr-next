@@ -1,6 +1,6 @@
 # 0015. The development certificate bypass is refused outside Development
 
-- **Status:** Accepted
+- **Status:** Accepted. The Compose stack no longer runs as Development by default; see [0020](0020-local-stack-defaults-are-conservative.md)
 - **Date:** 2026-10-23
 
 ## Context

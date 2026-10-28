@@ -1,6 +1,6 @@
 # 0016. AuthFacade returns its own token response shape on login
 
-- **Status:** Accepted
+- **Status:** Accepted, except the `unsupported_grant_type` code in point 4, which is superseded by [0019](0019-token-endpoint-binds-typed-form-parameters.md)
 - **Date:** 2026-10-24
 - **Supersedes:** point 1 of [0013](0013-pass-openemr-tokens-through.md) (login returns OpenEMR's token response unchanged)
 

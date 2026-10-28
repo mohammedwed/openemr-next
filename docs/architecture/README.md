@@ -20,7 +20,9 @@ old one's status is updated to point to it.
 | [0012](0012-accept-openemr-tokens-by-token-exchange.md) | AuthFacade accepts OpenEMR-issued JWTs through RFC 8693 token exchange | Superseded by 0013 | 2026-10-23 |
 | [0013](0013-pass-openemr-tokens-through.md) | AuthFacade passes OpenEMR's token response through unchanged | Point 1 superseded by 0016 | 2026-10-23 |
 | [0014](0014-password-grant-does-not-check-client-secret.md) | OpenEMR's password grant does not check the client secret | Accepted | 2026-10-23 |
-| [0015](0015-development-certificate-bypass-only-in-development.md) | The development certificate bypass is refused outside Development | Accepted | 2026-10-23 |
-| [0016](0016-facade-token-response-shape.md) | AuthFacade returns its own token response shape on login | Accepted | 2026-10-24 |
+| [0015](0015-development-certificate-bypass-only-in-development.md) | The development certificate bypass is refused outside Development | Accepted; stack default amended by 0020 | 2026-10-23 |
+| [0016](0016-facade-token-response-shape.md) | AuthFacade returns its own token response shape on login | Point 4 (grant type code) superseded by 0019 | 2026-10-24 |
 | [0017](0017-circuit-breakers-guard-openemr-calls.md) | Circuit breakers guard calls to OpenEMR | Accepted | 2026-10-24 |
 | [0018](0018-rate-limit-the-login-endpoint-per-client-address.md) | The login endpoint is rate limited per client address | Accepted | 2026-10-24 |
+| [0019](0019-token-endpoint-binds-typed-form-parameters.md) | The token endpoint binds typed form parameters; binding failures are `invalid_request` | Accepted | 2026-10-28 |
+| [0020](0020-local-stack-defaults-are-conservative.md) | The local stack is conservative by default: Production, loopback ports, non-root | Accepted | 2026-10-28 |
