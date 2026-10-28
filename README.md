@@ -174,7 +174,7 @@ Known problems with the baseline:
 └── scripts/
     ├── setup/new-env.sh        # create .env with generated secrets
     ├── stack/                  # up.sh (--restore), apply-credentials.sh
-    ├── snapshot/create.ps1     # write a snapshot to snapshots/
+    ├── snapshot/create.sh      # write a snapshot to snapshots/ (create.ps1 for PowerShell)
     ├── seeds/                  # AuthFacade OAuth client, run by the seed service
     └── lib/env.sh              # shared shell helpers (sourced, not run)
 ```
@@ -186,7 +186,7 @@ slim entity model.
 ## Local development
 
 **Prerequisites:** Docker Desktop (running), .NET 10 SDK, Bash (Git Bash on Windows),
-the GitHub CLI for downloading snapshots, and PowerShell for `snapshot/create.ps1`.
+and the GitHub CLI for downloading snapshots. PowerShell is optional (`snapshot/create.ps1`).
 Each script's requirements are listed in [`scripts/README.md`](scripts/README.md).
 
 **Configuration.** Run `bash scripts/setup/new-env.sh` to create `.env`

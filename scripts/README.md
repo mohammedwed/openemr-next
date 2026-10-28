@@ -7,7 +7,7 @@ Run everything from the repository root.
 | `setup/new-env.sh` | you, once | Create `.env` from `.env.example` with generated secrets. Never overwrites an existing `.env`. |
 | `stack/up.sh` | you | Start or resume the stack. With `--restore`, wipe the volumes and rebuild from the snapshot in `snapshots/` (downloaded from the release if missing). |
 | `stack/apply-credentials.sh` | `up.sh`, CI | Write the `.env` credentials into a restored stack: the database password, OpenEMR's `sqlconf.php`, and the AuthFacade client secret and redirect URI. |
-| `snapshot/create.ps1` | you (PowerShell) | Dump the database and sites volume into `snapshots/`. |
+| `snapshot/create.sh` | you | Dump the database and sites volume into `snapshots/`. Stops `openemr` and `auth-facade` while it runs. `create.ps1` is the PowerShell equivalent. |
 | `seeds/authfacade-client.*` | the `seed` Compose service | Register the AuthFacade OAuth client in OpenEMR. Mounted into the container, not run directly. |
 | `lib/env.sh` | other scripts, CI | Sourced helpers: `env_get`, `env_set`, `sql_quote`, `env_warn_legacy`. |
 
@@ -19,7 +19,7 @@ Run everything from the repository root.
 | `bash` (Git Bash on Windows) and `curl` | `stack/up.sh`, `stack/apply-credentials.sh` |
 | `openssl` | `setup/new-env.sh` |
 | GitHub CLI `gh`, logged in | `stack/up.sh --restore` when `snapshots/` is empty |
-| PowerShell | `snapshot/create.ps1` |
+| PowerShell (optional) | `snapshot/create.ps1`, the PowerShell equivalent of `create.sh` |
 
 ## Optional environment variables
 
@@ -43,7 +43,7 @@ restoring, run `bash scripts/stack/up.sh`.
 A snapshot is the database dump, the OpenEMR sites archive and an image list. CI and
 `up.sh --restore` download them from the GitHub release named by `SNAPSHOT_TAG`.
 
-1. Bring the stack to the state you want, then run `pwsh scripts/snapshot/create.ps1`.
+1. Bring the stack to the state you want, then run `bash scripts/snapshot/create.sh`.
 2. Check that `snapshots/` holds no real patient data.
 3. Upload the files to the release. These commands are a suggestion, not something the repo
    runs, so check them before relying on them:

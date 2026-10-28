@@ -2,6 +2,7 @@
 .SYNOPSIS
   Writes a snapshot of the running stack to snapshots/.
 .DESCRIPTION
+  The bash equivalent is create.sh; keep the two in step.
   Produces the three files that `stack/up.sh --restore` and CI restore from:
     db.sql          full database dump
     sites.tar.gz    OpenEMR sites volume (config, DB credentials, encryption keys)
