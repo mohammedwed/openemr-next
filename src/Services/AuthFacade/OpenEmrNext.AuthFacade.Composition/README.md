@@ -18,8 +18,8 @@ services.AddAuthFacade(configuration);
 ```
 
 `AddAuthFacade` binds and validates the `OpenEmr` section, so the host fails at
-startup when a required value is missing. It also registers the login use case
-(`PasswordLoginHandler`, scoped).
+startup when a required value is missing. It also registers the token-grant use case
+(`TokenGrantHandler`, scoped).
 
 Required settings:
 
@@ -34,12 +34,12 @@ Your host supplies these however it likes: appsettings, environment variables or
 
 ## 3. Resolve the use case inside a scope
 
-`PasswordLoginHandler` is scoped. A host with a root provider (a worker, for example) must
+`TokenGrantHandler` is scoped. A host with a root provider (a worker, for example) must
 create a scope:
 
 ```csharp
 using var scope = scopeFactory.CreateScope();
-var login = scope.ServiceProvider.GetRequiredService<PasswordLoginHandler>();
+var login = scope.ServiceProvider.GetRequiredService<TokenGrantHandler>();
 ```
 
 An HTTP host gets a request scope automatically.
@@ -61,7 +61,7 @@ catch (ArgumentException)
 }
 ```
 
-Each constructor rejects invalid input with an `ArgumentException`. The token endpoint checks the same rules on its request DTO first, so it never reaches these constructors with invalid input.
+Each constructor rejects invalid input with an `ArgumentException`. The token endpoint checks the same rules on its request DTO first, so it never reaches these constructors with invalid input. A refresh grant builds a `RefreshToken` the same way, and calls the `HandleAsync(RefreshToken, CancellationToken)` overload instead.
 
 ## 5. Call the use case and handle all four outcomes
 

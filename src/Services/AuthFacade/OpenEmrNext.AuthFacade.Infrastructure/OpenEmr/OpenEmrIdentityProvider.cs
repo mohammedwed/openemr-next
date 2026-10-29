@@ -42,6 +42,25 @@ internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrO
             : new PasswordGrantResult(statusCode);
     }
 
+    /// <inheritdoc/>
+    public async Task<PasswordGrantResult> RefreshGrantAsync(RefreshToken refreshToken, CancellationToken ct)
+    {
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "refresh_token",
+            ["client_id"] = _options.ClientId,
+            ["client_secret"] = _options.ClientSecret,
+            ["refresh_token"] = refreshToken.TakeValue(),
+            ["scope"] = _options.Scope
+        });
+
+        var (statusCode, body) = await PostGrantAsync(form, ct);
+
+        return statusCode == Status200OK
+            ? new PasswordGrantResult(statusCode, ReadToken(body))
+            : new PasswordGrantResult(statusCode);
+    }
+
     /// <summary>Sends the form to OpenEMR's token endpoint and returns its status and body.</summary>
     /// <exception cref="IdentityProviderUnavailableException">OpenEMR could not be reached, or it timed out.</exception>
     private async Task<(int StatusCode, string Body)> PostGrantAsync(FormUrlEncodedContent form, CancellationToken ct)

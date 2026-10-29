@@ -13,6 +13,14 @@ public interface IIdentityProvider
     /// <exception cref="IdentityProviderUnavailableException">OpenEMR could not be reached.</exception>
     /// <exception cref="IdentityProviderResponseException">OpenEMR succeeded but returned no usable token.</exception>
     Task<PasswordGrantResult> PasswordGrantAsync(Username username, Password password, CancellationToken ct);
+
+    /// <summary>Submits a refresh grant to OpenEMR and reports whether it accepted the refresh token.</summary>
+    /// <param name="refreshToken">The refresh token to redeem. Its plaintext is consumed by the call.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <returns>OpenEMR's status, plus the token when OpenEMR accepted the grant. The token is unverified.</returns>
+    /// <exception cref="IdentityProviderUnavailableException">OpenEMR could not be reached.</exception>
+    /// <exception cref="IdentityProviderResponseException">OpenEMR succeeded but returned no usable token.</exception>
+    Task<PasswordGrantResult> RefreshGrantAsync(RefreshToken refreshToken, CancellationToken ct);
 }
 
 /// <summary>The outcome of a password grant sent to OpenEMR.</summary>

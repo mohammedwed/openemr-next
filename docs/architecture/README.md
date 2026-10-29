@@ -28,3 +28,4 @@ old one's status is updated to point to it.
 | [0021](0021-token-form-is-a-request-dto-with-attribute-validation.md) | The token form binds to a request DTO that validates its properties with attributes | Accepted | 2026-10-28 |
 | [0020](0020-local-stack-defaults-are-conservative.md) | The local stack is conservative by default: Production, loopback ports, non-root | Accepted | 2026-10-28 |
 | [0022](0022-binder-failures-return-a-bare-400.md) | A form the binder cannot read returns a bare 400, not an OAuth body | Accepted | 2026-10-29 |
+| [0023](0023-token-endpoint-accepts-a-refresh-grant.md) | The token endpoint accepts a refresh grant, forwarded to OpenEMR | Accepted | 2026-10-29 |

@@ -11,4 +11,7 @@ public static class TokenRequestFields
 
     /// <summary>The password to verify.</summary>
     public const string Password = "password";
+
+    /// <summary>The refresh token to redeem.</summary>
+    public const string RefreshToken = "refresh_token";
 }

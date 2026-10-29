@@ -47,7 +47,13 @@ public class CircuitBreakingIdentityProviderTests
         public PasswordGrantResult? Result { get; set; }
         public Exception? Exception { get; set; }
 
-        public Task<PasswordGrantResult> PasswordGrantAsync(Username username, Password password, CancellationToken ct)
+        public Task<PasswordGrantResult> PasswordGrantAsync(Username username, Password password, CancellationToken ct) =>
+            RespondAsync();
+
+        public Task<PasswordGrantResult> RefreshGrantAsync(RefreshToken refreshToken, CancellationToken ct) =>
+            RespondAsync();
+
+        private Task<PasswordGrantResult> RespondAsync()
         {
             Calls++;
             if (Exception is not null)

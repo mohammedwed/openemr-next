@@ -26,8 +26,9 @@ public static class AuthFacadeOpenApi
         {
             document.Info.Title = "AuthFacade API";
             document.Info.Description =
-                "A token broker in front of OpenEMR. Log in with an OpenEMR username and password to get an " +
-                "OpenEMR access token, then send it as a bearer token to the other endpoints.";
+                "A token broker in front of OpenEMR. Log in with an OpenEMR username and password, or redeem a " +
+                "refresh token, to get an OpenEMR access token, then send it as a bearer token to the other " +
+                "endpoints.";
 
             document.Components ??= new OpenApiComponents();
             document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
@@ -77,8 +78,10 @@ public static class AuthFacadeOpenApi
 
     /// <summary>
     /// Merges the form described by <c>[AsParameters]</c>, which the generator emits as one schema per field inside
-    /// <c>allOf</c>, into a single object. It lists the required fields and marks the password as a password, so
-    /// clients built from the document send the form the endpoint expects.
+    /// <c>allOf</c>, into a single object, and marks the password and refresh token as passwords, so clients built
+    /// from the document send the form the endpoint expects. Only <c>grant_type</c> is unconditionally required:
+    /// which of the username/password or the refresh token the grant needs depends on its value, which this flat
+    /// schema cannot express (see <see cref="TokenRequest.Validate"/> for the actual rule).
     /// </summary>
     /// <param name="form">The form media type. Its schema is replaced when it has the per-field <c>allOf</c> shape.</param>
     private static void FlattenForm(OpenApiMediaType form)
@@ -92,12 +95,7 @@ public static class AuthFacadeOpenApi
         {
             Type = JsonSchemaType.Object,
             Properties = new Dictionary<string, IOpenApiSchema>(),
-            Required = new HashSet<string>
-            {
-                TokenRequestFields.GrantType,
-                TokenRequestFields.Username,
-                TokenRequestFields.Password
-            }
+            Required = new HashSet<string> { TokenRequestFields.GrantType }
         };
 
         foreach (var part in schema.AllOf.OfType<OpenApiSchema>())
@@ -108,9 +106,12 @@ public static class AuthFacadeOpenApi
             }
         }
 
-        if (flat.Properties.TryGetValue(TokenRequestFields.Password, out var password) && password is OpenApiSchema passwordSchema)
+        foreach (var name in new[] { TokenRequestFields.Password, TokenRequestFields.RefreshToken })
         {
-            passwordSchema.Format = "password";
+            if (flat.Properties.TryGetValue(name, out var property) && property is OpenApiSchema propertySchema)
+            {
+                propertySchema.Format = "password";
+            }
         }
 
         form.Schema = flat;
