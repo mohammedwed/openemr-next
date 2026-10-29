@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using OpenEmrNext.AuthFacade.Api;
-using OpenEmrNext.AuthFacade.Api.Endpoints;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Api;
 

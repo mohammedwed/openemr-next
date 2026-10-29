@@ -20,8 +20,7 @@ public static class TokenEndpoints
     /// <list type="bullet">
     /// <item>200 with a <see cref="TokenResponse"/> on success.</item>
     /// <item>400 <c>invalid_grant</c> when OpenEMR refuses the credentials.</item>
-    /// <item>400 <c>invalid_request</c> when a field is missing or invalid, including an unsupported grant type
-    /// (see <see cref="OAuthErrorBodies"/>).</item>
+    /// <item>400 <c>invalid_request</c> when a field is missing or invalid, including an unsupported grant type.</item>
     /// <item>415 with no body when the request is not a form.</item>
     /// <item>429 <c>too_many_requests</c> with <c>Retry-After</c> when the client address is over its limit.</item>
     /// <item>502 when OpenEMR fails, answers successfully without a usable token, or issues one that does not verify.</item>

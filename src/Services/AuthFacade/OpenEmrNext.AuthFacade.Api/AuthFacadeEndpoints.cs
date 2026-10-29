@@ -1,4 +1,6 @@
-namespace OpenEmrNext.AuthFacade.Api.Endpoints;
+using OpenEmrNext.AuthFacade.Api.Endpoints;
+
+namespace OpenEmrNext.AuthFacade.Api;
 
 /// <summary>Maps every AuthFacade endpoint group in one place.</summary>
 public static class AuthFacadeEndpoints

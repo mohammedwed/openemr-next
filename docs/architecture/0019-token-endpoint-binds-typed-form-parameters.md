@@ -1,6 +1,6 @@
 # 0019. The token endpoint binds typed form parameters; binding failures are `invalid_request`
 
-- **Status:** Accepted; point 1 superseded by [0021](0021-token-form-is-a-request-dto-with-attribute-validation.md)
+- **Status:** Accepted; point 1 superseded by [0021](0021-token-form-is-a-request-dto-with-attribute-validation.md); points 3-4 superseded by [0022](0022-binder-failures-return-a-bare-400.md)
 - **Date:** 2026-10-28
 - **Supersedes:** the `unsupported_grant_type` code in point 4 of [0016](0016-facade-token-response-shape.md)
 

@@ -1,5 +1,4 @@
 using OpenEmrNext.AuthFacade.Api;
-using OpenEmrNext.AuthFacade.Api.Endpoints;
 using Scalar.AspNetCore;
 
 // Composition root: dependencies are registered on the builder, then the middleware and
