@@ -29,11 +29,6 @@ public static class RequestValidationExtensions
             var request = context.Arguments.OfType<TRequest>().FirstOrDefault()
                 ?? throw new InvalidOperationException($"The endpoint has no {typeof(TRequest).Name} argument to validate.");
 
-            if (!IsValid(request))
-            {
-                return Results.BadRequest(ErrorResponse.InvalidRequest());
-            }
-
-            return await next(context);
+            return IsValid(request) ? await next(context) : Results.BadRequest(ErrorResponse.InvalidRequest());
         });
 }

@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OpenEmrNext.AuthFacade.Api;
-using OpenEmrNext.AuthFacade.Api.Endpoints;
 using OpenEmrNext.AuthFacade.Application.Ports;
 using OpenEmrNext.AuthFacade.UnitTests.Application;
 

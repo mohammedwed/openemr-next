@@ -12,7 +12,7 @@ public static class AuthFacadeApiExtensions
 {
     /// <summary>
     /// Registers the shared composition root, then the HTTP-only bearer validation, login rate limiting,
-    /// OAuth error bodies, authorization and OpenAPI document generation. Must run before the app is built.
+    /// authorization and OpenAPI document generation. Must run before the app is built.
     /// </summary>
     /// <param name="builder">The host builder to configure.</param>
     /// <returns>The same builder, for chaining.</returns>
@@ -22,9 +22,12 @@ public static class AuthFacadeApiExtensions
             .AddAuthFacade(builder.Configuration)
             .AddBearerAuthentication()
             .AddLoginRateLimiting()
-            .AddOAuthErrorBodies()
             .AddAuthorization()
             .AddOpenApi(options => options.ConfigureAuthFacade());
+
+        // A form AuthFacade cannot bind returns a quiet 400 in every environment. ASP.NET Core's default in
+        // Development is to throw instead, which puts the exception text in the response body.
+        builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = false);
 
         // The API host knows its environment, so it refuses the development TLS bypass anywhere else.
         builder.Services.AddOptions<OpenEmrOptions>()
@@ -37,7 +40,7 @@ public static class AuthFacadeApiExtensions
     }
 
     /// <summary>
-    /// Adds the OAuth error body, rate limiting, authentication and authorization middleware. Rate limiting runs first,
+    /// Adds the rate limiting, authentication and authorization middleware. Rate limiting runs first,
     /// so over-limit requests are refused before any token is checked. Endpoints are mapped separately
     /// with <c>MapAuthFacadeEndpoints</c>.
     /// </summary>
@@ -45,7 +48,6 @@ public static class AuthFacadeApiExtensions
     /// <returns>The same application, for chaining.</returns>
     public static WebApplication UseAuthFacadeHttpMiddleware(this WebApplication app)
     {
-        app.UseOAuthErrorBodies();
         app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();
