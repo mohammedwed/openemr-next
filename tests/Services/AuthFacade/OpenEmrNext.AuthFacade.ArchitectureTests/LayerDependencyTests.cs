@@ -34,7 +34,7 @@ public class LayerDependencyTests
 
     private static readonly Assembly Domain = typeof(Username).Assembly;
     private static readonly Assembly Ports = typeof(IIdentityProvider).Assembly;
-    private static readonly Assembly Application = typeof(PasswordLoginHandler).Assembly;
+    private static readonly Assembly Application = typeof(TokenGrantHandler).Assembly;
     private static readonly Assembly Infrastructure = typeof(InfrastructureServiceCollectionExtensions).Assembly;
     private static readonly Assembly Api = typeof(AuthFacadeApiExtensions).Assembly;
     private static readonly Assembly Composition = typeof(CompositionServiceCollectionExtensions).Assembly;

@@ -22,17 +22,26 @@ internal sealed class FakeIdentityProvider : IIdentityProvider
     /// <summary>The password passed on the last call, for assertions. Its plaintext is not consumed by the fake.</summary>
     public Password? ReceivedPassword { get; private set; }
 
+    /// <summary>The refresh token passed on the last call, for assertions. Its plaintext is not consumed by the fake.</summary>
+    public RefreshToken? ReceivedRefreshToken { get; private set; }
+
     /// <summary>Records the arguments, then throws <see cref="Exception"/> or returns <see cref="Result"/>.</summary>
     public Task<PasswordGrantResult> PasswordGrantAsync(Username username, Password password, CancellationToken ct)
     {
         ReceivedUsername = username;
         ReceivedPassword = password;
 
-        if (Exception is not null)
-        {
-            throw Exception;
-        }
-
-        return Task.FromResult(Result!);
+        return RespondAsync();
     }
+
+    /// <summary>Records the argument, then throws <see cref="Exception"/> or returns <see cref="Result"/>.</summary>
+    public Task<PasswordGrantResult> RefreshGrantAsync(RefreshToken refreshToken, CancellationToken ct)
+    {
+        ReceivedRefreshToken = refreshToken;
+
+        return RespondAsync();
+    }
+
+    private Task<PasswordGrantResult> RespondAsync() =>
+        Exception is not null ? throw Exception : Task.FromResult(Result!);
 }

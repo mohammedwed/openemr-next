@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using OpenEmrNext.AuthFacade.Api.Contracts.Requests;
 using OpenEmrNext.AuthFacade.Api.Contracts.Responses;
 using OpenEmrNext.AuthFacade.Application.Authentication;
@@ -5,21 +6,22 @@ using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 
 namespace OpenEmrNext.AuthFacade.Api.Endpoints;
 
-/// <summary>The token endpoint, which forwards a password grant to OpenEMR and returns its token response.</summary>
+/// <summary>The token endpoint, which forwards a password or refresh grant to OpenEMR and returns its token response.</summary>
 public static class TokenEndpoints
 {
     /// <summary>
-    /// Maps <c>POST /api/v1/connect/token</c>, which verifies a password grant with OpenEMR and returns the token
-    /// OpenEMR issues in AuthFacade's token response. Only the password grant is supported. The endpoint is named
-    /// <c>IssueToken</c>, which becomes its OpenAPI <c>operationId</c> and the method name in generated clients.
+    /// Maps <c>POST /api/v1/connect/token</c>, which verifies a password or refresh grant with OpenEMR and
+    /// returns the token OpenEMR issues in AuthFacade's token response. The endpoint is named <c>IssueToken</c>,
+    /// which becomes its OpenAPI <c>operationId</c> and the method name in generated clients.
     /// </summary>
     /// <remarks>
-    /// The form fields bind to <see cref="PasswordLoginRequest"/>, whose properties carry their validation rules.
+    /// The form fields bind to <see cref="TokenRequest"/>, whose properties carry their validation rules, including
+    /// which fields are required for each grant type (see <see cref="TokenRequest.Validate"/>).
     /// <see cref="RequestValidationExtensions.WithRequestValidation{TRequest}"/> checks them before the handler runs. The route conventions come from <see cref="PublicTokenEndpointExtensions.AsPublicTokenEndpoint"/>.
     /// <para>Responses:</para>
     /// <list type="bullet">
     /// <item>200 with a <see cref="TokenResponse"/> on success.</item>
-    /// <item>400 <c>invalid_grant</c> when OpenEMR refuses the credentials.</item>
+    /// <item>400 <c>invalid_grant</c> when OpenEMR refuses the credentials or refresh token.</item>
     /// <item>400 <c>invalid_request</c> when a field is missing or invalid, including an unsupported grant type.</item>
     /// <item>415 with no body when the request is not a form.</item>
     /// <item>429 <c>too_many_requests</c> with <c>Retry-After</c> when the client address is over its limit.</item>
@@ -32,20 +34,29 @@ public static class TokenEndpoints
     public static IEndpointRouteBuilder MapTokenEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/connect/token", async (
-            [AsParameters] PasswordLoginRequest request,
-            PasswordLoginHandler login,
+            [AsParameters] TokenRequest request,
+            TokenGrantHandler login,
             CancellationToken ct) =>
                     {
-                        var result = await login.HandleAsync(new Username(request.Username!), new Password(request.Password!), ct);
+                        var result = request.GrantType switch
+                        {
+                            GrantType.Password =>
+                                await login.HandleAsync(new Username(request.Username!), new Password(request.Password!), ct),
+                            GrantType.RefreshToken =>
+                                await login.HandleAsync(new RefreshToken(request.RefreshToken!), ct),
+                            _ => throw new InvalidOperationException(
+                                $"Unhandled grant type: {request.GrantType}. {nameof(TokenRequest.GrantType)}'s " +
+                                $"{nameof(AllowedValuesAttribute)} should have rejected this before the handler ran.")
+                        };
                         return ToHttpResult(result);
                     })
-            .WithRequestValidation<PasswordLoginRequest>()
+            .WithRequestValidation<TokenRequest>()
             .WithName("IssueToken")
             .WithTags("Authentication")
-            .WithSummary("Log in with an OpenEMR username and password")
+            .WithSummary("Log in with an OpenEMR username and password, or redeem a refresh token")
             .WithDescription(
-                "Verifies the password grant with OpenEMR and returns the access token OpenEMR issues. " +
-                "400 is invalid_grant when OpenEMR refuses the credentials and invalid_request when a form field " +
+                "Verifies a password or refresh grant with OpenEMR and returns the access token OpenEMR issues. " +
+                "400 is invalid_grant when OpenEMR refuses the grant and invalid_request when a form field " +
                 "is missing or invalid, including an unsupported grant type.")
             .Produces<TokenResponse>(StatusCodes.Status200OK)
             .Produces<ErrorResponse>(StatusCodes.Status400BadRequest)

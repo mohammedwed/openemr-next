@@ -4,13 +4,13 @@ using OpenEmrNext.AuthFacade.Domain.ValueObjects;
 namespace OpenEmrNext.AuthFacade.Application.Authentication;
 
 /// <summary>
-/// Handles a password login by forwarding the credentials to OpenEMR.
+/// Handles a password or refresh grant by forwarding it to OpenEMR.
 /// OpenEMR's token is returned to the caller only after its access token verifies.
 /// This service issues no token of its own.
 /// </summary>
-public sealed class PasswordLoginHandler(IIdentityProvider identityProvider, IExternalTokenVerifier verifier)
+public sealed class TokenGrantHandler(IIdentityProvider identityProvider, IExternalTokenVerifier verifier)
 {
-    /// <summary>The HTTP status OpenEMR returns when it accepts the credentials.</summary>
+    /// <summary>The HTTP status OpenEMR returns when it accepts the grant.</summary>
     private const int StatusOk = 200;
 
     /// <summary>The HTTP status OpenEMR returns when its request timed out.</summary>
@@ -21,17 +21,29 @@ public sealed class PasswordLoginHandler(IIdentityProvider identityProvider, IEx
     /// <param name="password">The validated password.</param>
     /// <param name="ct">Cancels the request.</param>
     /// <returns>
-    /// <see cref="LoginSucceeded"/> when OpenEMR accepts the credentials and its token verifies.
-    /// <see cref="LoginRejected"/> when OpenEMR refuses them with a client error.
+    /// <see cref="LoginSucceeded"/> when OpenEMR accepts the grant and its token verifies.
+    /// <see cref="LoginRejected"/> when OpenEMR refuses it with a client error.
     /// <see cref="LoginUnavailable"/> when OpenEMR or its keys cannot be reached.
     /// <see cref="LoginUpstreamError"/> when OpenEMR fails, its success response is unusable, or its token does not verify.
     /// </returns>
-    public async Task<LoginResult> HandleAsync(Username username, Password password, CancellationToken ct)
+    public Task<LoginResult> HandleAsync(Username username, Password password, CancellationToken ct) =>
+        HandleAsync(token => identityProvider.PasswordGrantAsync(username, password, token), ct);
+
+    /// <summary>Attempts a refresh grant.</summary>
+    /// <param name="refreshToken">The validated refresh token.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <returns>The same outcomes as <see cref="HandleAsync(Username, Password, CancellationToken)"/>.</returns>
+    public Task<LoginResult> HandleAsync(RefreshToken refreshToken, CancellationToken ct) =>
+        HandleAsync(token => identityProvider.RefreshGrantAsync(refreshToken, token), ct);
+
+    /// <summary>Submits the grant, maps OpenEMR's status, and verifies a successful token. Shared by both grants.</summary>
+    private async Task<LoginResult> HandleAsync(
+        Func<CancellationToken, Task<PasswordGrantResult>> submitGrantAsync, CancellationToken ct)
     {
         PasswordGrantResult grant;
         try
         {
-            grant = await identityProvider.PasswordGrantAsync(username, password, ct);
+            grant = await submitGrantAsync(ct);
         }
         catch (IdentityProviderUnavailableException)
         {
@@ -49,7 +61,7 @@ public sealed class PasswordLoginHandler(IIdentityProvider identityProvider, IEx
                 : await VerifyAsync(grant.Token, ct);
         }
 
-        // OpenEMR failing, as opposed to refusing the credentials, is an upstream fault.
+        // OpenEMR failing, as opposed to refusing the grant, is an upstream fault.
         if (grant.StatusCode >= 500 || grant.StatusCode == StatusRequestTimeout)
         {
             return new LoginUpstreamError();
@@ -60,7 +72,7 @@ public sealed class PasswordLoginHandler(IIdentityProvider identityProvider, IEx
 
     /// <summary>
     /// Verifies the access token OpenEMR issued. A token that does not verify is an upstream fault,
-    /// not a rejected login.
+    /// not a rejected grant.
     /// </summary>
     private async Task<LoginResult> VerifyAsync(OpenEmrToken token, CancellationToken ct)
     {

@@ -26,26 +26,29 @@ public class OpenApiDocumentTests
         Assert.Equal(255, properties.GetProperty("username").GetProperty("maxLength").GetInt32());
         Assert.Equal("string", properties.GetProperty("password").GetProperty("type").GetString());
         Assert.Equal(1024, properties.GetProperty("password").GetProperty("maxLength").GetInt32());
+        Assert.Equal("string", properties.GetProperty("refresh_token").GetProperty("type").GetString());
+        Assert.Equal(4096, properties.GetProperty("refresh_token").GetProperty("maxLength").GetInt32());
     }
 
     [Fact]
-    public async Task Password_field_is_marked_as_a_password()
+    public async Task Password_and_refresh_token_fields_are_marked_as_passwords()
     {
         using var document = await ReadDocumentAsync();
 
-        var password = FormSchema(document).GetProperty("properties").GetProperty("password");
+        var properties = FormSchema(document).GetProperty("properties");
 
-        Assert.Equal("password", password.GetProperty("format").GetString());
+        Assert.Equal("password", properties.GetProperty("password").GetProperty("format").GetString());
+        Assert.Equal("password", properties.GetProperty("refresh_token").GetProperty("format").GetString());
     }
 
     [Fact]
-    public async Task Token_endpoint_requires_the_three_form_fields()
+    public async Task Token_endpoint_requires_only_the_grant_type()
     {
         using var document = await ReadDocumentAsync();
 
         var required = FormSchema(document).GetProperty("required").EnumerateArray().Select(e => e.GetString()).ToList();
 
-        Assert.Equal(["grant_type", "username", "password"], required);
+        Assert.Equal(["grant_type"], required);
     }
 
     /// <summary>The schema of the token endpoint's form body, which must be one object rather than a list of parts.</summary>

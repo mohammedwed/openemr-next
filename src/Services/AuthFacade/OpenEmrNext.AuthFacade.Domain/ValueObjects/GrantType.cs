@@ -2,10 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace OpenEmrNext.AuthFacade.Domain.ValueObjects;
 
-/// <summary>
-/// An OAuth 2.0 grant type this service supports. Add alternatives to the pattern
-/// (e.g. <c>(password|refresh_token)</c>) as new grants are implemented.
-/// </summary>
+/// <summary>An OAuth 2.0 grant type this service supports.</summary>
 public sealed partial record GrantType
 {
     /// <summary>The grant type string, exactly as submitted.</summary>
@@ -31,6 +28,9 @@ public sealed partial record GrantType
     /// <summary>The password grant, which verifies a username and password with OpenEMR.</summary>
     public const string Password = "password";
 
-    [GeneratedRegex(@"\Apassword\z")]
+    /// <summary>The refresh grant, which trades a refresh token for a new access token with OpenEMR.</summary>
+    public const string RefreshToken = "refresh_token";
+
+    [GeneratedRegex(@"\A(password|refresh_token)\z")]
     private static partial Regex GrantTypePattern();
 }
