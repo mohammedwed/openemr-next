@@ -65,7 +65,15 @@ PHP
 #    site keys are used). ClientRepository::validateClient() decrypts oauth_clients.client_secret and
 #    compares for the authorization_code grant (ADR 0014); a plaintext value never matches, and the
 #    password and refresh grants never catch it, since OpenEMR skips the secret check for those (ADR 0025).
+#    Unlike step 1, this boots OpenEMR's own globals.php, which queries the database during startup (a
+#    translation lookup) — it must join the mysql service's own compose network to resolve and reach the
+#    "mysql" host sqlconf.php was just pointed at, or globals.php dies with "prepare() on false" before
+#    CryptoGen ever runs. Read from the running container rather than assumed from the project directory
+#    name, since that name (and so the network's) can differ between a local checkout and CI's.
+MYSQL_NETWORK=$(docker inspect "$(docker compose ps -q mysql)" -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}')
+: "${MYSQL_NETWORK:?Could not determine the mysql service Docker network; is it running?}"
 ENCRYPTED_SECRET=$(MSYS_NO_PATHCONV=1 docker run --rm -i --user root --entrypoint php \
+  --network "$MYSQL_NETWORK" \
   -e CLIENT_SECRET="$CLIENT_SECRET" \
   -v "$SITES_VOLUME:/var/www/localhost/htdocs/openemr/sites" \
   "$OPENEMR_IMAGE" <<'PHP'
