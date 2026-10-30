@@ -1,6 +1,8 @@
 using OpenEmrNext.AuthFacade.Api.Authentication;
+using OpenEmrNext.AuthFacade.Api.BrowserFlow;
 using OpenEmrNext.AuthFacade.Api.Endpoints;
 using OpenEmrNext.AuthFacade.Api.OpenApi;
+using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
 using OpenEmrNext.AuthFacade.Api.RateLimiting;
 using OpenEmrNext.AuthFacade.Composition;
 using OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
@@ -21,6 +23,7 @@ public static class AuthFacadeApiExtensions
         builder.Services
             .AddAuthFacade(builder.Configuration)
             .AddBearerAuthentication()
+            .AddOpenIddictClient(builder.Configuration)
             .AddLoginRateLimiting()
             .AddAuthorization()
             .AddOpenApi(options => options.ConfigureAuthFacade());
@@ -28,6 +31,16 @@ public static class AuthFacadeApiExtensions
         // A form AuthFacade cannot bind returns a quiet 400 in every environment. ASP.NET Core's default in
         // Development is to throw instead, which puts the exception text in the response body.
         builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = false);
+
+        // The browser authorization-code flow (ADR 0024) carries its state in Data-Protection-encrypted
+        // cookies rather than a server-side session store.
+        builder.Services.AddDataProtection();
+        builder.Services.AddSingleton<OidcFlowCookieProtector>();
+        builder.Services.AddSingleton<SessionCookieProtector>();
+        builder.Services.AddOptions<BrowserFlowOptions>()
+            .Bind(builder.Configuration.GetSection(BrowserFlowOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         // The API host knows its environment, so it refuses the development TLS bypass anywhere else.
         builder.Services.AddOptions<OpenEmrOptions>()

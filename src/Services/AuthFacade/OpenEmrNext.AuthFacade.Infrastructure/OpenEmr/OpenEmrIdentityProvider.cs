@@ -61,6 +61,27 @@ internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrO
             : new PasswordGrantResult(statusCode);
     }
 
+    /// <inheritdoc/>
+    public async Task<PasswordGrantResult> AuthorizationCodeGrantAsync(
+        string code, string codeVerifier, string redirectUri, CancellationToken ct)
+    {
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "authorization_code",
+            ["client_id"] = _options.ClientId,
+            ["client_secret"] = _options.ClientSecret,
+            ["code"] = code,
+            ["redirect_uri"] = redirectUri,
+            ["code_verifier"] = codeVerifier
+        });
+
+        var (statusCode, body) = await PostGrantAsync(form, ct);
+
+        return statusCode == Status200OK
+            ? new PasswordGrantResult(statusCode, ReadToken(body))
+            : new PasswordGrantResult(statusCode);
+    }
+
     /// <summary>Sends the form to OpenEMR's token endpoint and returns its status and body.</summary>
     /// <exception cref="IdentityProviderUnavailableException">OpenEMR could not be reached, or it timed out.</exception>
     private async Task<(int StatusCode, string Body)> PostGrantAsync(FormUrlEncodedContent form, CancellationToken ct)
@@ -131,7 +152,13 @@ internal sealed class OpenEmrIdentityProvider(HttpClient http, IOptions<OpenEmrO
                 ? refreshElement.GetString()
                 : null;
 
-            return new OpenEmrToken(accessToken, tokenType, expiresIn, refreshToken);
+            var idToken = root.TryGetProperty("id_token", out var idTokenElement) &&
+                          idTokenElement.ValueKind == JsonValueKind.String &&
+                          !string.IsNullOrWhiteSpace(idTokenElement.GetString())
+                ? idTokenElement.GetString()
+                : null;
+
+            return new OpenEmrToken(accessToken, tokenType, expiresIn, refreshToken, idToken);
         }
     }
 }

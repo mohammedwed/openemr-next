@@ -25,6 +25,15 @@ internal sealed class FakeIdentityProvider : IIdentityProvider
     /// <summary>The refresh token passed on the last call, for assertions. Its plaintext is not consumed by the fake.</summary>
     public RefreshToken? ReceivedRefreshToken { get; private set; }
 
+    /// <summary>The authorization code passed on the last call, for assertions.</summary>
+    public string? ReceivedCode { get; private set; }
+
+    /// <summary>The PKCE verifier passed on the last call, for assertions.</summary>
+    public string? ReceivedCodeVerifier { get; private set; }
+
+    /// <summary>The redirect URI passed on the last call, for assertions.</summary>
+    public string? ReceivedRedirectUri { get; private set; }
+
     /// <summary>Records the arguments, then throws <see cref="Exception"/> or returns <see cref="Result"/>.</summary>
     public Task<PasswordGrantResult> PasswordGrantAsync(Username username, Password password, CancellationToken ct)
     {
@@ -38,6 +47,17 @@ internal sealed class FakeIdentityProvider : IIdentityProvider
     public Task<PasswordGrantResult> RefreshGrantAsync(RefreshToken refreshToken, CancellationToken ct)
     {
         ReceivedRefreshToken = refreshToken;
+
+        return RespondAsync();
+    }
+
+    /// <summary>Records the arguments, then throws <see cref="Exception"/> or returns <see cref="Result"/>.</summary>
+    public Task<PasswordGrantResult> AuthorizationCodeGrantAsync(
+        string code, string codeVerifier, string redirectUri, CancellationToken ct)
+    {
+        ReceivedCode = code;
+        ReceivedCodeVerifier = codeVerifier;
+        ReceivedRedirectUri = redirectUri;
 
         return RespondAsync();
     }

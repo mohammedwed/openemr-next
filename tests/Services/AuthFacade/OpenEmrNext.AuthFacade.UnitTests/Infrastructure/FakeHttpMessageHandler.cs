@@ -18,9 +18,13 @@ internal sealed class FakeHttpMessageHandler : HttpMessageHandler
     /// <summary>The last request's body as a string, or null when the request had no body.</summary>
     public string? RequestBody { get; private set; }
 
+    /// <summary>How many requests have been sent through the handler.</summary>
+    public int CallCount { get; private set; }
+
     /// <summary>Records the request and its body, then throws or returns the configured response.</summary>
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
+        CallCount++;
         Request = request;
         RequestBody = request.Content is null ? null : await request.Content.ReadAsStringAsync(ct);
 

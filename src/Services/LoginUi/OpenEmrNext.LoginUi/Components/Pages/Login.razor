@@ -1,0 +1,51 @@
+@page "/"
+@inject IOptions<AuthFacadeOptions> AuthFacadeOptions
+
+<main class="login">
+    <h1>OpenEMR Next</h1>
+
+    @if (ErrorMessage is { } message)
+    {
+        <p class="login-error" role="alert">@message</p>
+    }
+
+    <p>Sign in with your existing OpenEMR account.</p>
+    <a class="login-button" href="@LoginUrl">Log in with OpenEMR</a>
+</main>
+
+@code {
+    /// <summary>
+    /// Where AuthFacade should send the browser after a successful login. Forwarded to AuthFacade's
+    /// <c>/oidc/login</c> endpoint unchanged; AuthFacade is the one that validates it against its own
+    /// allow-list before use (ADR 0024's <c>ReturnUrlValidator</c>, reused by ADR 0026).
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    /// <summary>
+    /// The error code AuthFacade's <c>/callback</c> appends when the OpenIddict-driven login did not
+    /// complete (ADR 0026): currently always <c>login_failed</c>, since that flow does not yet distinguish
+    /// why. Set only when <c>/callback</c> redirected back here after a failure.
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    private string LoginUrl
+    {
+        get
+        {
+            var baseUrl = AuthFacadeOptions.Value.BaseUrl.TrimEnd('/');
+            return string.IsNullOrEmpty(ReturnUrl)
+                ? $"{baseUrl}/oidc/login"
+                : $"{baseUrl}/oidc/login?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
+        }
+    }
+
+    /// <summary>
+    /// A message safe to show for <see cref="Error"/>. Any value, recognized or not, gets the same generic
+    /// message — AuthFacade's own error text is never echoed to the browser.
+    /// </summary>
+    private string? ErrorMessage => string.IsNullOrEmpty(Error)
+        ? null
+        : "Something went wrong signing in. Please try again.";
+}

@@ -61,11 +61,31 @@ file_put_contents($file, $content);
 echo "sqlconf.php updated\n";
 PHP
 
-# 2. Database: set the app user's password and the AuthFacade client secret.
+# 2. Encrypt the client secret with OpenEMR's own CryptoGen, against the same sites volume (so the same
+#    site keys are used). ClientRepository::validateClient() decrypts oauth_clients.client_secret and
+#    compares for the authorization_code grant (ADR 0014); a plaintext value never matches, and the
+#    password and refresh grants never catch it, since OpenEMR skips the secret check for those (ADR 0025).
+ENCRYPTED_SECRET=$(MSYS_NO_PATHCONV=1 docker run --rm -i --user root --entrypoint php \
+  -e CLIENT_SECRET="$CLIENT_SECRET" \
+  -v "$SITES_VOLUME:/var/www/localhost/htdocs/openemr/sites" \
+  "$OPENEMR_IMAGE" <<'PHP'
+<?php
+$fileRoot = '/var/www/localhost/htdocs/openemr';
+require_once "{$fileRoot}/vendor/autoload.php";
+$_GET['site'] = 'default';
+$ignoreAuth = true;
+$sessionAllowWrite = true;
+require_once "{$fileRoot}/interface/globals.php";
+echo (new OpenEMR\Common\Crypto\CryptoGen())->encryptStandard(getenv('CLIENT_SECRET'));
+PHP
+)
+: "${ENCRYPTED_SECRET:?Failed to encrypt the client secret}"
+
+# 3. Database: set the app user's password and the AuthFacade client secret.
 printf '%s\n' \
   "ALTER USER $(sql_quote "$DB_USER")@'%' IDENTIFIED BY $(sql_quote "$DB_PASS");" \
   "FLUSH PRIVILEGES;" \
-  "UPDATE oauth_clients SET client_secret = $(sql_quote "$CLIENT_SECRET"), redirect_uri = $(sql_quote "$REDIRECT_URI") WHERE client_id = $(sql_quote "$CLIENT_ID");" \
+  "UPDATE oauth_clients SET client_secret = $(sql_quote "$ENCRYPTED_SECRET"), redirect_uri = $(sql_quote "$REDIRECT_URI") WHERE client_id = $(sql_quote "$CLIENT_ID");" \
   | docker compose exec -T mysql sh -c "mariadb -uroot -p\"\$MYSQL_ROOT_PASSWORD\" $(printf '%q' "$DB_NAME")"
 
 echo "Applied DB password to sqlconf.php and database, and AuthFacade client secret and redirect URI from .env"

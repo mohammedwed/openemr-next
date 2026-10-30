@@ -55,8 +55,12 @@ services:
         condition: service_healthy
 
   # ---- One-shot: registers the AuthFacade OAuth client ----
+  # Runs the OpenEMR image itself, not a bare MariaDB client: it needs OpenEMR's own CryptoGen to encrypt
+  # the client secret the way OpenEMR's own ClientRepository does, which needs the real site keys in
+  # sitesvolume (ADR 0025). A plaintext secret silently breaks the authorization_code grant's client
+  # authentication (ADR 0014), even though the password and refresh grants never check it at all.
   seed:
-    image: ${MARIADB_IMAGE}
+    image: ${OPENEMR_IMAGE:?Set OPENEMR_IMAGE in .env}
     restart: "no"
     depends_on:
       mysql:
@@ -70,10 +74,9 @@ services:
       AUTHFACADE_CLIENT_SECRET: ${AUTHFACADE_CLIENT_SECRET:-}
       AUTHFACADE_REDIRECT_URI: http://localhost:${AUTHFACADE_HTTP_PORT:-7128}/callback
     volumes:
-      - ./scripts/seeds/authfacade-client.sql:/seed/authfacade-client.sql:ro
-      - ./scripts/seeds/authfacade-client.sh:/seed/seed.sh:ro
-      
-    entrypoint: ["sh", "/seed/seed.sh"]
+      - sitesvolume:/var/www/localhost/htdocs/openemr/sites
+      - ./scripts/seeds/authfacade-client.php:/seed/authfacade-client.php:ro
+    entrypoint: ["php", "/seed/authfacade-client.php"]
 
   # ---- AuthFacade (.NET) ----
   auth-facade:
@@ -95,6 +98,29 @@ services:
       OpenEmr__ClientId: ${AUTHFACADE_CLIENT_ID:?Set AUTHFACADE_CLIENT_ID in .env}
       OpenEmr__ClientSecret: ${AUTHFACADE_CLIENT_SECRET:?Set AUTHFACADE_CLIENT_SECRET in .env}
       OpenEmr__Scope: openid profile email offline_access
+      # Must match the redirect_uri the seed registers for this client (ADR 0005, ADR 0024). Computed the
+      # same way the seed service computes AUTHFACADE_REDIRECT_URI above: Compose does not share one
+      # service's environment values with another.
+      OpenEmr__RedirectUri: "http://localhost:${AUTHFACADE_HTTP_PORT:-7128}/callback"
+      # Where the browser flow (ADR 0024) lands with no returnUrl, or one outside the allow-list: the Login UI.
+      BrowserFlow__DefaultReturnUrl: "http://localhost:${LOGINUI_HTTP_PORT:-7129}/"
+      BrowserFlow__ReturnUrlAllowedHosts__0: localhost
+
+  # ---- Login UI (Blazor) ----
+  # A static page: one "Log in with OpenEMR" link to AuthFacade's /oidc/login (ADR 0026). It holds no
+  # credentials and calls AuthFacade for nothing itself; the browser follows the link directly.
+  login-ui:
+    build:
+      context: src/Services/LoginUi
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${HOST_BIND_ADDRESS:-127.0.0.1}:${LOGINUI_HTTP_PORT:-7129}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${LOGINUI_ENVIRONMENT:-Production}
+      # The browser follows this link directly, so it must be the host-reachable AuthFacade address
+      # (AUTHFACADE_HTTP_PORT), not the Compose-internal "auth-facade" hostname.
+      AuthFacade__BaseUrl: "http://localhost:${AUTHFACADE_HTTP_PORT:-7128}"
 
 volumes:
   databasevolume: {}

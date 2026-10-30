@@ -21,7 +21,8 @@ public class StartupValidationTests
         ["OpenEmr:BaseUrl"] = "https://openemr.test",
         ["OpenEmr:Issuer"] = "https://openemr.test/oauth2/default",
         ["OpenEmr:ClientId"] = "facade-client",
-        ["OpenEmr:ClientSecret"] = "facade-secret"
+        ["OpenEmr:ClientSecret"] = "facade-secret",
+        ["OpenEmr:RedirectUri"] = "https://facade.test/callback"
     };
 
     /// <summary>Builds (but does not start) a host with the OpenEMR services registered from <paramref name="settings"/>.</summary>
@@ -50,6 +51,7 @@ public class StartupValidationTests
     [InlineData("OpenEmr:Issuer")]
     [InlineData("OpenEmr:ClientId")]
     [InlineData("OpenEmr:ClientSecret")]
+    [InlineData("OpenEmr:RedirectUri")]
     public async Task Host_refuses_to_start_when_a_required_setting_is_missing(string missingKey)
     {
         var settings = ValidSettings();

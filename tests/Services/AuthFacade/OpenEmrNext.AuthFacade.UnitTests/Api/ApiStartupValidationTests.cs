@@ -29,7 +29,10 @@ public class ApiStartupValidationTests
             ["OpenEmr:Issuer"] = "https://openemr.test/oauth2/default",
             ["OpenEmr:ClientId"] = "facade-client",
             ["OpenEmr:ClientSecret"] = "facade-secret",
-            ["OpenEmr:AcceptAnyServerCertificate"] = acceptAnyCertificate.ToString()
+            ["OpenEmr:RedirectUri"] = "https://facade.test/callback",
+            ["OpenEmr:AcceptAnyServerCertificate"] = acceptAnyCertificate.ToString(),
+            ["BrowserFlow:DefaultReturnUrl"] = "https://app.test/",
+            ["BrowserFlow:ReturnUrlAllowedHosts:0"] = "app.test"
         });
 
         builder.AddAuthFacadeHttpDependencies();
