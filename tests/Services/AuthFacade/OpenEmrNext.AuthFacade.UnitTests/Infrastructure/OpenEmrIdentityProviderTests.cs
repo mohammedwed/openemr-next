@@ -162,4 +162,55 @@ public class OpenEmrIdentityProviderTests
         await Assert.ThrowsAsync<IdentityProviderResponseException>(
             () => CreateProvider().PasswordGrantAsync(Username(), Password(), CancellationToken.None));
     }
+
+    [Fact]
+    public async Task Authorization_code_grant_sends_the_code_verifier_and_redirect_uri()
+    {
+        RespondWith(HttpStatusCode.OK, "{\"access_token\":\"t\"}");
+
+        await CreateProvider().AuthorizationCodeGrantAsync(
+            "auth-code", "verifier-1", "https://facade.test/callback", CancellationToken.None);
+
+        var form = QueryHelpers.ParseQuery(_handler.RequestBody);
+        Assert.Equal("authorization_code", form["grant_type"]);
+        Assert.Equal("facade-client", form["client_id"]);
+        Assert.Equal("facade-secret", form["client_secret"]);
+        Assert.Equal("auth-code", form["code"]);
+        Assert.Equal("verifier-1", form["code_verifier"]);
+        Assert.Equal("https://facade.test/callback", form["redirect_uri"]);
+    }
+
+    [Fact]
+    public async Task Authorization_code_grant_reads_the_id_token()
+    {
+        const string body = "{\"access_token\":\"t\",\"id_token\":\"id-1\"}";
+        RespondWith(HttpStatusCode.OK, body);
+
+        var result = await CreateProvider().AuthorizationCodeGrantAsync(
+            "auth-code", "verifier-1", "https://facade.test/callback", CancellationToken.None);
+
+        Assert.Equal("id-1", result.Token!.IdToken);
+    }
+
+    [Fact]
+    public async Task Password_grant_response_without_an_id_token_leaves_it_null()
+    {
+        RespondWith(HttpStatusCode.OK, "{\"access_token\":\"t\"}");
+
+        var result = await CreateProvider().PasswordGrantAsync(Username(), Password(), CancellationToken.None);
+
+        Assert.Null(result.Token!.IdToken);
+    }
+
+    [Fact]
+    public async Task Rejected_authorization_code_passes_through_openemr_status()
+    {
+        RespondWith(HttpStatusCode.BadRequest, "{\"error\":\"invalid_grant\"}");
+
+        var result = await CreateProvider().AuthorizationCodeGrantAsync(
+            "auth-code", "verifier-1", "https://facade.test/callback", CancellationToken.None);
+
+        Assert.Equal(400, result.StatusCode);
+        Assert.Null(result.Token);
+    }
 }

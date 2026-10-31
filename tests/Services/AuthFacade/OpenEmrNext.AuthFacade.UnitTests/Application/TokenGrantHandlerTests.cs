@@ -204,4 +204,39 @@ public class TokenGrantHandlerTests
         // Still available: only the identity provider may take the plaintext.
         Assert.Equal("r-1", refreshToken.TakeValue());
     }
+
+    [Fact]
+    public async Task Accepted_authorization_code_with_a_verified_token_returns_the_openemr_token_fields()
+    {
+        _identityProvider.Result = new PasswordGrantResult(200, Token);
+        _verifier.Result = new VerifiedToken("subject-1", null);
+
+        var result = await CreateHandler().HandleAsync("code-1", "verifier-1", "https://facade.test/callback", CancellationToken.None);
+
+        var success = Assert.IsType<LoginSucceeded>(result);
+        Assert.Equal(Token, success.Token);
+    }
+
+    [Fact]
+    public async Task Rejected_authorization_code_returns_rejected_without_verifying()
+    {
+        _identityProvider.Result = new PasswordGrantResult(400);
+
+        var result = await CreateHandler().HandleAsync("code-1", "verifier-1", "https://facade.test/callback", CancellationToken.None);
+
+        Assert.IsType<LoginRejected>(result);
+        Assert.Null(_verifier.ReceivedToken);
+    }
+
+    [Fact]
+    public async Task Passes_the_code_verifier_and_redirect_uri_to_the_identity_provider()
+    {
+        _identityProvider.Result = new PasswordGrantResult(401);
+
+        await CreateHandler().HandleAsync("code-1", "verifier-1", "https://facade.test/callback", CancellationToken.None);
+
+        Assert.Equal("code-1", _identityProvider.ReceivedCode);
+        Assert.Equal("verifier-1", _identityProvider.ReceivedCodeVerifier);
+        Assert.Equal("https://facade.test/callback", _identityProvider.ReceivedRedirectUri);
+    }
 }

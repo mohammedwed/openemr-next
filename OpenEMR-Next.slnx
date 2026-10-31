@@ -10,6 +10,10 @@
     <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Application.Ports/OpenEmrNext.AuthFacade.Application.Ports.csproj" />
     <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Api/OpenEmrNext.AuthFacade.Api.csproj" />
   </Folder>
+  <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/LoginUi/">
+    <Project Path="src/Services/LoginUi/OpenEmrNext.LoginUi/OpenEmrNext.LoginUi.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Services/AuthFacade/OpenEmrNext.AuthFacade.UnitTests/OpenEmrNext.AuthFacade.UnitTests.csproj" />
     <Project Path="tests/Services/AuthFacade/OpenEmrNext.AuthFacade.ArchitectureTests/OpenEmrNext.AuthFacade.ArchitectureTests.csproj" />

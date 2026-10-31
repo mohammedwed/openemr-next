@@ -15,7 +15,7 @@ warns if `.env` still uses a renamed variable (see [Renamed variables](#renamed-
 ## Stack variables (`.env`)
 
 Naming: `OPENEMR_*` is the OpenEMR container, `AUTHFACADE_*` is the AuthFacade service,
-`DB_*` is the MariaDB database, `PHPMYADMIN_*` is phpMyAdmin.
+`LOGINUI_*` is the Login UI service, `DB_*` is the MariaDB database, `PHPMYADMIN_*` is phpMyAdmin.
 
 ### Images
 
@@ -35,6 +35,7 @@ Naming: `OPENEMR_*` is the OpenEMR container, `AUTHFACADE_*` is the AuthFacade s
 | `DB_PORT` | `8320` | MariaDB. |
 | `PHPMYADMIN_PORT` | `8310` | phpMyAdmin. |
 | `AUTHFACADE_HTTP_PORT` | `7128` | AuthFacade. Also forms the OAuth redirect URI `http://localhost:<port>/callback`. |
+| `LOGINUI_HTTP_PORT` | `7129` | Login UI. |
 
 ### Database
 
@@ -64,6 +65,16 @@ Naming: `OPENEMR_*` is the OpenEMR container, `AUTHFACADE_*` is the AuthFacade s
 | --- | --- | --- | --- |
 | `AUTHFACADE_CLIENT_ID` | none, required | no | Client ID the seed service registers in OpenEMR. Becomes `OpenEmr__ClientId`. |
 | `AUTHFACADE_CLIENT_SECRET` | none, required | yes | Client secret. Becomes `OpenEmr__ClientSecret`; `apply-credentials.sh` writes it to OpenEMR. |
+
+### Login UI runtime
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `LOGINUI_ENVIRONMENT` | `Production` | ASP.NET Core environment of the Login UI container. `Development` adds the developer exception page and debug logging. |
+
+The Login UI's own `AuthFacade__BaseUrl` is not a stack variable: `docker-compose.yml` derives it from
+`AUTHFACADE_HTTP_PORT` directly, since the browser follows the login link to AuthFacade's host-published
+address, not the Compose-internal `auth-facade` hostname.
 
 ### Integration tests
 
@@ -96,7 +107,17 @@ Set in `appsettings.json` or as environment variables with `__` for `:` (for exa
 | `ClientId` | required | OAuth client ID. From `AUTHFACADE_CLIENT_ID`. |
 | `ClientSecret` | required | OAuth client secret. From `AUTHFACADE_CLIENT_SECRET`. |
 | `Scope` | `openid api:oemr` | Scope requested in the password grant. Compose sets `openid profile email offline_access`. |
+| `RedirectUri` | required | Redirect URI registered for this client, used by the browser flow's `/login` and `/callback` (ADR 0024). Must match the seed's `redirect_uri` exactly. |
 | `AcceptAnyServerCertificate` | `false` | Trust any OpenEMR certificate. The host refuses to start with this set outside Development. |
+
+### `BrowserFlow`
+
+Governs where the browser authorization-code flow (ADR 0024) sends the browser.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `DefaultReturnUrl` | required | Where `/login` and `/callback` send the browser with no usable `returnUrl`. Points at the Login UI. |
+| `ReturnUrlAllowedHosts` | required, at least one | Hosts a caller-supplied `returnUrl` may resolve to; anything else falls back to `DefaultReturnUrl`. |
 
 ### `OpenEmr:CircuitBreaker`
 

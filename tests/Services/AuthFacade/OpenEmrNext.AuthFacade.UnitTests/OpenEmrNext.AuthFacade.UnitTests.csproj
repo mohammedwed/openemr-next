@@ -15,6 +15,12 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <!-- Same Polly v7/v8 conflict the Api project's csproj explains: its exclusions do not stop the
+         conflict flowing transitively into this project through the ProjectReference below, so both need
+         repeating here too, excluding compile assets only — TestApi actually runs the real pipeline, which
+         needs Polly v7 loadable at runtime. -->
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="10.0.11" ExcludeAssets="compile" />
+    <PackageReference Include="Polly" Version="7.2.4" ExcludeAssets="compile" />
   </ItemGroup>
 
   <ItemGroup>

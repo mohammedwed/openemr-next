@@ -1,6 +1,6 @@
 # 0005. The AuthFacade OAuth client is provisioned by seed with minimal scopes
 
-- **Status:** Accepted
+- **Status:** Accepted; the secret-storage gap named in Consequences is fixed by [0025](0025-seed-encrypts-the-client-secret.md)
 - **Date:** 2026-10-10 and 2026-10-11
 - **Source:** Converted from `docs/changelogs/2026-10-10-changelog.md` (decision 7) and `docs/changelogs/2026-10-11-changelog.md` (decisions 4 and 5)
 

@@ -40,6 +40,25 @@ public class CircuitBreakingIdentityProviderTests
     private Task<PasswordGrantResult> CallAsync() =>
         _breaker.PasswordGrantAsync(Username(), Password(), CancellationToken.None);
 
+    [Fact]
+    public async Task Authorization_code_grant_shares_the_password_grant_breaker()
+    {
+        _inner.Exception = new IdentityProviderUnavailableException(new HttpRequestException("refused"));
+
+        for (var i = 0; i < MinimumThroughput; i++)
+        {
+            await Assert.ThrowsAsync<IdentityProviderUnavailableException>(CallAsync);
+        }
+
+        var callsBeforeOpen = _inner.Calls;
+
+        var ex = await Assert.ThrowsAsync<IdentityProviderUnavailableException>(() =>
+            _breaker.AuthorizationCodeGrantAsync("code", "verifier", "https://facade.test/callback", CancellationToken.None));
+
+        Assert.IsType<BrokenCircuitException>(ex.InnerException);
+        Assert.Equal(callsBeforeOpen, _inner.Calls);
+    }
+
     /// <summary>An inner provider that counts calls and returns or throws what the test sets.</summary>
     private sealed class CountingIdentityProvider : IIdentityProvider
     {
@@ -51,6 +70,10 @@ public class CircuitBreakingIdentityProviderTests
             RespondAsync();
 
         public Task<PasswordGrantResult> RefreshGrantAsync(RefreshToken refreshToken, CancellationToken ct) =>
+            RespondAsync();
+
+        public Task<PasswordGrantResult> AuthorizationCodeGrantAsync(
+            string code, string codeVerifier, string redirectUri, CancellationToken ct) =>
             RespondAsync();
 
         private Task<PasswordGrantResult> RespondAsync()

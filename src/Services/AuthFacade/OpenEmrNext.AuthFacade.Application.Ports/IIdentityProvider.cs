@@ -21,6 +21,19 @@ public interface IIdentityProvider
     /// <exception cref="IdentityProviderUnavailableException">OpenEMR could not be reached.</exception>
     /// <exception cref="IdentityProviderResponseException">OpenEMR succeeded but returned no usable token.</exception>
     Task<PasswordGrantResult> RefreshGrantAsync(RefreshToken refreshToken, CancellationToken ct);
+
+    /// <summary>
+    /// Redeems an authorization code from the browser flow (ADR 0024) and reports whether OpenEMR accepted it.
+    /// </summary>
+    /// <param name="code">The authorization code OpenEMR issued at its own <c>/authorize</c> endpoint.</param>
+    /// <param name="codeVerifier">The PKCE verifier matching the challenge sent to <c>/authorize</c>.</param>
+    /// <param name="redirectUri">The redirect URI used to start the flow. Must match it exactly.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <returns>OpenEMR's status, plus the token when OpenEMR accepted the code. The token is unverified.</returns>
+    /// <exception cref="IdentityProviderUnavailableException">OpenEMR could not be reached.</exception>
+    /// <exception cref="IdentityProviderResponseException">OpenEMR succeeded but returned no usable token.</exception>
+    Task<PasswordGrantResult> AuthorizationCodeGrantAsync(
+        string code, string codeVerifier, string redirectUri, CancellationToken ct);
 }
 
 /// <summary>The outcome of a password grant sent to OpenEMR.</summary>
@@ -33,7 +46,12 @@ public sealed record PasswordGrantResult(int StatusCode, OpenEmrToken? Token = n
 /// <param name="TokenType">The <c>token_type</c>, <c>Bearer</c> when OpenEMR omits it.</param>
 /// <param name="ExpiresIn">The <c>expires_in</c> in seconds, when OpenEMR returns it.</param>
 /// <param name="RefreshToken">The <c>refresh_token</c>, when OpenEMR issues one.</param>
-public sealed record OpenEmrToken(string AccessToken, string TokenType, int? ExpiresIn, string? RefreshToken);
+/// <param name="IdToken">
+/// The <c>id_token</c>, when OpenEMR issues one. Only the authorization-code grant (ADR 0024) uses it; the
+/// password and refresh grants ignore it even when OpenEMR returns one.
+/// </param>
+public sealed record OpenEmrToken(
+    string AccessToken, string TokenType, int? ExpiresIn, string? RefreshToken, string? IdToken = null);
 
 /// <summary>Raised when the identity provider cannot be reached.</summary>
 public sealed class IdentityProviderUnavailableException(Exception innerException)

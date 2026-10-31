@@ -14,7 +14,11 @@ public interface IExternalTokenVerifier
 /// <summary>The claims this service takes from a verified external token.</summary>
 /// <param name="Subject">The <c>sub</c> claim: the user's stable identifier at the issuer.</param>
 /// <param name="Name">The <c>name</c> claim, or null when the issuer does not supply one.</param>
-public sealed record VerifiedToken(string Subject, string? Name);
+/// <param name="Nonce">
+/// The <c>nonce</c> claim, or null when the token carries none. Only an <c>id_token</c> from the
+/// authorization-code flow (ADR 0024) has one; its caller compares it to the value that flow stashed.
+/// </param>
+public sealed record VerifiedToken(string Subject, string? Name, string? Nonce = null);
 
 /// <summary>Raised when the keys needed to verify an external token cannot be fetched.</summary>
 public sealed class TokenVerifierUnavailableException(Exception innerException)
