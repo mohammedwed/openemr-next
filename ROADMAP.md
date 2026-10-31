@@ -40,7 +40,7 @@ a compatibility constraint.
 | M0a | Database baseline, reproducible and tested | Done (cleanup pending) | Oct 4 |
 | M0b | AuthFacade login through OpenEMR's OAuth server, facade-issued JWT | Done | Oct 10, Oct 11 |
 | M0c | Black-box integration tests with readiness gate | Done | Oct 11 |
-| M1 | Harden the identity bridge | In progress | Oct 10, Oct 11, Oct 21 |
+| M1 | Harden the identity bridge | In progress | Oct 10, Oct 11, Oct 21, Oct 24, Oct 29, Oct 30, Oct 31 |
 | M2 | Schema inventory for slice contexts | In progress | Oct 4 (entities scaffolded) |
 | M3 | Gateway and token validation | Not started | — |
 | M4 | Patient Management service | Not started | — |
@@ -71,7 +71,9 @@ patient rows; have the admin created from environment variables on first run.
 - Identity stays in OpenEMR; clients receive OpenEMR's token, verified before it is returned (ADR 0013)
 
 **Decision recorded:** the response is JSON, not a browser redirect. The
-redirect and cookie handling considered earlier are not part of this milestone.
+redirect and cookie handling considered earlier were out of scope here, and
+were built later, under M1: the authorization-code flow with PKCE (ADR 0024,
+ADR 0026) and the resulting session cookie (ADR 0027).
 
 ### M0c: Integration tests (done)
 
@@ -90,7 +92,16 @@ redirect and cookie handling considered earlier are not part of this milestone.
 - Login credential rules follow OpenEMR's limits, not a new-account policy (ADR 0008)
 - Malformed OpenEMR success responses return 502 instead of 500
 - Password plaintext is retrieved once and cleared (ADR 0009)
-- Unit tests (71), architecture tests (6) and live integration tests (13) pass
+- Login rate limiting per client address (ADR 0018)
+- The token endpoint accepts a refresh grant, so a bearer-token client can
+  redeem OpenEMR's refresh token instead of re-authenticating (ADR 0023)
+- Browser login via the authorization-code flow with PKCE, driven by
+  OpenIddict.Client against OpenEMR's own OIDC server (ADR 0024, ADR 0026)
+- The real OpenEMR access/refresh token persists inside the session cookie's
+  own encrypted ticket, instead of being discarded after login (ADR 0027)
+- A BFF proxy (YARP) lets a browser session reach OpenEMR's API with that
+  token attached server-side, so the browser itself never holds it (ADR 0029)
+- Unit tests (236), architecture tests (12) and live integration tests (13) pass
 
 **Remaining**
 
@@ -102,9 +113,11 @@ redirect and cookie handling considered earlier are not part of this milestone.
 - Confirm that request logging does not capture form bodies, with a test
 - Start-up ordering: AuthFacade waits for the database but not for OpenEMR; add a
   check or retry so early requests fail clearly
-- Decide the refresh and revocation approach, or record that it is deferred
+- Refresh is decided, not deferred, for bearer-token clients (ADR 0023); for
+  browser sessions, silent refresh on an expired access token is explicitly
+  deferred rather than forgotten (ADR 0029). Revocation (logout) is still
+  unaddressed for either path.
 - ADR: identity bridge design
-- Login rate limiting per client address: done, see ADR 0018
 - Login rate limiting per username and lockout at the facade. Open: today only
   the per-address limit and OpenEMR's own lockout apply.
 - Audit log of login outcomes and `/me` access, with no credentials or tokens

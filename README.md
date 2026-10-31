@@ -326,8 +326,8 @@ decisions recorded in the changelogs are the first candidates.
 Candidates, not final boundaries: identity and authentication, authorization,
 patient administration, clinical records, scheduling, billing and claims,
 documents, notifications, reporting, and interoperability. In the current scope,
-patient administration and clinical records are under implementation, and
-identity is built. The rest are design only.
+identity is built; patient administration and clinical records are planned
+(M4, M5) but not started. The rest are design only.
 
 ## Non-goals
 
