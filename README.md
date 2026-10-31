@@ -24,7 +24,7 @@ research vision below is the long-term direction, not the current deliverable.
 | Database baseline | Reproducible schema and seed data from the OpenEMR installer | Built, not yet cleaned |
 | `OpenEmr.Data` | EF Core model scaffolded from the live database | Built |
 | AuthFacade | Token broker (password grant) and BFF (browser login via OIDC/PKCE, session cookie, proxies browser calls to OpenEMR's API) | Built, hardening in progress |
-| API gateway (YARP) | Single entry point for the new services, token validation at the edge; AuthFacade's BFF proxy will forward to it as a single hop, rather than growing a route per service itself (ADR 0030) | Planned |
+| API gateway | A separate service — also built with YARP, the same library AuthFacade's BFF proxy already uses — as a single entry point for the new services, with token validation at the edge. AuthFacade's BFF proxy will forward to it as a single hop, rather than growing a route per service itself (ADR 0030) | Planned |
 | Patient Management | Registers patients, publishes `PatientRegistered` | Planned |
 | Clinical Care | Creates encounters and records vitals for registered patients | Planned |
 
