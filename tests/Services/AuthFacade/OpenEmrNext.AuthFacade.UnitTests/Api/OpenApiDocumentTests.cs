@@ -91,15 +91,34 @@ public class OpenApiDocumentTests
     }
 
     [Fact]
-    public async Task Only_the_current_user_operation_requires_the_bearer_token()
+    public async Task Document_declares_the_session_cookie_scheme()
     {
+        using var document = await ReadDocumentAsync();
+
+        var scheme = document.RootElement.GetProperty("components").GetProperty("securitySchemes")
+            .GetProperty(".AspNetCore.AuthFacadeSession");
+
+        Assert.Equal("apiKey", scheme.GetProperty("type").GetString());
+        Assert.Equal("cookie", scheme.GetProperty("in").GetString());
+        Assert.Equal(".AspNetCore.AuthFacadeSession", scheme.GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task Only_the_current_user_operation_requires_authorization_and_accepts_either_scheme()
+    {
+        // The default policy (AuthFacadeApiExtensions) accepts either scheme, so both must appear as
+        // separate requirement entries -- one combined entry would instead demand both at once.
         using var document = await ReadDocumentAsync();
 
         var me = Operation(document, "/api/v1/me", "get");
         var token = Operation(document, "/api/v1/connect/token", "post");
 
         Assert.True(me.TryGetProperty("security", out var security));
-        Assert.Contains("Bearer", security.EnumerateArray().SelectMany(r => r.EnumerateObject().Select(p => p.Name)));
+        var requirements = security.EnumerateArray().ToList();
+        Assert.Equal(2, requirements.Count);
+        var schemeNames = requirements.SelectMany(r => r.EnumerateObject().Select(p => p.Name)).ToList();
+        Assert.Contains("Bearer", schemeNames);
+        Assert.Contains(".AspNetCore.AuthFacadeSession", schemeNames);
         Assert.False(token.TryGetProperty("security", out _));
     }
 

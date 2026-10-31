@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using OpenEmrNext.AuthFacade.Api.Authentication;
 using OpenEmrNext.AuthFacade.Api.BrowserFlow;
 using OpenEmrNext.AuthFacade.Api.Endpoints;
@@ -25,7 +26,20 @@ public static class AuthFacadeApiExtensions
             .AddBearerAuthentication()
             .AddOpenIddictClient(builder.Configuration)
             .AddLoginRateLimiting()
-            .AddAuthorization()
+            .AddAuthorization(options =>
+            {
+                // RequireAuthorization() with no explicit policy (e.g. /me) resolves to this policy.
+                // Naming both schemes here matters: PolicyEvaluator only authenticates the single default
+                // scheme (Bearer) unless a policy lists more, so without this the AuthFacadeSession cookie
+                // that /callback signs in with (ADR 0026) was accepted by nothing -- a browser that logged
+                // in through the OIDC flow still could not call the API. With both named, either a bearer
+                // token or the session cookie satisfies RequireAuthenticatedUser().
+                options.DefaultPolicy = new AuthorizationPolicyBuilder(
+                        BearerAuthenticationServiceCollectionExtensions.BearerScheme,
+                        OpenIddictClientServiceCollectionExtensions.SessionScheme)
+                    .RequireAuthenticatedUser()
+                    .Build();
+            })
             .AddOpenApi(options => options.ConfigureAuthFacade());
 
         // A form AuthFacade cannot bind returns a quiet 400 in every environment. ASP.NET Core's default in

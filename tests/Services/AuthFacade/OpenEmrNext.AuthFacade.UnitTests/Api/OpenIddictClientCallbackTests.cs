@@ -58,6 +58,25 @@ public class OpenIddictClientCallbackTests
     }
 
     [Fact]
+    public async Task Session_cookie_from_a_successful_login_authorizes_a_later_api_call()
+    {
+        // Regression guard: /api/v1/me's RequireAuthorization() used to resolve to a policy that only ever
+        // authenticated the Bearer scheme, so the AuthFacadeSession cookie /callback just signed in with
+        // satisfied nothing -- a browser that completed the OIDC login still could not call the API.
+        await using var server = await FakeOpenEmrServer.StartAsync();
+        await using var api = await StartApiAsync(server);
+        var (state, nonce) = await LoginAsync(api);
+        server.Nonce = nonce;
+        server.Subject = "subject-42";
+        await api.BrowserClient.GetAsync($"/callback?code=fake-code&state={state}");
+
+        using var me = await api.BrowserClient.GetAsync("/api/v1/me");
+
+        Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+        Assert.Contains("subject-42", await me.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Callback_with_a_mismatched_nonce_redirects_with_login_failed()
     {
         // Regression guard: an id_token whose nonce does not match the one /oidc/login stashed must not be

@@ -2,14 +2,23 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using OpenEmrNext.AuthFacade.Api.Contracts.Requests;
+using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
 
 namespace OpenEmrNext.AuthFacade.Api.OpenApi;
 
-/// <summary>Configures the generated OpenAPI document: its description, bearer authentication and form content types.</summary>
+/// <summary>Configures the generated OpenAPI document: its description, bearer/cookie authentication and form content types.</summary>
 public static class AuthFacadeOpenApi
 {
     /// <summary>The name of the bearer security scheme in the document.</summary>
     public const string BearerScheme = "Bearer";
+
+    /// <summary>
+    /// The name of the session-cookie security scheme in the document. Named after the cookie
+    /// <see cref="OpenIddictClientServiceCollectionExtensions.SessionScheme"/> actually sets, not the
+    /// scheme name itself: ASP.NET Core's cookie handler prefixes it by default
+    /// (<c>.AspNetCore.AuthFacadeSession</c>, confirmed in <c>OpenIddictClientCallbackTests</c>).
+    /// </summary>
+    public const string CookieScheme = $".AspNetCore.{OpenIddictClientServiceCollectionExtensions.SessionScheme}";
 
     private const string FormUrlEncoded = "application/x-www-form-urlencoded";
 
@@ -39,6 +48,15 @@ public static class AuthFacadeOpenApi
                 BearerFormat = "JWT",
                 Description = "The access_token returned by POST /api/v1/connect/token."
             };
+            document.Components.SecuritySchemes[CookieScheme] = new OpenApiSecurityScheme
+            {
+                Type = SecuritySchemeType.ApiKey,
+                In = ParameterLocation.Cookie,
+                Name = CookieScheme,
+                Description = "The session cookie /callback sets after a successful browser login through " +
+                    "/oidc/login (ADR 0026). Only usable by a caller sharing that cookie jar, such as the " +
+                    "Login UI; most callers should use the bearer token from POST /api/v1/connect/token instead."
+            };
             return Task.CompletedTask;
         });
 
@@ -48,10 +66,16 @@ public static class AuthFacadeOpenApi
                 .OfType<IAuthorizeData>().Any();
             if (requiresAuthorization)
             {
+                // Two separate requirement entries, not one with both schemes: that would demand both at
+                // once, but the default authorization policy accepts either (see AuthFacadeApiExtensions).
                 operation.Security ??= [];
                 operation.Security.Add(new OpenApiSecurityRequirement
                 {
                     [new OpenApiSecuritySchemeReference(BearerScheme, context.Document)] = []
+                });
+                operation.Security.Add(new OpenApiSecurityRequirement
+                {
+                    [new OpenApiSecuritySchemeReference(CookieScheme, context.Document)] = []
                 });
             }
 
