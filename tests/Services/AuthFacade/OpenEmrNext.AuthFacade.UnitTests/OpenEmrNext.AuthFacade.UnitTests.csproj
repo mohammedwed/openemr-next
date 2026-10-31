@@ -32,6 +32,7 @@
     <ProjectReference Include="..\..\..\..\src\Services\AuthFacade\OpenEmrNext.AuthFacade.Application\OpenEmrNext.AuthFacade.Application.csproj" />
     <ProjectReference Include="..\..\..\..\src\Services\AuthFacade\OpenEmrNext.AuthFacade.Infrastructure\OpenEmrNext.AuthFacade.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\..\src\Services\AuthFacade\OpenEmrNext.AuthFacade.Api\OpenEmrNext.AuthFacade.Api.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Services\AuthFacade\OpenEmrNext.AuthFacade.Client\OpenEmrNext.AuthFacade.Client.csproj" />
   </ItemGroup>
 
 </Project>

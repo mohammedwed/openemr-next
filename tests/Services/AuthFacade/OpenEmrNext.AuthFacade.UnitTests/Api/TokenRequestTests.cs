@@ -57,11 +57,11 @@ public class TokenRequestTests
     private static TokenRequest PasswordRequest(
         string? grantType = "password",
         string? username = "alice_01",
-        string? password = "Passw0rd!") => new(grantType, username, password, RefreshToken: null);
+        string? password = "Passw0rd!") => new(grantType, username, password, refreshToken: null);
 
     private static TokenRequest RefreshRequest(
         string? grantType = "refresh_token",
-        string? refreshToken = "opaque-token-123") => new(grantType, Username: null, Password: null, refreshToken);
+        string? refreshToken = "opaque-token-123") => new(grantType, username: null, password: null, refreshToken);
 
     [Fact]
     public void A_complete_password_grant_is_valid()
@@ -122,6 +122,28 @@ public class TokenRequestTests
     public void Password_grant_does_not_require_a_refresh_token()
     {
         Assert.True(RequestValidationExtensions.IsValid(PasswordRequest()));
+    }
+
+    [Fact]
+    public void An_empty_refresh_token_on_a_password_grant_is_treated_as_absent()
+    {
+        // A client that always submits every field of this one shared form -- a typed client generated
+        // from the OpenAPI document, for one -- has no way to omit the field its chosen grant type does
+        // not use, and sends "" instead. That must not be rejected just for being present.
+        var request = new TokenRequest("password", "alice_01", "Passw0rd!", refreshToken: "");
+
+        Assert.True(RequestValidationExtensions.IsValid(request));
+        Assert.Null(request.RefreshToken);
+    }
+
+    [Fact]
+    public void An_empty_username_and_password_on_a_refresh_grant_are_treated_as_absent()
+    {
+        var request = new TokenRequest("refresh_token", username: "", password: "", "opaque-token-123");
+
+        Assert.True(RequestValidationExtensions.IsValid(request));
+        Assert.Null(request.Username);
+        Assert.Null(request.Password);
     }
 
     [Theory]

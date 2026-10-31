@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NSwag.ApiDescription.Client" Version="14.7.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      A committed snapshot (scripts/dev/generate-authfacade-openapi.sh regenerates it), not the live
+      document: AuthFacade's startup requires OpenEmr:ClientId/ClientSecret, which are never committed
+      (see docker-compose.yml), so pointing this at a running instance or generating it at build time would
+      make every build of this project depend on secrets that are not available in a bare checkout or CI.
+    -->
+    <OpenApiReference Include="OpenAPIs\AuthFacade.json" CodeGenerator="NSwagCSharp" Namespace="OpenEmrNext.AuthFacade.Client" ClassName="AuthFacadeClient">
+      <Options>/GenerateClientInterfaces:true /JsonLibrary:SystemTextJson /UseBaseUrl:false</Options>
+    </OpenApiReference>
+  </ItemGroup>
+
+</Project>

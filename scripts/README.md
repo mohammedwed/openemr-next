@@ -10,13 +10,15 @@ Run everything from the repository root.
 | `snapshot/create.sh` | you | Dump the database and sites volume into `snapshots/`. Stops `openemr` and `auth-facade` while it runs. |
 | `seeds/authfacade-client.*` | the `seed` Compose service | Register the AuthFacade OAuth client in OpenEMR. Mounted into the container, not run directly. |
 | `lib/env.sh` | other scripts, CI | Sourced helpers: `env_get`, `env_set`, `sql_quote`, `env_warn_legacy`. |
+| `dev/generate-authfacade-openapi.sh` | you, after changing AuthFacade's API | Regenerate the OpenAPI snapshot `OpenEmrNext.AuthFacade.Client`'s typed client is generated from. No Docker needed; see [ADR 0031](../docs/architecture/0031-nswag-client-generated-from-a-committed-snapshot.md). |
 
 ## Requirements
 
 | Tool | Needed by |
 | --- | --- |
-| Docker with `docker compose` | everything except `setup/new-env.sh` |
-| `bash` (Git Bash on Windows) and `curl` | `stack/up.sh`, `stack/apply-credentials.sh` |
+| Docker with `docker compose` | everything except `setup/new-env.sh`, `dev/generate-authfacade-openapi.sh` |
+| `bash` (Git Bash on Windows) and `curl` | `stack/up.sh`, `stack/apply-credentials.sh`, `dev/generate-authfacade-openapi.sh` |
+| `jq` | `dev/generate-authfacade-openapi.sh` |
 | `openssl` | `setup/new-env.sh` |
 | GitHub CLI `gh`, logged in | `stack/up.sh --restore` when `snapshots/` is empty |
 
