@@ -34,8 +34,9 @@ Naming: `OPENEMR_*` is the OpenEMR container, `AUTHFACADE_*` is the AuthFacade s
 | `OPENEMR_HTTPS_PORT` | `9300` | OpenEMR over HTTPS. Also forms the token issuer URL `https://localhost:<port>/oauth2/default`. |
 | `DB_PORT` | `8320` | MariaDB. |
 | `PHPMYADMIN_PORT` | `8310` | phpMyAdmin. |
-| `AUTHFACADE_HTTP_PORT` | `7128` | AuthFacade. Also forms the OAuth redirect URI `http://localhost:<port>/callback`. |
+| `AUTHFACADE_HTTP_PORT` | `7128` | AuthFacade, reached directly (by the Login UI's link, or for direct API testing). |
 | `LOGINUI_HTTP_PORT` | `7129` | Login UI. |
+| `GATEWAY_HTTP_PORT` | `7130` | The gateway (ADR 0033): the browser's entry point for the WebApp dashboard. Also forms the OAuth redirect URI `http://localhost:<port>/callback` — not `AUTHFACADE_HTTP_PORT` — since the dashboard's session cookie must be scoped to whichever origin OpenEMR redirects back to. |
 
 ### Database
 
@@ -76,6 +77,16 @@ The Login UI's own `AuthFacade__BaseUrl` is not a stack variable: `docker-compos
 `AUTHFACADE_HTTP_PORT` directly, since the browser follows the login link to AuthFacade's host-published
 address, not the Compose-internal `auth-facade` hostname.
 
+### Gateway runtime
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `GATEWAY_ENVIRONMENT` | `Production` | ASP.NET Core environment of the gateway container. |
+
+The gateway's own `AuthFacade__BaseUrl` and `WebApp__BaseUrl` are not stack variables either:
+`docker-compose.yml` sets them to the Compose-internal `auth-facade`/`webapp` hostnames directly, since the
+gateway reaches both over the Compose network, never through a host-published port.
+
 ### Integration tests
 
 | Variable | Default | Meaning |
@@ -93,6 +104,11 @@ because the defaults match the stack:
 | `OPENEMR_DISCOVERY_PATH` | `/oauth2/default/.well-known/openid-configuration` |
 | `OPENEMR_TOKEN_PATH` | `/oauth2/default/token` |
 
+`AUTHFACADE_REDIRECT_URI`'s own default no longer matches what the seed actually registers (the gateway's
+address, ADR 0033) — only `OpenEmr_authenticates_the_AuthFacade_client_secret` uses it, to post a bogus
+authorization code, and it only asserts the absence of `invalid_client`, not the specific error a mismatched
+redirect_uri would also produce, so this has not needed fixing yet.
+
 ## AuthFacade settings
 
 Set in `appsettings.json` or as environment variables with `__` for `:` (for example
@@ -107,7 +123,7 @@ Set in `appsettings.json` or as environment variables with `__` for `:` (for exa
 | `ClientId` | required | OAuth client ID. From `AUTHFACADE_CLIENT_ID`. |
 | `ClientSecret` | required | OAuth client secret. From `AUTHFACADE_CLIENT_SECRET`. |
 | `Scope` | `openid api:oemr` | Scope requested in the password grant. Compose sets `openid profile email offline_access`. |
-| `RedirectUri` | required | Redirect URI registered for this client, used by the browser flow's `/login` and `/callback` (ADR 0024). Must match the seed's `redirect_uri` exactly. |
+| `RedirectUri` | required | Redirect URI registered for this client, used by the browser flow's `/login` and `/callback` (ADR 0024). Must match the seed's `redirect_uri` exactly. In Compose, the gateway's address, not AuthFacade's own (ADR 0033). |
 | `AcceptAnyServerCertificate` | `false` | Trust any OpenEMR certificate. The host refuses to start with this set outside Development. |
 
 ### `BrowserFlow`

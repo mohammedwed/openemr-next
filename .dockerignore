@@ -1,0 +1,9 @@
+# Used only by builds whose Compose context is the repository root (currently just the webapp service
+# — ADR 0033 — since it needs OpenEmrNext.AuthFacade.Client, a sibling service directory its own context
+# could not otherwise reach). Builds scoped to one service's own directory have their own .dockerignore.
+**/bin
+**/obj
+**/.vs
+**/*.user
+.git
+snapshots

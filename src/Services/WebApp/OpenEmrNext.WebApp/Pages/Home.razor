@@ -1,0 +1,69 @@
+﻿@page "/"
+@inject IAuthFacadeClient AuthFacade
+@inject NavigationManager Navigation
+
+<PageTitle>Dashboard</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="pa-0">
+    <MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
+
+    @switch (_state)
+    {
+        case State.Loading:
+            <MudProgressCircular Indeterminate="true" />
+            break;
+
+        case State.SignedIn:
+            <MudPaper Elevation="2" Class="pa-6">
+                <MudText Typo="Typo.h6">Signed in as @_name</MudText>
+                <MudText Typo="Typo.body2" Class="mb-4">Subject: @_subject</MudText>
+                <MudAlert Severity="Severity.Info">
+                    Patient and encounter data isn't built yet (ROADMAP M4/M5) — this page proves the
+                    sign-in round trip end to end, through the generated AuthFacadeClient.
+                </MudAlert>
+            </MudPaper>
+            break;
+
+        case State.SignedOut:
+            <MudPaper Elevation="2" Class="pa-6 d-flex flex-column align-start ga-4">
+                <MudText>Sign in with your existing OpenEMR account.</MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@LoginUrl">Log in with OpenEMR</MudButton>
+            </MudPaper>
+            break;
+    }
+</MudContainer>
+
+@code {
+    private enum State { Loading, SignedIn, SignedOut }
+
+    private State _state = State.Loading;
+    private string? _name;
+    private string? _subject;
+
+    /// <summary>
+    /// Where <c>/oidc/login</c> sends the browser back to after a successful login: this same page. Safe to
+    /// pass as an explicit <c>returnUrl</c> because this app is served by AuthFacade itself (ADR 0032), so
+    /// its own address is already on <c>BrowserFlow:ReturnUrlAllowedHosts</c>.
+    /// </summary>
+    private string LoginUrl => $"/oidc/login?returnUrl={Uri.EscapeDataString(Navigation.BaseUri)}";
+
+    /// <summary>
+    /// Calls <c>GET /api/v1/me</c> through the generated client. A same-origin request carries the
+    /// <c>AuthFacadeSession</c> cookie automatically — no credentials flag or CORS configuration needed,
+    /// which is the whole reason this app is hosted from AuthFacade's own origin rather than its own.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var me = await AuthFacade.GetCurrentUserAsync();
+            _name = me.Name;
+            _subject = me.Subject;
+            _state = State.SignedIn;
+        }
+        catch (ApiException)
+        {
+            _state = State.SignedOut;
+        }
+    }
+}

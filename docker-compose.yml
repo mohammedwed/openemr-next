@@ -72,7 +72,11 @@ services:
       MYSQL_PWD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
       AUTHFACADE_CLIENT_ID: ${AUTHFACADE_CLIENT_ID:?Set AUTHFACADE_CLIENT_ID in .env}
       AUTHFACADE_CLIENT_SECRET: ${AUTHFACADE_CLIENT_SECRET:-}
-      AUTHFACADE_REDIRECT_URI: http://localhost:${AUTHFACADE_HTTP_PORT:-7128}/callback
+      # The gateway's address (ADR 0033), not AuthFacade's own: OpenEMR redirects the browser here after
+      # login, and that redirect's response is what sets the AuthFacadeSession cookie. For the dashboard's
+      # own later fetch calls (also made through the gateway) to carry that cookie, the whole round trip
+      # has to land on the one origin the dashboard is itself served from.
+      AUTHFACADE_REDIRECT_URI: http://localhost:${GATEWAY_HTTP_PORT:-7130}/callback
     volumes:
       - sitesvolume:/var/www/localhost/htdocs/openemr/sites
       - ./scripts/seeds/authfacade-client.php:/seed/authfacade-client.php:ro
@@ -98,13 +102,46 @@ services:
       OpenEmr__ClientId: ${AUTHFACADE_CLIENT_ID:?Set AUTHFACADE_CLIENT_ID in .env}
       OpenEmr__ClientSecret: ${AUTHFACADE_CLIENT_SECRET:?Set AUTHFACADE_CLIENT_SECRET in .env}
       OpenEmr__Scope: openid profile email offline_access
-      # Must match the redirect_uri the seed registers for this client (ADR 0005, ADR 0024). Computed the
-      # same way the seed service computes AUTHFACADE_REDIRECT_URI above: Compose does not share one
-      # service's environment values with another.
-      OpenEmr__RedirectUri: "http://localhost:${AUTHFACADE_HTTP_PORT:-7128}/callback"
+      # Must match the redirect_uri the seed registers for this client (ADR 0005, ADR 0024), and the
+      # gateway's address, not AuthFacade's own (ADR 0033) -- see AUTHFACADE_REDIRECT_URI above. Computed
+      # the same way the seed service computes it: Compose does not share one service's environment values
+      # with another.
+      OpenEmr__RedirectUri: "http://localhost:${GATEWAY_HTTP_PORT:-7130}/callback"
       # Where the browser flow (ADR 0024) lands with no returnUrl, or one outside the allow-list: the Login UI.
       BrowserFlow__DefaultReturnUrl: "http://localhost:${LOGINUI_HTTP_PORT:-7129}/"
       BrowserFlow__ReturnUrlAllowedHosts__0: localhost
+
+  # ---- WebApp (Blazor WebAssembly dashboard) ----
+  # Static files only, served by nginx (ADR 0033). Not published on the host: it only works correctly
+  # reached through the gateway, which is the one origin its AuthFacadeSession cookie is actually scoped
+  # to once a login completes. Publishing its own port directly would let someone load it from the wrong
+  # origin and find the session cookie never attaches.
+  webapp:
+    build:
+      # Context is the repository root, not this directory: the app references
+      # OpenEmrNext.AuthFacade.Client (ADR 0031), under src/Services/AuthFacade/, which a context scoped to
+      # src/Services/WebApp could not reach.
+      context: .
+      dockerfile: src/Services/WebApp/Dockerfile
+    restart: unless-stopped
+
+  # ---- Gateway (YARP) ----
+  # The single external origin a browser talks to for the dashboard (ADR 0033): routes AuthFacade's own
+  # path prefixes to it and everything else to WebApp's static files. Makes no auth decisions of its own.
+  gateway:
+    build:
+      context: src/Services/Gateway
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - auth-facade
+      - webapp
+    ports:
+      - "${HOST_BIND_ADDRESS:-127.0.0.1}:${GATEWAY_HTTP_PORT:-7130}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${GATEWAY_ENVIRONMENT:-Production}
+      AuthFacade__BaseUrl: "http://auth-facade:8080"
+      WebApp__BaseUrl: "http://webapp:8080"
 
   # ---- Login UI (Blazor) ----
   # A static page: one "Log in with OpenEMR" link to AuthFacade's /oidc/login (ADR 0026). It holds no
