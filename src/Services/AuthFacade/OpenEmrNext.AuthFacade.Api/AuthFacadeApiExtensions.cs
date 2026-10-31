@@ -4,6 +4,7 @@ using OpenEmrNext.AuthFacade.Api.BrowserFlow;
 using OpenEmrNext.AuthFacade.Api.Endpoints;
 using OpenEmrNext.AuthFacade.Api.OpenApi;
 using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
+using OpenEmrNext.AuthFacade.Api.Proxy;
 using OpenEmrNext.AuthFacade.Api.RateLimiting;
 using OpenEmrNext.AuthFacade.Composition;
 using OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
@@ -25,6 +26,7 @@ public static class AuthFacadeApiExtensions
             .AddAuthFacade(builder.Configuration)
             .AddBearerAuthentication()
             .AddOpenIddictClient(builder.Configuration)
+            .AddOpenEmrBffProxy(builder.Configuration)
             .AddLoginRateLimiting()
             .AddAuthorization(options =>
             {
@@ -46,11 +48,7 @@ public static class AuthFacadeApiExtensions
         // Development is to throw instead, which puts the exception text in the response body.
         builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = false);
 
-        // The browser authorization-code flow (ADR 0024) carries its state in Data-Protection-encrypted
-        // cookies rather than a server-side session store.
         builder.Services.AddDataProtection();
-        builder.Services.AddSingleton<OidcFlowCookieProtector>();
-        builder.Services.AddSingleton<SessionCookieProtector>();
         builder.Services.AddOptions<BrowserFlowOptions>()
             .Bind(builder.Configuration.GetSection(BrowserFlowOptions.SectionName))
             .ValidateDataAnnotations()

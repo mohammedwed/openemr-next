@@ -14,7 +14,9 @@ namespace OpenEmrNext.AuthFacade.UnitTests.Api;
 /// an actual round trip through OpenIddict.Client's own <c>HttpClient</c> — unlike <c>/oidc/login</c>, which
 /// makes no outbound call and needs no server at all. It does not implement <c>/authorize</c>: a test drives
 /// <c>/callback</c> directly with a code and the <c>state</c> <c>/oidc/login</c> already produced, the same
-/// way OpenEMR's own redirect would arrive, without actually simulating the browser's hop through it.
+/// way OpenEMR's own redirect would arrive, without actually simulating the browser's hop through it. Also
+/// stands in for one of OpenEMR's own protected API routes, at <c>/apis/default/api/ping</c>, for the BFF
+/// proxy tests.
 /// </summary>
 internal sealed class FakeOpenEmrServer : IAsyncDisposable
 {
@@ -63,6 +65,17 @@ internal sealed class FakeOpenEmrServer : IAsyncDisposable
                 id_token = server.BuildIdToken()
             })
             : Results.Json(new { error = "invalid_grant" }, statusCode: server.TokenEndpointStatusCode));
+
+        // Stands in for one of OpenEMR's own protected API routes, for the BFF proxy tests: it exists only
+        // to report back what it actually received, so a test can assert the proxy attached the session's
+        // access token server-side rather than the browser ever holding or sending one itself.
+        app.MapGet("/apis/default/api/ping", (HttpRequest request) =>
+            Results.Json(new { Authorization = request.Headers.Authorization.ToString() }));
+
+        // A protected route that always refuses the request, for the proxy tests that prove a non-200
+        // OpenEMR response relays back through the proxy unchanged rather than being reshaped or swallowed.
+        app.MapGet("/apis/default/api/missing-patient", () =>
+            Results.Json(new { error = "not_found" }, statusCode: 404));
 
         app.MapGet("/oauth2/default/jwk", () =>
         {

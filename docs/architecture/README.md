@@ -33,3 +33,6 @@ old one's status is updated to point to it.
 | [0025](0025-seed-encrypts-the-client-secret.md) | The seed encrypts the AuthFacade client secret with OpenEMR's own CryptoGen | Accepted | 2026-10-30 |
 | [0026](0026-openiddict-client-drives-the-authorization-code-flow.md) | OpenIddict.Client drives the browser authorization-code flow against OpenEMR | Accepted | 2026-10-30 |
 | [0027](0027-persist-tokens-in-the-session-cookie.md) | The session cookie carries the real OpenEMR access and refresh token | Accepted | 2026-10-31 |
+| [0028](0028-browser-login-and-session-assume-a-single-instance.md) | The browser login flow and the session cookie assume a single AuthFacade instance | Accepted | 2026-10-31 |
+| [0029](0029-yarp-proxies-browser-sessions-to-openemrs-api.md) | YARP proxies a browser session's API calls to OpenEMR, with the real token attached server-side | Accepted; multi-service question resolved by 0030 | 2026-10-31 |
+| [0030](0030-bff-proxy-forwards-to-the-gateway-not-each-service.md) | The BFF proxy forwards to the future gateway, not to each backend service directly | Accepted | 2026-10-31 |

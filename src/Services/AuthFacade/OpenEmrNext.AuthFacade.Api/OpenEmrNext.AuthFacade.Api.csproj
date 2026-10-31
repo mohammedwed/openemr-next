@@ -25,6 +25,7 @@
     -->
     <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="10.0.11" ExcludeAssets="compile" />
     <PackageReference Include="Polly" Version="7.2.4" ExcludeAssets="compile" />
+    <PackageReference Include="Yarp.ReverseProxy" Version="2.3.0" />
   </ItemGroup>
 
   <ItemGroup>

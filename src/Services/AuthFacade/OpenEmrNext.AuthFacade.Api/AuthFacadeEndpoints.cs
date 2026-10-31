@@ -17,9 +17,12 @@ public static class AuthFacadeEndpoints
         app.MapSystemEndpoints();
 
         // The browser authorization-code flow against OpenEMR, driven by OpenIddict.Client, is a browser
-        // navigation, not a versioned API call. It supersedes the hand-rolled ADR 0024 endpoints: both use
-        // the same registered /callback redirect_uri, so BrowserFlowEndpoints is not mapped alongside it.
+        // navigation, not a versioned API call.
         app.MapOpenIddictClientEndpoints();
+
+        // The BFF proxy forwards arbitrary OpenEMR paths under its own prefix, so it does not fit the
+        // versioned /api/v1 group either.
+        app.MapOpenEmrBffProxyEndpoints();
 
         var v1 = app.MapGroup("/api/v1");
         v1.MapTokenEndpoints();

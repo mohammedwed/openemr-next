@@ -51,9 +51,9 @@ public static class OpenIddictClientEndpoints
     /// code exchange, the <c>id_token</c>'s signature/issuer/audience, and its own state token's nonce —
     /// none of that is re-implemented here). On success, copies every claim into a new local-session
     /// identity, carries the real OpenEMR access/refresh token into the session cookie (see
-    /// <see cref="CaptureTokens"/>), and signs in with the cookie scheme; on failure, redirects to the
-    /// resolved return URL (OpenIddict preserves <see cref="AuthenticationProperties.RedirectUri"/> from the
-    /// challenge) with a generic error code, never OpenEMR's or OpenIddict's own error text.
+    /// <see cref="OpenIddictTokenCapture.Capture"/>), and signs in with the cookie scheme; on failure,
+    /// redirects to the resolved return URL (OpenIddict preserves <see cref="AuthenticationProperties.RedirectUri"/>
+    /// from the challenge) with a generic error code, never OpenEMR's or OpenIddict's own error text.
     /// </summary>
     private static async Task<IResult> HandleCallbackAsync(HttpContext context)
     {
@@ -66,50 +66,8 @@ public static class OpenIddictClientEndpoints
         }
 
         var identity = new ClaimsIdentity(principal.Claims, OpenIddictClientServiceCollectionExtensions.SessionScheme);
-        await context.SignInAsync(OpenIddictClientServiceCollectionExtensions.SessionScheme, new ClaimsPrincipal(identity), CaptureTokens(result));
+        await context.SignInAsync(OpenIddictClientServiceCollectionExtensions.SessionScheme, new ClaimsPrincipal(identity), OpenIddictTokenCapture.Capture(result));
 
         return Results.Redirect(returnUrl);
-    }
-
-    /// <summary>
-    /// Carries the access and refresh token OpenIddict.Client already obtained during the code exchange into
-    /// the session sign-in's own properties, under the plain names
-    /// <see cref="AuthenticationTokenExtensions.GetTokenAsync(HttpContext, string, string)"/> expects. Without
-    /// this, the real OpenEMR token OpenIddict already holds is discarded the moment this endpoint returns,
-    /// and nothing that only has the session cookie — a browser-based client that was never handed a bearer
-    /// token (ADR 0026's token-handler/BFF discussion) — could ever reach OpenEMR's API on the user's behalf.
-    /// OpenIddict's own AspNetCore integration stores these under its own constant names
-    /// (<see cref="OpenIddictClientAspNetCoreConstants.Tokens"/>), not the plain ASP.NET Core convention, so
-    /// they are read with one name and re-stored under the other.
-    /// </summary>
-    private static AuthenticationProperties CaptureTokens(AuthenticateResult result)
-    {
-        var properties = new AuthenticationProperties();
-        List<AuthenticationToken>? tokens = null;
-
-        var accessToken = result.Properties?.GetTokenValue(OpenIddictClientAspNetCoreConstants.Tokens.BackchannelAccessToken);
-        if (!string.IsNullOrEmpty(accessToken))
-        {
-            (tokens ??= []).Add(new AuthenticationToken { Name = "access_token", Value = accessToken });
-        }
-
-        var refreshToken = result.Properties?.GetTokenValue(OpenIddictClientAspNetCoreConstants.Tokens.RefreshToken);
-        if (!string.IsNullOrEmpty(refreshToken))
-        {
-            (tokens ??= []).Add(new AuthenticationToken { Name = "refresh_token", Value = refreshToken });
-        }
-
-        var expiresAt = result.Properties?.GetTokenValue(OpenIddictClientAspNetCoreConstants.Tokens.BackchannelAccessTokenExpirationDate);
-        if (!string.IsNullOrEmpty(expiresAt))
-        {
-            (tokens ??= []).Add(new AuthenticationToken { Name = "expires_at", Value = expiresAt });
-        }
-
-        if (tokens is not null)
-        {
-            properties.StoreTokens(tokens);
-        }
-
-        return properties;
     }
 }

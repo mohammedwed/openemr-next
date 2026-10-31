@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -118,6 +119,18 @@ internal sealed class TestApi : IAsyncDisposable
             var refresh = await ctx.GetTokenAsync(OpenIddictClientServiceCollectionExtensions.SessionScheme, "refresh_token");
             var expires = await ctx.GetTokenAsync(OpenIddictClientServiceCollectionExtensions.SessionScheme, "expires_at");
             return Results.Json(new { AccessToken = access, RefreshToken = refresh, ExpiresAt = expires });
+        }).AllowAnonymous();
+        // Test-only: signs the caller into the session scheme with no tokens stored, the scenario the BFF
+        // proxy's request transform must tolerate -- a ticket that predates ADR 0027, or one OpenIddict
+        // never captured a token for. Not reachable through the real login flow, which always carries
+        // whatever token OpenEMR issued.
+        app.MapGet("/test/sign-in-without-tokens", async (HttpContext ctx) =>
+        {
+            var identity = new ClaimsIdentity(
+                [new Claim(ClaimTypes.NameIdentifier, "test-subject")],
+                OpenIddictClientServiceCollectionExtensions.SessionScheme);
+            await ctx.SignInAsync(OpenIddictClientServiceCollectionExtensions.SessionScheme, new ClaimsPrincipal(identity));
+            return Results.Ok();
         }).AllowAnonymous();
         await app.StartAsync();
 
