@@ -23,8 +23,8 @@ research vision below is the long-term direction, not the current deliverable.
 | Local stack | OpenEMR, MariaDB, and AuthFacade in one Docker Compose project | Built |
 | Database baseline | Reproducible schema and seed data from the OpenEMR installer | Built, not yet cleaned |
 | `OpenEmr.Data` | EF Core model scaffolded from the live database | Built |
-| AuthFacade | Token broker: password grant, browser login (OIDC/PKCE), and a BFF proxy to OpenEMR's API | Built, hardening in progress |
-| API gateway (YARP) | Single entry point, token validation at the edge | Planned |
+| AuthFacade | Token broker (password grant) and BFF (browser login via OIDC/PKCE, session cookie, proxies browser calls to OpenEMR's API) | Built, hardening in progress |
+| API gateway (YARP) | Single entry point for the new services, token validation at the edge; AuthFacade's BFF proxy will forward to it as a single hop, rather than growing a route per service itself (ADR 0030) | Planned |
 | Patient Management | Registers patients, publishes `PatientRegistered` | Planned |
 | Clinical Care | Creates encounters and records vitals for registered patients | Planned |
 
@@ -71,6 +71,11 @@ stepping stone: each future service should scaffold only its own tables.
   `Authorization: Bearer` server-side. This is how a browser session — which never holds a
   bearer token itself — reaches OpenEMR's API. Requires the `AuthFacadeSession` cookie
   specifically. See [ADR 0029](docs/architecture/0029-yarp-proxies-browser-sessions-to-openemrs-api.md).
+  This makes AuthFacade a BFF (backend-for-frontend), not just a token broker: the browser only ever
+  talks to AuthFacade, which does the OIDC login, holds the session, and proxies API calls on its behalf.
+  **Planned:** once the API gateway (below) and a second backend service exist, this proxy gets one more
+  cluster pointed at the gateway — a single hop for anything beyond OpenEMR — rather than learning about
+  each new service itself. See [ADR 0030](docs/architecture/0030-bff-proxy-forwards-to-the-gateway-not-each-service.md).
 - `GET /health` is a liveness check.
 
 **Login UI (`src/Services/LoginUi`).** A static Blazor page with one link to
@@ -79,19 +84,39 @@ stepping stone: each future service should scaffold only its own tables.
 ## Architecture
 
 ```text
-            +-------------------+
- client --> | AuthFacade (.NET) |  passes OpenEMR's tokens through
-            +---------+---------+
-                      | password grant (OAuth2)
-            +---------v---------+        +-----------+
-            | OpenEMR (legacy)  |<------>| MariaDB   |
-            +-------------------+        +-----------+
-                                               ^
+            +------------------------+
+ client --> |   AuthFacade (.NET)    |  token broker (password/refresh grant)
+            |  + BFF for browsers    |  and BFF: OIDC login, session cookie,
+            +-----------+------------+  proxies browser calls to OpenEMR
+                        | OAuth2 (password/refresh grant, authorization
+                        | code, or a proxied call with the token attached)
+            +-----------v------------+        +-----------+
+            |    OpenEMR (legacy)    |<------>| MariaDB   |
+            +------------------------+        +-----------+
+                        ^
             seed (one-shot) registers the OAuth client
 ```
 
+A non-browser client calls `/api/v1/connect/token` directly with the password/refresh
+grant and holds the resulting bearer token itself. A browser never does: it completes
+`/oidc/login` and only ever receives the `AuthFacadeSession` cookie — AuthFacade holds
+the real OpenEMR token behind that cookie and attaches it server-side, both for `/me`
+and for calls proxied through `/bff/openemr/**`.
+
+**Planned (M3):** the BFF proxy's route table does not grow one entry per new
+backend service. Instead it gets a second cluster pointed at an API gateway,
+a single hop for anything beyond OpenEMR, once the gateway and a second
+service (Patient Management or Clinical Care) exist. See
+[ADR 0030](docs/architecture/0030-bff-proxy-forwards-to-the-gateway-not-each-service.md).
+
+```text
+ browser --(session cookie)--> AuthFacade (BFF) --(bearer, one hop)--> API Gateway --> Patient Management / Clinical Care
+```
+
 OpenEMR owns the schema, users, password rules, and the OAuth server. AuthFacade
-is a token broker in front of it. It does not store passwords or user records.
+is a token broker for non-browser clients and a BFF (backend-for-frontend) for
+browser sessions — not a general-purpose gateway. It does not store passwords
+or user records.
 
 ### Authentication boundary
 
