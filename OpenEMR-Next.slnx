@@ -11,6 +11,9 @@
     <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Api/OpenEmrNext.AuthFacade.Api.csproj" />
   </Folder>
   <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/AuthFacade/">
+    <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Client/OpenEmrNext.AuthFacade.Client.csproj" />
+  </Folder>
   <Folder Name="/src/Services/LoginUi/">
     <Project Path="src/Services/LoginUi/OpenEmrNext.LoginUi/OpenEmrNext.LoginUi.csproj" />
   </Folder>
