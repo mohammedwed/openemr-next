@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Sockets;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OpenEmrNext.AuthFacade.Api;
@@ -105,6 +108,17 @@ internal sealed class TestApi : IAsyncDisposable
         app.UseAuthFacadeHttpMiddleware();
         app.MapAuthFacadeEndpoints();
         app.MapOpenApi();
+        // Test-only: reads back the tokens the session cookie carries, the same way a future
+        // token-handling proxy endpoint would with HttpContext.GetTokenAsync(SessionScheme, ...) -- not
+        // mapped in production, and the only way to prove the round trip through the real, encrypted
+        // cookie ticket without reimplementing ASP.NET Core's own cookie protection in the test.
+        app.MapGet("/test/session-tokens", async (HttpContext ctx) =>
+        {
+            var access = await ctx.GetTokenAsync(OpenIddictClientServiceCollectionExtensions.SessionScheme, "access_token");
+            var refresh = await ctx.GetTokenAsync(OpenIddictClientServiceCollectionExtensions.SessionScheme, "refresh_token");
+            var expires = await ctx.GetTokenAsync(OpenIddictClientServiceCollectionExtensions.SessionScheme, "expires_at");
+            return Results.Json(new { AccessToken = access, RefreshToken = refresh, ExpiresAt = expires });
+        }).AllowAnonymous();
         await app.StartAsync();
 
         return new TestApi(app, identityProvider, tokenVerifier);

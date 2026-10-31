@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using Microsoft.AspNetCore.WebUtilities;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Api;
@@ -74,6 +75,25 @@ public class OpenIddictClientCallbackTests
 
         Assert.Equal(HttpStatusCode.OK, me.StatusCode);
         Assert.Contains("subject-42", await me.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Successful_callback_persists_the_real_openemr_access_and_refresh_token()
+    {
+        // Without this, the real OpenEMR token OpenIddict.Client already holds during the exchange is
+        // discarded the moment /callback returns, and a browser client that was only ever given the
+        // session cookie (never a bearer token, by design) has no way to reach OpenEMR's API later.
+        await using var server = await FakeOpenEmrServer.StartAsync();
+        await using var api = await StartApiAsync(server);
+        var (state, nonce) = await LoginAsync(api);
+        server.Nonce = nonce;
+        await api.BrowserClient.GetAsync($"/callback?code=fake-code&state={state}");
+
+        using var response = await api.BrowserClient.GetAsync("/test/session-tokens");
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal("fake-access-token", body.RootElement.GetProperty("accessToken").GetString());
+        Assert.False(string.IsNullOrEmpty(body.RootElement.GetProperty("expiresAt").GetString()));
     }
 
     [Fact]

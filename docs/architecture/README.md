@@ -32,3 +32,4 @@ old one's status is updated to point to it.
 | [0024](0024-browser-authorization-code-flow-with-pkce.md) | Browser authorization-code flow with PKCE establishes a cookie session | Superseded by 0026 | 2026-10-30 |
 | [0025](0025-seed-encrypts-the-client-secret.md) | The seed encrypts the AuthFacade client secret with OpenEMR's own CryptoGen | Accepted | 2026-10-30 |
 | [0026](0026-openiddict-client-drives-the-authorization-code-flow.md) | OpenIddict.Client drives the browser authorization-code flow against OpenEMR | Accepted | 2026-10-30 |
+| [0027](0027-persist-tokens-in-the-session-cookie.md) | The session cookie carries the real OpenEMR access and refresh token | Accepted | 2026-10-31 |
