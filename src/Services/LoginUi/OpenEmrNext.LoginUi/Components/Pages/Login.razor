@@ -1,17 +1,25 @@
 @page "/"
+@using Microsoft.AspNetCore.WebUtilities
 @inject IOptions<AuthFacadeOptions> AuthFacadeOptions
+@inject NavigationManager Navigation
 
-<main class="login">
-    <h1>OpenEMR Next</h1>
+<MudContainer MaxWidth="MaxWidth.ExtraSmall" Class="login-page">
+    <MudPaper Elevation="2" Class="pa-8 d-flex flex-column align-center ga-4">
+        <MudText Typo="Typo.h4" HtmlTag="h1">OpenEMR Next</MudText>
 
-    @if (ErrorMessage is { } message)
-    {
-        <p class="login-error" role="alert">@message</p>
-    }
+        @if (ErrorMessage is { } message)
+        {
+            <MudAlert Severity="Severity.Error" role="alert" Class="w-100">@message</MudAlert>
+        }
+        else if (LoginSucceeded)
+        {
+            <MudAlert Severity="Severity.Success" role="status" Class="w-100">Login successful.</MudAlert>
+        }
 
-    <p>Sign in with your existing OpenEMR account.</p>
-    <a class="login-button" href="@LoginUrl">Log in with OpenEMR</a>
-</main>
+        <MudText>Sign in with your existing OpenEMR account.</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@LoginUrl">Log in with OpenEMR</MudButton>
+    </MudPaper>
+</MudContainer>
 
 @code {
     /// <summary>
@@ -30,14 +38,26 @@
     [SupplyParameterFromQuery(Name = "error")]
     public string? Error { get; set; }
 
+    /// <summary>
+    /// Set when <c>/callback</c> redirected back here after a successful login — only possible when this
+    /// page itself supplied the <c>returnUrl</c> below, since AuthFacade never adds this on its own.
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "login")]
+    public string? LoginStatus { get; set; }
+
     private string LoginUrl
     {
         get
         {
             var baseUrl = AuthFacadeOptions.Value.BaseUrl.TrimEnd('/');
-            return string.IsNullOrEmpty(ReturnUrl)
-                ? $"{baseUrl}/oidc/login"
-                : $"{baseUrl}/oidc/login?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
+            // When nothing upstream gave us a returnUrl, we are the final destination either way: bake the
+            // success marker into the one we send, so a successful /callback redirect carries it back.
+            // A failed callback appends "error" to this same URL (AuthFacadeEndpoints.cs), so both can be
+            // present at once -- ErrorMessage is checked first in the markup above, and always wins.
+            var returnUrl = string.IsNullOrEmpty(ReturnUrl)
+                ? QueryHelpers.AddQueryString(Navigation.BaseUri, "login", "success")
+                : ReturnUrl;
+            return QueryHelpers.AddQueryString($"{baseUrl}/oidc/login", "returnUrl", returnUrl);
         }
     }
 
@@ -48,4 +68,6 @@
     private string? ErrorMessage => string.IsNullOrEmpty(Error)
         ? null
         : "Something went wrong signing in. Please try again.";
+
+    private bool LoginSucceeded => LoginStatus == "success";
 }
