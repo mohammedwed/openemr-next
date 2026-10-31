@@ -50,6 +50,23 @@ internal sealed class CircuitBreakingIdentityProvider(
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>Shares the password grant's breaker state: all three grants call the same OpenEMR token endpoint.</remarks>
+    public async Task<PasswordGrantResult> AuthorizationCodeGrantAsync(
+        string code, string codeVerifier, string redirectUri, CancellationToken ct)
+    {
+        try
+        {
+            return await pipeline.ExecuteAsync(
+                async token => await inner.AuthorizationCodeGrantAsync(code, codeVerifier, redirectUri, token), ct);
+        }
+        catch (BrokenCircuitException ex)
+        {
+            // The circuit is open, so no request was sent to OpenEMR.
+            throw new IdentityProviderUnavailableException(ex);
+        }
+    }
+
     /// <summary>Builds the breaker with the thresholds in <paramref name="options"/>.</summary>
     /// <param name="options">The thresholds to use.</param>
     /// <returns>A pipeline to share across requests.</returns>

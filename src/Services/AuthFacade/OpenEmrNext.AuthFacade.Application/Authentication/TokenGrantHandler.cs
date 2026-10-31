@@ -36,6 +36,19 @@ public sealed class TokenGrantHandler(IIdentityProvider identityProvider, IExter
     public Task<LoginResult> HandleAsync(RefreshToken refreshToken, CancellationToken ct) =>
         HandleAsync(token => identityProvider.RefreshGrantAsync(refreshToken, token), ct);
 
+    /// <summary>Redeems an authorization code from the browser flow (ADR 0024).</summary>
+    /// <param name="code">The authorization code OpenEMR issued.</param>
+    /// <param name="codeVerifier">The PKCE verifier matching the challenge sent to OpenEMR's <c>/authorize</c>.</param>
+    /// <param name="redirectUri">The redirect URI the flow started with. Must match it exactly.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <returns>
+    /// The same outcomes as <see cref="HandleAsync(Username, Password, CancellationToken)"/>. A caller still
+    /// needs to verify the <c>id_token</c> and its <c>nonce</c> itself; this method verifies only the access
+    /// token, the same way every grant does.
+    /// </returns>
+    public Task<LoginResult> HandleAsync(string code, string codeVerifier, string redirectUri, CancellationToken ct) =>
+        HandleAsync(token => identityProvider.AuthorizationCodeGrantAsync(code, codeVerifier, redirectUri, token), ct);
+
     /// <summary>Submits the grant, maps OpenEMR's status, and verifies a successful token. Shared by both grants.</summary>
     private async Task<LoginResult> HandleAsync(
         Func<CancellationToken, Task<PasswordGrantResult>> submitGrantAsync, CancellationToken ct)

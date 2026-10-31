@@ -28,6 +28,15 @@ public sealed class OpenEmrOptions
     [Required]
     public string ClientSecret { get; set; } = "";
 
+    /// <summary>
+    /// The redirect URI registered for this client (ADR 0024), for example
+    /// <c>http://localhost:7128/callback</c>. Used both to build the authorize URL at <c>/login</c> and to
+    /// redeem the code at <c>/callback</c>; it must match the value OpenEMR has on file for the client exactly.
+    /// Required.
+    /// </summary>
+    [Required]
+    public string RedirectUri { get; set; } = "";
+
     /// <summary>The OAuth scope requested in the password grant. Defaults to <c>openid api:oemr</c>.</summary>
     public string Scope { get; set; } = "openid api:oemr";
 

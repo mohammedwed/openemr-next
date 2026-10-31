@@ -1,0 +1,12 @@
+@* Sets MudBlazor's CSS variables for the static theme; no JS interop, so dynamic dark-mode switching
+   (which needs an interactive render mode this page does not have) is not used. *@
+<MudThemeProvider />
+
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" />
+    </Found>
+    <NotFound>
+        <p>Page not found.</p>
+    </NotFound>
+</Router>

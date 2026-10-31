@@ -97,7 +97,8 @@ redirect and cookie handling considered earlier are not part of this milestone.
 - Replace the development TLS bypass with a trusted certificate path for any
   shared environment
 - Fixed audience string replaced by a registered-client check
-- Persist data-protection keys
+- Persist data-protection keys (closes one of three gaps blocking more than one AuthFacade instance, see
+  ADR 0028)
 - Confirm that request logging does not capture form bodies, with a test
 - Start-up ordering: AuthFacade waits for the database but not for OpenEMR; add a
   check or retry so early requests fail clearly
@@ -141,6 +142,9 @@ different split, update the design before writing service code.
 - Compose entry for the gateway
 - ADR: whether AuthFacade stays as the permanent legacy bridge or is replaced by
   a dedicated identity service
+- AuthFacade's BFF proxy (ADR 0029) adds one cluster pointed at this gateway, as a single hop for any
+  browser-session call beyond OpenEMR, rather than growing a route per new service itself — decided ahead
+  of time in ADR 0030
 
 **Decision gate:** Record the identity architecture in an ADR.
 

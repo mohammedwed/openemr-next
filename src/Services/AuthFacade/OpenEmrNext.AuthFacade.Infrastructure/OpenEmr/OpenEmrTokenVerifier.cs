@@ -56,7 +56,11 @@ internal sealed class OpenEmrTokenVerifier(HttpClient http, IOptions<OpenEmrOpti
             ? nameValue
             : null;
 
-        return new VerifiedToken(value, name);
+        var nonce = result.Claims.TryGetValue("nonce", out var claimNonce) && claimNonce is string nonceValue && nonceValue.Length > 0
+            ? nonceValue
+            : null;
+
+        return new VerifiedToken(value, name, nonce);
     }
 
     /// <summary>Checks every rule the token must satisfy: RS256 only, signature, issuer, audience and lifetime.</summary>

@@ -1,8 +1,15 @@
+using System.Net;
+using System.Net.Sockets;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OpenEmrNext.AuthFacade.Api;
+using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
 using OpenEmrNext.AuthFacade.Application.Ports;
 using OpenEmrNext.AuthFacade.UnitTests.Application;
 
@@ -22,6 +29,12 @@ internal sealed class TestApi : IAsyncDisposable
         IdentityProvider = identityProvider;
         TokenVerifier = tokenVerifier;
         Client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
+        // The browser flow (ADR 0024) is tested across several requests that must carry the cookies the
+        // previous response set, without the client following the redirects itself.
+        BrowserClient = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
+        {
+            BaseAddress = new Uri(app.Urls.First())
+        };
     }
 
     /// <summary>The fake OpenEMR identity provider. Tests set its result or exception before a request.</summary>
@@ -34,11 +47,30 @@ internal sealed class TestApi : IAsyncDisposable
     public HttpClient Client { get; }
 
     /// <summary>
+    /// A client that does not follow redirects and keeps cookies across requests, for the browser flow
+    /// (ADR 0024): tests read the <c>Location</c> and <c>Set-Cookie</c> headers directly.
+    /// </summary>
+    public HttpClient BrowserClient { get; }
+
+    /// <summary>
     /// Starts the API on a random loopback port with in-memory settings and a fake OpenEMR
     /// identity provider. The fake is registered last, so it replaces the real one.
     /// </summary>
+    /// <param name="configOverrides">
+    /// Settings applied after the defaults, so they win — for a test that needs <c>OpenEmr:BaseUrl</c> and
+    /// <c>OpenEmr:Issuer</c> to point at a real fake OpenEMR server (<see cref="FakeOpenEmrServer"/>) instead
+    /// of the default unreachable placeholder hosts, to exercise a real HTTP round trip.
+    /// </param>
+    /// <param name="port">
+    /// A specific loopback port to bind, instead of letting the OS pick one. OpenIddict.Client recognizes
+    /// <c>/callback</c> as its own redirection endpoint by matching the incoming request's actual host
+    /// against the registered <c>OpenEmr:RedirectUri</c> (the same way Compose's port mapping preserves the
+    /// real <c>Host</c> header through to the container) — a test that drives <c>/callback</c> for real, not
+    /// just <c>/oidc/login</c>, needs its own port known ahead of time so it can set a matching
+    /// <c>OpenEmr:RedirectUri</c> override. Use <see cref="GetFreeTcpPort"/> to pick one.
+    /// </param>
     /// <returns>A running instance. Dispose it to stop the host.</returns>
-    public static async Task<TestApi> StartAsync()
+    public static async Task<TestApi> StartAsync(Dictionary<string, string?>? configOverrides = null, int? port = null)
     {
         var identityProvider = new FakeIdentityProvider();
         var tokenVerifier = new FakeExternalTokenVerifier();
@@ -49,14 +81,23 @@ internal sealed class TestApi : IAsyncDisposable
             EnvironmentName = "Development"
         });
 
-        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.WebHost.UseUrls($"http://127.0.0.1:{port ?? 0}");
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["OpenEmr:BaseUrl"] = "https://openemr.test",
+            // Deliberately different hosts, the same way Compose's container-internal BaseUrl diverges
+            // from the publicly-reachable Issuer: a browser-flow test that used the wrong one would fail.
+            ["OpenEmr:BaseUrl"] = "https://openemr-internal.test",
             ["OpenEmr:Issuer"] = "https://openemr.test/oauth2/default",
             ["OpenEmr:ClientId"] = "facade-client",
-            ["OpenEmr:ClientSecret"] = "facade-secret"
+            ["OpenEmr:ClientSecret"] = "facade-secret",
+            ["OpenEmr:RedirectUri"] = "https://facade.test/callback",
+            ["BrowserFlow:DefaultReturnUrl"] = "https://app.test/",
+            ["BrowserFlow:ReturnUrlAllowedHosts:0"] = "app.test"
         });
+        if (configOverrides is not null)
+        {
+            builder.Configuration.AddInMemoryCollection(configOverrides);
+        }
 
         builder.AddAuthFacadeHttpDependencies();
         // Registered last, so it replaces the real OpenEMR client.
@@ -64,17 +105,56 @@ internal sealed class TestApi : IAsyncDisposable
         builder.Services.AddSingleton<IExternalTokenVerifier>(tokenVerifier);
 
         var app = builder.Build();
+        await app.EnsureOpenIddictClientDatabaseCreatedAsync();
         app.UseAuthFacadeHttpMiddleware();
         app.MapAuthFacadeEndpoints();
         app.MapOpenApi();
+        // Test-only: reads back the tokens the session cookie carries, the same way a future
+        // token-handling proxy endpoint would with HttpContext.GetTokenAsync(SessionScheme, ...) -- not
+        // mapped in production, and the only way to prove the round trip through the real, encrypted
+        // cookie ticket without reimplementing ASP.NET Core's own cookie protection in the test.
+        app.MapGet("/test/session-tokens", async (HttpContext ctx) =>
+        {
+            var access = await ctx.GetTokenAsync(OpenIddictClientServiceCollectionExtensions.SessionScheme, "access_token");
+            var refresh = await ctx.GetTokenAsync(OpenIddictClientServiceCollectionExtensions.SessionScheme, "refresh_token");
+            var expires = await ctx.GetTokenAsync(OpenIddictClientServiceCollectionExtensions.SessionScheme, "expires_at");
+            return Results.Json(new { AccessToken = access, RefreshToken = refresh, ExpiresAt = expires });
+        }).AllowAnonymous();
+        // Test-only: signs the caller into the session scheme with no tokens stored, the scenario the BFF
+        // proxy's request transform must tolerate -- a ticket that predates ADR 0027, or one OpenIddict
+        // never captured a token for. Not reachable through the real login flow, which always carries
+        // whatever token OpenEMR issued.
+        app.MapGet("/test/sign-in-without-tokens", async (HttpContext ctx) =>
+        {
+            var identity = new ClaimsIdentity(
+                [new Claim(ClaimTypes.NameIdentifier, "test-subject")],
+                OpenIddictClientServiceCollectionExtensions.SessionScheme);
+            await ctx.SignInAsync(OpenIddictClientServiceCollectionExtensions.SessionScheme, new ClaimsPrincipal(identity));
+            return Results.Ok();
+        }).AllowAnonymous();
         await app.StartAsync();
 
         return new TestApi(app, identityProvider, tokenVerifier);
     }
 
+    /// <summary>
+    /// Asks the OS for a free loopback port and releases it immediately, for a caller that needs to know its
+    /// <see cref="StartAsync"/> port before calling it (to build a matching <c>OpenEmr:RedirectUri</c>). A
+    /// small, standard race exists between releasing it here and <see cref="StartAsync"/> rebinding it.
+    /// </summary>
+    public static int GetFreeTcpPort()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+
     public async ValueTask DisposeAsync()
     {
         Client.Dispose();
+        BrowserClient.Dispose();
         await _app.StopAsync();
         await _app.DisposeAsync();
     }
