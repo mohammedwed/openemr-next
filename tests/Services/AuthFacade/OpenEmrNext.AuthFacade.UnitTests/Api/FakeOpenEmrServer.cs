@@ -47,6 +47,15 @@ internal sealed class FakeOpenEmrServer : IAsyncDisposable
     /// <summary>When not 200, <c>/oauth2/default/token</c> returns this status with a generic OAuth error body instead of a token.</summary>
     public int TokenEndpointStatusCode { get; set; } = 200;
 
+    /// <summary>How many times <c>/oauth2/default/token</c> has been called, for the circuit breaker tests (ADR 0041).</summary>
+    public int TokenEndpointCallCount { get; private set; }
+
+    /// <summary>The status code <c>/apis/default/api/flaky</c> answers with, for the circuit breaker tests (ADR 0041).</summary>
+    public int FlakyEndpointStatusCode { get; set; } = 200;
+
+    /// <summary>How many times <c>/apis/default/api/flaky</c> has been called.</summary>
+    public int FlakyEndpointCallCount { get; private set; }
+
     /// <summary>Starts the server on a random loopback port.</summary>
     public static async Task<FakeOpenEmrServer> StartAsync()
     {
@@ -56,15 +65,19 @@ internal sealed class FakeOpenEmrServer : IAsyncDisposable
         var app = builder.Build();
         var server = new FakeOpenEmrServer(app, rsa);
 
-        app.MapPost("/oauth2/default/token", () => server.TokenEndpointStatusCode == 200
-            ? Results.Json(new
-            {
-                access_token = "fake-access-token",
-                token_type = "Bearer",
-                expires_in = 3600,
-                id_token = server.BuildIdToken()
-            })
-            : Results.Json(new { error = "invalid_grant" }, statusCode: server.TokenEndpointStatusCode));
+        app.MapPost("/oauth2/default/token", () =>
+        {
+            server.TokenEndpointCallCount++;
+            return server.TokenEndpointStatusCode == 200
+                ? Results.Json(new
+                {
+                    access_token = "fake-access-token",
+                    token_type = "Bearer",
+                    expires_in = 3600,
+                    id_token = server.BuildIdToken()
+                })
+                : Results.Json(new { error = "invalid_grant" }, statusCode: server.TokenEndpointStatusCode);
+        });
 
         // Stands in for one of OpenEMR's own protected API routes, for the BFF proxy tests: it exists only
         // to report back what it actually received, so a test can assert the proxy attached the session's
@@ -76,6 +89,14 @@ internal sealed class FakeOpenEmrServer : IAsyncDisposable
         // OpenEMR response relays back through the proxy unchanged rather than being reshaped or swallowed.
         app.MapGet("/apis/default/api/missing-patient", () =>
             Results.Json(new { error = "not_found" }, statusCode: 404));
+
+        // A protected route whose status code is settable, for the circuit breaker tests (ADR 0041): a
+        // 4xx here must never count as a failure, only a 5xx/408 does.
+        app.MapGet("/apis/default/api/flaky", () =>
+        {
+            server.FlakyEndpointCallCount++;
+            return Results.StatusCode(server.FlakyEndpointStatusCode);
+        });
 
         // Stands in for a future OpenEMR write (e.g. registering a patient) that takes a request body, for
         // the request-logging test: it only needs to accept the body and answer 200, never to read it.

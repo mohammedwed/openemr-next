@@ -54,10 +54,24 @@ public static class OpenIddictClientEndpoints
     /// redirects to the resolved return URL (OpenIddict preserves <see cref="AuthenticationProperties.RedirectUri"/>
     /// from the challenge) with a generic error code, never OpenEMR's or OpenIddict's own error text.
     /// </summary>
-    private static async Task<IResult> HandleCallbackAsync(HttpContext context)
+    private static async Task<IResult> HandleCallbackAsync(HttpContext context, IOptions<BrowserFlowOptions> browserFlowOptions)
     {
-        var result = await context.AuthenticateAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
-        var returnUrl = result.Properties?.RedirectUri ?? "/";
+        AuthenticateResult result;
+        try
+        {
+            result = await context.AuthenticateAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
+        }
+        catch (Exception)
+        {
+            // The token exchange itself blew up before OpenIddict could produce a failed AuthenticateResult
+            // at all -- e.g. the circuit breaker (ADR 0041) refusing the call outright because OpenEMR's
+            // token endpoint is already known to be down. There is no AuthenticationProperties to recover a
+            // returnUrl from here, so this falls back to the same default /oidc/login itself uses for a
+            // returnUrl it cannot use.
+            return Results.Redirect(QueryHelpers.AddQueryString(browserFlowOptions.Value.DefaultReturnUrl, "error", "login_failed"));
+        }
+
+        var returnUrl = result.Properties?.RedirectUri ?? browserFlowOptions.Value.DefaultReturnUrl;
 
         if (!result.Succeeded || result.Principal is not { Identity.IsAuthenticated: true } principal)
         {

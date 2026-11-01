@@ -113,7 +113,11 @@ ADR 0026) and the resulting session cookie (ADR 0027).
   terminates TLS with a local dev cert and AuthFacade trusts its forwarded
   headers (ADR 0039), so the session cookie's Secure flag — code already
   written to expect this (ADR 0024/0026) — is finally true end to end
-- Unit tests (42), architecture tests (1) and live integration tests (5) pass
+- Circuit breakers guard the token exchange, the JWKS fetch and the BFF
+  proxy's forwarded calls (ADR 0041), resurrecting ADR 0017's design for the
+  two call sites that exist after ADR 0035 removed the ones it originally
+  guarded; verified live by stopping the openemr container mid-session
+- Unit tests (47), architecture tests (1) and live integration tests (5) pass
   (down from this bullet's original counts: ADR 0035 removed the password
   grant, its tests, and the Domain/Application/Ports/Infrastructure layers)
 
