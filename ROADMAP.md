@@ -120,7 +120,11 @@ ADR 0026) and the resulting session cookie (ADR 0027).
   logout (ADR 0040) — the `end_session_endpoint` ADR 0024/0026 left
   unconfirmed turned out to exist, and its exact contract (a required
   `id_token_hint`, an exact-match `post_logout_redirect_uri`) is now handled
-- Unit tests (51), architecture tests (1) and live integration tests (5) pass
+- Circuit breakers guard the token exchange, the JWKS fetch and the BFF
+  proxy's forwarded calls (ADR 0041), resurrecting ADR 0017's design for the
+  two call sites that exist after ADR 0035 removed the ones it originally
+  guarded; verified live by stopping the openemr container mid-session
+- Unit tests (56), architecture tests (1) and live integration tests (5) pass
   (down from this bullet's original counts: ADR 0035 removed the password
   grant, its tests, and the Domain/Application/Ports/Infrastructure layers)
 

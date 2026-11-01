@@ -129,6 +129,19 @@ Set in `appsettings.json` or as environment variables with `__` for `:` (for exa
 | `ClientSecret` | required | OAuth client secret. From `AUTHFACADE_CLIENT_SECRET`. |
 | `RedirectUri` | required | Redirect URI registered for this client, used by the browser flow's `/login` and `/callback` (ADR 0024). Must match the seed's `redirect_uri` exactly. In Compose, the gateway's address, not AuthFacade's own (ADR 0033). `auth-facade` depends on `seed` completing (ADR 0037), so `docker compose up` reseeds automatically when this drifts. |
 
+### `OpenEmr:CircuitBreaker`
+
+Guards the token exchange, the JWKS fetch and the BFF proxy's forwarded calls (ADR 0041) — three
+independent breakers, one set of thresholds. A 4xx from OpenEMR never counts as a failure; only a
+connection problem, a timeout, a `408`, or a `5xx` does.
+
+| Key | Default | Rule |
+| --- | --- | --- |
+| `FailureRatio` | `0.5` | Above 0, at most 1. |
+| `SamplingDuration` | `00:00:30` | At least 500 ms. |
+| `MinimumThroughput` | `5` | At least 1. |
+| `BreakDuration` | `00:00:30` | At least 500 ms. |
+
 ### `BrowserFlow`
 
 Governs where the browser authorization-code flow (ADR 0024) sends the browser.

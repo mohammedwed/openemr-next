@@ -46,3 +46,4 @@ old one's status is updated to point to it.
 | [0038](0038-rate-limit-login-and-callback-per-client-address.md) | The browser login flow is rate limited per client address | Accepted | 2026-11-01 |
 | [0039](0039-gateway-terminates-tls-authfacade-trusts-forwarded-headers.md) | The gateway terminates TLS; AuthFacade trusts its forwarded headers | Accepted | 2026-11-01 |
 | [0040](0040-rp-initiated-logout.md) | RP-initiated logout ends both AuthFacade's and OpenEMR's sessions | Accepted | 2026-11-01 |
+| [0041](0041-circuit-breakers-guard-the-remaining-openemr-calls.md) | Circuit breakers guard the remaining calls to OpenEMR | Accepted | 2026-11-01 |

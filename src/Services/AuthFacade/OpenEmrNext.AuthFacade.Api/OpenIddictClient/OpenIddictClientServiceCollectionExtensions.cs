@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using OpenEmrNext.AuthFacade.Api.Resilience;
 using OpenEmrNext.AuthFacade.Composition;
 using OpenIddict.Abstractions;
 using OpenIddict.Client;
@@ -38,6 +39,17 @@ public static class OpenIddictClientServiceCollectionExtensions
     {
         var openEmr = configuration.GetSection(OpenEmrOptions.SectionName).Get<OpenEmrOptions>()
             ?? throw new InvalidOperationException($"The '{OpenEmrOptions.SectionName}' configuration section is missing.");
+
+        // Read directly rather than through IOptions<T>: BuildRegistration and UseSystemNetHttp's own
+        // builder both need the pipelines built now, synchronously, not resolved per-request later (the
+        // same reason `openEmr` above is read the same way). Still registered and validated at startup
+        // (ADR 0041) so a bad threshold fails fast rather than silently falling back to the defaults here.
+        var circuitBreaker = configuration.GetSection(CircuitBreakerOptions.SectionName).Get<CircuitBreakerOptions>()
+            ?? new CircuitBreakerOptions();
+        services.AddOptions<CircuitBreakerOptions>()
+            .BindConfiguration(CircuitBreakerOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         // A fresh, uniquely-named file per process (not a fixed path): the store only needs to survive one
         // in-flight login, so losing it on restart is fine (the same reasoning ADR 0024 already applied to
@@ -105,9 +117,14 @@ public static class OpenIddictClientServiceCollectionExtensions
                            o.CookieBuilder.SecurePolicy = CookieSecurePolicy.SameAsRequest;
                        });
 
-                options.UseSystemNetHttp();
+                // Guards the token exchange (ADR 0041): once OpenEMR's token endpoint has failed enough
+                // times, further attempts fail immediately instead of each one waiting out its own timeout.
+                // A rejected grant (a 4xx -- a bad code, a replayed one) is not a failure here; only a
+                // connection problem or a 5xx/408 opens the circuit.
+                options.UseSystemNetHttp()
+                       .SetHttpResiliencePipeline(OpenEmrCircuitBreakers.CreateHttpPipeline(circuitBreaker));
 
-                options.AddRegistration(BuildRegistration(openEmr));
+                options.AddRegistration(BuildRegistration(openEmr, circuitBreaker));
             });
 
         return services;
@@ -133,7 +150,7 @@ public static class OpenIddictClientServiceCollectionExtensions
     /// already needed, and the same bug this would silently reproduce if left to discovery, since OpenEMR's
     /// own discovery document only ever publishes the single public host for every endpoint.
     /// </summary>
-    private static OpenIddictClientRegistration BuildRegistration(OpenEmrOptions openEmr)
+    private static OpenIddictClientRegistration BuildRegistration(OpenEmrOptions openEmr, CircuitBreakerOptions circuitBreaker)
     {
         // No trailing slash: this must byte-for-byte match the "iss" claim OpenEMR actually writes into its
         // tokens (confirmed against OpenEmrTokenVerifier, which already validates that successfully), or
@@ -166,8 +183,11 @@ public static class OpenIddictClientServiceCollectionExtensions
             // anything, so JsonWebKeySetUri on it would never actually be followed (see
             // OpenEmrConfigurationManager's remarks — this was ID2090's root cause). The HttpClient is
             // owned by the manager for the app's lifetime, the same long-lived-singleton pattern
-            // OpenEmrTokenVerifier already uses for the equivalent bearer-token JWKS fetch.
-            ConfigurationManager = new OpenEmrConfigurationManager(new HttpClient(), configuration, jwksUri)
+            // OpenEmrTokenVerifier already uses for the equivalent bearer-token JWKS fetch. A separate
+            // circuit breaker instance from the token exchange's (ADR 0041): same thresholds, but its own
+            // state, since a failing JWKS endpoint says nothing about whether the token endpoint is up.
+            ConfigurationManager = new OpenEmrConfigurationManager(
+                new HttpClient(), configuration, jwksUri, OpenEmrCircuitBreakers.CreateJwksPipeline(circuitBreaker))
         };
     }
 }

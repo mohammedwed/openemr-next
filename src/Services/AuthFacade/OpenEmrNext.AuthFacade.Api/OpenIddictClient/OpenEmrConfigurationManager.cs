@@ -2,6 +2,8 @@ using System.Text.Json;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Tokens;
 using OpenIddict.Abstractions;
+using Polly;
+using Polly.CircuitBreaker;
 
 namespace OpenEmrNext.AuthFacade.Api.OpenIddictClient;
 
@@ -27,8 +29,16 @@ namespace OpenEmrNext.AuthFacade.Api.OpenIddictClient;
 /// all. A failed fetch is swallowed here and simply retried on the next call; if the keys are still missing
 /// once token validation actually needs them, OpenIddict reports that on its own (<c>ID2090</c>).
 /// </para>
+/// <para>
+/// The fetch runs through <paramref name="pipeline"/>, a circuit breaker (ADR 0041): once OpenEMR's JWKS
+/// endpoint has failed enough times, further calls fail immediately with <see cref="BrokenCircuitException"/>
+/// instead of waiting out a real timeout against an endpoint already known to be down. That exception is
+/// swallowed the same way the others are — the cached keys are kept and the next call retries once the
+/// breaker's own cooldown lets a trial call through.
+/// </para>
 /// </summary>
-internal sealed class OpenEmrConfigurationManager(HttpClient http, OpenIddictConfiguration configuration, Uri jwksUri)
+internal sealed class OpenEmrConfigurationManager(
+    HttpClient http, OpenIddictConfiguration configuration, Uri jwksUri, ResiliencePipeline<string> pipeline)
     : IConfigurationManager<OpenIddictConfiguration>
 {
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromHours(1);
@@ -55,7 +65,8 @@ internal sealed class OpenEmrConfigurationManager(HttpClient http, OpenIddictCon
 
             try
             {
-                var json = await http.GetStringAsync(jwksUri, cancel);
+                var json = await pipeline.ExecuteAsync(
+                    async token => await http.GetStringAsync(jwksUri, token), cancel);
                 var keySet = new JsonWebKeySet(json);
 
                 configuration.JsonWebKeySet = keySet;
@@ -68,7 +79,7 @@ internal sealed class OpenEmrConfigurationManager(HttpClient http, OpenIddictCon
                 _fetchedAt = DateTime.UtcNow;
                 _refreshRequested = false;
             }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or BrokenCircuitException)
             {
                 // Leave _fetchedAt and the cached keys as they were: the next call retries. Letting this
                 // propagate would fail the challenge step too, not just token validation (see remarks).
