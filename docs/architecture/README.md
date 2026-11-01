@@ -44,3 +44,4 @@ old one's status is updated to point to it.
 | [0036](0036-wait-for-openemrs-readiness-probe-at-startup.md) | AuthFacade waits for OpenEMR's readiness probe at startup | Accepted | 2026-11-01 |
 | [0037](0037-authfacade-depends-on-seed-completing.md) | AuthFacade depends on the seed completing successfully | Accepted | 2026-11-01 |
 | [0039](0039-gateway-terminates-tls-authfacade-trusts-forwarded-headers.md) | The gateway terminates TLS; AuthFacade trusts its forwarded headers | Accepted | 2026-11-01 |
+| [0042](0042-audit-log-scoped-to-login-and-the-bff-proxy.md) | The audit trail covers login outcomes and the BFF proxy, not `/me` | Accepted | 2026-11-01 |
