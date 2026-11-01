@@ -13,8 +13,8 @@ var authFacadeBaseUrl = builder.Configuration["AuthFacade:BaseUrl"]
 var webAppBaseUrl = builder.Configuration["WebApp:BaseUrl"]
     ?? throw new InvalidOperationException("WebApp:BaseUrl is required.");
 
-// Every path AuthFacade itself maps outside /api/v1 (TokenEndpoints, UserEndpoints, OpenIddictClientEndpoints,
-// OpenEmrBffProxyEndpoints, SystemEndpoints) plus /api/v1 itself. More specific than WebApp's own
+// Every path AuthFacade itself maps outside /api/v1 (UserEndpoints, OpenIddictClientEndpoints,
+// LogoutEndpoints, OpenEmrBffProxyEndpoints, SystemEndpoints) plus /api/v1 itself. More specific than WebApp's own
 // catch-all below, so normal ASP.NET Core route precedence sends a request here first regardless of
 // registration order -- no exclusion pattern needed, unlike AuthFacadeEndpoints' own SPA fallback
 // attempt, which fought the same problem with a fragile regex instead of plain route specificity.
@@ -23,6 +23,7 @@ string[] authFacadeRoutePatterns =
     "/api/{**catch-all}",
     "/oidc/{**catch-all}",
     "/callback",
+    "/logout",
     "/bff/{**catch-all}",
     "/health",
     "/openapi/{**catch-all}",
