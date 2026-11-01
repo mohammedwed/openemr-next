@@ -33,7 +33,15 @@ var routes = authFacadeRoutePatterns
     {
         RouteId = $"authfacade-{index}",
         ClusterId = "authfacade",
-        Match = new RouteMatch { Path = pattern }
+        Match = new RouteMatch { Path = pattern },
+        // Without this, YARP sends the destination's own authority ("auth-facade:8080") as the Host
+        // header, not this gateway's ("localhost:7130"). OpenIddict.Client recognizes /callback as its
+        // own registered redirection endpoint by comparing the request it actually receives against the
+        // registered RedirectUri (ADR 0033's whole point: that redirect_uri is this gateway's address,
+        // not AuthFacade's own) -- with the wrong Host, that comparison fails and /callback throws
+        // "endpoints that are not managed by the OpenIddict client stack", even though the state token
+        // itself (looked up by the state query parameter, independent of Host) was found correctly.
+        Transforms = [new Dictionary<string, string> { ["RequestHeaderOriginalHost"] = "true" }]
     })
     .Append(new RouteConfig
     {
