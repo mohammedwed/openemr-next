@@ -116,7 +116,11 @@ ADR 0026) and the resulting session cookie (ADR 0027).
   terminates TLS with a local dev cert and AuthFacade trusts its forwarded
   headers (ADR 0039), so the session cookie's Secure flag — code already
   written to expect this (ADR 0024/0026) — is finally true end to end
-- Unit tests (48), architecture tests (1) and live integration tests (5) pass
+- Logout ends both AuthFacade's and OpenEMR's own session via RP-initiated
+  logout (ADR 0040) — the `end_session_endpoint` ADR 0024/0026 left
+  unconfirmed turned out to exist, and its exact contract (a required
+  `id_token_hint`, an exact-match `post_logout_redirect_uri`) is now handled
+- Unit tests (51), architecture tests (1) and live integration tests (5) pass
   (down from this bullet's original counts: ADR 0035 removed the password
   grant, its tests, and the Domain/Application/Ports/Infrastructure layers)
 
@@ -125,7 +129,10 @@ ADR 0026) and the resulting session cookie (ADR 0027).
 - Persist data-protection keys (closes one of three gaps blocking more than one AuthFacade instance, see
   ADR 0028)
 - For browser sessions, silent refresh on an expired access token is explicitly
-  deferred rather than forgotten (ADR 0029); revocation (logout) is unaddressed
+  deferred rather than forgotten (ADR 0029); force-ending a session from
+  outside the browser that holds it (an admin action, or a stolen-cookie
+  response) still has no server-side session record to revoke against (ADR
+  0040) — logout itself is done, that narrower gap is not
 - ADR: identity bridge design
 - Audit log of login outcomes and `/me` access, with no credentials or tokens
   in the log
