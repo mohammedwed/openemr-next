@@ -20,6 +20,9 @@ public static class AuthFacadeEndpoints
         // navigation, not a versioned API call.
         app.MapOpenIddictClientEndpoints();
 
+        // RP-initiated logout (ADR 0040) is the same kind of browser navigation.
+        app.MapLogoutEndpoints();
+
         // The BFF proxy forwards arbitrary OpenEMR paths under its own prefix, so it does not fit the
         // versioned /api/v1 group either.
         app.MapOpenEmrBffProxyEndpoints();

@@ -98,6 +98,12 @@ services:
       # gateway's plain-HTTP port, which now only redirects (ADR 0039) -- registering the plain-HTTP
       # address here would just add an extra http-then-https hop to every login.
       AUTHFACADE_REDIRECT_URI: https://localhost:${GATEWAY_HTTPS_PORT:-7131}/callback
+      # Where OpenEMR sends the browser back after RP-initiated logout (ADR 0040) -- must exactly match
+      # what AuthFacade's own /logout sends as post_logout_redirect_uri, byte for byte: OpenEMR compares
+      # this column with a plain SQL `=`, not a host allow-list. Same value AuthFacade's own
+      # BrowserFlow:DefaultReturnUrl already resolves to; Compose does not share one service's environment
+      # values with another, so it is computed the same way a second time, same as AUTHFACADE_REDIRECT_URI.
+      AUTHFACADE_POST_LOGOUT_REDIRECT_URI: http://localhost:${LOGINUI_HTTP_PORT:-7129}/
     volumes:
       - sitesvolume:/var/www/localhost/htdocs/openemr/sites
       - ./scripts/seeds/authfacade-client.php:/seed/authfacade-client.php:ro

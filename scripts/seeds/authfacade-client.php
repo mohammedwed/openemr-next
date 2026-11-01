@@ -10,9 +10,11 @@
  * refuses the client with invalid_client. The password and refresh grants never caught this, since OpenEMR
  * skips the secret check entirely for those. See ADR 0005 and ADR 0025.
  *
- * Safe to run again: it adds the client only if missing and refreshes its scope, redirect URI and secret.
+ * Safe to run again: it adds the client only if missing and refreshes its scope, redirect URI, secret and
+ * logout redirect URI.
  *
- * Required environment: DB_HOST, DB_NAME, DB_USER, MYSQL_PWD, AUTHFACADE_CLIENT_ID, AUTHFACADE_REDIRECT_URI.
+ * Required environment: DB_HOST, DB_NAME, DB_USER, MYSQL_PWD, AUTHFACADE_CLIENT_ID, AUTHFACADE_REDIRECT_URI,
+ * AUTHFACADE_POST_LOGOUT_REDIRECT_URI.
  * Optional: AUTHFACADE_CLIENT_SECRET (the client gets a NULL secret, and is treated as non-confidential, if unset).
  * Exits non-zero: a required variable is missing, or the oauth_clients table does not appear within 15 minutes.
  */
@@ -35,6 +37,11 @@ $dbUser = requireEnv('DB_USER');
 $dbPass = requireEnv('MYSQL_PWD');
 $clientId = requireEnv('AUTHFACADE_CLIENT_ID');
 $redirectUri = requireEnv('AUTHFACADE_REDIRECT_URI');
+// Must match, byte for byte, the post_logout_redirect_uri AuthFacade's own /logout sends (ADR 0040):
+// AuthorizationController::userSessionLogout() compares it against this column with a plain SQL `=`, not
+// an allow-list, so anything other than an exact match silently drops the redirect (OpenEMR still ends its
+// own session either way -- it just answers with a plain-text page instead of sending the browser back).
+$postLogoutRedirectUri = requireEnv('AUTHFACADE_POST_LOGOUT_REDIRECT_URI');
 $clientSecret = getenv('AUTHFACADE_CLIENT_SECRET');
 if ($clientSecret === false || $clientSecret === '') {
     fwrite(STDERR, "AUTHFACADE_CLIENT_SECRET not set; inserting client with NULL secret\n");
@@ -82,22 +89,23 @@ $exists->execute([$clientId]);
 if ($exists->fetchColumn() === false) {
     $insert = $pdo->prepare(
         'INSERT INTO oauth_clients
-            (client_id, client_name, client_role, client_secret, redirect_uri, grant_types,
+            (client_id, client_name, client_role, client_secret, redirect_uri, logout_redirect_uris, grant_types,
              scope, user_id, site_id, is_confidential, is_enabled,
              skip_ehr_launch_authorization_flow, dsi_type, register_date)
          VALUES
-            (?, \'AuthFacade\', \'user\', ?, ?, \'authorization_code\',
+            (?, \'AuthFacade\', \'user\', ?, ?, ?, \'authorization_code\',
              \'openid profile email offline_access\', NULL, \'default\', ?, 1,
              0, 0, NOW())'
     );
-    $insert->execute([$clientId, $encryptedSecret, $redirectUri, $isConfidential]);
+    $insert->execute([$clientId, $encryptedSecret, $redirectUri, $postLogoutRedirectUri, $isConfidential]);
 }
 
 $update = $pdo->prepare(
     'UPDATE oauth_clients
-     SET scope = \'openid profile email offline_access\', redirect_uri = ?, client_secret = ?, is_confidential = ?
+     SET scope = \'openid profile email offline_access\', redirect_uri = ?, logout_redirect_uris = ?,
+         client_secret = ?, is_confidential = ?
      WHERE client_id = ?'
 );
-$update->execute([$redirectUri, $encryptedSecret, $isConfidential, $clientId]);
+$update->execute([$redirectUri, $postLogoutRedirectUri, $encryptedSecret, $isConfidential, $clientId]);
 
 echo "AuthFacade seed complete\n";

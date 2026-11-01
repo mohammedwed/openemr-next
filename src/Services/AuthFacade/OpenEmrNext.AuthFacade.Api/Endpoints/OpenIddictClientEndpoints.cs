@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
+using OpenEmrNext.AuthFacade.Api.RateLimiting;
 using OpenIddict.Client.AspNetCore;
 
 namespace OpenEmrNext.AuthFacade.Api.Endpoints;
@@ -13,7 +14,8 @@ namespace OpenEmrNext.AuthFacade.Api.Endpoints;
 /// OpenIddict client's own redirection endpoint, reached via passthrough — completes it and establishes the
 /// local session cookie. Reuses <see cref="ReturnUrlValidator"/> and <see cref="BrowserFlowOptions"/> from
 /// the earlier hand-rolled flow (ADR 0024); the allow-list problem they solve is unchanged by which engine
-/// drives the redirect.
+/// drives the redirect. Both routes require <see cref="RateLimitingServiceCollectionExtensions.LoginPolicy"/>,
+/// so a flood of requests from one address is refused before either handler runs (ADR 0038).
 /// </summary>
 public static class OpenIddictClientEndpoints
 {
@@ -24,13 +26,15 @@ public static class OpenIddictClientEndpoints
     {
         app.MapGet("/oidc/login", HandleLogin)
             .AllowAnonymous()
-            .ExcludeFromDescription();
+            .ExcludeFromDescription()
+            .RequireRateLimiting(RateLimitingServiceCollectionExtensions.LoginPolicy);
 
         // Cast to Delegate: MapMethods otherwise binds this to the raw-RequestDelegate overload (ASP0016),
         // which discards the Task<IResult> return value and would always answer a bare 200.
         app.MapMethods("/callback", ["GET", "POST"], (Delegate)HandleCallbackAsync)
             .AllowAnonymous()
-            .ExcludeFromDescription();
+            .ExcludeFromDescription()
+            .RequireRateLimiting(RateLimitingServiceCollectionExtensions.LoginPolicy);
 
         return app;
     }

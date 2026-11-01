@@ -68,6 +68,11 @@ Naming: `OPENEMR_*` is the OpenEMR container, `AUTHFACADE_*` is the AuthFacade s
 | `AUTHFACADE_CLIENT_ID` | none, required | no | Client ID the seed service registers in OpenEMR. Becomes `OpenEmr__ClientId`. |
 | `AUTHFACADE_CLIENT_SECRET` | none, required | yes | Client secret. Becomes `OpenEmr__ClientSecret`; `apply-credentials.sh` writes it to OpenEMR. |
 
+Not a `.env` variable, same as `AUTHFACADE_REDIRECT_URI`: `docker-compose.yml` also passes the seed service
+`AUTHFACADE_POST_LOGOUT_REDIRECT_URI`, computed from `LOGINUI_HTTP_PORT`, registered as this client's
+`logout_redirect_uris` (ADR 0040). Must exactly match what `/logout` sends as `post_logout_redirect_uri` —
+OpenEMR compares it with a plain SQL `=`, not a host allow-list.
+
 ### Login UI runtime
 
 | Variable | Default | Meaning |
@@ -75,8 +80,8 @@ Naming: `OPENEMR_*` is the OpenEMR container, `AUTHFACADE_*` is the AuthFacade s
 | `LOGINUI_ENVIRONMENT` | `Production` | ASP.NET Core environment of the Login UI container. `Development` adds the developer exception page and debug logging. |
 
 The Login UI's own `AuthFacade__BaseUrl` is not a stack variable: `docker-compose.yml` derives it from
-`AUTHFACADE_HTTP_PORT` directly, since the browser follows the login link to AuthFacade's host-published
-address, not the Compose-internal `auth-facade` hostname.
+`GATEWAY_HTTPS_PORT` (ADR 0039), since the browser follows the login link to the gateway's HTTPS address,
+not AuthFacade's own plain-HTTP port or the Compose-internal `auth-facade` hostname.
 
 ### Gateway runtime
 
@@ -143,8 +148,19 @@ Governs where the browser authorization-code flow (ADR 0024) sends the browser.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `DefaultReturnUrl` | required | Where `/login` and `/callback` send the browser with no usable `returnUrl`. Points at the Login UI. |
-| `ReturnUrlAllowedHosts` | required, at least one | Hosts a caller-supplied `returnUrl` may resolve to; anything else falls back to `DefaultReturnUrl`. |
+| `DefaultReturnUrl` | required | Where `/login` and `/callback` send the browser with no usable `returnUrl`. Points at the Login UI. Also where `/logout` always sends the browser (ADR 0040) — logout has no caller-supplied `returnUrl` of its own, and this is the one value registered as `AUTHFACADE_POST_LOGOUT_REDIRECT_URI`. |
+| `ReturnUrlAllowedHosts` | required, at least one | Hosts a caller-supplied `returnUrl` may resolve to; anything else falls back to `DefaultReturnUrl`. Not read by `/logout`. |
+
+### `LoginRateLimit`
+
+Limits requests to `/oidc/login` and `/callback` per client address (ADR 0038). Every request counts,
+successful or not; an over-limit request gets 429 with a `Retry-After` header and is never forwarded to
+OpenEMR.
+
+| Key | Default | Rule |
+| --- | --- | --- |
+| `PermitLimit` | `10` | At least 1. |
+| `Window` | `00:01:00` | At least one second. |
 
 ### Running outside Docker
 
