@@ -1,5 +1,6 @@
 using OpenEmrNext.AuthFacade.Api;
 using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
+using OpenEmrNext.AuthFacade.Api.Startup;
 using Scalar.AspNetCore;
 
 // Composition root: dependencies are registered on the builder, then the middleware and
@@ -9,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddAuthFacadeHttpDependencies();
 var app = builder.Build();
 await app.EnsureOpenIddictClientDatabaseCreatedAsync();
+await app.WaitForOpenEmrAsync();
 app.UseAuthFacadeHttpMiddleware();
 app.MapAuthFacadeEndpoints();
 

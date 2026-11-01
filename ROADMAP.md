@@ -103,6 +103,9 @@ ADR 0026) and the resulting session cookie (ADR 0027).
   own encrypted ticket, instead of being discarded after login (ADR 0027)
 - A BFF proxy (YARP) lets a browser session reach OpenEMR's API with that
   token attached server-side, so the browser itself never holds it (ADR 0029)
+- Start-up ordering: Compose waits for OpenEMR's own readiness probe before
+  starting AuthFacade's container, and AuthFacade's own startup polls the same
+  probe as a second line of defense outside Compose (ADR 0036)
 - Unit tests (32), architecture tests (5) and live integration tests (4) pass
   (down from this bullet's original counts: ADR 0035 removed the password grant and its tests)
 
@@ -111,8 +114,6 @@ ADR 0026) and the resulting session cookie (ADR 0027).
 - Persist data-protection keys (closes one of three gaps blocking more than one AuthFacade instance, see
   ADR 0028)
 - Confirm that request logging does not capture form bodies, with a test
-- Start-up ordering: AuthFacade waits for the database but not for OpenEMR; add a
-  check or retry so early requests fail clearly
 - For browser sessions, silent refresh on an expired access token is explicitly
   deferred rather than forgotten (ADR 0029); revocation (logout) is unaddressed
 - ADR: identity bridge design
@@ -258,8 +259,6 @@ From 11 October:
 - **M2 can expand:** Time-box it and accept a good-enough inventory.
 - **Synthetic data quality:** M4 and M5 tests pass without proving much unless
   the data includes messy edge cases.
-- **Start-up ordering:** Requests can fail during OpenEMR's start window until
-  M1 adds a proper gate.
 - **Solo capacity:** Each milestone should end in a working, demonstrable state.
   If time runs short, reduce M5 and M6 rather than leaving M0–M4 half-finished.
 - **Scope creep:** Work outside the four deployable pieces needs an ADR first.
