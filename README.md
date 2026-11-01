@@ -4,10 +4,10 @@ An independent project exploring how an existing healthcare platform, OpenEMR,
 can be moved incrementally toward a modular C# architecture without a
 big-bang rewrite.
 
-> **Status:** Early implementation. The local stack, the database baseline, the
-> AuthFacade token broker, browser login, a BFF proxy to OpenEMR's API, a
-> Blazor WebAssembly dashboard, and a gateway fronting it are built and
-> tested. The domain services are not started.
+> **Status:** Early implementation. The local stack, the database baseline,
+> AuthFacade as a BFF (browser login, session cookie, a proxy to OpenEMR's
+> API), a Blazor WebAssembly dashboard, and a gateway fronting it are built
+> and tested. The domain services are not started.
 > **Not intended for production clinical use.**
 
 OpenEMR Next is not an official OpenEMR rewrite, fork, replacement, or
@@ -67,8 +67,8 @@ stepping stone: each future service should scaffold only its own tables.
   `Authorization: Bearer` server-side. This is how a browser session — which never holds a
   bearer token itself — reaches OpenEMR's API. Requires the `AuthFacadeSession` cookie
   specifically. See [ADR 0029](docs/architecture/0029-yarp-proxies-browser-sessions-to-openemrs-api.md).
-  This makes AuthFacade a BFF (backend-for-frontend), not just a token broker: the browser only ever
-  talks to AuthFacade, which does the OIDC login, holds the session, and proxies API calls on its behalf.
+  AuthFacade is a BFF (backend-for-frontend): the browser only ever talks to AuthFacade, which does
+  the OIDC login, holds the session, and proxies API calls on its behalf.
   **Planned:** once the API gateway (below) and a second backend service exist, this proxy gets one more
   cluster pointed at the gateway — a single hop for anything beyond OpenEMR — rather than learning about
   each new service itself. See [ADR 0030](docs/architecture/0030-bff-proxy-forwards-to-the-gateway-not-each-service.md).
@@ -225,7 +225,7 @@ Known problems with the baseline:
 ├── .github/workflows/ci.yml    # build, restore snapshot, run tests
 ├── docs/                       # ADRs, changelogs, design notes
 ├── src/
-│   ├── Services/AuthFacade/    # token broker + BFF: Domain, Application, Infrastructure, Api, Client
+│   ├── Services/AuthFacade/    # BFF for the dashboard: Composition, Api, Client
 │   ├── Services/LoginUi/       # static page linking to AuthFacade's /oidc/login
 │   ├── Services/WebApp/        # Blazor WebAssembly dashboard, served by its own nginx container
 │   ├── Services/Gateway/       # YARP reverse proxy: the dashboard's one external origin

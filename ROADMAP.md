@@ -218,14 +218,18 @@ From 10 October:
 From 21 October:
 
 - Layered AuthFacade structure, with dependency rules enforced by tests
+  (superseded by ADR 0035: three of the five layers are removed)
 - Login credential rules follow OpenEMR's limits; complexity policy deferred
+  (superseded by ADR 0035)
 - Password plaintext retrieved once; copies in memory accepted as a limit
+  (superseded by ADR 0035)
 
 From 11 October:
 
 - One root Compose file for the whole solution
 - One configuration source, gitignored secrets
-- AuthFacade as a token broker, not an identity provider
+- AuthFacade as a token broker, not an identity provider (superseded by
+  ADR 0035: the password grant is removed; AuthFacade is a BFF, not a broker)
 - OAuth client provisioned by an idempotent seed
 - Minimal scopes for the AuthFacade client
 - Black-box integration tests with a readiness gate
@@ -233,9 +237,6 @@ From 11 October:
 
 ## Open questions
 
-- **Browser login:** If users sign in through a web page, AuthFacade needs the
-  authorization-code flow with PKCE, including redirect and consent design. Not
-  yet scheduled.
 - **Ownership of the OAuth client:** OpenEMR owns the row today. If AuthFacade
   becomes a standalone identity service, ownership and the seed move with it.
 - **Client-registration correctness:** The seed inserts a `oauth_clients` row
