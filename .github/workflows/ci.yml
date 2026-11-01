@@ -39,6 +39,7 @@ jobs:
           OPENEMR_ADMIN_PASSWORD: ${{ secrets.OE_PASS || 'ci-admin-password' }}
           AUTHFACADE_CLIENT_SECRET: ${{ secrets.AUTHFACADE_CLIENT_SECRET || 'ci-client-secret' }}
           AUTHFACADE_CLIENT_ID: ${{ vars.AUTHFACADE_CLIENT_ID || 'authfacade' }}
+          AUTHFACADE_DB_PASSWORD: ${{ secrets.AUTHFACADE_DB_PASSWORD || 'ci-authfacade-db-password' }}
         run: |
           cp .env.example .env
           source scripts/lib/env.sh
@@ -47,6 +48,7 @@ jobs:
           env_set OPENEMR_ADMIN_PASSWORD "$OPENEMR_ADMIN_PASSWORD"
           env_set AUTHFACADE_CLIENT_SECRET "$AUTHFACADE_CLIENT_SECRET"
           env_set AUTHFACADE_CLIENT_ID "$AUTHFACADE_CLIENT_ID"
+          env_set AUTHFACADE_DB_PASSWORD "$AUTHFACADE_DB_PASSWORD"
           env_set STACK_READY_TIMEOUT_MINUTES 3
           # Print variable names only, never values.
           cut -d= -f1 .env

@@ -10,6 +10,7 @@ Run everything from the repository root.
 | `stack/apply-credentials.sh` | `up.sh`, CI | Write the `.env` credentials into a restored stack: the database password, OpenEMR's `sqlconf.php`, and the AuthFacade client secret and redirect URI. |
 | `snapshot/create.sh` | you | Dump the database and sites volume into `snapshots/`. Stops `openemr` and `auth-facade` while it runs. |
 | `seeds/authfacade-client.*` | the `seed` Compose service | Register the AuthFacade OAuth client in OpenEMR. Mounted into the container, not run directly. |
+| `seeds/authfacade-db.sh` | the `seed-authfacade-db` Compose service | Create AuthFacade's own dedicated database and user (ADR 0043). Mounted into the container, not run directly. |
 | `lib/env.sh` | other scripts, CI | Sourced helpers: `env_get`, `env_set`, `sql_quote`, `env_warn_legacy`. |
 | `dev/generate-authfacade-openapi.sh` | you, after changing AuthFacade's API | Regenerate the OpenAPI snapshot `OpenEmrNext.AuthFacade.Client`'s typed client is generated from. No Docker needed; see [ADR 0031](../docs/architecture/0031-nswag-client-generated-from-a-committed-snapshot.md). |
 

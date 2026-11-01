@@ -128,14 +128,23 @@ ADR 0026) and the resulting session cookie (ADR 0027).
   tokens in the log — scoped there instead of `/me` (ADR 0042): the BFF
   proxy is where a signed-in session actually touches OpenEMR's data, at a
   fraction of `/me`'s per-page-load volume
-- Unit tests (60), architecture tests (1) and live integration tests (5) pass
+- The OpenIddict state-token store and the Data Protection key ring behind the
+  `AuthFacadeSession` cookie now persist in a dedicated MariaDB database,
+  separate from OpenEMR's own (ADR 0043) — closes two of the three gaps ADR
+  0028 named blocking more than one AuthFacade instance; a container restart
+  no longer silently logs out every signed-in session, the practical problem
+  that motivated this over the state-token store's own narrower ~5-minute
+  login-window gap
+- Unit tests (67), architecture tests (1) and live integration tests (5) pass
   (down from this bullet's original counts: ADR 0035 removed the password
   grant, its tests, and the Domain/Application/Ports/Infrastructure layers)
 
 **Remaining**
 
-- Persist data-protection keys (closes one of three gaps blocking more than one AuthFacade instance, see
-  ADR 0028)
+- OpenIddict's own encryption/signing certificates are still dev-only and
+  ephemeral (the third gap ADR 0028 named, explicitly not addressed by ADR
+  0043 — a separate, file-based follow-up mirroring the gateway's TLS cert
+  pattern, ADR 0039)
 - For browser sessions, silent refresh on an expired access token is explicitly
   deferred rather than forgotten (ADR 0029); force-ending a session from
   outside the browser that holds it (an admin action, or a stolen-cookie

@@ -14,7 +14,21 @@
     <PackageReference Include="OpenIddict.Client.AspNetCore" Version="7.7.2" />
     <PackageReference Include="OpenIddict.Client.SystemNetHttp" Version="7.7.2" />
     <PackageReference Include="OpenIddict.EntityFrameworkCore" Version="7.7.2" />
+    <!-- Sqlite is the fallback store (ADR 0043) for anything that never configures AuthFacadeDb:*,
+         namely tests and a bare `dotnet run` outside Docker. The real Compose stack configures a
+         dedicated MariaDB database instead, via Microting.EntityFrameworkCore.MySql below. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.14" />
+    <PackageReference Include="Microting.EntityFrameworkCore.MySql" Version="10.0.3" />
+    <!-- Pins past the transitive MySqlConnector 2.5.0's known moderate vulnerability (GHSA-473q-m89c-ghf8). -->
+    <PackageReference Include="MySqlConnector" Version="2.6.2" />
+    <!-- Pinned past GHSA-9mv3-2cwr-p262 (10.0.0-10.0.6): a cookie-forgery bug via improper signature
+         verification, exactly the integrity guarantee this cookie-protection feature exists for. -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="10.0.7" />
+    <!-- System.Security.Cryptography.Xml is framework-provided for net10.0 (NuGet refuses to pin it,
+         NU1510 "automatically available") so it always tracks the installed runtime's own patched copy;
+         only Pkcs is a real, separately-restored package here, pinned past its own advisory
+         (GHSA-2fmv-rv2c-59x7, fixed 10.0.13). -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <!--
       OpenIddict.Client.SystemNetHttp transitively pulls in Microsoft.Extensions.Http.Polly, which still
       depends on the legacy Polly v7 package. Its Polly.CircuitBreaker.BrokenCircuitException collides, at

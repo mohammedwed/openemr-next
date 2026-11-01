@@ -15,6 +15,11 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <!-- Transitive via the Api project's DataProtection.EntityFrameworkCore (ADR 0043), resolved here to a
+         vulnerable 10.0.7 (several GHSA advisories, last fixed in 10.0.13). This project uses the plain
+         Microsoft.NET.Sdk, not Sdk.Web, so it gets no ASP.NET Core shared-framework pruning for this
+         package (no NU1510 here): the pin is real and necessary, not cosmetic. -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.13" />
   </ItemGroup>
 
   <ItemGroup>

@@ -73,6 +73,19 @@ Not a `.env` variable, same as `AUTHFACADE_REDIRECT_URI`: `docker-compose.yml` a
 `logout_redirect_uris` (ADR 0040). Must exactly match what `/logout` sends as `post_logout_redirect_uri` —
 OpenEMR compares it with a plain SQL `=`, not a host allow-list.
 
+### AuthFacade database
+
+| Variable | Default | Secret | Meaning |
+| --- | --- | --- | --- |
+| `AUTHFACADE_DB_NAME` | `authfacade` | no | AuthFacade's own dedicated database name, separate from OpenEMR's own `DB_NAME` (ADR 0043). Created by the `seed-authfacade-db` service. Becomes `AuthFacadeDb__Database`. |
+| `AUTHFACADE_DB_USER` | `authfacade` | no | Dedicated, least-privilege user that can reach only that database. Becomes `AuthFacadeDb__User`. |
+| `AUTHFACADE_DB_PASSWORD` | none, required | yes | Password for `AUTHFACADE_DB_USER`. Becomes `AuthFacadeDb__Password`; `seed-authfacade-db` writes it to the database. |
+
+This holds only AuthFacade's own session-related state — OpenIddict.Client's state-token store and the
+Data Protection key ring behind the `AuthFacadeSession` cookie — never OpenEMR's own data, on the same
+`mysql` service. Outside Compose (tests, a bare `dotnet run`), no `AuthFacadeDb` section is configured and
+AuthFacade falls back to a throwaway per-process SQLite file instead.
+
 ### Login UI runtime
 
 | Variable | Default | Meaning |
@@ -128,6 +141,21 @@ Set in `appsettings.json` or as environment variables with `__` for `:` (for exa
 | `ClientId` | required | OAuth client ID. From `AUTHFACADE_CLIENT_ID`. |
 | `ClientSecret` | required | OAuth client secret. From `AUTHFACADE_CLIENT_SECRET`. |
 | `RedirectUri` | required | Redirect URI registered for this client, used by the browser flow's `/login` and `/callback` (ADR 0024). Must match the seed's `redirect_uri` exactly. In Compose, the gateway's address, not AuthFacade's own (ADR 0033). `auth-facade` depends on `seed` completing (ADR 0037), so `docker compose up` reseeds automatically when this drifts. |
+
+### `AuthFacadeDb`
+
+AuthFacade's own dedicated database (ADR 0043): OpenIddict.Client's state-token store and the Data
+Protection key ring behind the `AuthFacadeSession` cookie. Deliberately optional as a whole — when `Host`
+is unset, AuthFacade falls back to a throwaway per-process SQLite file instead, which every unit test and
+a bare `dotnet run` outside Docker rely on. Only the real Compose stack sets this section.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `Host` | `""` (SQLite fallback) | MariaDB server hostname. In Compose: `mysql`. |
+| `Port` | `3306` | MariaDB server port. |
+| `Database` | `""` | Dedicated database name, separate from OpenEMR's own. From `AUTHFACADE_DB_NAME`. |
+| `User` | `""` | Dedicated, least-privilege user that can reach only `Database`. From `AUTHFACADE_DB_USER`. |
+| `Password` | `""` | That user's password. From `AUTHFACADE_DB_PASSWORD`. |
 
 ### `OpenEmr:CircuitBreaker`
 

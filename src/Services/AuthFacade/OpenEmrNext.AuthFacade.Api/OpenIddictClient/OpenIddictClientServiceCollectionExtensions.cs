@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -51,11 +52,41 @@ public static class OpenIddictClientServiceCollectionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        // A fresh, uniquely-named file per process (not a fixed path): the store only needs to survive one
-        // in-flight login, so losing it on restart is fine (the same reasoning ADR 0024 already applied to
-        // its Data Protection key ring), and a fixed shared path would let concurrent test hosts collide.
-        var sqlitePath = Path.Combine(Path.GetTempPath(), $"authfacade-openiddict-client-{Guid.NewGuid():N}.sqlite3");
-        services.AddDbContext<ClientDbContext>(options => options.UseSqlite($"Data Source={sqlitePath}").UseOpenIddict());
+        // The real Compose stack configures AuthFacadeDb:* to point at a dedicated MariaDB database,
+        // separate from OpenEMR's own, so both the state-token store and the Data Protection key ring
+        // below survive a restart and (eventually) a second replica (ADR 0043, closing the gap ADR 0028
+        // named). Nothing else configures that section -- tests, and a bare `dotnet run` outside Docker,
+        // fall back to a fresh, uniquely-named SQLite file per process: losing it on restart is fine
+        // there (the store only needs to survive one in-flight login in that case), and a fixed shared
+        // path would let concurrent test hosts collide.
+        var authFacadeDb = configuration.GetSection(AuthFacadeDbOptions.SectionName).Get<AuthFacadeDbOptions>()
+            ?? new AuthFacadeDbOptions();
+        // Computed once, here, rather than inside the AddDbContext callback below: that callback re-runs
+        // on every new scope (AddDbContext's optionsLifetime defaults to Scoped, not Singleton), so a path
+        // generated inside it would pick a fresh, schema-less file for every request after
+        // EnsureAuthFacadeDatabaseCreatedAsync populated only the first one.
+        var sqlitePath = Path.Combine(Path.GetTempPath(), $"authfacade-{Guid.NewGuid():N}.sqlite3");
+        services.AddDbContext<AuthFacadeDbContext>(options =>
+        {
+            if (authFacadeDb.IsConfigured)
+            {
+                var connectionString = "Server=" + authFacadeDb.Host +
+                    ";Port=" + authFacadeDb.Port +
+                    ";Database=" + authFacadeDb.Database +
+                    ";User=" + authFacadeDb.User +
+                    ";Password=" + authFacadeDb.Password + ";";
+                options.UseMySql(connectionString, new MariaDbServerVersion(new Version(12, 3, 3))).UseOpenIddict();
+            }
+            else
+            {
+                options.UseSqlite($"Data Source={sqlitePath}").UseOpenIddict();
+            }
+        });
+
+        // The AuthFacadeSession cookie's ticket (ADR 0027) is protected with these same keys, in the same
+        // database as the state-token store above -- one dedicated store for everything session-related
+        // (ADR 0043), nothing shared with OpenEMR's own data.
+        services.AddDataProtection().PersistKeysToDbContext<AuthFacadeDbContext>();
 
         // The primary AddAuthentication() call: it sets DefaultScheme to this cookie scheme, so /me
         // (and anything else with no explicit scheme named) resolves to it.
@@ -81,7 +112,7 @@ public static class OpenIddictClientServiceCollectionExtensions
             });
 
         services.AddOpenIddict()
-            .AddCore(options => options.UseEntityFrameworkCore().UseDbContext<ClientDbContext>())
+            .AddCore(options => options.UseEntityFrameworkCore().UseDbContext<AuthFacadeDbContext>())
             .AddClient(options =>
             {
                 options.AllowAuthorizationCodeFlow();
@@ -131,14 +162,15 @@ public static class OpenIddictClientServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Creates the state-token store's schema. There is no migration history (<see cref="ClientDbContext"/>'s
-    /// remarks explain why); call this once after the host is built and before it starts serving requests.
+    /// Creates AuthFacade's own database schema — OpenIddict's state-token store and the Data Protection
+    /// key ring table alike. There is no migration history (<see cref="AuthFacadeDbContext"/>'s remarks
+    /// explain why); call this once after the host is built and before it starts serving requests.
     /// </summary>
     /// <param name="app">The built application.</param>
-    public static async Task EnsureOpenIddictClientDatabaseCreatedAsync(this WebApplication app)
+    public static async Task EnsureAuthFacadeDatabaseCreatedAsync(this WebApplication app)
     {
         await using var scope = app.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<ClientDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<AuthFacadeDbContext>();
         await db.Database.EnsureCreatedAsync();
     }
 
