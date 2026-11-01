@@ -1,6 +1,6 @@
 # 0018. The login endpoint is rate limited per client address
 
-- **Status:** Superseded by [0035](0035-password-grant-and-bearer-auth-are-removed.md)
+- **Status:** Superseded by [0035](0035-password-grant-and-bearer-auth-are-removed.md); its design is resurrected against the browser flow by [0038](0038-rate-limit-login-and-callback-per-client-address.md)
 - **Date:** 2026-10-24
 
 ## Context

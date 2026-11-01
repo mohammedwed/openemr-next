@@ -1,6 +1,7 @@
 using OpenEmrNext.AuthFacade.Api.OpenApi;
 using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
 using OpenEmrNext.AuthFacade.Api.Proxy;
+using OpenEmrNext.AuthFacade.Api.RateLimiting;
 using OpenEmrNext.AuthFacade.Composition;
 
 namespace OpenEmrNext.AuthFacade.Api;
@@ -9,8 +10,8 @@ namespace OpenEmrNext.AuthFacade.Api;
 public static class AuthFacadeApiExtensions
 {
     /// <summary>
-    /// Registers the shared composition root, then the OpenIddict client, BFF proxy, authorization and
-    /// OpenAPI document generation. Must run before the app is built.
+    /// Registers the shared composition root, then the OpenIddict client, BFF proxy, login rate limiting,
+    /// authorization and OpenAPI document generation. Must run before the app is built.
     /// </summary>
     /// <param name="builder">The host builder to configure.</param>
     /// <returns>The same builder, for chaining.</returns>
@@ -20,6 +21,7 @@ public static class AuthFacadeApiExtensions
             .AddAuthFacade(builder.Configuration)
             .AddOpenIddictClient(builder.Configuration)
             .AddOpenEmrBffProxy(builder.Configuration)
+            .AddLoginRateLimiting()
             .AddAuthorization()
             .AddOpenApi(options => options.ConfigureAuthFacade());
 
@@ -33,13 +35,16 @@ public static class AuthFacadeApiExtensions
     }
 
     /// <summary>
-    /// Adds the authentication and authorization middleware. Endpoints are mapped separately
-    /// with <c>MapAuthFacadeEndpoints</c>.
+    /// Adds the rate limiting, authentication and authorization middleware. Rate limiting runs first, so an
+    /// over-limit request to <c>/oidc/login</c> or <c>/callback</c> is refused before either endpoint's
+    /// handler — or any call to OpenEMR — runs. Endpoints are mapped separately with
+    /// <c>MapAuthFacadeEndpoints</c>.
     /// </summary>
     /// <param name="app">The built application.</param>
     /// <returns>The same application, for chaining.</returns>
     public static WebApplication UseAuthFacadeHttpMiddleware(this WebApplication app)
     {
+        app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();
         return app;
