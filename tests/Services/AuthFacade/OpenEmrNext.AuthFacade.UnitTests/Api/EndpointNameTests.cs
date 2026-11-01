@@ -41,7 +41,6 @@ public class EndpointNameTests
     }
 
     [Theory]
-    [InlineData("IssueToken")]
     [InlineData("GetCurrentUser")]
     public void Public_endpoints_keep_their_names(string name)
     {

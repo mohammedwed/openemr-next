@@ -7,27 +7,21 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using OpenEmrNext.AuthFacade.Api;
 using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
-using OpenEmrNext.AuthFacade.Application.Ports;
-using OpenEmrNext.AuthFacade.UnitTests.Application;
 
 namespace OpenEmrNext.AuthFacade.UnitTests.Api;
 
 /// <summary>
-/// Runs the real AuthFacade pipeline on a random local port with the OpenEMR identity
-/// provider replaced by a fake. Needs no Docker stack and no extra test packages.
+/// Runs the real AuthFacade pipeline on a random local port. Needs no Docker stack and no extra test packages.
 /// </summary>
 internal sealed class TestApi : IAsyncDisposable
 {
     private readonly WebApplication _app;
 
-    private TestApi(WebApplication app, FakeIdentityProvider identityProvider, FakeExternalTokenVerifier tokenVerifier)
+    private TestApi(WebApplication app)
     {
         _app = app;
-        IdentityProvider = identityProvider;
-        TokenVerifier = tokenVerifier;
         Client = new HttpClient { BaseAddress = new Uri(app.Urls.First()) };
         // The browser flow (ADR 0024) is tested across several requests that must carry the cookies the
         // previous response set, without the client following the redirects itself.
@@ -36,12 +30,6 @@ internal sealed class TestApi : IAsyncDisposable
             BaseAddress = new Uri(app.Urls.First())
         };
     }
-
-    /// <summary>The fake OpenEMR identity provider. Tests set its result or exception before a request.</summary>
-    public FakeIdentityProvider IdentityProvider { get; }
-
-    /// <summary>The fake verifier for OpenEMR-issued tokens. Tests set its result before a request to <c>/api/v1/me</c>.</summary>
-    public FakeExternalTokenVerifier TokenVerifier { get; }
 
     /// <summary>An HTTP client whose base address is the running API.</summary>
     public HttpClient Client { get; }
@@ -72,9 +60,6 @@ internal sealed class TestApi : IAsyncDisposable
     /// <returns>A running instance. Dispose it to stop the host.</returns>
     public static async Task<TestApi> StartAsync(Dictionary<string, string?>? configOverrides = null, int? port = null)
     {
-        var identityProvider = new FakeIdentityProvider();
-        var tokenVerifier = new FakeExternalTokenVerifier();
-
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
             ContentRootPath = AppContext.BaseDirectory,
@@ -100,9 +85,6 @@ internal sealed class TestApi : IAsyncDisposable
         }
 
         builder.AddAuthFacadeHttpDependencies();
-        // Registered last, so it replaces the real OpenEMR client.
-        builder.Services.AddSingleton<IIdentityProvider>(identityProvider);
-        builder.Services.AddSingleton<IExternalTokenVerifier>(tokenVerifier);
 
         var app = builder.Build();
         await app.EnsureOpenIddictClientDatabaseCreatedAsync();
@@ -134,7 +116,7 @@ internal sealed class TestApi : IAsyncDisposable
         }).AllowAnonymous();
         await app.StartAsync();
 
-        return new TestApi(app, identityProvider, tokenVerifier);
+        return new TestApi(app);
     }
 
     /// <summary>

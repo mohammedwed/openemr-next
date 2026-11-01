@@ -2,116 +2,15 @@
   "openapi": "3.1.1",
   "info": {
     "title": "AuthFacade API",
-    "description": "A token broker in front of OpenEMR. Log in with an OpenEMR username and password, or redeem a refresh token, to get an OpenEMR access token, then send it as a bearer token to the other endpoints.",
+    "description": "A BFF in front of OpenEMR. Log in through GET /oidc/login, and the session cookie it establishes authorizes the other endpoints.",
     "version": "1.0.0"
   },
   "servers": [
     {
-      "url": "http://127.0.0.1:57164/"
+      "url": "http://127.0.0.1:63150/"
     }
   ],
   "paths": {
-    "/api/v1/connect/token": {
-      "post": {
-        "tags": [
-          "Authentication"
-        ],
-        "summary": "Log in with an OpenEMR username and password, or redeem a refresh token",
-        "description": "Verifies a password or refresh grant with OpenEMR and returns the access token OpenEMR issues. 400 is invalid_grant when OpenEMR refuses the grant and invalid_request when a form field is missing or invalid, including an unsupported grant type.",
-        "operationId": "IssueToken",
-        "requestBody": {
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "required": [
-                  "grant_type"
-                ],
-                "type": "object",
-                "properties": {
-                  "grant_type": {
-                    "type": "string"
-                  },
-                  "username": {
-                    "maxLength": 255,
-                    "minLength": 1,
-                    "pattern": "\\A[^\\p{Cc}]{1,255}\\z",
-                    "type": "string"
-                  },
-                  "password": {
-                    "maxLength": 1024,
-                    "minLength": 1,
-                    "type": "string",
-                    "format": "password"
-                  },
-                  "refresh_token": {
-                    "maxLength": 4096,
-                    "minLength": 1,
-                    "type": "string",
-                    "format": "password"
-                  }
-                }
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TokenResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "Unsupported Media Type"
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Bad Gateway",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/me": {
       "get": {
         "tags": [
@@ -136,9 +35,6 @@
         },
         "security": [
           {
-            "Bearer": []
-          },
-          {
             ".AspNetCore.AuthFacadeSession": []
           }
         ]
@@ -147,23 +43,6 @@
   },
   "components": {
     "schemas": {
-      "ErrorResponse": {
-        "required": [
-          "error"
-        ],
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "string"
-          },
-          "error_description": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
-      },
       "MeResponse": {
         "required": [
           "subject",
@@ -184,59 +63,18 @@
             ]
           }
         }
-      },
-      "TokenResponse": {
-        "required": [
-          "access_token",
-          "token_type",
-          "expires_in",
-          "refresh_token"
-        ],
-        "type": "object",
-        "properties": {
-          "access_token": {
-            "type": "string"
-          },
-          "token_type": {
-            "type": "string"
-          },
-          "expires_in": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "refresh_token": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
       }
     },
     "securitySchemes": {
-      "Bearer": {
-        "type": "http",
-        "description": "The access_token returned by POST /api/v1/connect/token.",
-        "scheme": "bearer",
-        "bearerFormat": "JWT"
-      },
       ".AspNetCore.AuthFacadeSession": {
         "type": "apiKey",
-        "description": "The session cookie /callback sets after a successful browser login through /oidc/login (ADR 0026). Only usable by a caller sharing that cookie jar, such as the Login UI; most callers should use the bearer token from POST /api/v1/connect/token instead.",
+        "description": "The session cookie /callback sets after a successful browser login through /oidc/login (ADR 0026). Only usable by a caller sharing that cookie jar, such as the Login UI.",
         "name": ".AspNetCore.AuthFacadeSession",
         "in": "cookie"
       }
     }
   },
   "tags": [
-    {
-      "name": "Authentication"
-    },
     {
       "name": "Identity"
     }

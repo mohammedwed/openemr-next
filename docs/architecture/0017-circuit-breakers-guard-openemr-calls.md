@@ -1,6 +1,6 @@
 # 0017. Circuit breakers guard calls to OpenEMR
 
-- **Status:** Accepted
+- **Status:** Superseded by [0035](0035-password-grant-and-bearer-auth-are-removed.md), which removes the decorators this guarded; the underlying Polly pattern remains available for reuse
 - **Date:** 2026-10-24
 
 ## Context

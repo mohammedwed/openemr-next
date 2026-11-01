@@ -1,20 +1,17 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using OpenEmrNext.AuthFacade.Application;
-using OpenEmrNext.AuthFacade.Infrastructure;
 using OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
 
 namespace OpenEmrNext.AuthFacade.Composition;
 
 /// <summary>
-/// The composition root that every AuthFacade host calls. It calls each layer's entry point,
-/// and registers nothing that depends on a host.
+/// The composition root that every AuthFacade host calls, and the only place configuration is read.
 /// </summary>
 public static class CompositionServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the Application and Infrastructure layers. Each host adds its own bearer
-    /// validation and transport on top.
+    /// Binds and validates the <c>OpenEmr</c> section. Each host builds its own OpenIddict client,
+    /// BFF proxy and transport on top, reading the bound <see cref="OpenEmrOptions"/>.
     /// </summary>
     /// <param name="services">The service collection to add to.</param>
     /// <param name="configuration">The configuration that holds the <c>OpenEmr</c> section.</param>
@@ -27,8 +24,6 @@ public static class CompositionServiceCollectionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        return services
-            .AddApplication()
-            .AddInfrastructure();
+        return services;
     }
 }

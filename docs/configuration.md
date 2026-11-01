@@ -51,7 +51,7 @@ Naming: `OPENEMR_*` is the OpenEMR container, `AUTHFACADE_*` is the AuthFacade s
 
 | Variable | Default | Secret | Meaning |
 | --- | --- | --- | --- |
-| `OPENEMR_ADMIN_USER` | `admin` | no | Admin login. Passed to the image as `OE_USER`. Also used by the live login tests. |
+| `OPENEMR_ADMIN_USER` | `admin` | no | Admin login. Passed to the image as `OE_USER`. |
 | `OPENEMR_ADMIN_PASSWORD` | none, required | yes | Admin password. Passed to the image as `OE_PASS`. A restored snapshot only accepts `ci-admin-password`. |
 
 ### AuthFacade runtime
@@ -99,7 +99,6 @@ because the defaults match the stack:
 
 | Variable | Default |
 | --- | --- |
-| `AUTHFACADE_TOKEN_PATH` | `/api/v1/connect/token` |
 | `AUTHFACADE_REDIRECT_URI` | `http://localhost:<AUTHFACADE_HTTP_PORT>/callback` |
 | `OPENEMR_DISCOVERY_PATH` | `/oauth2/default/.well-known/openid-configuration` |
 | `OPENEMR_TOKEN_PATH` | `/oauth2/default/token` |
@@ -122,9 +121,7 @@ Set in `appsettings.json` or as environment variables with `__` for `:` (for exa
 | `Issuer` | required | Issuer OpenEMR writes into tokens. Can differ from `BaseUrl` when reached over another network. |
 | `ClientId` | required | OAuth client ID. From `AUTHFACADE_CLIENT_ID`. |
 | `ClientSecret` | required | OAuth client secret. From `AUTHFACADE_CLIENT_SECRET`. |
-| `Scope` | `openid api:oemr` | Scope requested in the password grant. Compose sets `openid profile email offline_access`. |
 | `RedirectUri` | required | Redirect URI registered for this client, used by the browser flow's `/login` and `/callback` (ADR 0024). Must match the seed's `redirect_uri` exactly. In Compose, the gateway's address, not AuthFacade's own (ADR 0033). |
-| `AcceptAnyServerCertificate` | `false` | Trust any OpenEMR certificate. The host refuses to start with this set outside Development. |
 
 ### `BrowserFlow`
 
@@ -135,33 +132,11 @@ Governs where the browser authorization-code flow (ADR 0024) sends the browser.
 | `DefaultReturnUrl` | required | Where `/login` and `/callback` send the browser with no usable `returnUrl`. Points at the Login UI. |
 | `ReturnUrlAllowedHosts` | required, at least one | Hosts a caller-supplied `returnUrl` may resolve to; anything else falls back to `DefaultReturnUrl`. |
 
-### `OpenEmr:CircuitBreaker`
-
-Guards calls to OpenEMR. Defaults open the circuit when half of at least five calls in 30 seconds fail,
-and keep it open for 30 seconds.
-
-| Key | Default | Rule |
-| --- | --- | --- |
-| `FailureRatio` | `0.5` | Above 0, at most 1. |
-| `SamplingDuration` | `00:00:30` | At least 500 ms. |
-| `MinimumThroughput` | `5` | At least 1. |
-| `BreakDuration` | `00:00:30` | At least 500 ms. |
-
-### `LoginRateLimit`
-
-Limits login requests per client address.
-
-| Key | Default | Rule |
-| --- | --- | --- |
-| `PermitLimit` | `10` | Most requests per window. At least 1. |
-| `Window` | `00:01:00` | Fixed window length. At least one second. |
-
 ### Running outside Docker
 
-`appsettings.Development.json` points `OpenEmr:BaseUrl` and `Issuer` at `https://localhost:9300`
-and sets `AcceptAnyServerCertificate`. It cannot read `.env`, so edit it if you change
-`OPENEMR_HTTPS_PORT`. `ClientId` and `ClientSecret` must be supplied, for example with
-`dotnet user-secrets`.
+`appsettings.Development.json` points `OpenEmr:BaseUrl` and `Issuer` at `https://localhost:9300`.
+It cannot read `.env`, so edit it if you change `OPENEMR_HTTPS_PORT`. `ClientId` and `ClientSecret`
+must be supplied, for example with `dotnet user-secrets`.
 
 ## Renamed variables
 

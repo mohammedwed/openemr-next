@@ -66,9 +66,10 @@ patient rows; have the admin created from environment variables on first run.
 ### M0b: AuthFacade login (done)
 
 - `POST /connect/token` verifies credentials through OpenEMR's password grant
-  and returns a facade JWT in the response body (superseded: see ADR 0013, which returns OpenEMR's token response)
-- `GET /me` validates the facade JWT and returns the subject and name (superseded: `/me` now validates OpenEMR's token)
-- Identity stays in OpenEMR; clients receive OpenEMR's token, verified before it is returned (ADR 0013)
+  and returns a facade JWT in the response body (superseded: see ADR 0013, which returns OpenEMR's token response;
+  the endpoint itself and bearer authentication are later removed entirely by ADR 0035)
+- `GET /me` validates the facade JWT and returns the subject and name (superseded: `/me` now validates the session cookie only, ADR 0035)
+- Identity stays in OpenEMR; clients receive OpenEMR's token, verified before it is returned (ADR 0013, superseded by ADR 0035)
 
 **Decision recorded:** the response is JSON, not a browser redirect. The
 redirect and cookie handling considered earlier were out of scope here, and
@@ -78,7 +79,8 @@ ADR 0026) and the resulting session cookie (ADR 0027).
 ### M0c: Integration tests (done)
 
 - `OpenEmrNext.AuthFacade.IntegrationTests` runs against the live stack and covers the seed,
-  OpenEMR's OAuth server, the password grant, and `/me` signature validation
+  OpenEMR's OAuth server, the password grant, and `/me` signature validation (the password-grant
+  and `/me` bearer coverage was removed with the password grant itself, ADR 0035)
 - The readiness gate checks four conditions under one deadline before tests run
 
 ### M1: Harden the identity bridge (in progress)
@@ -88,44 +90,37 @@ ADR 0026) and the resulting session cookie (ADR 0027).
 - Credentials are never stored or logged by AuthFacade
 - Client scopes are minimal
 - Integration tests verify signatures and the subject claim
-- Layer dependency rules enforced by architecture tests (ADR 0007)
-- Login credential rules follow OpenEMR's limits, not a new-account policy (ADR 0008)
-- Malformed OpenEMR success responses return 502 instead of 500
-- Password plaintext is retrieved once and cleared (ADR 0009)
-- Login rate limiting per client address (ADR 0018)
+- Layer dependency rules enforced by architecture tests (ADR 0007, narrowed by ADR 0035)
+- Login credential rules follow OpenEMR's limits, not a new-account policy (ADR 0008, superseded by ADR 0035)
+- Malformed OpenEMR success responses return 502 instead of 500 (superseded by ADR 0035: the endpoint is removed)
+- Password plaintext is retrieved once and cleared (ADR 0009, superseded by ADR 0035)
+- Login rate limiting per client address (ADR 0018, superseded by ADR 0035)
 - The token endpoint accepts a refresh grant, so a bearer-token client can
-  redeem OpenEMR's refresh token instead of re-authenticating (ADR 0023)
+  redeem OpenEMR's refresh token instead of re-authenticating (ADR 0023, superseded by ADR 0035)
 - Browser login via the authorization-code flow with PKCE, driven by
   OpenIddict.Client against OpenEMR's own OIDC server (ADR 0024, ADR 0026)
 - The real OpenEMR access/refresh token persists inside the session cookie's
   own encrypted ticket, instead of being discarded after login (ADR 0027)
 - A BFF proxy (YARP) lets a browser session reach OpenEMR's API with that
   token attached server-side, so the browser itself never holds it (ADR 0029)
-- Unit tests (236), architecture tests (12) and live integration tests (13) pass
+- Unit tests (32), architecture tests (5) and live integration tests (4) pass
+  (down from this bullet's original counts: ADR 0035 removed the password grant and its tests)
 
 **Remaining**
 
-- Replace the development TLS bypass with a trusted certificate path for any
-  shared environment
 - Fixed audience string replaced by a registered-client check
 - Persist data-protection keys (closes one of three gaps blocking more than one AuthFacade instance, see
   ADR 0028)
 - Confirm that request logging does not capture form bodies, with a test
 - Start-up ordering: AuthFacade waits for the database but not for OpenEMR; add a
   check or retry so early requests fail clearly
-- Refresh is decided, not deferred, for bearer-token clients (ADR 0023); for
-  browser sessions, silent refresh on an expired access token is explicitly
-  deferred rather than forgotten (ADR 0029). Revocation (logout) is still
-  unaddressed for either path.
+- For browser sessions, silent refresh on an expired access token is explicitly
+  deferred rather than forgotten (ADR 0029); revocation (logout) is unaddressed
 - ADR: identity bridge design
-- Login rate limiting per username and lockout at the facade. Open: today only
-  the per-address limit and OpenEMR's own lockout apply.
 - Audit log of login outcomes and `/me` access, with no credentials or tokens
   in the log
 - HTTPS for the service itself, with a redirect and HSTS. Required before any
-  shared environment, together with the TLS item above
-- Record the accepted risk of password copies in memory (ADR 0009) and the
-  complexity-policy gap (ADR 0008) in the M1 exit review
+  shared environment
 
 **Exit criteria:** The security items above are either done or recorded as
 accepted risks. The ADR is merged.
@@ -254,12 +249,12 @@ From 11 October:
 
 ## Risks
 
-- **Upstream OpenEMR defect:** Some wrong-password requests return 500. The
-  integration test will fail if this recurs. Track it upstream.
-- **Brute force against login:** The facade limits each client address to 10
-  login requests a minute (ADR 0018). A distributed attack across many addresses
-  against one account is not limited until the per-username item is done, so
-  OpenEMR's lockout remains the only control for that case.
+- **Upstream OpenEMR defect:** Some wrong-password login attempts return 500.
+  No automated test guards against a regression since the password grant's own
+  integration test was removed with it (ADR 0035). Track it upstream.
+- **Brute force against login:** The password grant's per-client-address limiter
+  (ADR 0018) is gone along with it (ADR 0035). Browser login goes through
+  OpenEMR's own `login.php`, so OpenEMR's lockout is the only control.
 - **M2 can expand:** Time-box it and accept a good-enough inventory.
 - **Synthetic data quality:** M4 and M5 tests pass without proving much unless
   the data includes messy edge cases.
@@ -268,8 +263,6 @@ From 11 October:
 - **Solo capacity:** Each milestone should end in a working, demonstrable state.
   If time runs short, reduce M5 and M6 rather than leaving M0–M4 half-finished.
 - **Scope creep:** Work outside the four deployable pieces needs an ADR first.
-- **Password grant:** Deprecated in OAuth 2.1. Acceptable here, but it must not
-  become a pattern for browser or third-party clients.
 
 ## Long-term phases
 

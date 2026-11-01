@@ -22,8 +22,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\src\Services\AuthFacade\OpenEmrNext.AuthFacade.Domain\OpenEmrNext.AuthFacade.Domain.csproj" />
-    <ProjectReference Include="..\..\..\..\src\Services\AuthFacade\OpenEmrNext.AuthFacade.Application\OpenEmrNext.AuthFacade.Application.csproj" />
     <ProjectReference Include="..\..\..\..\src\Services\AuthFacade\OpenEmrNext.AuthFacade.Infrastructure\OpenEmrNext.AuthFacade.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\..\src\Services\AuthFacade\OpenEmrNext.AuthFacade.Api\OpenEmrNext.AuthFacade.Api.csproj" />
   </ItemGroup>

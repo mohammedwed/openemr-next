@@ -1,6 +1,6 @@
 # 0011. Each host composes AuthFacade through a host-neutral composition root
 
-- **Status:** Accepted
+- **Status:** Superseded by [0035](0035-password-grant-and-bearer-auth-are-removed.md)
 - **Date:** 2026-10-23
 
 ## Context

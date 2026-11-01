@@ -45,9 +45,9 @@ public static class OpenIddictClientServiceCollectionExtensions
         var sqlitePath = Path.Combine(Path.GetTempPath(), $"authfacade-openiddict-client-{Guid.NewGuid():N}.sqlite3");
         services.AddDbContext<ClientDbContext>(options => options.UseSqlite($"Data Source={sqlitePath}").UseOpenIddict());
 
-        // A second, additive AddAuthentication() call: it does not touch the DefaultScheme the bearer
-        // registration already set, so /me keeps resolving to Bearer with no explicit scheme named.
-        services.AddAuthentication()
+        // The primary AddAuthentication() call: it sets DefaultScheme to this cookie scheme, so /me
+        // (and anything else with no explicit scheme named) resolves to it.
+        services.AddAuthentication(SessionScheme)
             .AddCookie(SessionScheme, options =>
             {
                 options.Cookie.HttpOnly = true;

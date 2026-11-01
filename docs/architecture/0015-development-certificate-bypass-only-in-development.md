@@ -1,6 +1,6 @@
 # 0015. The development certificate bypass is refused outside Development
 
-- **Status:** Accepted. The Compose stack no longer runs as Development by default; see [0020](0020-local-stack-defaults-are-conservative.md)
+- **Status:** Superseded by [0035](0035-password-grant-and-bearer-auth-are-removed.md), which removes `AcceptAnyServerCertificate` entirely
 - **Date:** 2026-10-23
 
 ## Context

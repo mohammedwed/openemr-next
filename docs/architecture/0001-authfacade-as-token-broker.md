@@ -1,6 +1,6 @@
 # 0001. AuthFacade is a token broker in front of OpenEMR
 
-- **Status:** Accepted
+- **Status:** Superseded by [0035](0035-password-grant-and-bearer-auth-are-removed.md)
 - **Date:** 2026-10-10 (confirmed 2026-10-11)
 - **Source:** Converted from `docs/changelogs/2026-10-10-changelog.md` (decisions 2, 4) and `docs/changelogs/2026-10-11-changelog.md` (decision 3)
 

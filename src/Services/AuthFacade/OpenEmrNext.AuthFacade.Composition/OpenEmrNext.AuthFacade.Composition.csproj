@@ -7,7 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OpenEmrNext.AuthFacade.Application\OpenEmrNext.AuthFacade.Application.csproj" />
     <ProjectReference Include="..\OpenEmrNext.AuthFacade.Infrastructure\OpenEmrNext.AuthFacade.Infrastructure.csproj" />
   </ItemGroup>
 

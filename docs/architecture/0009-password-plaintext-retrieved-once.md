@@ -1,6 +1,6 @@
 # 0009. The password plaintext is retrieved once and cleared
 
-- **Status:** Accepted
+- **Status:** Superseded by [0035](0035-password-grant-and-bearer-auth-are-removed.md)
 - **Date:** 2026-10-21
 
 ## Context

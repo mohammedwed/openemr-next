@@ -1,6 +1,6 @@
 # 0003. Credential verification is delegated to OpenEMR
 
-- **Status:** Accepted
+- **Status:** Superseded by [0035](0035-password-grant-and-bearer-auth-are-removed.md)
 - **Date:** 2026-10-10
 - **Source:** Converted from `docs/changelogs/2026-10-10-changelog.md` (decision 2)
 

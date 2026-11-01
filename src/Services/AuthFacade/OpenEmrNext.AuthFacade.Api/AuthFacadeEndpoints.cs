@@ -25,7 +25,6 @@ public static class AuthFacadeEndpoints
         app.MapOpenEmrBffProxyEndpoints();
 
         var v1 = app.MapGroup("/api/v1");
-        v1.MapTokenEndpoints();
         v1.MapUserEndpoints();
         return app;
     }
