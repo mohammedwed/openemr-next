@@ -108,7 +108,6 @@ ADR 0026) and the resulting session cookie (ADR 0027).
 
 **Remaining**
 
-- Fixed audience string replaced by a registered-client check
 - Persist data-protection keys (closes one of three gaps blocking more than one AuthFacade instance, see
   ADR 0028)
 - Confirm that request logging does not capture form bodies, with a test
