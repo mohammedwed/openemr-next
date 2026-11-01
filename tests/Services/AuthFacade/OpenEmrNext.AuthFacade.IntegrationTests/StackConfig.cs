@@ -21,14 +21,24 @@ public static class StackConfig
     /// <summary>The base URL of the AuthFacade container on localhost. From <c>AUTHFACADE_HTTP_PORT</c>, default 7128.</summary>
     public static string AuthFacadeBaseUrl => $"http://localhost:{Get("AUTHFACADE_HTTP_PORT", "7128")}";
 
-    /// <summary>The redirect URI registered for the AuthFacade OAuth client. Defaults to the AuthFacade base URL plus <c>/callback</c>.</summary>
-    public static string AuthFacadeRedirectUri => Get("AUTHFACADE_REDIRECT_URI", $"{AuthFacadeBaseUrl}/callback");
+    /// <summary>The base URL of the gateway on localhost. From <c>GATEWAY_HTTP_PORT</c>, default 7130.</summary>
+    public static string GatewayBaseUrl => $"http://localhost:{Get("GATEWAY_HTTP_PORT", "7130")}";
+
+    /// <summary>
+    /// The redirect URI registered for the AuthFacade OAuth client. Defaults to the gateway's base URL plus
+    /// <c>/callback</c> — the seed registers the gateway's address, not AuthFacade's own (ADR 0033), and
+    /// AuthFacade itself sends this same value when it builds the authorize URL.
+    /// </summary>
+    public static string AuthFacadeRedirectUri => Get("AUTHFACADE_REDIRECT_URI", $"{GatewayBaseUrl}/callback");
 
     /// <summary>The base URL of the OpenEMR container on localhost. From <c>OPENEMR_HTTPS_PORT</c>, default 9300.</summary>
     public static string OpenEmrBaseUrl => $"https://localhost:{Get("OPENEMR_HTTPS_PORT", "9300")}";
 
     /// <summary>The path of OpenEMR's OIDC discovery document. From <c>OPENEMR_DISCOVERY_PATH</c>.</summary>
     public static string OpenEmrDiscoveryPath => Get("OPENEMR_DISCOVERY_PATH", "/oauth2/default/.well-known/openid-configuration");
+
+    /// <summary>The path of OpenEMR's OAuth authorize endpoint. From <c>OPENEMR_AUTHORIZE_PATH</c>, default <c>/oauth2/default/authorize</c>.</summary>
+    public static string OpenEmrAuthorizePath => Get("OPENEMR_AUTHORIZE_PATH", "/oauth2/default/authorize");
 
     /// <summary>The path of OpenEMR's OAuth token endpoint. From <c>OPENEMR_TOKEN_PATH</c>, default <c>/oauth2/default/token</c>.</summary>
     public static string OpenEmrTokenPath => Get("OPENEMR_TOKEN_PATH", "/oauth2/default/token");

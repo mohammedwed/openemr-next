@@ -51,9 +51,12 @@ The seed script itself was never the problem: ADR 0025 made it safe to rerun (it
 - A targeted `docker compose up mysql` or `docker compose up openemr` alone still will not run `seed` — it
   has no dependents naming it other than `auth-facade`. This is intentional: those commands have no reason
   to touch the OAuth client.
-- Does not address the integration tests' own `AUTHFACADE_REDIRECT_URI` default drifting from the seed's
-  actual value (`docs/configuration.md`, "Integration tests") — that default is read directly by the test
-  process, outside Compose, and is unaffected by a `depends_on` change here.
+- Does not, by itself, give any test coverage for the authorize-endpoint redirect_uri check that actually
+  failed. `AuthFacadeStackTests.OpenEmr_accepts_the_AuthFacade_redirect_uri` closes that gap separately: it
+  hits `/oauth2/default/authorize` with the real redirect_uri and fails if it ever drifts from the seed's
+  registration again, independent of whether `depends_on` catches it first. It also fixed
+  `StackConfig.AuthFacadeRedirectUri`'s own default, which had drifted the same way (`docs/configuration.md`,
+  "Integration tests").
 
 ## Alternatives considered
 

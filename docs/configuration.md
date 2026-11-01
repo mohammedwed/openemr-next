@@ -99,14 +99,14 @@ because the defaults match the stack:
 
 | Variable | Default |
 | --- | --- |
-| `AUTHFACADE_REDIRECT_URI` | `http://localhost:<AUTHFACADE_HTTP_PORT>/callback` |
+| `AUTHFACADE_REDIRECT_URI` | `http://localhost:<GATEWAY_HTTP_PORT>/callback` |
 | `OPENEMR_DISCOVERY_PATH` | `/oauth2/default/.well-known/openid-configuration` |
 | `OPENEMR_TOKEN_PATH` | `/oauth2/default/token` |
+| `OPENEMR_AUTHORIZE_PATH` | `/oauth2/default/authorize` |
 
-`AUTHFACADE_REDIRECT_URI`'s own default no longer matches what the seed actually registers (the gateway's
-address, ADR 0033) — only `OpenEmr_authenticates_the_AuthFacade_client_secret` uses it, to post a bogus
-authorization code, and it only asserts the absence of `invalid_client`, not the specific error a mismatched
-redirect_uri would also produce, so this has not needed fixing yet.
+`AuthFacadeStackTests.OpenEmr_accepts_the_AuthFacade_redirect_uri` hits the authorize endpoint directly with
+this value, so a redirect_uri that drifts from what the seed actually registers (the gateway's address, ADR
+0033) now fails the integration suite instead of only surfacing in a real browser login (ADR 0037).
 
 ## AuthFacade settings
 
