@@ -1,8 +1,8 @@
-namespace OpenEmrNext.AuthFacade.Api.BrowserFlow;
+namespace OpenEmrNext.AuthFacade.Api.OpenIddictClient;
 
 /// <summary>
 /// Resolves the <c>returnUrl</c> a caller supplies to <c>/login</c> against the configured allow-list
-/// (ADR 0024), so an attacker-supplied value cannot turn the flow into an open redirect.
+/// (ADR 0026), so an attacker-supplied value cannot turn the flow into an open redirect.
 /// </summary>
 internal static class ReturnUrlValidator
 {

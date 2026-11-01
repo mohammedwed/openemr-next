@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using OpenEmrNext.AuthFacade.Api.Authentication;
-using OpenEmrNext.AuthFacade.Api.BrowserFlow;
 using OpenEmrNext.AuthFacade.Api.Endpoints;
 using OpenEmrNext.AuthFacade.Api.OpenApi;
 using OpenEmrNext.AuthFacade.Api.OpenIddictClient;

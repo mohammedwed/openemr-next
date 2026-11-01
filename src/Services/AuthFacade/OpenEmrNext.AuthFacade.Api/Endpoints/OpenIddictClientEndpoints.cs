@@ -2,7 +2,6 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
-using OpenEmrNext.AuthFacade.Api.BrowserFlow;
 using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
 using OpenIddict.Client.AspNetCore;
 
