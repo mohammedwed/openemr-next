@@ -5,8 +5,9 @@ can be moved incrementally toward a modular C# architecture without a
 big-bang rewrite.
 
 > **Status:** Early implementation. The local stack, the database baseline, the
-> AuthFacade token broker, browser login, and a BFF proxy to OpenEMR's API are
-> built and tested. The gateway and domain services are not started.
+> AuthFacade token broker, browser login, a BFF proxy to OpenEMR's API, a
+> Blazor WebAssembly dashboard, and a gateway fronting it are built and
+> tested. The domain services are not started.
 > **Not intended for production clinical use.**
 
 OpenEMR Next is not an official OpenEMR rewrite, fork, replacement, or
@@ -24,16 +25,19 @@ research vision below is the long-term direction, not the current deliverable.
 | Database baseline | Reproducible schema and seed data from the OpenEMR installer | Built, not yet cleaned |
 | `OpenEmr.Data` | EF Core model scaffolded from the live database | Built |
 | AuthFacade | Token broker (password grant) and BFF (browser login via OIDC/PKCE, session cookie, proxies browser calls to OpenEMR's API) | Built, hardening in progress |
-| API gateway | A separate service — also built with YARP, the same library AuthFacade's BFF proxy already uses — as a single entry point for the new services, with token validation at the edge. AuthFacade's BFF proxy will forward to it as a single hop, rather than growing a route per service itself (ADR 0030) | Planned |
+| WebApp dashboard | Blazor WebAssembly: shows the signed-in identity via a generated typed client; stub nav for Patients/Encounters | Built |
+| API gateway | Routes a browser's requests by path: AuthFacade's own prefixes to it, everything else to the dashboard's static files (ADR 0033). No token validation of its own yet, and nothing to route to beyond AuthFacade until a domain service exists | Built, narrower than originally planned |
 | Patient Management | Registers patients, publishes `PatientRegistered` | Planned |
 | Clinical Care | Creates encounters and records vitals for registered patients | Planned |
 
 ## What exists today
 
 **Local stack.** A single Compose file at the repository root runs MariaDB,
-OpenEMR (pinned to `openemr/openemr:8.0.0.3`), phpMyAdmin, and AuthFacade on one
-network. Services address each other by name. The MariaDB host port is 3307.
-AuthFacade listens on port 7128.
+OpenEMR (pinned to `openemr/openemr:8.0.0.3`), phpMyAdmin, AuthFacade, the
+WebApp dashboard, the gateway, and the Login UI on one network. Services
+address each other by name. The MariaDB host port is 8320. AuthFacade listens
+on port 7128, the Login UI on 7129, and the gateway — the dashboard's own
+entry point — on 7130. The WebApp container itself publishes no host port.
 
 **Database snapshot.** The stack restores its database from a snapshot
 (`db.sql`, `sites.tar.gz`, `images.txt`) kept in the git-ignored `snapshots/`
@@ -81,7 +85,38 @@ stepping stone: each future service should scaffold only its own tables.
 **Login UI (`src/Services/LoginUi`).** A static Blazor page with one link to
 `/oidc/login`; the browser follows it to AuthFacade directly.
 
+**WebApp (`src/Services/WebApp`).** A Blazor WebAssembly dashboard, served by its
+own nginx container — reached only through the gateway below, never directly:
+publishing its own port would let someone load it from the wrong origin and find
+the session cookie never attaches. Calls `GET /api/v1/me` through a generated
+typed client ([ADR 0031](docs/architecture/0031-nswag-client-generated-from-a-committed-snapshot.md))
+and shows the signed-in identity, or a login link if unauthenticated. Nav for
+Patients and Encounters is disabled: nothing beyond identity is real yet.
+
+**Gateway (`src/Services/Gateway`).** A YARP reverse proxy — the one external
+address a browser talks to for the dashboard. Routes AuthFacade's own path
+prefixes (`/api`, `/oidc`, `/callback`, `/bff`, `/health`, `/openapi`, `/scalar`)
+to it and everything else to WebApp's static files, by plain ASP.NET Core route
+specificity, no exclusion pattern needed. Makes no auth decisions of its own —
+AuthFacade still does all of that. See
+[ADR 0033](docs/architecture/0033-gateway-fronts-webapp-and-authfacade.md) and
+[ADR 0034](docs/architecture/0034-gateway-preserves-the-original-host-header.md)
+(preserving the original `Host` header, needed for AuthFacade's own
+redirect-URI check to recognize `/callback` when reached through the proxy).
+
 ## Architecture
+
+A browser never talks to AuthFacade directly for the dashboard — it talks to the
+gateway, which decides where each request actually goes:
+
+```text
+ browser --> Gateway --(/api, /oidc, /callback, /bff, /health)--> AuthFacade (below)
+ browser --> Gateway --(everything else)-------------------------> WebApp (static dashboard files)
+```
+
+A non-browser client (the password/refresh grant, or the Login UI's own redirect)
+still reaches AuthFacade directly — the gateway exists for the dashboard's sake,
+not as the only way in:
 
 ```text
             +------------------------+
@@ -103,10 +138,12 @@ grant and holds the resulting bearer token itself. A browser never does: it comp
 the real OpenEMR token behind that cookie and attaches it server-side, both for `/me`
 and for calls proxied through `/bff/openemr/**`.
 
-**Planned (M3):** the BFF proxy's route table does not grow one entry per new
-backend service. Instead it gets a second cluster pointed at an API gateway,
-a single hop for anything beyond OpenEMR, once the gateway and a second
-service (Patient Management or Clinical Care) exist. See
+**Still planned:** the gateway above already exists and already fronts the
+dashboard, but AuthFacade's own BFF proxy does not yet forward into it. The
+BFF proxy's route table should not grow one entry per new backend service —
+instead it should get a second cluster pointed at the gateway, a single hop
+for anything beyond OpenEMR — but there is no second backend service
+(Patient Management or Clinical Care) yet for that hop to actually reach. See
 [ADR 0030](docs/architecture/0030-bff-proxy-forwards-to-the-gateway-not-each-service.md).
 
 ```text
@@ -184,6 +221,10 @@ or user records.
   rejected by OpenEMR itself until that scope is deliberately widened. No silent
   refresh happens when the session's access token expires either. See
   [ADR 0029](docs/architecture/0029-yarp-proxies-browser-sessions-to-openemrs-api.md).
+- The gateway does no token validation of its own — it only routes by path.
+  Every auth decision still happens in AuthFacade. If a future domain service
+  needs authenticated requests, whether it validates its own token or the
+  gateway starts validating once at the edge is not yet decided.
 
 ## Legacy database compatibility
 
@@ -220,8 +261,10 @@ Known problems with the baseline:
 ├── .github/workflows/ci.yml    # build, restore snapshot, run tests
 ├── docs/                       # ADRs, changelogs, design notes
 ├── src/
-│   ├── Services/AuthFacade/    # token broker: Domain, Application, Infrastructure, Api
+│   ├── Services/AuthFacade/    # token broker + BFF: Domain, Application, Infrastructure, Api, Client
 │   ├── Services/LoginUi/       # static page linking to AuthFacade's /oidc/login
+│   ├── Services/WebApp/        # Blazor WebAssembly dashboard, served by its own nginx container
+│   ├── Services/Gateway/       # YARP reverse proxy: the dashboard's one external origin
 │   └── OpenEmr.Data/           # EF Core entities and context (scaffolded)
 ├── tests/
 │   └── Services/AuthFacade/    # unit, architecture, and black-box integration tests
@@ -230,12 +273,13 @@ Known problems with the baseline:
     ├── stack/                  # up.sh (--restore), apply-credentials.sh
     ├── snapshot/create.sh      # write a snapshot to snapshots/
     ├── seeds/                  # AuthFacade OAuth client, run by the seed service
+    ├── dev/                    # generate-authfacade-openapi.sh: refresh the committed client snapshot
     └── lib/env.sh              # shared shell helpers (sourced, not run)
 ```
 
-Planned additions: `src/Gateway`, `src/PatientManagement`, `src/ClinicalCare`,
-and their tests. Each new service gets its own Compose entry, database, and
-slim entity model.
+Planned additions: `src/PatientManagement`, `src/ClinicalCare`, and their
+tests. Each new service gets its own Compose entry, database, and slim entity
+model, and a route added to the existing gateway rather than a new one.
 
 ## Local development
 
