@@ -1,7 +1,7 @@
 using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Authentication;
 using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
-using OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
+using OpenEmrNext.AuthFacade.Composition;
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Transforms;
 

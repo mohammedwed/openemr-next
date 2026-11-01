@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
+namespace OpenEmrNext.AuthFacade.Composition;
 
 /// <summary>Configuration for the OpenEMR connection, bound from the <c>OpenEmr</c> section.</summary>
 public sealed class OpenEmrOptions

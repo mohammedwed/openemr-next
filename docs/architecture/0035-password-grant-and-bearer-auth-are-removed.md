@@ -50,9 +50,11 @@ browser flow, the BFF proxy) is ASP.NET-Core-specific by nature and already live
 3. **Delete `OpenEmrNext.AuthFacade.Domain`, `.Application.Ports`, and `.Application`** outright rather than
    leaving them as empty skeletons: there is no portable business logic left to isolate, so an empty layer
    would be scaffolding with nothing to protect. `OpenEmrNext.AuthFacade.Composition` and
-   `OpenEmrNext.AuthFacade.Infrastructure` survive, shrunk to what is still real: `Infrastructure` now holds
-   only `OpenEmrOptions`; `Composition`'s `AddAuthFacade` now only binds and validates that section directly,
-   with no layer entry points left to delegate to.
+   `OpenEmrNext.AuthFacade.Infrastructure` initially survived, shrunk to just `OpenEmrOptions`, with
+   `Composition`'s `AddAuthFacade` binding and validating that section directly instead of delegating to a
+   layer entry point. A project holding exactly one config class is itself not worth a separate project:
+   `OpenEmrOptions` moved into `Composition` (which already owns binding it) and `Infrastructure` was deleted
+   too, leaving two AuthFacade projects: `Composition` and `Api`.
 4. **Remove the circuit breakers** (`CircuitBreakingIdentityProvider`, `CircuitBreakingTokenVerifier`,
    `CircuitBreakerPipeline`, `CircuitBreakerOptions`) rather than leaving them wired to nothing. The Polly
    *pattern* is sound and reusable — the decorators were just pointed at the one call graph that is gone.
@@ -73,9 +75,10 @@ browser flow, the BFF proxy) is ASP.NET-Core-specific by nature and already live
 - AuthFacade is no longer a general-purpose "token broker for any client" (ADR 0001's original framing). It
   is a BFF for its own browser/dashboard clients, full stop: `GET /oidc/login` establishes a session cookie,
   the BFF proxy uses it server-side, and nothing else authenticates against it.
-- The solution shrinks from six AuthFacade projects to three: `Infrastructure`, `Composition`, `Api`. The
-  layered-architecture rules `LayerDependencyTests` enforces shrink to match: only the rules about
-  `Infrastructure`/`Composition`/`Api` survive.
+- The solution shrinks from six AuthFacade projects to two: `Composition` and `Api`. The layered-architecture
+  rules `LayerDependencyTests` enforces shrink to match: with only those two left, the one rule still worth
+  enforcing is that `Composition` — the one place configuration is read — never references `Api` or
+  ASP.NET Core.
 - `AuthFacadeStackTests` (live integration smoke tests) is unaffected — it never used the password grant.
   `MeEndpointTests` and `TokenEndpointTests` (live integration tests that did) are deleted outright: there is
   currently no live, non-unit-test coverage of `/api/v1/me` against the real stack. The in-process

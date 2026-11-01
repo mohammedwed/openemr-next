@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
 
 namespace OpenEmrNext.AuthFacade.Composition;
 

@@ -20,7 +20,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenEmrNext.AuthFacade.Composition\OpenEmrNext.AuthFacade.Composition.csproj" />
-    <ProjectReference Include="..\OpenEmrNext.AuthFacade.Infrastructure\OpenEmrNext.AuthFacade.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

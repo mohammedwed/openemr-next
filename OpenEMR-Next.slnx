@@ -3,7 +3,6 @@
     <Project Path="src/OpenEmr.Data/OpenEmr.Data.csproj" />
   </Folder>
   <Folder Name="/src/AuthFacade/">
-    <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Infrastructure/OpenEmrNext.AuthFacade.Infrastructure.csproj" />
     <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Composition/OpenEmrNext.AuthFacade.Composition.csproj" />
     <Project Path="src/Services/AuthFacade/OpenEmrNext.AuthFacade.Api/OpenEmrNext.AuthFacade.Api.csproj" />
   </Folder>

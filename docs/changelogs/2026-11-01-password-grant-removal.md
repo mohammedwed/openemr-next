@@ -45,9 +45,12 @@ nothing else. See ADR 0035.
 
 ## Changed
 
-- The solution shrinks from six AuthFacade projects to three: `Infrastructure` (now just `OpenEmrOptions`),
-  `Composition` (now just binds and validates it — no layer entry points left to delegate to), and `Api`.
-- `LayerDependencyTests` shrinks to match: only the rules about `Infrastructure`/`Composition`/`Api` survive.
+- The solution shrinks from six AuthFacade projects to two: `Composition` (now holds `OpenEmrOptions`
+  directly and binds/validates it — no layer entry points left to delegate to) and `Api`. `Infrastructure`
+  briefly survived holding just that one config class, then was deleted too: a project with one file isn't
+  worth the project.
+- `LayerDependencyTests` shrinks to match: the one rule left worth enforcing is that `Composition` never
+  references `Api` or ASP.NET Core.
 - The committed OpenAPI snapshot (ADR 0031) is regenerated; the generated `AuthFacadeClient` loses
   `IssueTokenAsync` and keeps only `GetCurrentUserAsync`.
 - `appsettings.json`/`appsettings.Development.json`, `docker-compose.yml`, and `docs/configuration.md` lose
