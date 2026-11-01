@@ -21,15 +21,19 @@ public static class StackConfig
     /// <summary>The base URL of the AuthFacade container on localhost. From <c>AUTHFACADE_HTTP_PORT</c>, default 7128.</summary>
     public static string AuthFacadeBaseUrl => $"http://localhost:{Get("AUTHFACADE_HTTP_PORT", "7128")}";
 
-    /// <summary>The base URL of the gateway on localhost. From <c>GATEWAY_HTTP_PORT</c>, default 7130.</summary>
+    /// <summary>The base URL of the gateway's plain-HTTP listener on localhost. From <c>GATEWAY_HTTP_PORT</c>, default 7130. Redirects to <see cref="GatewayHttpsBaseUrl"/> and serves nothing else (ADR 0039).</summary>
     public static string GatewayBaseUrl => $"http://localhost:{Get("GATEWAY_HTTP_PORT", "7130")}";
 
+    /// <summary>The base URL of the gateway's HTTPS listener on localhost. From <c>GATEWAY_HTTPS_PORT</c>, default 7131 (ADR 0039).</summary>
+    public static string GatewayHttpsBaseUrl => $"https://localhost:{Get("GATEWAY_HTTPS_PORT", "7131")}";
+
     /// <summary>
-    /// The redirect URI registered for the AuthFacade OAuth client. Defaults to the gateway's base URL plus
-    /// <c>/callback</c> — the seed registers the gateway's address, not AuthFacade's own (ADR 0033), and
-    /// AuthFacade itself sends this same value when it builds the authorize URL.
+    /// The redirect URI registered for the AuthFacade OAuth client. Defaults to the gateway's HTTPS base
+    /// URL plus <c>/callback</c> — the seed registers the gateway's address, not AuthFacade's own (ADR
+    /// 0033), and HTTPS specifically, not the gateway's plain-HTTP port (ADR 0039), since that is the
+    /// exact value AuthFacade itself sends when it builds the authorize URL.
     /// </summary>
-    public static string AuthFacadeRedirectUri => Get("AUTHFACADE_REDIRECT_URI", $"{GatewayBaseUrl}/callback");
+    public static string AuthFacadeRedirectUri => Get("AUTHFACADE_REDIRECT_URI", $"{GatewayHttpsBaseUrl}/callback");
 
     /// <summary>The base URL of the OpenEMR container on localhost. From <c>OPENEMR_HTTPS_PORT</c>, default 9300.</summary>
     public static string OpenEmrBaseUrl => $"https://localhost:{Get("OPENEMR_HTTPS_PORT", "9300")}";

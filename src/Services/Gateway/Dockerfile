@@ -12,6 +12,9 @@ WORKDIR /app
 COPY --from=build /app/publish .
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
+# HTTPS (ADR 0039). docker-compose.yml overrides ASPNETCORE_URLS to bind both and mounts the cert
+# scripts/setup/new-dev-cert.sh generates; without that override this port listens on nothing.
+EXPOSE 8443
 # The image ships a non-root "app" user (APP_UID). Port 8080 needs no privileges.
 USER $APP_UID
 ENTRYPOINT ["dotnet", "OpenEmrNext.Gateway.dll"]

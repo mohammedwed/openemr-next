@@ -84,7 +84,10 @@ internal sealed class TestApi : IAsyncDisposable
             ["OpenEmr:ClientSecret"] = "facade-secret",
             ["OpenEmr:RedirectUri"] = "https://facade.test/callback",
             ["BrowserFlow:DefaultReturnUrl"] = "https://app.test/",
-            ["BrowserFlow:ReturnUrlAllowedHosts:0"] = "app.test"
+            ["BrowserFlow:ReturnUrlAllowedHosts:0"] = "app.test",
+            // Every test client connects from loopback (see WebHost.UseUrls below), so this is the one
+            // network a test needs trusted to simulate a request that arrived through the gateway (ADR 0039).
+            ["ForwardedHeaders:TrustedNetworkCidr"] = "127.0.0.1/32"
         });
         if (configOverrides is not null)
         {
@@ -125,6 +128,10 @@ internal sealed class TestApi : IAsyncDisposable
             await ctx.SignInAsync(OpenIddictClientServiceCollectionExtensions.SessionScheme, new ClaimsPrincipal(identity));
             return Results.Ok();
         }).AllowAnonymous();
+        // Test-only: reports what the forwarded-headers middleware (ADR 0039) decided about this request,
+        // the same thing a cookie's CookieSecurePolicy.SameAsRequest reads to decide Secure.
+        app.MapGet("/test/is-https", (HttpContext ctx) => Results.Json(new { ctx.Request.IsHttps }))
+            .AllowAnonymous();
         await app.StartAsync();
 
         return new TestApi(app);

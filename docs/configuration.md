@@ -34,9 +34,10 @@ Naming: `OPENEMR_*` is the OpenEMR container, `AUTHFACADE_*` is the AuthFacade s
 | `OPENEMR_HTTPS_PORT` | `9300` | OpenEMR over HTTPS. Also forms the token issuer URL `https://localhost:<port>/oauth2/default`. |
 | `DB_PORT` | `8320` | MariaDB. |
 | `PHPMYADMIN_PORT` | `8310` | phpMyAdmin. |
-| `AUTHFACADE_HTTP_PORT` | `7128` | AuthFacade, reached directly (by the Login UI's link, or for direct API testing). |
+| `AUTHFACADE_HTTP_PORT` | `7128` | AuthFacade, reached directly over plain HTTP (Scalar/OpenAPI, or direct API testing). Not what the Login UI's link uses (ADR 0039). |
 | `LOGINUI_HTTP_PORT` | `7129` | Login UI. |
-| `GATEWAY_HTTP_PORT` | `7130` | The gateway (ADR 0033): the browser's entry point for the WebApp dashboard. Also forms the OAuth redirect URI `http://localhost:<port>/callback` — not `AUTHFACADE_HTTP_PORT` — since the dashboard's session cookie must be scoped to whichever origin OpenEMR redirects back to. |
+| `GATEWAY_HTTP_PORT` | `7130` | The gateway (ADR 0033), over plain HTTP: redirects to `GATEWAY_HTTPS_PORT` (ADR 0039) and otherwise serves nothing. |
+| `GATEWAY_HTTPS_PORT` | `7131` | The gateway's HTTPS listener (ADR 0039): the browser's real entry point for both the WebApp dashboard and the Login UI's link. Run `scripts/setup/new-dev-cert.sh` first. Also forms the OAuth redirect URI `https://localhost:<port>/callback` (ADR 0005, ADR 0033, ADR 0039) — not `GATEWAY_HTTP_PORT`, which now only redirects to this port and serves nothing else. |
 
 ### Database
 
