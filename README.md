@@ -167,7 +167,6 @@ gateway. It does not store passwords or user records.
 - Login outcomes and `/api/v1/me` access are not audit-logged.
 - The service serves plain HTTP on port 8080, with no HTTPS redirect or HSTS.
 - Startup does not wait for OpenEMR, so early requests can fail.
-- Form values are not logged, but no test enforces this yet.
 - The OAuth client is provisioned by a seed that inserts into `oauth_clients`.
   The seed updates scope on an existing row but not `grant_types`, so changing
   those requires a manual edit or a fresh volume.

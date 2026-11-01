@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using OpenEmrNext.AuthFacade.Api;
 using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
 
@@ -57,8 +58,14 @@ internal sealed class TestApi : IAsyncDisposable
     /// just <c>/oidc/login</c>, needs its own port known ahead of time so it can set a matching
     /// <c>OpenEmr:RedirectUri</c> override. Use <see cref="GetFreeTcpPort"/> to pick one.
     /// </param>
+    /// <param name="loggerProvider">
+    /// Attached to the host's logging pipeline with every category opened down to <see cref="LogLevel.Trace"/>,
+    /// for a test that asserts something never appears in a log, across any category — not given by default,
+    /// since capturing every log line is otherwise pure overhead.
+    /// </param>
     /// <returns>A running instance. Dispose it to stop the host.</returns>
-    public static async Task<TestApi> StartAsync(Dictionary<string, string?>? configOverrides = null, int? port = null)
+    public static async Task<TestApi> StartAsync(
+        Dictionary<string, string?>? configOverrides = null, int? port = null, ILoggerProvider? loggerProvider = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -82,6 +89,10 @@ internal sealed class TestApi : IAsyncDisposable
         if (configOverrides is not null)
         {
             builder.Configuration.AddInMemoryCollection(configOverrides);
+        }
+        if (loggerProvider is not null)
+        {
+            builder.Logging.SetMinimumLevel(LogLevel.Trace).AddProvider(loggerProvider);
         }
 
         builder.AddAuthFacadeHttpDependencies();
