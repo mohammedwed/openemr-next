@@ -121,7 +121,7 @@ Set in `appsettings.json` or as environment variables with `__` for `:` (for exa
 | `Issuer` | required | Issuer OpenEMR writes into tokens. Can differ from `BaseUrl` when reached over another network. |
 | `ClientId` | required | OAuth client ID. From `AUTHFACADE_CLIENT_ID`. |
 | `ClientSecret` | required | OAuth client secret. From `AUTHFACADE_CLIENT_SECRET`. |
-| `RedirectUri` | required | Redirect URI registered for this client, used by the browser flow's `/login` and `/callback` (ADR 0024). Must match the seed's `redirect_uri` exactly. In Compose, the gateway's address, not AuthFacade's own (ADR 0033). |
+| `RedirectUri` | required | Redirect URI registered for this client, used by the browser flow's `/login` and `/callback` (ADR 0024). Must match the seed's `redirect_uri` exactly. In Compose, the gateway's address, not AuthFacade's own (ADR 0033). `auth-facade` depends on `seed` completing (ADR 0037), so `docker compose up` reseeds automatically when this drifts. |
 
 ### `BrowserFlow`
 

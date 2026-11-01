@@ -42,3 +42,4 @@ old one's status is updated to point to it.
 | [0034](0034-gateway-preserves-the-original-host-header.md) | The gateway preserves the original Host header for AuthFacade's routes | Accepted | 2026-11-01 |
 | [0035](0035-password-grant-and-bearer-auth-are-removed.md) | The password grant and bearer authentication are removed | Accepted | 2026-11-01 |
 | [0036](0036-wait-for-openemrs-readiness-probe-at-startup.md) | AuthFacade waits for OpenEMR's readiness probe at startup | Accepted | 2026-11-01 |
+| [0037](0037-authfacade-depends-on-seed-completing.md) | AuthFacade depends on the seed completing successfully | Accepted | 2026-11-01 |
