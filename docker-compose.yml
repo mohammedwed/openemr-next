@@ -42,6 +42,16 @@ services:
       OPENEMR_SETTING_rest_api: 1
       OPENEMR_SETTING_rest_fhir_api: 1
       OPENEMR_SETTING_rest_system_scopes_api: 1
+    healthcheck:
+      # OpenEMR itself, not the TCP port: the site can accept a connection well before its own
+      # install/upgrade routine finishes and it actually serves requests. A generous start_period: a
+      # fresh install takes noticeably longer than a warm restart, and failures during it never count
+      # against retries, so this only costs time, not a false "unhealthy" on a slow first boot.
+      test: ["CMD", "curl", "-f", "http://localhost/meta/health/readyz"]
+      start_period: 3m
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   phpmyadmin:
     image: ${PHPMYADMIN_IMAGE}
@@ -88,11 +98,13 @@ services:
       context: src/Services/AuthFacade
       dockerfile: Dockerfile
     restart: unless-stopped
-    # Needs OpenEMR (not the database) at request time. It does not need OpenEMR to be healthy to
-    # start: /health is static and does not call OpenEMR.
+    # Waits for OpenEMR's own readiness probe, not just its container starting, so the window where a
+    # request would hit a still-booting OpenEMR and fail with a raw connection error is closed before
+    # this container even starts (ADR 0036). AuthFacade's own startup also polls the same probe, as a
+    # second line of defense outside Compose (a bare `dotnet run`, or a race).
     depends_on:
       openemr:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "${HOST_BIND_ADDRESS:-127.0.0.1}:${AUTHFACADE_HTTP_PORT:-7128}:8080"
     environment:
