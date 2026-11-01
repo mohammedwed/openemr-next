@@ -103,14 +103,17 @@ ADR 0026) and the resulting session cookie (ADR 0027).
   own encrypted ticket, instead of being discarded after login (ADR 0027)
 - A BFF proxy (YARP) lets a browser session reach OpenEMR's API with that
   token attached server-side, so the browser itself never holds it (ADR 0029)
-- Unit tests (32), architecture tests (5) and live integration tests (4) pass
-  (down from this bullet's original counts: ADR 0035 removed the password grant and its tests)
+- A request body proxied to OpenEMR never appears in any log, across every
+  logger category down to Trace — AuthFacade calls no logger directly, and
+  this guards against a regression from the framework or a library
+- Unit tests (33), architecture tests (1) and live integration tests (4) pass
+  (down from this bullet's original counts: ADR 0035 removed the password
+  grant, its tests, and the Domain/Application/Ports/Infrastructure layers)
 
 **Remaining**
 
 - Persist data-protection keys (closes one of three gaps blocking more than one AuthFacade instance, see
   ADR 0028)
-- Confirm that request logging does not capture form bodies, with a test
 - Start-up ordering: AuthFacade waits for the database but not for OpenEMR; add a
   check or retry so early requests fail clearly
 - For browser sessions, silent refresh on an expired access token is explicitly
