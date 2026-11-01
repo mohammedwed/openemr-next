@@ -89,7 +89,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     # Needs OpenEMR (not the database) at request time. It does not need OpenEMR to be healthy to
-    # start: /health is static and calls to OpenEMR go through circuit breakers.
+    # start: /health is static and does not call OpenEMR.
     depends_on:
       openemr:
         condition: service_started
@@ -101,7 +101,6 @@ services:
       OpenEmr__Issuer: "https://localhost:${OPENEMR_HTTPS_PORT:-9300}/oauth2/default"
       OpenEmr__ClientId: ${AUTHFACADE_CLIENT_ID:?Set AUTHFACADE_CLIENT_ID in .env}
       OpenEmr__ClientSecret: ${AUTHFACADE_CLIENT_SECRET:?Set AUTHFACADE_CLIENT_SECRET in .env}
-      OpenEmr__Scope: openid profile email offline_access
       # Must match the redirect_uri the seed registers for this client (ADR 0005, ADR 0024), and the
       # gateway's address, not AuthFacade's own (ADR 0033) -- see AUTHFACADE_REDIRECT_URI above. Computed
       # the same way the seed service computes it: Compose does not share one service's environment values

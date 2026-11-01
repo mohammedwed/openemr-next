@@ -1,6 +1,6 @@
 # 0021. The token form binds to a request DTO that validates its properties with attributes
 
-- **Status:** Accepted
+- **Status:** Superseded by [0035](0035-password-grant-and-bearer-auth-are-removed.md)
 - **Date:** 2026-10-28
 - **Supersedes:** point 1 of [0019](0019-token-endpoint-binds-typed-form-parameters.md), which bound the form fields as typed parameters with `TryParse`
 

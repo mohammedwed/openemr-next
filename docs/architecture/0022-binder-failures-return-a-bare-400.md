@@ -1,6 +1,6 @@
 # 0022. A form the binder cannot read returns a bare 400, not an OAuth body
 
-- **Status:** Accepted
+- **Status:** Superseded by [0035](0035-password-grant-and-bearer-auth-are-removed.md)
 - **Supersedes:** points 3 and 4 of [0019](0019-token-endpoint-binds-typed-form-parameters.md), which gave an
   OAuth body to the framework's empty 400 through a middleware and endpoint marker
 

@@ -1,17 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
-using OpenEmrNext.AuthFacade.Api.Contracts.Requests;
 using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
 
 namespace OpenEmrNext.AuthFacade.Api.OpenApi;
 
-/// <summary>Configures the generated OpenAPI document: its description, bearer/cookie authentication and form content types.</summary>
+/// <summary>Configures the generated OpenAPI document: its description, cookie authentication and operation security.</summary>
 public static class AuthFacadeOpenApi
 {
-    /// <summary>The name of the bearer security scheme in the document.</summary>
-    public const string BearerScheme = "Bearer";
-
     /// <summary>
     /// The name of the session-cookie security scheme in the document. Named after the cookie
     /// <see cref="OpenIddictClientServiceCollectionExtensions.SessionScheme"/> actually sets, not the
@@ -20,12 +16,8 @@ public static class AuthFacadeOpenApi
     /// </summary>
     public const string CookieScheme = $".AspNetCore.{OpenIddictClientServiceCollectionExtensions.SessionScheme}";
 
-    private const string FormUrlEncoded = "application/x-www-form-urlencoded";
-
     /// <summary>
-    /// Describes the API, declares the bearer scheme and marks the operations that require authorization,
-    /// offers the token endpoint's form only as <c>application/x-www-form-urlencoded</c>, and describes
-    /// the value-object form fields as strings.
+    /// Describes the API, declares the session-cookie scheme and marks the operations that require authorization.
     /// </summary>
     /// <param name="options">The document options.</param>
     /// <returns>The same options, for chaining.</returns>
@@ -35,19 +27,11 @@ public static class AuthFacadeOpenApi
         {
             document.Info.Title = "AuthFacade API";
             document.Info.Description =
-                "A token broker in front of OpenEMR. Log in with an OpenEMR username and password, or redeem a " +
-                "refresh token, to get an OpenEMR access token, then send it as a bearer token to the other " +
-                "endpoints.";
+                "A BFF in front of OpenEMR. Log in through GET /oidc/login, and the session cookie it " +
+                "establishes authorizes the other endpoints.";
 
             document.Components ??= new OpenApiComponents();
             document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
-            document.Components.SecuritySchemes[BearerScheme] = new OpenApiSecurityScheme
-            {
-                Type = SecuritySchemeType.Http,
-                Scheme = "bearer",
-                BearerFormat = "JWT",
-                Description = "The access_token returned by POST /api/v1/connect/token."
-            };
             document.Components.SecuritySchemes[CookieScheme] = new OpenApiSecurityScheme
             {
                 Type = SecuritySchemeType.ApiKey,
@@ -55,7 +39,7 @@ public static class AuthFacadeOpenApi
                 Name = CookieScheme,
                 Description = "The session cookie /callback sets after a successful browser login through " +
                     "/oidc/login (ADR 0026). Only usable by a caller sharing that cookie jar, such as the " +
-                    "Login UI; most callers should use the bearer token from POST /api/v1/connect/token instead."
+                    "Login UI."
             };
             return Task.CompletedTask;
         });
@@ -66,78 +50,16 @@ public static class AuthFacadeOpenApi
                 .OfType<IAuthorizeData>().Any();
             if (requiresAuthorization)
             {
-                // Two separate requirement entries, not one with both schemes: that would demand both at
-                // once, but the default authorization policy accepts either (see AuthFacadeApiExtensions).
                 operation.Security ??= [];
-                operation.Security.Add(new OpenApiSecurityRequirement
-                {
-                    [new OpenApiSecuritySchemeReference(BearerScheme, context.Document)] = []
-                });
                 operation.Security.Add(new OpenApiSecurityRequirement
                 {
                     [new OpenApiSecuritySchemeReference(CookieScheme, context.Document)] = []
                 });
             }
 
-            // OAuth token endpoints take application/x-www-form-urlencoded. The framework also accepts
-            // multipart, and clients such as Scalar send the first content type listed.
-            if (operation.RequestBody?.Content is { } content && content.ContainsKey(FormUrlEncoded))
-            {
-                foreach (var contentType in content.Keys.Where(key => key != FormUrlEncoded).ToList())
-                {
-                    content.Remove(contentType);
-                }
-
-                if (content.TryGetValue(FormUrlEncoded, out var form))
-                {
-                    FlattenForm(form);
-                }
-            }
-
             return Task.CompletedTask;
         });
 
         return options;
-    }
-
-    /// <summary>
-    /// Merges the form described by <c>[AsParameters]</c>, which the generator emits as one schema per field inside
-    /// <c>allOf</c>, into a single object, and marks the password and refresh token as passwords, so clients built
-    /// from the document send the form the endpoint expects. Only <c>grant_type</c> is unconditionally required:
-    /// which of the username/password or the refresh token the grant needs depends on its value, which this flat
-    /// schema cannot express (see <see cref="TokenRequest.Validate"/> for the actual rule).
-    /// </summary>
-    /// <param name="form">The form media type. Its schema is replaced when it has the per-field <c>allOf</c> shape.</param>
-    private static void FlattenForm(OpenApiMediaType form)
-    {
-        if (form.Schema is not OpenApiSchema { AllOf.Count: > 0 } schema)
-        {
-            return;
-        }
-
-        var flat = new OpenApiSchema
-        {
-            Type = JsonSchemaType.Object,
-            Properties = new Dictionary<string, IOpenApiSchema>(),
-            Required = new HashSet<string> { TokenRequestFields.GrantType }
-        };
-
-        foreach (var part in schema.AllOf.OfType<OpenApiSchema>())
-        {
-            foreach (var (name, property) in part.Properties ?? new Dictionary<string, IOpenApiSchema>())
-            {
-                flat.Properties[name] = property;
-            }
-        }
-
-        foreach (var name in new[] { TokenRequestFields.Password, TokenRequestFields.RefreshToken })
-        {
-            if (flat.Properties.TryGetValue(name, out var property) && property is OpenApiSchema propertySchema)
-            {
-                propertySchema.Format = "password";
-            }
-        }
-
-        form.Schema = flat;
     }
 }

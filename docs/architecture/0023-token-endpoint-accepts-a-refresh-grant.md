@@ -1,6 +1,6 @@
 # 0023. The token endpoint accepts a refresh grant, forwarded to OpenEMR
 
-- **Status:** Accepted
+- **Status:** Superseded by [0035](0035-password-grant-and-bearer-auth-are-removed.md)
 - **Date:** 2026-10-29
 
 ## Context

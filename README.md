@@ -4,10 +4,10 @@ An independent project exploring how an existing healthcare platform, OpenEMR,
 can be moved incrementally toward a modular C# architecture without a
 big-bang rewrite.
 
-> **Status:** Early implementation. The local stack, the database baseline, the
-> AuthFacade token broker, browser login, a BFF proxy to OpenEMR's API, a
-> Blazor WebAssembly dashboard, and a gateway fronting it are built and
-> tested. The domain services are not started.
+> **Status:** Early implementation. The local stack, the database baseline,
+> AuthFacade as a BFF (browser login, session cookie, a proxy to OpenEMR's
+> API), a Blazor WebAssembly dashboard, and a gateway fronting it are built
+> and tested. The domain services are not started.
 > **Not intended for production clinical use.**
 
 OpenEMR Next is not an official OpenEMR rewrite, fork, replacement, or
@@ -24,7 +24,7 @@ research vision below is the long-term direction, not the current deliverable.
 | Local stack | OpenEMR, MariaDB, and AuthFacade in one Docker Compose project | Built |
 | Database baseline | Reproducible schema and seed data from the OpenEMR installer | Built, not yet cleaned |
 | `OpenEmr.Data` | EF Core model scaffolded from the live database | Built |
-| AuthFacade | Token broker (password grant) and BFF (browser login via OIDC/PKCE, session cookie, proxies browser calls to OpenEMR's API) | Built, hardening in progress |
+| AuthFacade | BFF (browser login via OIDC/PKCE, session cookie, proxies browser calls to OpenEMR's API) | Built, hardening in progress |
 | WebApp dashboard | Blazor WebAssembly: shows the signed-in identity via a generated typed client; stub nav for Patients/Encounters | Built |
 | API gateway | Routes a browser's requests by path: AuthFacade's own prefixes to it, everything else to the dashboard's static files (ADR 0033). No token validation of its own yet, and nothing to route to beyond AuthFacade until a domain service exists | Built, narrower than originally planned |
 | Patient Management | Registers patients, publishes `PatientRegistered` | Planned |
@@ -51,17 +51,9 @@ stepping stone: each future service should scaffold only its own tables.
 
 **AuthFacade (`src/Services/AuthFacade`).** A minimal ASP.NET Core API:
 
-- `POST /api/v1/connect/token` accepts the password or refresh grant. It verifies the login with
-  OpenEMR's OAuth2 server and returns a token response with `access_token`,
-  `token_type`, `expires_in`, and `refresh_token` when OpenEMR issues one. The
-  access token is verified before it is returned. A refused login returns 400
-  `invalid_grant`. AuthFacade issues no token of its own. See
-  [ADR 0013](docs/architecture/0013-pass-openemr-tokens-through.md),
-  [ADR 0016](docs/architecture/0016-facade-token-response-shape.md), and
-  [ADR 0023](docs/architecture/0023-token-endpoint-accepts-a-refresh-grant.md).
-- `GET /api/v1/me` accepts either an OpenEMR-issued bearer token or the
-  `AuthFacadeSession` cookie from the browser flow below. The token is verified
-  against OpenEMR's JWKS, and `/api/v1/me` returns the subject and name.
+- `GET /api/v1/me` accepts the `AuthFacadeSession` cookie from the browser flow
+  below, and returns the subject and name. See
+  [ADR 0035](docs/architecture/0035-password-grant-and-bearer-auth-are-removed.md).
 - `GET /oidc/login` and `/callback` drive the browser authorization-code flow
   with PKCE against OpenEMR's own OAuth2/OIDC server, via OpenIddict.Client. On
   success the browser only ever receives the `AuthFacadeSession` cookie — never
@@ -75,8 +67,8 @@ stepping stone: each future service should scaffold only its own tables.
   `Authorization: Bearer` server-side. This is how a browser session — which never holds a
   bearer token itself — reaches OpenEMR's API. Requires the `AuthFacadeSession` cookie
   specifically. See [ADR 0029](docs/architecture/0029-yarp-proxies-browser-sessions-to-openemrs-api.md).
-  This makes AuthFacade a BFF (backend-for-frontend), not just a token broker: the browser only ever
-  talks to AuthFacade, which does the OIDC login, holds the session, and proxies API calls on its behalf.
+  AuthFacade is a BFF (backend-for-frontend): the browser only ever talks to AuthFacade, which does
+  the OIDC login, holds the session, and proxies API calls on its behalf.
   **Planned:** once the API gateway (below) and a second backend service exist, this proxy gets one more
   cluster pointed at the gateway — a single hop for anything beyond OpenEMR — rather than learning about
   each new service itself. See [ADR 0030](docs/architecture/0030-bff-proxy-forwards-to-the-gateway-not-each-service.md).
@@ -114,17 +106,16 @@ gateway, which decides where each request actually goes:
  browser --> Gateway --(everything else)-------------------------> WebApp (static dashboard files)
 ```
 
-A non-browser client (the password/refresh grant, or the Login UI's own redirect)
-still reaches AuthFacade directly — the gateway exists for the dashboard's sake,
-not as the only way in:
+The Login UI's own redirect to `/oidc/login` reaches AuthFacade directly — the
+gateway exists for the dashboard's sake, not as the only way in:
 
 ```text
             +------------------------+
- client --> |   AuthFacade (.NET)    |  token broker (password/refresh grant)
-            |  + BFF for browsers    |  and BFF: OIDC login, session cookie,
-            +-----------+------------+  proxies browser calls to OpenEMR
-                        | OAuth2 (password/refresh grant, authorization
-                        | code, or a proxied call with the token attached)
+ browser --> |   AuthFacade (.NET)    |  BFF: OIDC login, session cookie,
+            |     BFF for browsers   |  proxies browser calls to OpenEMR
+            +-----------+------------+
+                        | OAuth2 (authorization code,
+                        | or a proxied call with the token attached)
             +-----------v------------+        +-----------+
             |    OpenEMR (legacy)    |<------>| MariaDB   |
             +------------------------+        +-----------+
@@ -132,11 +123,10 @@ not as the only way in:
             seed (one-shot) registers the OAuth client
 ```
 
-A non-browser client calls `/api/v1/connect/token` directly with the password/refresh
-grant and holds the resulting bearer token itself. A browser never does: it completes
-`/oidc/login` and only ever receives the `AuthFacadeSession` cookie — AuthFacade holds
-the real OpenEMR token behind that cookie and attaches it server-side, both for `/me`
-and for calls proxied through `/bff/openemr/**`.
+A browser completes `/oidc/login` and only ever receives the `AuthFacadeSession`
+cookie — never a bearer token. AuthFacade holds the real OpenEMR token behind
+that cookie and attaches it server-side, both for `/me` and for calls proxied
+through `/bff/openemr/**`.
 
 **Still planned:** the gateway above already exists and already fronts the
 dashboard, but AuthFacade's own BFF proxy does not yet forward into it. The
@@ -151,68 +141,42 @@ for anything beyond OpenEMR — but there is no second backend service
 ```
 
 OpenEMR owns the schema, users, password rules, and the OAuth server. AuthFacade
-is a token broker for non-browser clients and a BFF (backend-for-frontend) for
-browser sessions — not a general-purpose gateway. It does not store passwords
-or user records.
+is a BFF (backend-for-frontend) for browser sessions — not a general-purpose
+gateway. It does not store passwords or user records.
 
 ### Authentication boundary
 
 - **Identity stays in OpenEMR.** Users, ACLs, password hashing, MFA, lockout,
   and expiry are enforced by OpenEMR. AuthFacade delegates to it rather than
   copying its logic.
-- **Clients receive OpenEMR's tokens in AuthFacade's own response shape.**
-  AuthFacade verifies the access token against OpenEMR's JWKS before returning
-  it (ADR 0013), and returns only the four token fields (ADR 0016).
-- **Calls to OpenEMR are guarded by circuit breakers.** While OpenEMR is failing,
-  logins and token checks fail fast instead of waiting for timeouts (ADR 0017).
-- **Login is rate limited per client address.** `POST /api/v1/connect/token` returns
-  429 `too_many_requests` when one address exceeds its limit, before OpenEMR is
-  called (ADR 0018).
 - **Minimal client scopes.** The AuthFacade OAuth client holds authentication
-  scopes only (`openid`, `profile`, `email`, `offline_access`). The client
-  secret does not protect the password grant, because OpenEMR does not check it
-  there (ADR 0014). Only the client ID's registration and the scopes limit what
-  the client can do.
+  scopes only (`openid`, `profile`, `email`, `offline_access`). Only the client
+  ID's registration and the scopes limit what the client can do.
 - **Browser login never hands the browser a bearer token.** The authorization-code
   flow with PKCE (ADR 0024), driven by OpenIddict.Client against OpenEMR's own
   OIDC server (ADR 0026), ends in an `HttpOnly` session cookie only. The real
   OpenEMR access/refresh token lives inside that cookie's encrypted ticket
   (ADR 0027) and is attached to proxied API calls server-side (ADR 0029) — the
-  browser itself never sees it. The password grant remains for non-browser
-  clients.
+  browser itself never sees it. There is no other way to authenticate to
+  AuthFacade: the password grant and bearer authentication were removed once
+  this flow existed end to end (ADR 0035).
 
 ### Known gaps
 
 - `/api/v1/me` confirms identity only. Authorization for OpenEMR data is not built.
 - The audience check uses a fixed string rather than a registered client.
-- Login is rate limited per client address (10 requests a minute by default,
-  ADR 0018), but not per username. A distributed attack against one account is
-  limited only by OpenEMR's lockout.
 - Login outcomes and `/api/v1/me` access are not audit-logged.
 - The service serves plain HTTP on port 8080, with no HTTPS redirect or HSTS.
 - Startup does not wait for OpenEMR, so early requests can fail.
 - Form values are not logged, but no test enforces this yet.
-- Password plaintext has copies in memory that cannot be zeroed. See
-  `docs/architecture/0009-password-plaintext-retrieved-once.md`.
-- Login accepts any username and password within the length limits, so the
-  complexity policy is not enforced anywhere yet. See
-  `docs/architecture/0008-login-credential-rules.md`.
 - The OAuth client is provisioned by a seed that inserts into `oauth_clients`.
   The seed updates scope on an existing row but not `grant_types`, so changing
   those requires a manual edit or a fresh volume.
-- The password grant is deprecated in OAuth 2.1. Retained for this integration
-  only.
-- An upstream OpenEMR defect returns 500 on some wrong-password requests, when
-  its failed-login counter receives an object where a string is expected.
-  AuthFacade cannot prevent this from outside. The strict integration test will
-  fail if it recurs.
-- The development TLS bypass (`DangerousAcceptAnyServerCertificateValidator`)
-  is enabled by `OpenEmr:AcceptAnyServerCertificate`. The setting defaults to
-  `false` and is `true` in `appsettings.Development.json`, which the Compose
-  stack loads. The API host refuses to start with it set outside Development.
-  The Compose stack reaches OpenEMR over plain HTTP inside the Docker network,
-  so the bypass has no effect there today. It must be replaced with a trusted
-  certificate before any shared use.
+- An upstream OpenEMR defect returns 500 on some wrong-password login attempts,
+  when its failed-login counter receives an object where a string is expected.
+  AuthFacade cannot prevent this from outside. There is currently no automated
+  test guarding against a regression: the one that did (a live password-grant
+  call) was removed with the password grant itself (ADR 0035).
 - Data-protection keys are not persisted, which also means AuthFacade's browser
   login and session cookie only work with a single running instance today —
   see [ADR 0028](docs/architecture/0028-browser-login-and-session-assume-a-single-instance.md).
@@ -261,7 +225,7 @@ Known problems with the baseline:
 ├── .github/workflows/ci.yml    # build, restore snapshot, run tests
 ├── docs/                       # ADRs, changelogs, design notes
 ├── src/
-│   ├── Services/AuthFacade/    # token broker + BFF: Domain, Application, Infrastructure, Api, Client
+│   ├── Services/AuthFacade/    # BFF for the dashboard: Composition, Api, Client
 │   ├── Services/LoginUi/       # static page linking to AuthFacade's /oidc/login
 │   ├── Services/WebApp/        # Blazor WebAssembly dashboard, served by its own nginx container
 │   ├── Services/Gateway/       # YARP reverse proxy: the dashboard's one external origin

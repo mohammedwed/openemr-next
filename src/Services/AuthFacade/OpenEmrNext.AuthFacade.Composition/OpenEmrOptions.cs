@@ -1,7 +1,6 @@
 using System.ComponentModel.DataAnnotations;
-using Microsoft.Extensions.Options;
 
-namespace OpenEmrNext.AuthFacade.Infrastructure.OpenEmr;
+namespace OpenEmrNext.AuthFacade.Composition;
 
 /// <summary>Configuration for the OpenEMR connection, bound from the <c>OpenEmr</c> section.</summary>
 public sealed class OpenEmrOptions
@@ -36,21 +35,4 @@ public sealed class OpenEmrOptions
     /// </summary>
     [Required]
     public string RedirectUri { get; set; } = "";
-
-    /// <summary>The OAuth scope requested in the password grant. Defaults to <c>openid api:oemr</c>.</summary>
-    public string Scope { get; set; } = "openid api:oemr";
-
-    /// <summary>
-    /// Accepts any OpenEMR server certificate. Off by default. Set only in development settings,
-    /// because OpenEMR's development certificate is self-signed. The API host refuses to start with
-    /// this set outside the Development environment.
-    /// </summary>
-    public bool AcceptAnyServerCertificate { get; set; }
-
-    /// <summary>
-    /// Settings for the circuit breakers that guard calls to OpenEMR. The defaults open after half of at
-    /// least five calls in 30 seconds fail, and keep the circuit open for 30 seconds.
-    /// </summary>
-    [ValidateObjectMembers]
-    public CircuitBreakerOptions CircuitBreaker { get; set; } = new();
 }

@@ -1,6 +1,6 @@
 # 0007. AuthFacade is split into layered projects with enforced dependency rules
 
-- **Status:** Accepted
+- **Status:** Superseded by [0035](0035-password-grant-and-bearer-auth-are-removed.md), which removes three of the five layers
 - **Date:** 2026-10-21
 
 ## Context
