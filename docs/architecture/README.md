@@ -49,3 +49,4 @@ old one's status is updated to point to it.
 | [0041](0041-circuit-breakers-guard-the-remaining-openemr-calls.md) | Circuit breakers guard the remaining calls to OpenEMR | Accepted | 2026-11-01 |
 | [0042](0042-audit-log-scoped-to-login-and-the-bff-proxy.md) | The audit trail covers login outcomes and the BFF proxy, not `/me` | Accepted | 2026-11-01 |
 | [0043](0043-authfacade-session-state-in-a-dedicated-mariadb-database.md) | AuthFacade's session state persists in a dedicated MariaDB database | Accepted | 2026-11-01 |
+| [0044](0044-session-store-backs-the-cookie-for-revocation.md) | A server-side session store backs the cookie, so a session can be revoked | Accepted | 2026-11-01 |

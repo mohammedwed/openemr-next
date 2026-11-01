@@ -23,6 +23,11 @@ public static class AuthFacadeEndpoints
         // RP-initiated logout (ADR 0040) is the same kind of browser navigation.
         app.MapLogoutEndpoints();
 
+        // Self-service revocation of every session for the caller's own subject (ADR 0044) is an API
+        // action, not a browser navigation, but it is not versioned either: it is about the session itself,
+        // the same footing as /logout right above it.
+        app.MapSessionEndpoints();
+
         // The BFF proxy forwards arbitrary OpenEMR paths under its own prefix, so it does not fit the
         // versioned /api/v1 group either.
         app.MapOpenEmrBffProxyEndpoints();

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using OpenEmrNext.AuthFacade.Api.Resilience;
 using OpenEmrNext.AuthFacade.Composition;
 using OpenIddict.Abstractions;
@@ -109,6 +110,17 @@ public static class OpenIddictClientServiceCollectionExtensions
                     context.Response.StatusCode = StatusCodes.Status403Forbidden;
                     return Task.CompletedTask;
                 };
+            });
+
+        // Backs the session cookie with a server-side record (ADR 0044), so a session can actually be
+        // revoked instead of only ever expiring on its own. A separate, post-registration step rather than
+        // set inside AddCookie's own configure delegate above: AuthFacadeSessionStore needs
+        // IServiceScopeFactory and IDataProtectionProvider, neither resolvable yet at this point -- the
+        // builder pattern below runs once those are actually available from the built container.
+        services.AddOptions<CookieAuthenticationOptions>(SessionScheme)
+            .Configure<IServiceScopeFactory, IDataProtectionProvider>((options, scopeFactory, dataProtectionProvider) =>
+            {
+                options.SessionStore = new AuthFacadeSessionStore(scopeFactory, dataProtectionProvider);
             });
 
         services.AddOpenIddict()
