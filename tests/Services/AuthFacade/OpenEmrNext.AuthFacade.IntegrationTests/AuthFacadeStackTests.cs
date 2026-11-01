@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using MySqlConnector;
 using Xunit;
@@ -53,6 +54,34 @@ public class AuthFacadeStackTests
 
         using var doc = JsonDocument.Parse(json);
         Assert.True(doc.RootElement.TryGetProperty("token_endpoint", out _));
+    }
+
+    [Fact]
+    public async Task OpenEmr_accepts_the_AuthFacade_redirect_uri()
+    {
+        // Exercises CustomAuthCodeGrant::validateRedirectUri(), called from the authorize endpoint
+        // (oauth2/authorize.php), not the token endpoint OpenEmr_authenticates_the_AuthFacade_client_secret
+        // below covers. A registered redirect_uri that has drifted from what AuthFacade actually sends
+        // (e.g. the seed running before ADR 0033 moved it to the gateway's address) fails here with
+        // invalid_client, before a real browser ever reaches OpenEMR's own login page (ADR 0037).
+        var query = new Dictionary<string, string>
+        {
+            ["response_type"] = "code",
+            ["client_id"] = StackConfig.ClientId,
+            ["redirect_uri"] = StackConfig.AuthFacadeRedirectUri,
+            ["scope"] = "openid profile email offline_access",
+            ["state"] = "integration-test-state",
+            ["code_challenge"] = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+            ["code_challenge_method"] = "S256"
+        };
+        var queryString = string.Join("&", query.Select(kv => $"{kv.Key}={Uri.EscapeDataString(kv.Value)}"));
+
+        var response = await Http.GetAsync(
+            $"{StackConfig.OpenEmrBaseUrl}{StackConfig.OpenEmrAuthorizePath}?{queryString}");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.DoesNotContain("invalid_client", body);
     }
 
     [Fact]

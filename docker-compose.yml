@@ -102,9 +102,19 @@ services:
     # request would hit a still-booting OpenEMR and fail with a raw connection error is closed before
     # this container even starts (ADR 0036). AuthFacade's own startup also polls the same probe, as a
     # second line of defense outside Compose (a bare `dotnet run`, or a race).
+    #
+    # Also depends on `seed` completing, so a `docker compose up` that brings up auth-facade (named
+    # explicitly or as part of the whole stack) always pulls `seed` in as a dependency too (ADR 0037).
+    # Compose recreates and reruns a one-shot service when its own resolved config changes, but only if
+    # something actually asks for it that run; without this, changing AUTHFACADE_CLIENT_ID/_SECRET/
+    # _REDIRECT_URI (or the formula that builds the seed's redirect URI, as ADR 0033 did) left the stale
+    # registration in place until someone remembered to `docker compose up seed` by hand, and OpenEMR
+    # answered every login with `invalid_client`.
     depends_on:
       openemr:
         condition: service_healthy
+      seed:
+        condition: service_completed_successfully
     ports:
       - "${HOST_BIND_ADDRESS:-127.0.0.1}:${AUTHFACADE_HTTP_PORT:-7128}:8080"
     environment:
