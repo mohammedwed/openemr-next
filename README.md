@@ -164,7 +164,6 @@ gateway. It does not store passwords or user records.
 ### Known gaps
 
 - `/api/v1/me` confirms identity only. Authorization for OpenEMR data is not built.
-- The audience check uses a fixed string rather than a registered client.
 - Login outcomes and `/api/v1/me` access are not audit-logged.
 - The service serves plain HTTP on port 8080, with no HTTPS redirect or HSTS.
 - Startup does not wait for OpenEMR, so early requests can fail.
