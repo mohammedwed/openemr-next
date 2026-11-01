@@ -1,4 +1,5 @@
 using Yarp.ReverseProxy.Configuration;
+using Yarp.ReverseProxy.Transforms;
 
 // The single external origin a browser talks to (ADR 0033): WebApp (the dashboard) and AuthFacade need to
 // share one origin for the AuthFacadeSession cookie to work on the dashboard's own fetch calls, without
@@ -65,8 +66,43 @@ ClusterConfig[] clusters =
     }
 ];
 
-builder.Services.AddReverseProxy().LoadFromMemory(routes, clusters);
+// Every route forwarded to AuthFacade carries the real scheme and client address (ADR 0039): AuthFacade's
+// own forwarded-headers middleware trusts exactly this gateway's network to read them, which is what lets
+// the session cookie's Secure flag and the per-address login rate limit (ADR 0038) both see the truth
+// instead of this gateway's own scheme and address. Registered once, globally -- it applies to every
+// route this proxy builds, WebApp's included, the same way the BFF proxy's own token-attaching transform
+// (OpenEmrBffProxyServiceCollectionExtensions) applies globally despite that proxy having only one route.
+//
+// The HSTS header is added here too, not via app.UseHsts(): this app does nothing but proxy (every
+// request matches MapReverseProxy, there is no other endpoint), so the backend's own response headers
+// are always what a client actually sees -- middleware-set response headers never survive being copied
+// over by the proxied response. Confirmed by testing: with only UseHsts() in the pipeline, the header
+// never reached the client at all.
+builder.Services.AddReverseProxy()
+    .LoadFromMemory(routes, clusters)
+    .AddTransforms(transformContext =>
+    {
+        transformContext.AddXForwardedFor().AddXForwardedProto();
+        transformContext.AddResponseHeader("Strict-Transport-Security", "max-age=2592000", append: false, ResponseCondition.Always);
+    });
+
+// HttpsRedirection:HttpsPort is the externally-published HTTPS port (GATEWAY_HTTPS_PORT), not Kestrel's
+// own internal 8443: the redirect's Location header must name a port the browser can actually reach.
+builder.Services.AddHttpsRedirection(options =>
+{
+    var httpsPort = builder.Configuration.GetValue<int?>("HttpsRedirection:HttpsPort");
+    if (httpsPort is not null)
+    {
+        options.HttpsPort = httpsPort;
+    }
+});
 
 var app = builder.Build();
+
+// Redirects any plain-HTTP request to HTTPS (ADR 0039), before the proxy itself runs, so neither
+// AuthFacade nor WebApp ever see a request this gateway hasn't already upgraded. HSTS is a response
+// transform above, not middleware here -- see that comment for why.
+app.UseHttpsRedirection();
+
 app.MapReverseProxy();
 app.Run();

@@ -75,3 +75,6 @@ nunit-*.xml
 !.env.example
 
 snapshots/
+
+# Self-signed dev cert for the gateway (scripts/setup/new-dev-cert.sh, ADR 0039)
+/certs/
