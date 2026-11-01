@@ -112,7 +112,11 @@ ADR 0026) and the resulting session cookie (ADR 0027).
 - `/oidc/login` and `/callback` are rate limited per client address, one
   shared budget across both steps of the flow (ADR 0018's design, resurrected
   by ADR 0038 after ADR 0035 removed it along with the password grant)
-- Unit tests (42), architecture tests (1) and live integration tests (5) pass
+- HTTPS for the service itself, with a redirect and HSTS: the gateway
+  terminates TLS with a local dev cert and AuthFacade trusts its forwarded
+  headers (ADR 0039), so the session cookie's Secure flag — code already
+  written to expect this (ADR 0024/0026) — is finally true end to end
+- Unit tests (48), architecture tests (1) and live integration tests (5) pass
   (down from this bullet's original counts: ADR 0035 removed the password
   grant, its tests, and the Domain/Application/Ports/Infrastructure layers)
 
@@ -125,8 +129,6 @@ ADR 0026) and the resulting session cookie (ADR 0027).
 - ADR: identity bridge design
 - Audit log of login outcomes and `/me` access, with no credentials or tokens
   in the log
-- HTTPS for the service itself, with a redirect and HSTS. Required before any
-  shared environment
 
 **Exit criteria:** The security items above are either done or recorded as
 accepted risks. The ADR is merged.

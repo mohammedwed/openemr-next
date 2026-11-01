@@ -5,6 +5,7 @@ Run everything from the repository root.
 | Script | Run by | Purpose |
 | --- | --- | --- |
 | `setup/new-env.sh` | you, once | Create `.env` from `.env.example` with generated secrets. Never overwrites an existing `.env`. |
+| `setup/new-dev-cert.sh` | you, once | Generate the gateway's self-signed TLS certificate in `certs/` (ADR 0039). Never overwrites an existing one. |
 | `stack/up.sh` | you | Start or resume the stack. With `--restore`, wipe the volumes and rebuild from the snapshot in `snapshots/` (downloaded from the release if missing). |
 | `stack/apply-credentials.sh` | `up.sh`, CI | Write the `.env` credentials into a restored stack: the database password, OpenEMR's `sqlconf.php`, and the AuthFacade client secret and redirect URI. |
 | `snapshot/create.sh` | you | Dump the database and sites volume into `snapshots/`. Stops `openemr` and `auth-facade` while it runs. |
@@ -19,7 +20,7 @@ Run everything from the repository root.
 | Docker with `docker compose` | everything except `setup/new-env.sh`, `dev/generate-authfacade-openapi.sh` |
 | `bash` (Git Bash on Windows) and `curl` | `stack/up.sh`, `stack/apply-credentials.sh`, `dev/generate-authfacade-openapi.sh` |
 | `jq` | `dev/generate-authfacade-openapi.sh` |
-| `openssl` | `setup/new-env.sh` |
+| `openssl` | `setup/new-env.sh`, `setup/new-dev-cert.sh` |
 | GitHub CLI `gh`, logged in | `stack/up.sh --restore` when `snapshots/` is empty |
 
 ## Optional environment variables
@@ -33,6 +34,7 @@ Run everything from the repository root.
 
 ```bash
 bash scripts/setup/new-env.sh
+bash scripts/setup/new-dev-cert.sh
 bash scripts/stack/up.sh --restore
 ```
 
