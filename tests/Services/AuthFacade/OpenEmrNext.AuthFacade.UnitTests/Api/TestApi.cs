@@ -101,7 +101,7 @@ internal sealed class TestApi : IAsyncDisposable
         builder.AddAuthFacadeHttpDependencies();
 
         var app = builder.Build();
-        await app.EnsureOpenIddictClientDatabaseCreatedAsync();
+        await app.EnsureAuthFacadeDatabaseCreatedAsync();
         app.UseAuthFacadeHttpMiddleware();
         app.MapAuthFacadeEndpoints();
         app.MapOpenApi();

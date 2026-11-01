@@ -5,8 +5,8 @@
 #   bash scripts/setup/new-env.sh
 #
 # Needs:   openssl, and .env.example in the repository root.
-# Sets:    DB_ROOT_PASSWORD, DB_PASSWORD and AUTHFACADE_CLIENT_SECRET to random values, and
-#          OPENEMR_ADMIN_PASSWORD to the snapshot's fixed admin password.
+# Sets:    DB_ROOT_PASSWORD, DB_PASSWORD, AUTHFACADE_CLIENT_SECRET and AUTHFACADE_DB_PASSWORD to random
+#          values, and OPENEMR_ADMIN_PASSWORD to the snapshot's fixed admin password.
 # Exits 1: if .env already exists, or .env.example is missing.
 set -euo pipefail
 
@@ -30,6 +30,7 @@ source scripts/lib/env.sh
 env_set DB_ROOT_PASSWORD "$(secret)"
 env_set DB_PASSWORD "$(secret)"
 env_set AUTHFACADE_CLIENT_SECRET "$(secret)"
+env_set AUTHFACADE_DB_PASSWORD "$(secret)"
 
 # The snapshot's admin hash matches this password, so it must not be generated.
 env_set OPENEMR_ADMIN_PASSWORD "ci-admin-password"

@@ -109,6 +109,26 @@ services:
       - ./scripts/seeds/authfacade-client.php:/seed/authfacade-client.php:ro
     entrypoint: ["php", "/seed/authfacade-client.php"]
 
+  # ---- One-shot: creates AuthFacade's own dedicated database and user ----
+  # Runs the bare MariaDB image already used for the mysql service itself (ADR 0043): AuthFacade's
+  # session-related state (OpenIddict.Client's state-token store and the Data Protection key ring behind
+  # the AuthFacadeSession cookie) lives here, in a database separate from OpenEMR's own, surviving a
+  # container restart instead of being lost with it.
+  seed-authfacade-db:
+    image: ${MARIADB_IMAGE}
+    restart: "no"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_PWD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
+      AUTHFACADE_DB_NAME: ${AUTHFACADE_DB_NAME:-authfacade}
+      AUTHFACADE_DB_USER: ${AUTHFACADE_DB_USER:-authfacade}
+      AUTHFACADE_DB_PASSWORD: ${AUTHFACADE_DB_PASSWORD:?Set AUTHFACADE_DB_PASSWORD in .env}
+    volumes:
+      - ./scripts/seeds/authfacade-db.sh:/seed/authfacade-db.sh:ro
+    entrypoint: ["bash", "/seed/authfacade-db.sh"]
+
   # ---- AuthFacade (.NET) ----
   auth-facade:
     build:
@@ -132,6 +152,8 @@ services:
         condition: service_healthy
       seed:
         condition: service_completed_successfully
+      seed-authfacade-db:
+        condition: service_completed_successfully
     ports:
       - "${HOST_BIND_ADDRESS:-127.0.0.1}:${AUTHFACADE_HTTP_PORT:-7128}:8080"
     environment:
@@ -151,6 +173,12 @@ services:
       # The one network the gateway's forwarded X-Forwarded-For/-Proto headers (ADR 0039) are trusted
       # from, so a request reaching AuthFacade directly on its own published port cannot spoof either one.
       ForwardedHeaders__TrustedNetworkCidr: ${DOCKER_NETWORK_CIDR:-172.28.0.0/16}
+      # AuthFacade's own dedicated database (ADR 0043), created by seed-authfacade-db above -- separate
+      # from OpenEMR's own "openemr" database, on the same mysql service.
+      AuthFacadeDb__Host: mysql
+      AuthFacadeDb__Database: ${AUTHFACADE_DB_NAME:-authfacade}
+      AuthFacadeDb__User: ${AUTHFACADE_DB_USER:-authfacade}
+      AuthFacadeDb__Password: ${AUTHFACADE_DB_PASSWORD:?Set AUTHFACADE_DB_PASSWORD in .env}
 
   # ---- WebApp (Blazor WebAssembly dashboard) ----
   # Static files only, served by nginx (ADR 0033). Not published on the host: it only works correctly

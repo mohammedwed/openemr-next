@@ -9,7 +9,7 @@ using Scalar.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 builder.AddAuthFacadeHttpDependencies();
 var app = builder.Build();
-await app.EnsureOpenIddictClientDatabaseCreatedAsync();
+await app.EnsureAuthFacadeDatabaseCreatedAsync();
 await app.WaitForOpenEmrAsync();
 app.UseAuthFacadeHttpMiddleware();
 app.MapAuthFacadeEndpoints();

@@ -24,6 +24,11 @@
          pipeline, which needs Polly v7 loadable at runtime. -->
     <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="10.0.11" ExcludeAssets="compile" />
     <PackageReference Include="Polly" Version="7.2.4" ExcludeAssets="compile" />
+    <!-- Transitive via the Api project's DataProtection.EntityFrameworkCore (ADR 0043), resolved here to a
+         vulnerable 10.0.7 (several GHSA advisories, last fixed in 10.0.13). Unlike the Api project, this
+         project uses the plain Microsoft.NET.Sdk, not Sdk.Web, so it gets no ASP.NET Core shared-framework
+         pruning for this package (no NU1510 here): the pin is real and necessary, not cosmetic. -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.13" />
   </ItemGroup>
 
   <ItemGroup>

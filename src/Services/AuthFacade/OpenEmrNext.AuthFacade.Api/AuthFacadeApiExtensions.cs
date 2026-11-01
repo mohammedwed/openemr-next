@@ -28,7 +28,6 @@ public static class AuthFacadeApiExtensions
             .AddAuthorization()
             .AddOpenApi(options => options.ConfigureAuthFacade());
 
-        builder.Services.AddDataProtection();
         builder.Services.AddOptions<BrowserFlowOptions>()
             .Bind(builder.Configuration.GetSection(BrowserFlowOptions.SectionName))
             .ValidateDataAnnotations()
