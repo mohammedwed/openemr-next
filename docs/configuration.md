@@ -138,6 +138,17 @@ Governs where the browser authorization-code flow (ADR 0024) sends the browser.
 | `DefaultReturnUrl` | required | Where `/login` and `/callback` send the browser with no usable `returnUrl`. Points at the Login UI. Also where `/logout` always sends the browser (ADR 0040) — logout has no caller-supplied `returnUrl` of its own, and this is the one value registered as `AUTHFACADE_POST_LOGOUT_REDIRECT_URI`. |
 | `ReturnUrlAllowedHosts` | required, at least one | Hosts a caller-supplied `returnUrl` may resolve to; anything else falls back to `DefaultReturnUrl`. Not read by `/logout`. |
 
+### `LoginRateLimit`
+
+Limits requests to `/oidc/login` and `/callback` per client address (ADR 0038). Every request counts,
+successful or not; an over-limit request gets 429 with a `Retry-After` header and is never forwarded to
+OpenEMR.
+
+| Key | Default | Rule |
+| --- | --- | --- |
+| `PermitLimit` | `10` | At least 1. |
+| `Window` | `00:01:00` | At least one second. |
+
 ### Running outside Docker
 
 `appsettings.Development.json` points `OpenEmr:BaseUrl` and `Issuer` at `https://localhost:9300`.
