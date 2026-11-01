@@ -138,8 +138,8 @@ generic `login_failed` redirect in Decision 6 actually runs for every failure pa
   internals (the `Configuration`-vs-`ConfigurationManager` split, the `JsonWebKeySet`-vs-`SigningKeys` split)
   that is not obvious from the public API surface and was only found by reading OpenIddict's own source;
   an OpenIddict upgrade that changes this internal shape could silently break JWKS resolution again.
-- RP-initiated logout is still not covered, for the same reason ADR 0024 could not cover it: unconfirmed
-  whether OpenEMR's discovery document publishes an `end_session_endpoint`.
+- RP-initiated logout was not covered here, for the same reason ADR 0024 could not cover it: unconfirmed
+  whether OpenEMR's discovery document publishes an `end_session_endpoint`. It does; [ADR 0040](0040-rp-initiated-logout.md) builds it.
 - No shared Data Protection or OpenIddict-state key ring exists for multiple instances — the SQLite file and
   the dev certificates are both per-process.
 - `/oidc/login` and `/callback` remain unrated by ADR 0018's per-address login rate limit, the same gap ADR

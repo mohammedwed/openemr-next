@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
+using OpenEmrNext.AuthFacade.Api.Resilience;
 using OpenEmrNext.AuthFacade.UnitTests.Infrastructure;
 using OpenIddict.Abstractions;
 
@@ -37,7 +38,7 @@ public class OpenEmrConfigurationManagerTests
     }
 
     /// <summary>A configuration manager over a fake JWKS endpoint publishing the test key's public half.</summary>
-    private OpenEmrConfigurationManager CreateManager()
+    private OpenEmrConfigurationManager CreateManager(CircuitBreakerOptions? circuitBreaker = null)
     {
         SetFreshJwksResponse();
 
@@ -48,7 +49,9 @@ public class OpenEmrConfigurationManagerTests
             TokenEndpoint = new Uri("https://openemr.test/oauth2/default/token")
         };
 
-        return new OpenEmrConfigurationManager(new HttpClient(_handler), configuration, JwksUri);
+        return new OpenEmrConfigurationManager(
+            new HttpClient(_handler), configuration, JwksUri,
+            OpenEmrCircuitBreakers.CreateJwksPipeline(circuitBreaker ?? new CircuitBreakerOptions()));
     }
 
     [Fact]
@@ -110,6 +113,30 @@ public class OpenEmrConfigurationManagerTests
         await manager.GetConfigurationAsync(CancellationToken.None);
 
         Assert.Equal(2, _handler.CallCount);
+    }
+
+    [Fact]
+    public async Task An_open_circuit_stops_fetching_and_keeps_whatever_keys_it_already_had()
+    {
+        // ADR 0041: once the JWKS endpoint has failed MinimumThroughput times, the breaker opens and the
+        // next fetch is refused before any request reaches the handler at all.
+        var manager = CreateManager(new CircuitBreakerOptions
+        {
+            MinimumThroughput = 2,
+            SamplingDuration = TimeSpan.FromSeconds(30),
+            BreakDuration = TimeSpan.FromSeconds(30)
+        });
+        _handler.Response = new HttpResponseMessage(HttpStatusCode.InternalServerError);
+        await manager.GetConfigurationAsync(CancellationToken.None);
+        manager.RequestRefresh();
+        await manager.GetConfigurationAsync(CancellationToken.None);
+        var callsOnceOpen = _handler.CallCount;
+
+        manager.RequestRefresh();
+        var configuration = await manager.GetConfigurationAsync(CancellationToken.None);
+
+        Assert.Equal(callsOnceOpen, _handler.CallCount);
+        Assert.Null(configuration.JsonWebKeySet);
     }
 
     [Fact]

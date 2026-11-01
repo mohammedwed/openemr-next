@@ -14,13 +14,14 @@
             break;
 
         case State.SignedIn:
-            <MudPaper Elevation="2" Class="pa-6">
+            <MudPaper Elevation="2" Class="pa-6 d-flex flex-column ga-4">
                 <MudText Typo="Typo.h6">Signed in as @_name</MudText>
                 <MudText Typo="Typo.body2" Class="mb-4">Subject: @_subject</MudText>
                 <MudAlert Severity="Severity.Info">
                     Patient and encounter data isn't built yet (ROADMAP M4/M5) — this page proves the
                     sign-in round trip end to end, through the generated AuthFacadeClient.
                 </MudAlert>
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/logout" Class="align-self-start">Log out</MudButton>
             </MudPaper>
             break;
 

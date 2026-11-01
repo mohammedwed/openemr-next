@@ -109,15 +109,26 @@ ADR 0026) and the resulting session cookie (ADR 0027).
 - A request body proxied to OpenEMR never appears in any log, across every
   logger category down to Trace — AuthFacade calls no logger directly, and
   this guards against a regression from the framework or a library
+- `/oidc/login` and `/callback` are rate limited per client address, one
+  shared budget across both steps of the flow (ADR 0018's design, resurrected
+  by ADR 0038 after ADR 0035 removed it along with the password grant)
 - HTTPS for the service itself, with a redirect and HSTS: the gateway
   terminates TLS with a local dev cert and AuthFacade trusts its forwarded
   headers (ADR 0039), so the session cookie's Secure flag — code already
   written to expect this (ADR 0024/0026) — is finally true end to end
+- Logout ends both AuthFacade's and OpenEMR's own session via RP-initiated
+  logout (ADR 0040) — the `end_session_endpoint` ADR 0024/0026 left
+  unconfirmed turned out to exist, and its exact contract (a required
+  `id_token_hint`, an exact-match `post_logout_redirect_uri`) is now handled
+- Circuit breakers guard the token exchange, the JWKS fetch and the BFF
+  proxy's forwarded calls (ADR 0041), resurrecting ADR 0017's design for the
+  two call sites that exist after ADR 0035 removed the ones it originally
+  guarded; verified live by stopping the openemr container mid-session
 - Audit log of login outcomes and BFF proxy access, with no credentials or
   tokens in the log — scoped there instead of `/me` (ADR 0042): the BFF
   proxy is where a signed-in session actually touches OpenEMR's data, at a
   fraction of `/me`'s per-page-load volume
-- Unit tests (46), architecture tests (1) and live integration tests (5) pass
+- Unit tests (60), architecture tests (1) and live integration tests (5) pass
   (down from this bullet's original counts: ADR 0035 removed the password
   grant, its tests, and the Domain/Application/Ports/Infrastructure layers)
 
@@ -126,7 +137,10 @@ ADR 0026) and the resulting session cookie (ADR 0027).
 - Persist data-protection keys (closes one of three gaps blocking more than one AuthFacade instance, see
   ADR 0028)
 - For browser sessions, silent refresh on an expired access token is explicitly
-  deferred rather than forgotten (ADR 0029); revocation (logout) is unaddressed
+  deferred rather than forgotten (ADR 0029); force-ending a session from
+  outside the browser that holds it (an admin action, or a stolen-cookie
+  response) still has no server-side session record to revoke against (ADR
+  0040) — logout itself is done, that narrower gap is not
 - ADR: identity bridge design
 
 **Exit criteria:** The security items above are either done or recorded as

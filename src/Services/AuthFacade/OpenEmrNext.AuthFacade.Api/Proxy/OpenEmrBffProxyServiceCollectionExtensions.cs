@@ -4,8 +4,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.JsonWebTokens;
 using OpenEmrNext.AuthFacade.Api.Audit;
 using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
+using OpenEmrNext.AuthFacade.Api.Resilience;
 using OpenEmrNext.AuthFacade.Composition;
 using Yarp.ReverseProxy.Configuration;
+using Yarp.ReverseProxy.Forwarder;
 using Yarp.ReverseProxy.Transforms;
 
 namespace OpenEmrNext.AuthFacade.Api.Proxy;
@@ -37,6 +39,14 @@ public static class OpenEmrBffProxyServiceCollectionExtensions
     {
         var openEmr = configuration.GetSection(OpenEmrOptions.SectionName).Get<OpenEmrOptions>()
             ?? throw new InvalidOperationException($"The '{OpenEmrOptions.SectionName}' configuration section is missing.");
+
+        // Read directly, the same reason AddOpenIddictClient does (ADR 0041): the breaker is built now,
+        // synchronously, not resolved per-request later. Still registered and validated at startup via
+        // AddOpenIddictClient's own call for the same options type -- not repeated here, since both call
+        // sites share one OpenEmr:CircuitBreaker section and AddAuthFacadeHttpDependencies always calls
+        // AddOpenIddictClient too.
+        var circuitBreaker = configuration.GetSection(CircuitBreakerOptions.SectionName).Get<CircuitBreakerOptions>()
+            ?? new CircuitBreakerOptions();
 
         var route = new RouteConfig
         {
@@ -93,6 +103,11 @@ public static class OpenEmrBffProxyServiceCollectionExtensions
                     return default;
                 });
             });
+
+        // Registered after AddReverseProxy()'s own TryAddSingleton for the same service type, so this one
+        // is what actually gets resolved (ADR 0041) -- see CircuitBreakingForwarderHttpClientFactory's remarks.
+        services.AddSingleton<IForwarderHttpClientFactory>(
+            new CircuitBreakingForwarderHttpClientFactory(OpenEmrCircuitBreakers.CreateHttpPipeline(circuitBreaker)));
 
         return services;
     }

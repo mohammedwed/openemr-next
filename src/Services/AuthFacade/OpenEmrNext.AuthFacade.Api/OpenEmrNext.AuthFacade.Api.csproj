@@ -15,6 +15,16 @@
     <PackageReference Include="OpenIddict.Client.SystemNetHttp" Version="7.7.2" />
     <PackageReference Include="OpenIddict.EntityFrameworkCore" Version="7.7.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.14" />
+    <!--
+      OpenIddict.Client.SystemNetHttp transitively pulls in Microsoft.Extensions.Http.Polly, which still
+      depends on the legacy Polly v7 package. Its Polly.CircuitBreaker.BrokenCircuitException collides, at
+      COMPILE time, with the same type name in Polly.Core v8, which the circuit breakers (ADR 0041) use
+      directly, so compile assets are excluded to drop it from the compiler's reference set. Runtime
+      assets are kept: OpenIddict.Client.SystemNetHttp's own handler configuration actually loads Polly v7
+      at startup (confirmed: excluding "all" instead of "compile" here throws FileNotFoundException for it).
+    -->
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="10.0.11" ExcludeAssets="compile" />
+    <PackageReference Include="Polly" Version="7.2.4" ExcludeAssets="compile" />
     <PackageReference Include="Yarp.ReverseProxy" Version="2.3.0" />
   </ItemGroup>
 

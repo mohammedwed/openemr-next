@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using OpenEmrNext.AuthFacade.Api.Audit;
 using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
+using OpenEmrNext.AuthFacade.Api.RateLimiting;
 using OpenIddict.Client.AspNetCore;
 
 namespace OpenEmrNext.AuthFacade.Api.Endpoints;
@@ -15,7 +16,8 @@ namespace OpenEmrNext.AuthFacade.Api.Endpoints;
 /// OpenIddict client's own redirection endpoint, reached via passthrough — completes it and establishes the
 /// local session cookie. Reuses <see cref="ReturnUrlValidator"/> and <see cref="BrowserFlowOptions"/> from
 /// the earlier hand-rolled flow (ADR 0024); the allow-list problem they solve is unchanged by which engine
-/// drives the redirect.
+/// drives the redirect. Both routes require <see cref="RateLimitingServiceCollectionExtensions.LoginPolicy"/>,
+/// so a flood of requests from one address is refused before either handler runs (ADR 0038).
 /// </summary>
 public static class OpenIddictClientEndpoints
 {
@@ -26,13 +28,15 @@ public static class OpenIddictClientEndpoints
     {
         app.MapGet("/oidc/login", HandleLogin)
             .AllowAnonymous()
-            .ExcludeFromDescription();
+            .ExcludeFromDescription()
+            .RequireRateLimiting(RateLimitingServiceCollectionExtensions.LoginPolicy);
 
         // Cast to Delegate: MapMethods otherwise binds this to the raw-RequestDelegate overload (ASP0016),
         // which discards the Task<IResult> return value and would always answer a bare 200.
         app.MapMethods("/callback", ["GET", "POST"], (Delegate)HandleCallbackAsync)
             .AllowAnonymous()
-            .ExcludeFromDescription();
+            .ExcludeFromDescription()
+            .RequireRateLimiting(RateLimitingServiceCollectionExtensions.LoginPolicy);
 
         return app;
     }
@@ -58,10 +62,26 @@ public static class OpenIddictClientEndpoints
     /// outcome is recorded to the audit trail (ADR 0042) — the subject on success, a fixed internal reason
     /// label on failure, never OpenEMR's own error text there either.
     /// </summary>
-    private static async Task<IResult> HandleCallbackAsync(HttpContext context, ILogger<AuditLog> auditLog)
+    private static async Task<IResult> HandleCallbackAsync(
+        HttpContext context, IOptions<BrowserFlowOptions> browserFlowOptions, ILogger<AuditLog> auditLog)
     {
-        var result = await context.AuthenticateAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
-        var returnUrl = result.Properties?.RedirectUri ?? "/";
+        AuthenticateResult result;
+        try
+        {
+            result = await context.AuthenticateAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
+        }
+        catch (Exception)
+        {
+            // The token exchange itself blew up before OpenIddict could produce a failed AuthenticateResult
+            // at all -- e.g. the circuit breaker (ADR 0041) refusing the call outright because OpenEMR's
+            // token endpoint is already known to be down. There is no AuthenticationProperties to recover a
+            // returnUrl from here, so this falls back to the same default /oidc/login itself uses for a
+            // returnUrl it cannot use.
+            auditLog.LoginFailed("exception");
+            return Results.Redirect(QueryHelpers.AddQueryString(browserFlowOptions.Value.DefaultReturnUrl, "error", "login_failed"));
+        }
+
+        var returnUrl = result.Properties?.RedirectUri ?? browserFlowOptions.Value.DefaultReturnUrl;
 
         if (!result.Succeeded || result.Principal is not { Identity.IsAuthenticated: true } principal)
         {
