@@ -47,3 +47,4 @@ old one's status is updated to point to it.
 | [0039](0039-gateway-terminates-tls-authfacade-trusts-forwarded-headers.md) | The gateway terminates TLS; AuthFacade trusts its forwarded headers | Accepted | 2026-11-01 |
 | [0040](0040-rp-initiated-logout.md) | RP-initiated logout ends both AuthFacade's and OpenEMR's sessions | Accepted | 2026-11-01 |
 | [0041](0041-circuit-breakers-guard-the-remaining-openemr-calls.md) | Circuit breakers guard the remaining calls to OpenEMR | Accepted | 2026-11-01 |
+| [0042](0042-audit-log-scoped-to-login-and-the-bff-proxy.md) | The audit trail covers login outcomes and the BFF proxy, not `/me` | Accepted | 2026-11-01 |

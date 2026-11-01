@@ -1,5 +1,8 @@
 using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.JsonWebTokens;
+using OpenEmrNext.AuthFacade.Api.Audit;
 using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
 using OpenEmrNext.AuthFacade.Api.Resilience;
 using OpenEmrNext.AuthFacade.Composition;
@@ -15,7 +18,8 @@ namespace OpenEmrNext.AuthFacade.Api.Proxy;
 /// <see cref="RoutePrefix"/> is forwarded to <c>OpenEmr:BaseUrl</c> at the same remaining path, with the real
 /// OpenEMR access token the session cookie carries (ADR 0027) attached as <c>Authorization: Bearer</c>.
 /// OpenEMR's response is relayed back unchanged, the same passthrough principle ADR 0013 already applied to
-/// the token endpoint.
+/// the token endpoint. Every call is also recorded to the audit trail (ADR 0042): this is the one place a
+/// signed-in session actually touches OpenEMR's data.
 /// </summary>
 public static class OpenEmrBffProxyServiceCollectionExtensions
 {
@@ -65,22 +69,40 @@ public static class OpenEmrBffProxyServiceCollectionExtensions
 
         services.AddReverseProxy()
             .LoadFromMemory([route], [cluster])
-            .AddTransforms(builderContext => builderContext.AddRequestTransform(async transformContext =>
+            .AddTransforms(builderContext =>
             {
-                // The only credential a browser session holds is the AuthFacadeSession cookie (ADR
-                // 0024/0026); the real OpenEMR token it carries (ADR 0027) is attached here, server-side, so
-                // OpenEMR sees an ordinary bearer-authenticated request. No token on the session (a ticket
-                // that predates ADR 0027, or one OpenEMR never issued a refresh/access pair for) means no
-                // Authorization header is attached at all -- OpenEMR then rejects the request itself; this
-                // proxy makes no auth decision of its own (ADR 0013's passthrough).
-                var accessToken = await transformContext.HttpContext.GetTokenAsync(
-                    OpenIddictClientServiceCollectionExtensions.SessionScheme, "access_token");
-
-                if (!string.IsNullOrEmpty(accessToken))
+                builderContext.AddRequestTransform(async transformContext =>
                 {
-                    transformContext.ProxyRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-                }
-            }));
+                    // The only credential a browser session holds is the AuthFacadeSession cookie (ADR
+                    // 0024/0026); the real OpenEMR token it carries (ADR 0027) is attached here, server-side, so
+                    // OpenEMR sees an ordinary bearer-authenticated request. No token on the session (a ticket
+                    // that predates ADR 0027, or one OpenEMR never issued a refresh/access pair for) means no
+                    // Authorization header is attached at all -- OpenEMR then rejects the request itself; this
+                    // proxy makes no auth decision of its own (ADR 0013's passthrough).
+                    var accessToken = await transformContext.HttpContext.GetTokenAsync(
+                        OpenIddictClientServiceCollectionExtensions.SessionScheme, "access_token");
+
+                    if (!string.IsNullOrEmpty(accessToken))
+                    {
+                        transformContext.ProxyRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                    }
+                });
+
+                // Every call that reaches this proxy touches real OpenEMR data, so it goes to the audit
+                // trail (ADR 0042): who (the session's subject), what (method and the path the browser
+                // called, not OpenEMR's own rewritten one), and the outcome -- never the request or
+                // response body, and never the token this same transform step attached above.
+                builderContext.AddResponseTransform(transformContext =>
+                {
+                    var auditLog = transformContext.HttpContext.RequestServices.GetRequiredService<ILogger<AuditLog>>();
+                    var subject = transformContext.HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ?? "unknown";
+                    var statusCode = transformContext.ProxyResponse is null ? 0 : (int)transformContext.ProxyResponse.StatusCode;
+
+                    auditLog.ProxyAccess(subject, transformContext.HttpContext.Request.Method, transformContext.HttpContext.Request.Path, statusCode);
+
+                    return default;
+                });
+            });
 
         // Registered after AddReverseProxy()'s own TryAddSingleton for the same service type, so this one
         // is what actually gets resolved (ADR 0041) -- see CircuitBreakingForwarderHttpClientFactory's remarks.

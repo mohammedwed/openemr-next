@@ -2,6 +2,8 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
+using OpenEmrNext.AuthFacade.Api.Audit;
 using OpenEmrNext.AuthFacade.Api.OpenIddictClient;
 using OpenEmrNext.AuthFacade.Api.RateLimiting;
 using OpenIddict.Client.AspNetCore;
@@ -56,9 +58,12 @@ public static class OpenIddictClientEndpoints
     /// identity, carries the real OpenEMR access/refresh token into the session cookie (see
     /// <see cref="OpenIddictTokenCapture.Capture"/>), and signs in with the cookie scheme; on failure,
     /// redirects to the resolved return URL (OpenIddict preserves <see cref="AuthenticationProperties.RedirectUri"/>
-    /// from the challenge) with a generic error code, never OpenEMR's or OpenIddict's own error text.
+    /// from the challenge) with a generic error code, never OpenEMR's or OpenIddict's own error text. Either
+    /// outcome is recorded to the audit trail (ADR 0042) — the subject on success, a fixed internal reason
+    /// label on failure, never OpenEMR's own error text there either.
     /// </summary>
-    private static async Task<IResult> HandleCallbackAsync(HttpContext context, IOptions<BrowserFlowOptions> browserFlowOptions)
+    private static async Task<IResult> HandleCallbackAsync(
+        HttpContext context, IOptions<BrowserFlowOptions> browserFlowOptions, ILogger<AuditLog> auditLog)
     {
         AuthenticateResult result;
         try
@@ -72,6 +77,7 @@ public static class OpenIddictClientEndpoints
             // token endpoint is already known to be down. There is no AuthenticationProperties to recover a
             // returnUrl from here, so this falls back to the same default /oidc/login itself uses for a
             // returnUrl it cannot use.
+            auditLog.LoginFailed("exception");
             return Results.Redirect(QueryHelpers.AddQueryString(browserFlowOptions.Value.DefaultReturnUrl, "error", "login_failed"));
         }
 
@@ -79,11 +85,13 @@ public static class OpenIddictClientEndpoints
 
         if (!result.Succeeded || result.Principal is not { Identity.IsAuthenticated: true } principal)
         {
+            auditLog.LoginFailed("rejected");
             return Results.Redirect(QueryHelpers.AddQueryString(returnUrl, "error", "login_failed"));
         }
 
         var identity = new ClaimsIdentity(principal.Claims, OpenIddictClientServiceCollectionExtensions.SessionScheme);
         await context.SignInAsync(OpenIddictClientServiceCollectionExtensions.SessionScheme, new ClaimsPrincipal(identity), OpenIddictTokenCapture.Capture(result));
+        auditLog.LoginSucceeded(principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ?? "unknown");
 
         return Results.Redirect(returnUrl);
     }
