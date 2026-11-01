@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
