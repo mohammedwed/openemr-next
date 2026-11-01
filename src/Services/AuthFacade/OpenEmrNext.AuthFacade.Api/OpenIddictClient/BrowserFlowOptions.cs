@@ -1,9 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace OpenEmrNext.AuthFacade.Api.BrowserFlow;
+namespace OpenEmrNext.AuthFacade.Api.OpenIddictClient;
 
 /// <summary>
-/// Governs where the browser authorization-code flow (ADR 0024) sends the browser, bound from the
+/// Governs where the browser authorization-code flow (ADR 0026) sends the browser, bound from the
 /// <c>BrowserFlow</c> section.
 /// </summary>
 public sealed class BrowserFlowOptions : IValidatableObject
