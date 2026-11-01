@@ -77,6 +77,10 @@ internal sealed class FakeOpenEmrServer : IAsyncDisposable
         app.MapGet("/apis/default/api/missing-patient", () =>
             Results.Json(new { error = "not_found" }, statusCode: 404));
 
+        // Stands in for a future OpenEMR write (e.g. registering a patient) that takes a request body, for
+        // the request-logging test: it only needs to accept the body and answer 200, never to read it.
+        app.MapPost("/apis/default/api/echo", () => Results.Ok());
+
         app.MapGet("/oauth2/default/jwk", () =>
         {
             var key = rsa.ExportParameters(includePrivateParameters: false);
