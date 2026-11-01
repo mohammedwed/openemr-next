@@ -109,11 +109,14 @@ ADR 0026) and the resulting session cookie (ADR 0027).
 - A request body proxied to OpenEMR never appears in any log, across every
   logger category down to Trace — AuthFacade calls no logger directly, and
   this guards against a regression from the framework or a library
+- `/oidc/login` and `/callback` are rate limited per client address, one
+  shared budget across both steps of the flow (ADR 0018's design, resurrected
+  by ADR 0038 after ADR 0035 removed it along with the password grant)
 - HTTPS for the service itself, with a redirect and HSTS: the gateway
   terminates TLS with a local dev cert and AuthFacade trusts its forwarded
   headers (ADR 0039), so the session cookie's Secure flag — code already
   written to expect this (ADR 0024/0026) — is finally true end to end
-- Unit tests (42), architecture tests (1) and live integration tests (5) pass
+- Unit tests (48), architecture tests (1) and live integration tests (5) pass
   (down from this bullet's original counts: ADR 0035 removed the password
   grant, its tests, and the Domain/Application/Ports/Infrastructure layers)
 
