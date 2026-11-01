@@ -135,7 +135,15 @@ ADR 0026) and the resulting session cookie (ADR 0027).
   no longer silently logs out every signed-in session, the practical problem
   that motivated this over the state-token store's own narrower ~5-minute
   login-window gap
-- Unit tests (67), architecture tests (1) and live integration tests (5) pass
+- The `AuthFacadeSession` cookie now carries only an opaque key; the actual
+  ticket — claims and the real OpenEMR access/refresh token inside them (ADR
+  0027) — lives in a server-side record in the same database (ADR 0043), via
+  ASP.NET Core's own `ITicketStore` extensibility point (ADR 0044). A session
+  can now actually be revoked: `POST /sessions/revoke-all` ends every session
+  for the caller's own subject, the self-service answer to a suspected stolen
+  cookie that ADR 0028/0040 both named as missing — no cooperation needed
+  from whichever browser holds the stolen copy
+- Unit tests (71), architecture tests (1) and live integration tests (5) pass
   (down from this bullet's original counts: ADR 0035 removed the password
   grant, its tests, and the Domain/Application/Ports/Infrastructure layers)
 
@@ -146,10 +154,11 @@ ADR 0026) and the resulting session cookie (ADR 0027).
   0043 — a separate, file-based follow-up mirroring the gateway's TLS cert
   pattern, ADR 0039)
 - For browser sessions, silent refresh on an expired access token is explicitly
-  deferred rather than forgotten (ADR 0029); force-ending a session from
-  outside the browser that holds it (an admin action, or a stolen-cookie
-  response) still has no server-side session record to revoke against (ADR
-  0040) — logout itself is done, that narrower gap is not
+  deferred rather than forgotten (ADR 0029). Revoking an *arbitrary other*
+  user's session (the admin-action half of the gap ADR 0040 named) is still
+  not possible — it needs an authorization model this project does not have
+  yet, the same gap `/api/v1/me` already has; ADR 0044 only closed the
+  self-service, stolen-cookie half
 - ADR: identity bridge design
 
 **Exit criteria:** The security items above are either done or recorded as

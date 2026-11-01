@@ -18,6 +18,13 @@ rate limiting (ADR 0038), HTTPS with HSTS (ADR 0039), RP-initiated logout (ADR 0
 state persisted in a dedicated MariaDB database (ADR 0043) — each verified against the live stack, not just
 unit-tested. Two smaller startup-ordering fixes (ADR 0036, 0037) landed alongside them.
 
+Logout (ADR 0040) had named, and explicitly not solved, one more gap: no way to force-end a session from
+outside the browser holding it, since the `AuthFacadeSession` cookie's ticket was entirely self-contained —
+there was no server-side record of a session to delete. That is now fixed (ADR 0044): the cookie carries
+only an opaque key, the real ticket lives in the same database ADR 0043 introduced, and
+`POST /sessions/revoke-all` deletes every session for the caller's own subject, ending a stolen copy of the
+cookie immediately with no cooperation from whichever browser holds it.
+
 ## Removed
 
 - **The password grant and bearer authentication, and the layered architecture built around them** (ADR
@@ -125,6 +132,30 @@ unit-tested. Two smaller startup-ordering fixes (ADR 0036, 0037) landed alongsid
   this PR's checks failed immediately with "required variable ... is missing a value" before the stack ever
   started; fixed in `ci.yml` the same way the other secrets are handled there.
 
+### Session revocation (ADR 0044)
+
+- **The `AuthFacadeSession` cookie now carries only an opaque key, not the whole ticket.** The real
+  ticket — claims and the real OpenEMR access/refresh token inside them (ADR 0027) — is fetched from a new
+  `AuthFacadeSessions` table (same database as ADR 0043) on every request, via `AuthFacadeSessionStore`, a
+  singleton `ITicketStore` implementation assigned to the cookie scheme's `SessionStore`. `/callback` and
+  `/logout` needed no changes at all: both already call the standard `SignInAsync`/`SignOutAsync`, which
+  the cookie handler itself uses to call `StoreAsync`/`RemoveAsync` once a store is configured.
+- **`POST /sessions/revoke-all`** ends every session recorded for the caller's own subject, not just the
+  one making the request, then signs the caller's own current cookie out too. This is the self-service half
+  of the gap ADR 0028/0040 both named ("force-ending a session from outside the browser that holds it") —
+  the half achievable without inventing an authorization model this project does not have; revoking an
+  arbitrary *other* user's session (an admin action) is explicitly still not built.
+- OpenEMR itself has no server-to-server revocation endpoint to call (confirmed against its own OIDC
+  discovery document and source — `AccessTokenRepository`/`RefreshTokenRepository` have internal revoke
+  methods but no reachable REST route), so the underlying OpenEMR token is not revoked at OpenEMR's end —
+  a pre-existing limitation, unchanged by this work, now stated against this feature specifically.
+- The gateway's route table gained `/sessions/{**catch-all}`.
+- Verified live: the new `AuthFacadeSessions` table (with its `Subject` index) is created in the real
+  `authfacade` database; `/sessions/revoke-all` reaches AuthFacade through the gateway and answers 401
+  unauthenticated, the same as `/api/v1/me`. The existing `authfacade` database from ADR 0043 needed
+  dropping and recreating once for the new table to appear — the same "no migrations" limitation ADR
+  0043 already documented, hit again rather than newly introduced.
+
 ## Fixed
 
 - **The gateway now preserves the original `Host` header** on every route it forwards to AuthFacade
@@ -136,12 +167,12 @@ unit-tested. Two smaller startup-ordering fixes (ADR 0036, 0037) landed alongsid
 
 ## Tests
 
-- Unit tests end the day at 67 (up from 236 before ADR 0035's removals, down to a smaller base once the
+- Unit tests end the day at 71 (up from 236 before ADR 0035's removals, down to a smaller base once the
   password-grant layers were deleted, then back up as each hardening item added its own coverage: 6 for
   forwarded headers, 6 for rate limiting, 3 for logout, 5 for circuit breakers, 4 for audit logging, 7 for
-  the MariaDB session store). Architecture tests: 1 (down from 12, now enforcing only that `Composition`
-  never references `Api` or ASP.NET Core, the one layering rule still meaningful with two projects left).
-  Live integration tests: 5.
+  the MariaDB session store, 4 for session revocation). Architecture tests: 1 (down from 12, now enforcing
+  only that `Composition` never references `Api` or ASP.NET Core, the one layering rule still meaningful
+  with two projects left). Live integration tests: 5.
 - Verified with `curl` and a persistent cookie jar through the real gateway → AuthFacade → OpenEMR chain for
   the `Host`-header fix, submitting a bogus authorization code: before the fix, `/callback` crashed with
   `InvalidOperationException: ... endpoints that are not managed by the OpenIddict client stack`; after it,

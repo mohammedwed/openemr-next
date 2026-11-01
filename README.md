@@ -5,11 +5,11 @@ can be moved incrementally toward a modular C# architecture without a
 big-bang rewrite.
 
 > **Status:** Early implementation. The local stack, the database baseline,
-> AuthFacade as a BFF (browser login, session cookie, logout, a proxy to
-> OpenEMR's API — rate limited, circuit-broken, and audit-logged, over HTTPS,
-> with its own session state persisted in a dedicated database), a Blazor
-> WebAssembly dashboard, and a gateway terminating TLS in front of all of it
-> are built and tested. The domain services are not started.
+> AuthFacade as a BFF (browser login, a revocable session cookie, logout, a
+> proxy to OpenEMR's API — rate limited, circuit-broken, and audit-logged,
+> over HTTPS, with its own session state persisted in a dedicated database),
+> a Blazor WebAssembly dashboard, and a gateway terminating TLS in front of
+> all of it are built and tested. The domain services are not started.
 > **Not intended for production clinical use.**
 
 OpenEMR Next is not an official OpenEMR rewrite, fork, replacement, or
@@ -26,7 +26,7 @@ research vision below is the long-term direction, not the current deliverable.
 | Local stack | OpenEMR, MariaDB, and AuthFacade in one Docker Compose project | Built |
 | Database baseline | Reproducible schema and seed data from the OpenEMR installer | Built, not yet cleaned |
 | `OpenEmr.Data` | EF Core model scaffolded from the live database | Built |
-| AuthFacade | BFF (browser login via OIDC/PKCE, session cookie, logout, proxies browser calls to OpenEMR's API) — rate limited, circuit-broken, audit-logged, over HTTPS, with its own session state in a dedicated database | Built, hardening in progress |
+| AuthFacade | BFF (browser login via OIDC/PKCE, a revocable session cookie, logout, proxies browser calls to OpenEMR's API) — rate limited, circuit-broken, audit-logged, over HTTPS, with its own session state in a dedicated database | Built, hardening in progress |
 | WebApp dashboard | Blazor WebAssembly: shows the signed-in identity via a generated typed client; stub nav for Patients/Encounters | Built |
 | API gateway | Terminates TLS and routes a browser's requests by path: AuthFacade's own prefixes to it, everything else to the dashboard's static files (ADR 0033, ADR 0039). No token validation of its own yet, and nothing to route to beyond AuthFacade until a domain service exists | Built, narrower than originally planned |
 | Patient Management | Registers patients, publishes `PatientRegistered` | Planned |
@@ -80,6 +80,11 @@ stepping stone: each future service should scaffold only its own tables.
 - `GET /logout` ends the session locally, then redirects to OpenEMR's own RP-initiated logout endpoint
   when the session carries an `id_token`, ending both sessions together. See
   [ADR 0040](docs/architecture/0040-rp-initiated-logout.md).
+- `POST /sessions/revoke-all` ends every session for the caller's own subject, not just the one calling
+  it — the self-service response to a suspected stolen cookie. The `AuthFacadeSession` cookie carries only
+  an opaque key; the real ticket lives in a server-side record (same database as ADR 0043) that this
+  deletes, so a stolen copy of the cookie stops working on its very next use, with no cooperation from
+  whichever browser is holding it. See [ADR 0044](docs/architecture/0044-session-store-backs-the-cookie-for-revocation.md).
 - `GET /health` is a liveness check.
 - `/oidc/login` and `/callback` are rate limited per client address
   ([ADR 0038](docs/architecture/0038-rate-limit-login-and-callback-per-client-address.md)); the token
@@ -125,7 +130,7 @@ depends on it (ADR 0039). The gateway terminates TLS and decides where each requ
 ```
 
 Behind the gateway, AuthFacade drives the OAuth2 flow against OpenEMR and keeps its own session-related
-state — OpenIddict's state tokens and the Data Protection key ring behind the session cookie — in a
+state — OpenIddict's state tokens, the Data Protection key ring, and now each session's own ticket — in a
 dedicated database, separate from OpenEMR's own:
 
 ```text
@@ -138,10 +143,10 @@ dedicated database, separate from OpenEMR's own:
                         |     BFF for browsers   |  proxies browser calls to OpenEMR
                         +------+-------------+---+
                                |             |
-           OAuth2 (code, or a  |             |  session state only: OpenIddict's
-           proxied call with   |             |  state tokens + the Data Protection
-           the token attached) |             |  key ring behind the session cookie
-                               v             v  (ADR 0043)
+           OAuth2 (code, or a  |             |  session state only: OpenIddict's state
+           proxied call with   |             |  tokens, the Data Protection key ring, and
+           the token attached) |             |  each session's own revocable ticket
+                               v             v  (ADR 0043, ADR 0044)
                   +------------------+   +------------------------+
                   | OpenEMR (legacy) |   | mysql: authfacade DB  |
                   +--------+---------+   +------------------------+
@@ -200,6 +205,11 @@ gateway. It does not store passwords or user records.
   (ADR 0040) signs out the local session, then redirects to OpenEMR's own RP-initiated logout endpoint
   when the session captured an `id_token` — confirming the browser's own cookie is actually gone, not just
   AuthFacade's record of it.
+- **A session is a server-side record, not just an encrypted cookie — so it can be revoked.** The
+  `AuthFacadeSession` cookie carries only an opaque key (ADR 0044); the real ticket, and the real OpenEMR
+  token inside it, lives in AuthFacade's own database (ADR 0043). `POST /sessions/revoke-all` deletes it,
+  which is what makes a stolen copy of the cookie stop working everywhere, immediately — not just the
+  browser that calls it.
 
 ### Known gaps
 
@@ -221,12 +231,13 @@ gateway. It does not store passwords or user records.
 - The browser login's OIDC scope (`openid profile email offline_access`) does not
   include `api:oemr`, so the BFF proxy's calls to OpenEMR's protected API will be
   rejected by OpenEMR itself until that scope is deliberately widened. No silent
-  refresh happens when the session's access token expires, and there is still no
-  way to force-end a session from outside the browser holding it — an admin
-  action, or a response to a stolen cookie — since there is no server-side
-  session record to revoke against; logout itself (ADR 0040) only ends the
-  session the caller already holds. See
+  refresh happens when the session's access token expires either. See
   [ADR 0029](docs/architecture/0029-yarp-proxies-browser-sessions-to-openemrs-api.md).
+- `/sessions/revoke-all` (ADR 0044) only revokes the caller's *own* sessions. Revoking an arbitrary other
+  user's session — an admin action — is still not possible: it would need an authorization model this
+  project does not have, the same gap `/api/v1/me` already has above. Revoking a session also cannot
+  reach OpenEMR's own side: OpenEMR exposes no server-to-server token revocation endpoint, so the
+  underlying access/refresh token stays valid there until it naturally expires.
 - The gateway does no token validation of its own — it only routes by path.
   Every auth decision still happens in AuthFacade. If a future domain service
   needs authenticated requests, whether it validates its own token or the

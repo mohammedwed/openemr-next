@@ -1,6 +1,7 @@
 # 0040. RP-initiated logout ends both AuthFacade's and OpenEMR's sessions
 
-- **Status:** Accepted
+- **Status:** Accepted. The stolen-cookie revocation gap this ADR names below is closed by
+  [0044](0044-session-store-backs-the-cookie-for-revocation.md); the admin-action half of it is not.
 - **Date:** 2026-11-01
 
 ## Context
