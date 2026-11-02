@@ -70,7 +70,9 @@ stepping stone: each future service should scaffold only its own tables.
   at the same remaining path, with the session's real OpenEMR access token attached as
   `Authorization: Bearer` server-side. This is how a browser session — which never holds a
   bearer token itself — reaches OpenEMR's API. Requires the `AuthFacadeSession` cookie
-  specifically, and is guarded by a circuit breaker and logged to the audit trail (see below). See
+  specifically, and is guarded by a circuit breaker and logged to the audit trail (see below). An
+  expired access token is silently refreshed first, so the browser never notices
+  ([ADR 0045](docs/architecture/0045-silent-refresh-and-admin-session-revocation.md)). See
   [ADR 0029](docs/architecture/0029-yarp-proxies-browser-sessions-to-openemrs-api.md).
   AuthFacade is a BFF (backend-for-frontend): the browser only ever talks to AuthFacade, which does
   the OIDC login, holds the session, and proxies API calls on its behalf.
@@ -85,6 +87,9 @@ stepping stone: each future service should scaffold only its own tables.
   an opaque key; the real ticket lives in a server-side record (same database as ADR 0043) that this
   deletes, so a stolen copy of the cookie stops working on its very next use, with no cooperation from
   whichever browser is holding it. See [ADR 0044](docs/architecture/0044-session-store-backs-the-cookie-for-revocation.md).
+- `POST /sessions/revoke/{subject}` — the admin-action counterpart: an OpenEMR subject on a config-driven
+  allowlist (`Admin:Subjects`, empty by default) can end any *other* subject's sessions too, logged with
+  who did it and against whom. See [ADR 0045](docs/architecture/0045-silent-refresh-and-admin-session-revocation.md).
 - `GET /health` is a liveness check.
 - `/oidc/login` and `/callback` are rate limited per client address
   ([ADR 0038](docs/architecture/0038-rate-limit-login-and-callback-per-client-address.md)); the token
@@ -209,7 +214,12 @@ gateway. It does not store passwords or user records.
   `AuthFacadeSession` cookie carries only an opaque key (ADR 0044); the real ticket, and the real OpenEMR
   token inside it, lives in AuthFacade's own database (ADR 0043). `POST /sessions/revoke-all` deletes it,
   which is what makes a stolen copy of the cookie stop working everywhere, immediately — not just the
-  browser that calls it.
+  browser that calls it. A config-driven allowlist of admin subjects can do the same to any *other*
+  subject's sessions (ADR 0045).
+- **An expiring access token is refreshed silently, server-side.** The BFF proxy redeems the session's
+  refresh token before it needs one, with no round trip through the browser; a rejected refresh falls back
+  to the stale token and lets OpenEMR's own 401 decide, the same passthrough every other BFF proxy call
+  already follows (ADR 0045).
 
 ### Known gaps
 
@@ -230,14 +240,12 @@ gateway. It does not store passwords or user records.
   [ADR 0028](docs/architecture/0028-browser-login-and-session-assume-a-single-instance.md).
 - The browser login's OIDC scope (`openid profile email offline_access`) does not
   include `api:oemr`, so the BFF proxy's calls to OpenEMR's protected API will be
-  rejected by OpenEMR itself until that scope is deliberately widened. No silent
-  refresh happens when the session's access token expires either. See
+  rejected by OpenEMR itself until that scope is deliberately widened. See
   [ADR 0029](docs/architecture/0029-yarp-proxies-browser-sessions-to-openemrs-api.md).
-- `/sessions/revoke-all` (ADR 0044) only revokes the caller's *own* sessions. Revoking an arbitrary other
-  user's session — an admin action — is still not possible: it would need an authorization model this
-  project does not have, the same gap `/api/v1/me` already has above. Revoking a session also cannot
-  reach OpenEMR's own side: OpenEMR exposes no server-to-server token revocation endpoint, so the
-  underlying access/refresh token stays valid there until it naturally expires.
+- Neither a refresh nor a revocation reaches OpenEMR's own side: it exposes no server-to-server token
+  revocation endpoint (confirmed against its own discovery document and source), so the underlying OpenEMR
+  refresh token stays valid there until it naturally expires, independent of anything AuthFacade does with
+  its own session record.
 - The gateway does no token validation of its own — it only routes by path.
   Every auth decision still happens in AuthFacade. If a future domain service
   needs authenticated requests, whether it validates its own token or the

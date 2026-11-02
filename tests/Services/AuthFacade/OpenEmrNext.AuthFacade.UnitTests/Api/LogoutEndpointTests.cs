@@ -69,6 +69,27 @@ public class LogoutEndpointTests
     }
 
     [Fact]
+    public async Task Logout_after_a_silent_refresh_still_sends_the_current_id_token_hint()
+    {
+        // Confirms the two features actually compose: AccessTokenRefresher (ADR 0045) re-signs the session
+        // in with a freshly issued id_token, and /logout must read that latest one, not a stale value left
+        // over from the original login.
+        await using var server = await FakeOpenEmrServer.StartAsync();
+        server.AccessTokenExpiresInSeconds = 10;
+        await using var api = await StartApiAsync(server);
+        var (state, nonce) = await LoginAsync(api);
+        server.Nonce = nonce;
+        await api.BrowserClient.GetAsync($"/callback?code=fake-code&state={state}");
+        await api.BrowserClient.GetAsync("/bff/openemr/apis/default/api/ping");
+
+        using var logout = await api.BrowserClient.GetAsync("/logout");
+
+        Assert.Equal(HttpStatusCode.Redirect, logout.StatusCode);
+        var query = QueryHelpers.ParseQuery(logout.Headers.Location!.Query);
+        Assert.False(string.IsNullOrEmpty(query["id_token_hint"]));
+    }
+
+    [Fact]
     public async Task Logout_without_a_session_redirects_straight_to_the_default_return_url_without_calling_openemr()
     {
         // No login happened, so there is no id_token to send -- and nothing for OpenEMR to end. Asserting

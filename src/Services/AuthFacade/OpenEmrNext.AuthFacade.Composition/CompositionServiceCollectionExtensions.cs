@@ -23,6 +23,11 @@ public static class CompositionServiceCollectionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        // No ValidateDataAnnotations/ValidateOnStart: an empty Subjects list is a valid, deliberately
+        // conservative default (ADR 0045), not a misconfiguration to fail startup over.
+        services.AddOptions<AdminOptions>()
+            .Bind(configuration.GetSection(AdminOptions.SectionName));
+
         return services;
     }
 }

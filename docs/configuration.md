@@ -190,6 +190,17 @@ OpenEMR.
 | `PermitLimit` | `10` | At least 1. |
 | `Window` | `00:01:00` | At least one second. |
 
+### `Admin`
+
+Who may call `POST /sessions/revoke/{subject}` to end an *arbitrary other* subject's sessions (ADR 0045) —
+not wired through `.env`, since a list needs indexed environment keys that do not fit the single-scalar
+convention every other setting here uses. Set it directly (environment variables,
+`appsettings.Development.json`, or user-secrets) if you want to exercise it locally.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `Subjects` | `[]` | OpenEMR subjects (user IDs) trusted to revoke any session. Empty means nobody can — fails closed, not open. Set as `Admin__Subjects__0`, `Admin__Subjects__1`, … as environment variables. |
+
 ### Running outside Docker
 
 `appsettings.Development.json` points `OpenEmr:BaseUrl` and `Issuer` at `https://localhost:9300`.

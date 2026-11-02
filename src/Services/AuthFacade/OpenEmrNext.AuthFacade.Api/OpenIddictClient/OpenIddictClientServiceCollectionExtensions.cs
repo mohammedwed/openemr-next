@@ -123,11 +123,20 @@ public static class OpenIddictClientServiceCollectionExtensions
                 options.SessionStore = new AuthFacadeSessionStore(scopeFactory, dataProtectionProvider);
             });
 
+        // Silently renews an expired access token against OpenEMR's refresh grant (ADR 0045), for the BFF
+        // proxy's own request transform to call. Scoped: it resolves OpenIddictClientService and the
+        // current request's HttpContext through the usual per-request container, nothing it needs to
+        // outlive a single request.
+        services.AddScoped<AccessTokenRefresher>();
+
         services.AddOpenIddict()
             .AddCore(options => options.UseEntityFrameworkCore().UseDbContext<AuthFacadeDbContext>())
             .AddClient(options =>
             {
                 options.AllowAuthorizationCodeFlow();
+                // AccessTokenRefresher (ADR 0045) redeems the session's refresh token directly via
+                // AuthenticateWithRefreshTokenAsync, outside the browser-driven authorization-code flow.
+                options.AllowRefreshTokenFlow();
 
                 // Dev-only ephemeral certificates. A real deployment needs persisted ones; ADR 0020
                 // already treats this stack as local-only, so this matches its existing maturity level.
@@ -187,6 +196,14 @@ public static class OpenIddictClientServiceCollectionExtensions
     }
 
     /// <summary>
+    /// The exact issuer <see cref="BuildRegistration"/> registers the client under — no trailing slash, to
+    /// byte-for-byte match the <c>iss</c> claim OpenEMR actually writes into its tokens. Shared with
+    /// <see cref="AccessTokenRefresher"/> (ADR 0045), which must name the same registration to redeem a
+    /// refresh token against it; OpenIddict.Client matches a refresh request to a registration by issuer.
+    /// </summary>
+    internal static Uri NormalizeIssuer(OpenEmrOptions openEmr) => new(openEmr.Issuer.TrimEnd('/'), UriKind.Absolute);
+
+    /// <summary>
     /// Builds the one client registration against OpenEMR, with the discovery document's automatic
     /// endpoint lookup bypassed: the authorize endpoint must be the publicly-reachable <c>OpenEmr:Issuer</c>
     /// address (the browser follows it), while the token and JWKS endpoints must be the container-internal
@@ -199,8 +216,11 @@ public static class OpenIddictClientServiceCollectionExtensions
         // No trailing slash: this must byte-for-byte match the "iss" claim OpenEMR actually writes into its
         // tokens (confirmed against OpenEmrTokenVerifier, which already validates that successfully), or
         // id_token validation fails with ID2088 "issuer not valid" even though the token itself is genuine.
+        // The string form is kept separately, not derived from the Uri below: Uri.ToString() re-adds a
+        // trailing "/" for a bare-authority URI (no issue for OpenEMR's real issuer, which always has a
+        // path, but not a guarantee worth depending on here).
         var issuerString = openEmr.Issuer.TrimEnd('/');
-        var issuer = new Uri(issuerString, UriKind.Absolute);
+        var issuer = NormalizeIssuer(openEmr);
         var internalBase = openEmr.BaseUrl.TrimEnd('/') + "/oauth2/default";
         var jwksUri = new Uri($"{internalBase}/jwk", UriKind.Absolute);
 
@@ -209,7 +229,11 @@ public static class OpenIddictClientServiceCollectionExtensions
             Issuer = issuer,
             AuthorizationEndpoint = new Uri($"{issuerString}/authorize", UriKind.Absolute),
             TokenEndpoint = new Uri($"{internalBase}/token", UriKind.Absolute),
-            GrantTypesSupported = { GrantTypes.AuthorizationCode },
+            // RefreshToken, not just AuthorizationCode: AccessTokenRefresher (ADR 0045) redeems the
+            // refresh token OpenEMR issues alongside the original grant. Without this, OpenIddict.Client
+            // refuses AuthenticateWithRefreshTokenAsync outright -- this static configuration is what it
+            // consults to decide what the registration is even allowed to do, discovery being bypassed.
+            GrantTypesSupported = { GrantTypes.AuthorizationCode, GrantTypes.RefreshToken },
             ResponseTypesSupported = { ResponseTypes.Code },
             ResponseModesSupported = { ResponseModes.Query },
             CodeChallengeMethodsSupported = { CodeChallengeMethods.Sha256 }

@@ -143,7 +143,19 @@ ADR 0026) and the resulting session cookie (ADR 0027).
   for the caller's own subject, the self-service answer to a suspected stolen
   cookie that ADR 0028/0040 both named as missing — no cooperation needed
   from whichever browser holds the stolen copy
-- Unit tests (71), architecture tests (1) and live integration tests (5) pass
+- The BFF proxy silently refreshes an expired access token against OpenEMR's
+  refresh grant before the next proxied call needs it (ADR 0045), closing
+  the gap ADR 0029 explicitly deferred — the browser never notices. A failed
+  refresh falls back to the stale token rather than failing the request;
+  OpenEMR's own 401 decides, the same passthrough every other call already
+  uses
+- Admin-initiated session revocation (ADR 0045): a config-driven allowlist of
+  OpenEMR subjects (`Admin:Subjects`, empty by default) can revoke any other
+  subject's sessions via `POST /sessions/revoke/{subject}` — the admin-action
+  half of the gap ADR 0028/0040 both named, left open by ADR 0044's
+  self-service-only `/sessions/revoke-all`. Logged to the audit trail with
+  who did it and against whom
+- Unit tests (80), architecture tests (1) and live integration tests (5) pass
   (down from this bullet's original counts: ADR 0035 removed the password
   grant, its tests, and the Domain/Application/Ports/Infrastructure layers)
 
@@ -153,12 +165,11 @@ ADR 0026) and the resulting session cookie (ADR 0027).
   ephemeral (the third gap ADR 0028 named, explicitly not addressed by ADR
   0043 — a separate, file-based follow-up mirroring the gateway's TLS cert
   pattern, ADR 0039)
-- For browser sessions, silent refresh on an expired access token is explicitly
-  deferred rather than forgotten (ADR 0029). Revoking an *arbitrary other*
-  user's session (the admin-action half of the gap ADR 0040 named) is still
-  not possible — it needs an authorization model this project does not have
-  yet, the same gap `/api/v1/me` already has; ADR 0044 only closed the
-  self-service, stolen-cookie half
+- Neither a refresh nor a revocation reaches OpenEMR's own side: it exposes
+  no server-to-server token revocation endpoint (confirmed against its own
+  discovery document and source, ADR 0044), so the underlying OpenEMR
+  refresh token is never invalidated there — an accepted, pre-existing
+  limitation, not something either ADR 0044 or ADR 0045 claims to fix
 - ADR: identity bridge design
 
 **Exit criteria:** The security items above are either done or recorded as
