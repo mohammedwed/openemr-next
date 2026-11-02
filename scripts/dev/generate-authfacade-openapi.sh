@@ -54,6 +54,9 @@ if ! curl -fs "$BASE_URL/health" >/dev/null; then
 fi
 
 mkdir -p "$(dirname "$OUTPUT")"
-curl -fs "$BASE_URL/openapi/v1.json" | jq . > "$OUTPUT"
+# `servers` is dropped: it would just be this run's random loopback port, and the generated client never
+# reads it (OpenApiReference passes /UseBaseUrl:false; callers supply their own HttpClient.BaseAddress
+# instead) -- keeping it would make every regeneration diff from the last even with no real API change.
+curl -fs "$BASE_URL/openapi/v1.json" | jq 'del(.servers)' > "$OUTPUT"
 
 echo "Wrote $OUTPUT"

@@ -5,18 +5,13 @@
     "description": "A BFF in front of OpenEMR. Log in through GET /oidc/login, and the session cookie it establishes authorizes the other endpoints.",
     "version": "1.0.0"
   },
-  "servers": [
-    {
-      "url": "http://127.0.0.1:63150/"
-    }
-  ],
   "paths": {
     "/api/v1/me": {
       "get": {
         "tags": [
           "Identity"
         ],
-        "summary": "Get the subject and name of the bearer token",
+        "summary": "Get the subject and name of the signed-in session",
         "operationId": "GetCurrentUser",
         "responses": {
           "200": {
