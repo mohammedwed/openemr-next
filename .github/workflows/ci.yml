@@ -89,6 +89,9 @@ jobs:
       - name: Apply environment values to restored stack
         run: bash scripts/stack/apply-credentials.sh
 
+      - name: Generate AuthFacade's persisted certificates
+        run: bash scripts/setup/new-authfacade-certs.sh
+
       - name: Start stack
         run: docker compose up -d --build --wait --wait-timeout 1200 openemr auth-facade phpmyadmin
 

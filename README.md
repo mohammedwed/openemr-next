@@ -232,12 +232,11 @@ gateway. It does not store passwords or user records.
   AuthFacade cannot prevent this from outside. There is currently no automated
   test guarding against a regression: the one that did (a live password-grant
   call) was removed with the password grant itself (ADR 0035).
-- OpenIddict's own encryption/signing certificates are still dev-only and
-  ephemeral, generated fresh per process. AuthFacade's session state itself now
-  persists across a restart (ADR 0043), but this means more than one AuthFacade
-  instance still cannot run: a second replica could not decrypt a state token
-  written by another one regardless of where it lives. See
-  [ADR 0028](docs/architecture/0028-browser-login-and-session-assume-a-single-instance.md).
+- AuthFacade's session-related state — OpenIddict's state-token store, the Data Protection key ring, and
+  now its own encryption/signing certificates too — all persist past a restart (ADR 0043, ADR 0044, ADR
+  0046), closing the three structural reasons a second AuthFacade replica couldn't work. Running more than
+  one is still untested; this removes the blockers named against it, it does not itself prove it works.
+  See [ADR 0028](docs/architecture/0028-browser-login-and-session-assume-a-single-instance.md).
 - The browser login's OIDC scope (`openid profile email offline_access`) does not
   include `api:oemr`, so the BFF proxy's calls to OpenEMR's protected API will be
   rejected by OpenEMR itself until that scope is deliberately widened. See
@@ -318,6 +317,12 @@ committed. It is the single source for ports, images, and credentials: Compose, 
 scripts, CI, and the integration tests all read it, so change a value there and
 nowhere else. `scripts/lib/env.sh` holds the shared shell helpers. Every variable is described in
 [`docs/configuration.md`](docs/configuration.md).
+
+**Certificates.** Run `bash scripts/setup/new-dev-cert.sh` (the gateway's own TLS certificate, ADR 0039)
+and `bash scripts/setup/new-authfacade-certs.sh` (AuthFacade's persisted OpenIddict certificates, ADR
+0046) once. Both write to the gitignored `certs/` directory and never overwrite an existing file. The
+second one is required: `docker-compose.yml` points `auth-facade` at its output unconditionally, so the
+stack fails to start it without having run this first.
 
 **Start the stack:**
 

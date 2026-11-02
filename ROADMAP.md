@@ -155,21 +155,26 @@ ADR 0026) and the resulting session cookie (ADR 0027).
   half of the gap ADR 0028/0040 both named, left open by ADR 0044's
   self-service-only `/sessions/revoke-all`. Logged to the audit trail with
   who did it and against whom
-- Unit tests (80), architecture tests (1) and live integration tests (5) pass
+- OpenIddict's own encryption/signing certificates are now persisted files too
+  (ADR 0046), the last of the three gaps ADR 0028 named — closed the same
+  way ADR 0039 already closed it for the gateway's own TLS certificate.
+  Verified live: a state token encrypted before restarting `auth-facade` was
+  still correctly decrypted after the restart, proceeding all the way to a
+  real token request to OpenEMR
+- Unit tests (81), architecture tests (1) and live integration tests (5) pass
   (down from this bullet's original counts: ADR 0035 removed the password
   grant, its tests, and the Domain/Application/Ports/Infrastructure layers)
 
 **Remaining**
 
-- OpenIddict's own encryption/signing certificates are still dev-only and
-  ephemeral (the third gap ADR 0028 named, explicitly not addressed by ADR
-  0043 — a separate, file-based follow-up mirroring the gateway's TLS cert
-  pattern, ADR 0039)
 - Neither a refresh nor a revocation reaches OpenEMR's own side: it exposes
   no server-to-server token revocation endpoint (confirmed against its own
   discovery document and source, ADR 0044), so the underlying OpenEMR
   refresh token is never invalidated there — an accepted, pre-existing
   limitation, not something either ADR 0044 or ADR 0045 claims to fix
+- Running more than one AuthFacade replica is still untested. ADR 0046
+  closed the last structural blocker ADR 0028 named against it, but closing
+  the blockers is not the same as proving it works
 - ADR: identity bridge design
 
 **Exit criteria:** The security items above are either done or recorded as

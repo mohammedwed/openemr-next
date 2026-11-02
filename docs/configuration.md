@@ -157,6 +157,21 @@ a bare `dotnet run` outside Docker rely on. Only the real Compose stack sets thi
 | `User` | `""` | Dedicated, least-privilege user that can reach only `Database`. From `AUTHFACADE_DB_USER`. |
 | `Password` | `""` | That user's password. From `AUTHFACADE_DB_PASSWORD`. |
 
+### `AuthFacadeCertificates`
+
+The two certificates OpenIddict.Client uses to encrypt and sign its own state tokens (ADR 0046), from
+`scripts/setup/new-authfacade-certs.sh`. Deliberately optional as a whole, the same shape as
+`AuthFacadeDb` — when `EncryptionCertificatePath` is unset, AuthFacade falls back to OpenIddict's own
+per-process development certificates instead, which every unit test and a bare `dotnet run` outside
+Docker rely on. Only the real Compose stack sets this section, unconditionally — see the script's own
+requirement in [`scripts/README.md`](../scripts/README.md).
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `EncryptionCertificatePath` | `""` (development-certificate fallback) | Path to the PKCS#12 (`.pfx`) encryption certificate. In Compose: `/certs/authfacade-encryption.pfx`. |
+| `SigningCertificatePath` | `""` | Path to the PKCS#12 (`.pfx`) signing certificate. In Compose: `/certs/authfacade-signing.pfx`. |
+| `Password` | `""` | Password protecting both PKCS#12 files. The generated certificates have none — see ADR 0046. |
+
 ### `OpenEmr:CircuitBreaker`
 
 Guards the token exchange, the JWKS fetch and the BFF proxy's forwarded calls (ADR 0041) — three

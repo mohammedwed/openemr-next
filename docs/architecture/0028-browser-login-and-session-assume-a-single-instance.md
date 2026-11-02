@@ -1,7 +1,9 @@
 # 0028. The browser login flow and the session cookie assume a single AuthFacade instance
 
-- **Status:** Accepted (records an existing trade-off; no code changes). Gaps 1 and 3 below are now closed
-  by [0043](0043-authfacade-session-state-in-a-dedicated-mariadb-database.md); gap 2 remains open.
+- **Status:** Accepted (records an existing trade-off; no code changes). All three gaps below are now
+  closed: 1 and 3 by [0043](0043-authfacade-session-state-in-a-dedicated-mariadb-database.md), 2 by
+  [0046](0046-persisted-openiddict-certificates.md). This ADR's own multi-instance claim is not itself
+  retested by either — see each one's Consequences.
 - **Date:** 2026-10-31
 - **Builds on:** [0026](0026-openiddict-client-drives-the-authorization-code-flow.md), [0027](0027-persist-tokens-in-the-session-cookie.md)
 

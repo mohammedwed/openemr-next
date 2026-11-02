@@ -51,3 +51,4 @@ old one's status is updated to point to it.
 | [0043](0043-authfacade-session-state-in-a-dedicated-mariadb-database.md) | AuthFacade's session state persists in a dedicated MariaDB database | Accepted | 2026-11-01 |
 | [0044](0044-session-store-backs-the-cookie-for-revocation.md) | A server-side session store backs the cookie, so a session can be revoked | Accepted | 2026-11-01 |
 | [0045](0045-silent-refresh-and-admin-session-revocation.md) | Silent token refresh, and admin-initiated session revocation | Accepted | 2026-11-02 |
+| [0046](0046-persisted-openiddict-certificates.md) | OpenIddict's encryption and signing certificates are persisted files | Accepted | 2026-11-02 |

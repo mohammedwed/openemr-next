@@ -62,6 +62,14 @@ public static class OpenIddictClientServiceCollectionExtensions
         // path would let concurrent test hosts collide.
         var authFacadeDb = configuration.GetSection(AuthFacadeDbOptions.SectionName).Get<AuthFacadeDbOptions>()
             ?? new AuthFacadeDbOptions();
+
+        // The real Compose stack configures AuthFacadeCertificates:* to point at two persisted
+        // certificates (scripts/setup/new-authfacade-certs.sh), so a state token encrypted before a
+        // restart is still decryptable after one (ADR 0045, closing the third gap ADR 0028 named). Nothing
+        // else configures that section -- tests, and a bare `dotnet run` outside Docker, fall back to
+        // OpenIddict's own per-process development certificates below, the same as before this ADR.
+        var certificates = configuration.GetSection(AuthFacadeCertificateOptions.SectionName).Get<AuthFacadeCertificateOptions>()
+            ?? new AuthFacadeCertificateOptions();
         // Computed once, here, rather than inside the AddDbContext callback below: that callback re-runs
         // on every new scope (AddDbContext's optionsLifetime defaults to Scoped, not Singleton), so a path
         // generated inside it would pick a fresh, schema-less file for every request after
@@ -138,10 +146,20 @@ public static class OpenIddictClientServiceCollectionExtensions
                 // AuthenticateWithRefreshTokenAsync, outside the browser-driven authorization-code flow.
                 options.AllowRefreshTokenFlow();
 
-                // Dev-only ephemeral certificates. A real deployment needs persisted ones; ADR 0020
-                // already treats this stack as local-only, so this matches its existing maturity level.
-                options.AddDevelopmentEncryptionCertificate()
-                       .AddDevelopmentSigningCertificate();
+                if (certificates.IsConfigured)
+                {
+                    using var encryptionStream = File.OpenRead(certificates.EncryptionCertificatePath);
+                    options.AddEncryptionCertificate(encryptionStream, certificates.Password);
+                    using var signingStream = File.OpenRead(certificates.SigningCertificatePath);
+                    options.AddSigningCertificate(signingStream, certificates.Password);
+                }
+                else
+                {
+                    // Dev-only, regenerated fresh every process start. Fine for tests and a bare
+                    // `dotnet run`; the real Compose stack always configures persisted ones above (ADR 0045).
+                    options.AddDevelopmentEncryptionCertificate()
+                           .AddDevelopmentSigningCertificate();
+                }
 
                 options.UseAspNetCore()
                        .EnableRedirectionEndpointPassthrough()

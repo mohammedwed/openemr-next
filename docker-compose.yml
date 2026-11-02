@@ -156,6 +156,8 @@ services:
         condition: service_completed_successfully
     ports:
       - "${HOST_BIND_ADDRESS:-127.0.0.1}:${AUTHFACADE_HTTP_PORT:-7128}:8080"
+    volumes:
+      - ./certs:/certs:ro
     environment:
       ASPNETCORE_ENVIRONMENT: ${AUTHFACADE_ENVIRONMENT:-Production}
       OpenEmr__BaseUrl: "http://openemr:80"
@@ -179,6 +181,14 @@ services:
       AuthFacadeDb__Database: ${AUTHFACADE_DB_NAME:-authfacade}
       AuthFacadeDb__User: ${AUTHFACADE_DB_USER:-authfacade}
       AuthFacadeDb__Password: ${AUTHFACADE_DB_PASSWORD:?Set AUTHFACADE_DB_PASSWORD in .env}
+      # Persisted OpenIddict.Client encryption/signing certificates (ADR 0045), from
+      # scripts/setup/new-authfacade-certs.sh -- replaces the per-process development certificates it
+      # otherwise regenerates fresh on every restart, closing the third gap ADR 0028 named. No password
+      # secret to manage: these protect nothing but transport/at-rest confidentiality on this machine,
+      # the same "no passphrase" choice already made for the gateway's own certificate (ADR 0039).
+      AuthFacadeCertificates__EncryptionCertificatePath: /certs/authfacade-encryption.pfx
+      AuthFacadeCertificates__SigningCertificatePath: /certs/authfacade-signing.pfx
+      AuthFacadeCertificates__Password: ""
 
   # ---- WebApp (Blazor WebAssembly dashboard) ----
   # Static files only, served by nginx (ADR 0033). Not published on the host: it only works correctly
