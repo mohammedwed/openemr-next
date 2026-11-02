@@ -103,7 +103,10 @@ services:
       # this column with a plain SQL `=`, not a host allow-list. Same value AuthFacade's own
       # BrowserFlow:DefaultReturnUrl already resolves to; Compose does not share one service's environment
       # values with another, so it is computed the same way a second time, same as AUTHFACADE_REDIRECT_URI.
-      AUTHFACADE_POST_LOGOUT_REDIRECT_URI: http://localhost:${LOGINUI_HTTP_PORT:-7129}/
+      # WebApp's own origin (through the gateway, ADR 0032), not LoginUi's: landing post-logout on a page
+      # with WebApp's own nav chrome beats a bare standalone page, and WebApp's Home.razor already handles
+      # the signed-out state (and a failed-login ?error=, same as LoginUi's own page does).
+      AUTHFACADE_POST_LOGOUT_REDIRECT_URI: https://localhost:${GATEWAY_HTTPS_PORT:-7131}/
     volumes:
       - sitesvolume:/var/www/localhost/htdocs/openemr/sites
       - ./scripts/seeds/authfacade-client.php:/seed/authfacade-client.php:ro
@@ -169,8 +172,9 @@ services:
       # above. Computed the same way the seed service computes it: Compose does not share one service's
       # environment values with another.
       OpenEmr__RedirectUri: "https://localhost:${GATEWAY_HTTPS_PORT:-7131}/callback"
-      # Where the browser flow (ADR 0024) lands with no returnUrl, or one outside the allow-list: the Login UI.
-      BrowserFlow__DefaultReturnUrl: "http://localhost:${LOGINUI_HTTP_PORT:-7129}/"
+      # Where the browser flow (ADR 0024) lands with no returnUrl, or one outside the allow-list: WebApp's
+      # dashboard (see AUTHFACADE_POST_LOGOUT_REDIRECT_URI above, which must match this byte for byte).
+      BrowserFlow__DefaultReturnUrl: "https://localhost:${GATEWAY_HTTPS_PORT:-7131}/"
       BrowserFlow__ReturnUrlAllowedHosts__0: localhost
       # The one network the gateway's forwarded X-Forwarded-For/-Proto headers (ADR 0039) are trusted
       # from, so a request reaching AuthFacade directly on its own published port cannot spoof either one.
