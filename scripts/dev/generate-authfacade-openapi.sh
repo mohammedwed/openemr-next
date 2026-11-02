@@ -18,6 +18,7 @@
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
+source scripts/lib/env.sh
 
 API_PROJECT=src/Services/AuthFacade/OpenEmrNext.AuthFacade.Api
 OUTPUT=src/Services/AuthFacade/OpenEmrNext.AuthFacade.Client/OpenAPIs/AuthFacade.json
@@ -34,6 +35,16 @@ export ASPNETCORE_ENVIRONMENT=Development
 export ASPNETCORE_URLS="$BASE_URL"
 export OpenEmr__ClientId=openapi-codegen-placeholder
 export OpenEmr__ClientSecret=openapi-codegen-placeholder
+# Overrides appsettings.Development.json's own OpenEmr:BaseUrl (https://localhost:9300): that one assumes
+# whoever's running this has already told their OS to trust OpenEMR's self-signed dev cert, which is true
+# for a developer's own machine but not a CI runner. The plain `new HttpClient()` inside
+# OpenEmrReadinessGate has no cert bypass, so against the HTTPS address it fails every poll on an
+# untrusted cert and silently eats its own full 60-second non-fatal timeout before giving up and starting
+# anyway -- longer than this script's own health-check patience below, so it would get killed first. The
+# real Compose stack never hits this: it points AuthFacade at OpenEMR over plain HTTP, container-to-
+# container (OpenEmr__BaseUrl: "http://openemr:80" in docker-compose.yml). Doing the same here, against
+# OpenEMR's plain-HTTP host port, sidesteps the cert entirely instead of just waiting out the timeout.
+export OpenEmr__BaseUrl="http://127.0.0.1:$(env_get OPENEMR_HTTP_PORT 8300)"
 
 API_LOG=$(mktemp)
 (cd "$API_PROJECT" && exec dotnet run --no-build --no-launch-profile) >"$API_LOG" 2>&1 &
@@ -54,6 +65,9 @@ if ! curl -fs "$BASE_URL/health" >/dev/null; then
 fi
 
 mkdir -p "$(dirname "$OUTPUT")"
-curl -fs "$BASE_URL/openapi/v1.json" | jq . > "$OUTPUT"
+# `servers` is dropped: it would just be this run's random loopback port, and the generated client never
+# reads it (OpenApiReference passes /UseBaseUrl:false; callers supply their own HttpClient.BaseAddress
+# instead) -- keeping it would make every regeneration diff from the last even with no real API change.
+curl -fs "$BASE_URL/openapi/v1.json" | jq 'del(.servers)' > "$OUTPUT"
 
 echo "Wrote $OUTPUT"

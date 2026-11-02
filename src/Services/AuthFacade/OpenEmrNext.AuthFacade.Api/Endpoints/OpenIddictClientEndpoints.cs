@@ -65,6 +65,8 @@ public static class OpenIddictClientEndpoints
     private static async Task<IResult> HandleCallbackAsync(
         HttpContext context, IOptions<BrowserFlowOptions> browserFlowOptions, ILogger<AuditLog> auditLog)
     {
+        static IResult LoginFailed(string url) => Results.Redirect(QueryHelpers.AddQueryString(url, "error", "login_failed"));
+
         AuthenticateResult result;
         try
         {
@@ -78,7 +80,7 @@ public static class OpenIddictClientEndpoints
             // returnUrl from here, so this falls back to the same default /oidc/login itself uses for a
             // returnUrl it cannot use.
             auditLog.LoginFailed("exception");
-            return Results.Redirect(QueryHelpers.AddQueryString(browserFlowOptions.Value.DefaultReturnUrl, "error", "login_failed"));
+            return LoginFailed(browserFlowOptions.Value.DefaultReturnUrl);
         }
 
         var returnUrl = result.Properties?.RedirectUri ?? browserFlowOptions.Value.DefaultReturnUrl;
@@ -86,7 +88,7 @@ public static class OpenIddictClientEndpoints
         if (!result.Succeeded || result.Principal is not { Identity.IsAuthenticated: true } principal)
         {
             auditLog.LoginFailed("rejected");
-            return Results.Redirect(QueryHelpers.AddQueryString(returnUrl, "error", "login_failed"));
+            return LoginFailed(returnUrl);
         }
 
         var identity = new ClaimsIdentity(principal.Claims, OpenIddictClientServiceCollectionExtensions.SessionScheme);

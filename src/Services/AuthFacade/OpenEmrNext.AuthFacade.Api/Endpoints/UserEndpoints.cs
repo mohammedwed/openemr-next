@@ -4,13 +4,13 @@ using OpenEmrNext.AuthFacade.Api.Contracts.Responses;
 
 namespace OpenEmrNext.AuthFacade.Api.Endpoints;
 
-/// <summary>Endpoints that describe the caller, based on a validated service token.</summary>
+/// <summary>Endpoints that describe the caller, based on the authenticated session cookie.</summary>
 public static class UserEndpoints
 {
     /// <summary>
-    /// Maps <c>GET /api/v1/me</c>, which returns the subject and name claims of the bearer token.
-    /// Requires authorization. The endpoint is named <c>GetCurrentUser</c>, which becomes its OpenAPI
-    /// <c>operationId</c>.
+    /// Maps <c>GET /api/v1/me</c>, which returns the subject and name claims of the session cookie
+    /// (ADR 0026). Requires authorization. The endpoint is named <c>GetCurrentUser</c>, which becomes
+    /// its OpenAPI <c>operationId</c>.
     /// </summary>
     /// <param name="app">The endpoint route builder.</param>
     /// <returns>The same builder, for chaining.</returns>
@@ -21,7 +21,7 @@ public static class UserEndpoints
             user.FindFirst(JwtRegisteredClaimNames.Name)?.Value)))
             .WithName("GetCurrentUser")
             .WithTags("Identity")
-            .WithSummary("Get the subject and name of the bearer token")
+            .WithSummary("Get the subject and name of the signed-in session")
             .Produces<MeResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .RequireAuthorization();

@@ -112,6 +112,17 @@ jobs:
         with:
           global-json-file: global.json
 
+      # Catches the committed AuthFacade.Client/OpenAPIs/AuthFacade.json drifting from the API's real
+      # shape (ADR 0031's own noted gap): the script starts a throwaway AuthFacade instance and regenerates
+      # the snapshot from its live /openapi/v1.json, so any uncommitted change here means someone changed
+      # an endpoint without re-running it. Runs after "Start stack" above: the script's own instance
+      # still needs OpenEMR reachable at OpenEmr:BaseUrl (OpenEmrReadinessGate), which is only true once
+      # that step has brought OpenEMR up.
+      - name: Check AuthFacade OpenAPI snapshot is up to date
+        run: |
+          bash scripts/dev/generate-authfacade-openapi.sh
+          git diff --exit-code -- src/Services/AuthFacade/OpenEmrNext.AuthFacade.Client/OpenAPIs/AuthFacade.json
+
       - name: Restore dependencies
         run: dotnet restore ${{ env.SOLUTION }}
 
