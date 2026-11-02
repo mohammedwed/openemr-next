@@ -27,6 +27,10 @@
 
         case State.SignedOut:
             <MudPaper Elevation="2" Class="pa-6 d-flex flex-column align-start ga-4">
+                @if (ErrorMessage is { } message)
+                {
+                    <MudAlert Severity="Severity.Error" role="alert" Class="w-100">@message</MudAlert>
+                }
                 <MudText>Sign in with your existing OpenEMR account.</MudText>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@LoginUrl">Log in with OpenEMR</MudButton>
             </MudPaper>
@@ -40,6 +44,19 @@
     private State _state = State.Loading;
     private string? _name;
     private string? _subject;
+
+    /// <summary>
+    /// The error code AuthFacade's <c>/callback</c> appends when login did not complete (ADR 0026) --
+    /// reachable here now that LoginUi defaults a returnUrl-less login's destination to this page
+    /// (Login.razor), not just back to itself. Same generic text either way: AuthFacade's own error text
+    /// is never echoed to the browser.
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    private string? ErrorMessage => string.IsNullOrEmpty(Error)
+        ? null
+        : "Something went wrong signing in. Please try again.";
 
     /// <summary>
     /// Where <c>/oidc/login</c> sends the browser back to after a successful login: this same page. Safe to

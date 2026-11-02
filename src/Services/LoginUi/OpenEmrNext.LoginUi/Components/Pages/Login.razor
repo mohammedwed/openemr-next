@@ -1,7 +1,6 @@
 @page "/"
 @using Microsoft.AspNetCore.WebUtilities
 @inject IOptions<AuthFacadeOptions> AuthFacadeOptions
-@inject NavigationManager Navigation
 
 <MudContainer MaxWidth="MaxWidth.ExtraSmall" Class="login-page">
     <MudPaper Elevation="2" Class="pa-8 d-flex flex-column align-center ga-4">
@@ -50,13 +49,13 @@
         get
         {
             var baseUrl = AuthFacadeOptions.Value.BaseUrl.TrimEnd('/');
-            // When nothing upstream gave us a returnUrl, we are the final destination either way: bake the
-            // success marker into the one we send, so a successful /callback redirect carries it back.
-            // A failed callback appends "error" to this same URL (AuthFacadeEndpoints.cs), so both can be
-            // present at once -- ErrorMessage is checked first in the markup above, and always wins.
-            var returnUrl = string.IsNullOrEmpty(ReturnUrl)
-                ? QueryHelpers.AddQueryString(Navigation.BaseUri, "login", "success")
-                : ReturnUrl;
+            // When nothing upstream gave us a returnUrl -- the common case, since /logout always lands
+            // here with none (LogoutEndpoints.cs) -- send a successful login on to WebApp's dashboard
+            // instead of back to this bare page, which has no nav chrome of its own once signed in.
+            // WebApp shares this same origin through the gateway (ADR 0032), so baseUrl already is its
+            // address too. A failed callback appends "error" to this same URL (OpenIddictClientEndpoints.cs);
+            // Home.razor shows it the same way ErrorMessage does here.
+            var returnUrl = string.IsNullOrEmpty(ReturnUrl) ? $"{baseUrl}/" : ReturnUrl;
             return QueryHelpers.AddQueryString($"{baseUrl}/oidc/login", "returnUrl", returnUrl);
         }
     }

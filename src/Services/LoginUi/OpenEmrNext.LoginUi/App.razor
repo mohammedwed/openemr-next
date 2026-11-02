@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OpenEMR Next</title>
     <base href="/" />
+    <!-- MudBlazor's own setup docs: its components assume these are loaded -- without them, Material
+         icons render as literal fallback text instead of glyphs, and text falls back to the browser's
+         default sans-serif instead of the font MudBlazor's spacing is tuned for. -->
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Material+Icons" />
     <link rel="stylesheet" href="_content/MudBlazor/MudBlazor.min.css" />
     <link rel="stylesheet" href="app.css" />
     <HeadOutlet />
