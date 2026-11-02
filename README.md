@@ -438,9 +438,6 @@ migration.
   for how AuthFacade's design fits together end to end; the rest are the individual decisions behind it
 - Changelogs (dated, one per working session)
 
-Links to documents that do not yet exist should be created or removed before
-publication.
-
 ## License
 
 OpenEMR Next is licensed under the [Apache License 2.0](LICENSE). It is an
