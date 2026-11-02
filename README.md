@@ -26,7 +26,7 @@ research vision below is the long-term direction, not the current deliverable.
 | Local stack | OpenEMR, MariaDB, and AuthFacade in one Docker Compose project | Built |
 | Database baseline | Reproducible schema and seed data from the OpenEMR installer | Built, not yet cleaned |
 | `OpenEmr.Data` | EF Core model scaffolded from the live database | Built |
-| AuthFacade | BFF (browser login via OIDC/PKCE, a revocable session cookie, logout, proxies browser calls to OpenEMR's API) — rate limited, circuit-broken, audit-logged, over HTTPS, with its own session state in a dedicated database | Built, hardening in progress |
+| AuthFacade | BFF (browser login via OIDC/PKCE, a revocable session cookie, logout, proxies browser calls to OpenEMR's API) — rate limited, circuit-broken, audit-logged, over HTTPS, with its own session state in a dedicated database | Built, hardened ([ADR 0047](docs/architecture/0047-the-identity-bridge-design.md)) |
 | WebApp dashboard | Blazor WebAssembly: shows the signed-in identity via a generated typed client; stub nav for Patients/Encounters | Built |
 | API gateway | Terminates TLS and routes a browser's requests by path: AuthFacade's own prefixes to it, everything else to the dashboard's static files (ADR 0033, ADR 0039). No token validation of its own yet, and nothing to route to beyond AuthFacade until a domain service exists | Built, narrower than originally planned |
 | Patient Management | Registers patients, publishes `PatientRegistered` | Planned |
@@ -367,7 +367,7 @@ Measurement depth matches the current phase.
   scenarios (planned with M5)
 - Change-impact scope for representative changes
 - Architecture test results (planned with M6)
-- Security review of the identity bridge (in progress with M1)
+- Security review of the identity bridge (M1, done — see [ADR 0047](docs/architecture/0047-the-identity-bridge-design.md))
 
 **Planned later:** delivery metrics (lead time, deployment frequency, change
 failure rate), reliability (availability, p95/p99 latency, recovery time),
@@ -434,7 +434,8 @@ migration.
 - [Development Workflow](docs/development-workflow.md)
 - [Development and Test Environments](docs/environments.md)
 - [Domain-Driven Design Guide](docs/domain-driven-design.md)
-- ADRs in `docs/architecture/`
+- ADRs in `docs/architecture/` — start with [ADR 0047](docs/architecture/0047-the-identity-bridge-design.md)
+  for how AuthFacade's design fits together end to end; the rest are the individual decisions behind it
 - Changelogs (dated, one per working session)
 
 Links to documents that do not yet exist should be created or removed before

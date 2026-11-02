@@ -40,7 +40,7 @@ a compatibility constraint.
 | M0a | Database baseline, reproducible and tested | Done (cleanup pending) | Oct 4 |
 | M0b | AuthFacade login through OpenEMR's OAuth server, facade-issued JWT | Done | Oct 10, Oct 11 |
 | M0c | Black-box integration tests with readiness gate | Done | Oct 11 |
-| M1 | Harden the identity bridge | In progress | Oct 10, Oct 11, Oct 21, Oct 24, Oct 29, Oct 30, Oct 31 |
+| M1 | Harden the identity bridge | Done | Oct 10, Oct 11, Oct 21, Oct 24, Oct 29, Oct 30, Oct 31, Nov 1, Nov 2 |
 | M2 | Schema inventory for slice contexts | In progress | Oct 4 (entities scaffolded) |
 | M3 | Gateway and token validation | Not started | — |
 | M4 | Patient Management service | Not started | — |
@@ -83,7 +83,7 @@ ADR 0026) and the resulting session cookie (ADR 0027).
   and `/me` bearer coverage was removed with the password grant itself, ADR 0035)
 - The readiness gate checks four conditions under one deadline before tests run
 
-### M1: Harden the identity bridge (in progress)
+### M1: Harden the identity bridge (done)
 
 **Done**
 
@@ -164,21 +164,26 @@ ADR 0026) and the resulting session cookie (ADR 0027).
 - Unit tests (81), architecture tests (1) and live integration tests (5) pass
   (down from this bullet's original counts: ADR 0035 removed the password
   grant, its tests, and the Domain/Application/Ports/Infrastructure layers)
+- ADR: identity bridge design (ADR 0047) — the capstone synthesizing every
+  ADR above into one description of the finished bridge, its guarantees, and
+  its accepted risks (below). Merged, satisfying this milestone's exit
+  criterion.
 
-**Remaining**
+**Accepted risks** (recorded, not fixed — see ADR 0047 for the full list)
 
 - Neither a refresh nor a revocation reaches OpenEMR's own side: it exposes
   no server-to-server token revocation endpoint (confirmed against its own
   discovery document and source, ADR 0044), so the underlying OpenEMR
-  refresh token is never invalidated there — an accepted, pre-existing
-  limitation, not something either ADR 0044 or ADR 0045 claims to fix
+  refresh token is never invalidated there
 - Running more than one AuthFacade replica is still untested. ADR 0046
   closed the last structural blocker ADR 0028 named against it, but closing
   the blockers is not the same as proving it works
-- ADR: identity bridge design
+- Authorization for OpenEMR data, and for admin-initiated session revocation
+  specifically, is not built — `/api/v1/me` confirms identity only, and
+  `Admin:Subjects` is a fixed allowlist, not a real authorization model
 
 **Exit criteria:** The security items above are either done or recorded as
-accepted risks. The ADR is merged.
+accepted risks. The ADR is merged. **Met.**
 
 ### M2: Schema inventory (in progress)
 
