@@ -11,17 +11,21 @@ namespace OpenEmrNext.AuthFacade.UnitTests.Api;
 /// </summary>
 public class SessionRevocationTests
 {
-    private static async Task<TestApi> StartApiAsync(FakeOpenEmrServer server)
+    private static async Task<TestApi> StartApiAsync(FakeOpenEmrServer server, string? adminSubject = null)
     {
         var port = TestApi.GetFreeTcpPort();
-        return await TestApi.StartAsync(
-            new Dictionary<string, string?>
-            {
-                ["OpenEmr:BaseUrl"] = server.BaseUrl,
-                ["OpenEmr:Issuer"] = server.Issuer,
-                ["OpenEmr:RedirectUri"] = $"http://127.0.0.1:{port}/callback"
-            },
-            port);
+        var overrides = new Dictionary<string, string?>
+        {
+            ["OpenEmr:BaseUrl"] = server.BaseUrl,
+            ["OpenEmr:Issuer"] = server.Issuer,
+            ["OpenEmr:RedirectUri"] = $"http://127.0.0.1:{port}/callback"
+        };
+        if (adminSubject is not null)
+        {
+            overrides["Admin:Subjects:0"] = adminSubject;
+        }
+
+        return await TestApi.StartAsync(overrides, port);
     }
 
     /// <summary>
@@ -105,6 +109,70 @@ public class SessionRevocationTests
         await using var api = await StartApiAsync(server);
 
         using var response = await api.Client.PostAsync("/sessions/revoke-all", null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_allowlisted_admin_subject_can_revoke_another_subjects_sessions()
+    {
+        await using var server = await FakeOpenEmrServer.StartAsync();
+        await using var api = await StartApiAsync(server, adminSubject: "admin-subject");
+        server.Subject = "admin-subject";
+        using var admin = await LoginAsNewBrowserAsync(api, server);
+        server.Subject = "target-subject";
+        using var target = await LoginAsNewBrowserAsync(api, server);
+
+        using var revoke = await admin.PostAsync("/sessions/revoke/target-subject", null);
+        Assert.Equal(HttpStatusCode.NoContent, revoke.StatusCode);
+
+        using var meTarget = await target.GetAsync("/api/v1/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, meTarget.StatusCode);
+        // The admin only revoked someone else's sessions; their own is untouched.
+        using var meAdmin = await admin.GetAsync("/api/v1/me");
+        Assert.Equal(HttpStatusCode.OK, meAdmin.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_admin_revoking_their_own_subject_is_signed_out_too()
+    {
+        await using var server = await FakeOpenEmrServer.StartAsync();
+        await using var api = await StartApiAsync(server, adminSubject: "admin-subject");
+        server.Subject = "admin-subject";
+        using var admin = await LoginAsNewBrowserAsync(api, server);
+
+        using var revoke = await admin.PostAsync("/sessions/revoke/admin-subject", null);
+        Assert.Equal(HttpStatusCode.NoContent, revoke.StatusCode);
+
+        using var me = await admin.GetAsync("/api/v1/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_subject_not_on_the_admin_allowlist_gets_forbidden_and_changes_nothing()
+    {
+        await using var server = await FakeOpenEmrServer.StartAsync();
+        // No Admin:Subjects configured at all -- the default, fail-closed allowlist.
+        await using var api = await StartApiAsync(server);
+        server.Subject = "not-an-admin";
+        using var caller = await LoginAsNewBrowserAsync(api, server);
+        server.Subject = "target-subject";
+        using var target = await LoginAsNewBrowserAsync(api, server);
+
+        using var revoke = await caller.PostAsync("/sessions/revoke/target-subject", null);
+        Assert.Equal(HttpStatusCode.Forbidden, revoke.StatusCode);
+
+        using var meTarget = await target.GetAsync("/api/v1/me");
+        Assert.Equal(HttpStatusCode.OK, meTarget.StatusCode);
+    }
+
+    [Fact]
+    public async Task Admin_revoke_requires_an_authenticated_session()
+    {
+        await using var server = await FakeOpenEmrServer.StartAsync();
+        await using var api = await StartApiAsync(server, adminSubject: "admin-subject");
+
+        using var response = await api.Client.PostAsync("/sessions/revoke/some-subject", null);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

@@ -1,4 +1,6 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authentication;
+using OpenIddict.Client;
 using OpenIddict.Client.AspNetCore;
 
 namespace OpenEmrNext.AuthFacade.Api.OpenIddictClient;
@@ -55,5 +57,37 @@ public static class OpenIddictTokenCapture
         }
 
         return properties;
+    }
+
+    /// <summary>
+    /// Overwrites <paramref name="properties"/>' tokens with a silent refresh's result (ADR 0045), in
+    /// place: the access token is always new, but OpenEMR does not necessarily rotate the refresh token or
+    /// reissue an <c>id_token</c> on every refresh, so either is kept from the existing properties when the
+    /// result did not carry a new one — never dropped outright.
+    /// </summary>
+    /// <param name="properties">The session's current properties, read from its own authentication ticket.</param>
+    /// <param name="result">What <see cref="OpenIddictClientService.AuthenticateWithRefreshTokenAsync"/> returned.</param>
+    public static void ApplyRefresh(AuthenticationProperties properties, OpenIddictClientModels.RefreshTokenAuthenticationResult result)
+    {
+        List<AuthenticationToken> tokens = [new() { Name = "access_token", Value = result.AccessToken ?? "" }];
+
+        var refreshToken = result.RefreshToken ?? properties.GetTokenValue("refresh_token");
+        if (!string.IsNullOrEmpty(refreshToken))
+        {
+            tokens.Add(new AuthenticationToken { Name = "refresh_token", Value = refreshToken });
+        }
+
+        var idToken = result.IdentityToken ?? properties.GetTokenValue("id_token");
+        if (!string.IsNullOrEmpty(idToken))
+        {
+            tokens.Add(new AuthenticationToken { Name = "id_token", Value = idToken });
+        }
+
+        if (result.AccessTokenExpirationDate is { } expiresAt)
+        {
+            tokens.Add(new AuthenticationToken { Name = "expires_at", Value = expiresAt.ToString("o", CultureInfo.InvariantCulture) });
+        }
+
+        properties.StoreTokens(tokens);
     }
 }

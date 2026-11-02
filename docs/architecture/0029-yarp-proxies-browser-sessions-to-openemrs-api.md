@@ -1,6 +1,6 @@
 # 0029. YARP proxies a browser session's API calls to OpenEMR, with the real token attached server-side
 
-- **Status:** Accepted; the Consequences question about reaching other backend services is resolved by [0030](0030-bff-proxy-forwards-to-the-gateway-not-each-service.md)
+- **Status:** Accepted; the Consequences question about reaching other backend services is resolved by [0030](0030-bff-proxy-forwards-to-the-gateway-not-each-service.md); the deferred silent-refresh gap is closed by [0045](0045-silent-refresh-and-admin-session-revocation.md)
 - **Date:** 2026-10-31
 - **Builds on:** [0013](0013-pass-openemr-tokens-through.md), [0024](0024-browser-authorization-code-flow-with-pkce.md), [0026](0026-openiddict-client-drives-the-authorization-code-flow.md), [0027](0027-persist-tokens-in-the-session-cookie.md)
 

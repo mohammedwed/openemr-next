@@ -26,7 +26,7 @@ research vision below is the long-term direction, not the current deliverable.
 | Local stack | OpenEMR, MariaDB, and AuthFacade in one Docker Compose project | Built |
 | Database baseline | Reproducible schema and seed data from the OpenEMR installer | Built, not yet cleaned |
 | `OpenEmr.Data` | EF Core model scaffolded from the live database | Built |
-| AuthFacade | BFF (browser login via OIDC/PKCE, a revocable session cookie, logout, proxies browser calls to OpenEMR's API) — rate limited, circuit-broken, audit-logged, over HTTPS, with its own session state in a dedicated database | Built, hardening in progress |
+| AuthFacade | BFF (browser login via OIDC/PKCE, a revocable session cookie, logout, proxies browser calls to OpenEMR's API) — rate limited, circuit-broken, audit-logged, over HTTPS, with its own session state in a dedicated database | Built, hardened ([ADR 0047](docs/architecture/0047-the-identity-bridge-design.md)) |
 | WebApp dashboard | Blazor WebAssembly: shows the signed-in identity via a generated typed client; stub nav for Patients/Encounters | Built |
 | API gateway | Terminates TLS and routes a browser's requests by path: AuthFacade's own prefixes to it, everything else to the dashboard's static files (ADR 0033, ADR 0039). No token validation of its own yet, and nothing to route to beyond AuthFacade until a domain service exists | Built, narrower than originally planned |
 | Patient Management | Registers patients, publishes `PatientRegistered` | Planned |
@@ -70,7 +70,9 @@ stepping stone: each future service should scaffold only its own tables.
   at the same remaining path, with the session's real OpenEMR access token attached as
   `Authorization: Bearer` server-side. This is how a browser session — which never holds a
   bearer token itself — reaches OpenEMR's API. Requires the `AuthFacadeSession` cookie
-  specifically, and is guarded by a circuit breaker and logged to the audit trail (see below). See
+  specifically, and is guarded by a circuit breaker and logged to the audit trail (see below). An
+  expired access token is silently refreshed first, so the browser never notices
+  ([ADR 0045](docs/architecture/0045-silent-refresh-and-admin-session-revocation.md)). See
   [ADR 0029](docs/architecture/0029-yarp-proxies-browser-sessions-to-openemrs-api.md).
   AuthFacade is a BFF (backend-for-frontend): the browser only ever talks to AuthFacade, which does
   the OIDC login, holds the session, and proxies API calls on its behalf.
@@ -85,6 +87,9 @@ stepping stone: each future service should scaffold only its own tables.
   an opaque key; the real ticket lives in a server-side record (same database as ADR 0043) that this
   deletes, so a stolen copy of the cookie stops working on its very next use, with no cooperation from
   whichever browser is holding it. See [ADR 0044](docs/architecture/0044-session-store-backs-the-cookie-for-revocation.md).
+- `POST /sessions/revoke/{subject}` — the admin-action counterpart: an OpenEMR subject on a config-driven
+  allowlist (`Admin:Subjects`, empty by default) can end any *other* subject's sessions too, logged with
+  who did it and against whom. See [ADR 0045](docs/architecture/0045-silent-refresh-and-admin-session-revocation.md).
 - `GET /health` is a liveness check.
 - `/oidc/login` and `/callback` are rate limited per client address
   ([ADR 0038](docs/architecture/0038-rate-limit-login-and-callback-per-client-address.md)); the token
@@ -209,7 +214,12 @@ gateway. It does not store passwords or user records.
   `AuthFacadeSession` cookie carries only an opaque key (ADR 0044); the real ticket, and the real OpenEMR
   token inside it, lives in AuthFacade's own database (ADR 0043). `POST /sessions/revoke-all` deletes it,
   which is what makes a stolen copy of the cookie stop working everywhere, immediately — not just the
-  browser that calls it.
+  browser that calls it. A config-driven allowlist of admin subjects can do the same to any *other*
+  subject's sessions (ADR 0045).
+- **An expiring access token is refreshed silently, server-side.** The BFF proxy redeems the session's
+  refresh token before it needs one, with no round trip through the browser; a rejected refresh falls back
+  to the stale token and lets OpenEMR's own 401 decide, the same passthrough every other BFF proxy call
+  already follows (ADR 0045).
 
 ### Known gaps
 
@@ -222,22 +232,19 @@ gateway. It does not store passwords or user records.
   AuthFacade cannot prevent this from outside. There is currently no automated
   test guarding against a regression: the one that did (a live password-grant
   call) was removed with the password grant itself (ADR 0035).
-- OpenIddict's own encryption/signing certificates are still dev-only and
-  ephemeral, generated fresh per process. AuthFacade's session state itself now
-  persists across a restart (ADR 0043), but this means more than one AuthFacade
-  instance still cannot run: a second replica could not decrypt a state token
-  written by another one regardless of where it lives. See
-  [ADR 0028](docs/architecture/0028-browser-login-and-session-assume-a-single-instance.md).
+- AuthFacade's session-related state — OpenIddict's state-token store, the Data Protection key ring, and
+  now its own encryption/signing certificates too — all persist past a restart (ADR 0043, ADR 0044, ADR
+  0046), closing the three structural reasons a second AuthFacade replica couldn't work. Running more than
+  one is still untested; this removes the blockers named against it, it does not itself prove it works.
+  See [ADR 0028](docs/architecture/0028-browser-login-and-session-assume-a-single-instance.md).
 - The browser login's OIDC scope (`openid profile email offline_access`) does not
   include `api:oemr`, so the BFF proxy's calls to OpenEMR's protected API will be
-  rejected by OpenEMR itself until that scope is deliberately widened. No silent
-  refresh happens when the session's access token expires either. See
+  rejected by OpenEMR itself until that scope is deliberately widened. See
   [ADR 0029](docs/architecture/0029-yarp-proxies-browser-sessions-to-openemrs-api.md).
-- `/sessions/revoke-all` (ADR 0044) only revokes the caller's *own* sessions. Revoking an arbitrary other
-  user's session — an admin action — is still not possible: it would need an authorization model this
-  project does not have, the same gap `/api/v1/me` already has above. Revoking a session also cannot
-  reach OpenEMR's own side: OpenEMR exposes no server-to-server token revocation endpoint, so the
-  underlying access/refresh token stays valid there until it naturally expires.
+- Neither a refresh nor a revocation reaches OpenEMR's own side: it exposes no server-to-server token
+  revocation endpoint (confirmed against its own discovery document and source), so the underlying OpenEMR
+  refresh token stays valid there until it naturally expires, independent of anything AuthFacade does with
+  its own session record.
 - The gateway does no token validation of its own — it only routes by path.
   Every auth decision still happens in AuthFacade. If a future domain service
   needs authenticated requests, whether it validates its own token or the
@@ -311,6 +318,12 @@ scripts, CI, and the integration tests all read it, so change a value there and
 nowhere else. `scripts/lib/env.sh` holds the shared shell helpers. Every variable is described in
 [`docs/configuration.md`](docs/configuration.md).
 
+**Certificates.** Run `bash scripts/setup/new-dev-cert.sh` (the gateway's own TLS certificate, ADR 0039)
+and `bash scripts/setup/new-authfacade-certs.sh` (AuthFacade's persisted OpenIddict certificates, ADR
+0046) once. Both write to the gitignored `certs/` directory and never overwrite an existing file. The
+second one is required: `docker-compose.yml` points `auth-facade` at its output unconditionally, so the
+stack fails to start it without having run this first.
+
 **Start the stack:**
 
 ```bash
@@ -354,7 +367,7 @@ Measurement depth matches the current phase.
   scenarios (planned with M5)
 - Change-impact scope for representative changes
 - Architecture test results (planned with M6)
-- Security review of the identity bridge (in progress with M1)
+- Security review of the identity bridge (M1, done — see [ADR 0047](docs/architecture/0047-the-identity-bridge-design.md))
 
 **Planned later:** delivery metrics (lead time, deployment frequency, change
 failure rate), reliability (availability, p95/p99 latency, recovery time),
@@ -421,7 +434,8 @@ migration.
 - [Development Workflow](docs/development-workflow.md)
 - [Development and Test Environments](docs/environments.md)
 - [Domain-Driven Design Guide](docs/domain-driven-design.md)
-- ADRs in `docs/architecture/`
+- ADRs in `docs/architecture/` — start with [ADR 0047](docs/architecture/0047-the-identity-bridge-design.md)
+  for how AuthFacade's design fits together end to end; the rest are the individual decisions behind it
 - Changelogs (dated, one per working session)
 
 Links to documents that do not yet exist should be created or removed before

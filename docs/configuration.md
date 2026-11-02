@@ -157,6 +157,21 @@ a bare `dotnet run` outside Docker rely on. Only the real Compose stack sets thi
 | `User` | `""` | Dedicated, least-privilege user that can reach only `Database`. From `AUTHFACADE_DB_USER`. |
 | `Password` | `""` | That user's password. From `AUTHFACADE_DB_PASSWORD`. |
 
+### `AuthFacadeCertificates`
+
+The two certificates OpenIddict.Client uses to encrypt and sign its own state tokens (ADR 0046), from
+`scripts/setup/new-authfacade-certs.sh`. Deliberately optional as a whole, the same shape as
+`AuthFacadeDb` — when `EncryptionCertificatePath` is unset, AuthFacade falls back to OpenIddict's own
+per-process development certificates instead, which every unit test and a bare `dotnet run` outside
+Docker rely on. Only the real Compose stack sets this section, unconditionally — see the script's own
+requirement in [`scripts/README.md`](../scripts/README.md).
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `EncryptionCertificatePath` | `""` (development-certificate fallback) | Path to the PKCS#12 (`.pfx`) encryption certificate. In Compose: `/certs/authfacade-encryption.pfx`. |
+| `SigningCertificatePath` | `""` | Path to the PKCS#12 (`.pfx`) signing certificate. In Compose: `/certs/authfacade-signing.pfx`. |
+| `Password` | `""` | Password protecting both PKCS#12 files. The generated certificates have none — see ADR 0046. |
+
 ### `OpenEmr:CircuitBreaker`
 
 Guards the token exchange, the JWKS fetch and the BFF proxy's forwarded calls (ADR 0041) — three
@@ -189,6 +204,17 @@ OpenEMR.
 | --- | --- | --- |
 | `PermitLimit` | `10` | At least 1. |
 | `Window` | `00:01:00` | At least one second. |
+
+### `Admin`
+
+Who may call `POST /sessions/revoke/{subject}` to end an *arbitrary other* subject's sessions (ADR 0045) —
+not wired through `.env`, since a list needs indexed environment keys that do not fit the single-scalar
+convention every other setting here uses. Set it directly (environment variables,
+`appsettings.Development.json`, or user-secrets) if you want to exercise it locally.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `Subjects` | `[]` | OpenEMR subjects (user IDs) trusted to revoke any session. Empty means nobody can — fails closed, not open. Set as `Admin__Subjects__0`, `Admin__Subjects__1`, … as environment variables. |
 
 ### Running outside Docker
 

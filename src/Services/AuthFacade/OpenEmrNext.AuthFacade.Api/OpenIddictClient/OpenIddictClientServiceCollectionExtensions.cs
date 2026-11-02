@@ -62,6 +62,14 @@ public static class OpenIddictClientServiceCollectionExtensions
         // path would let concurrent test hosts collide.
         var authFacadeDb = configuration.GetSection(AuthFacadeDbOptions.SectionName).Get<AuthFacadeDbOptions>()
             ?? new AuthFacadeDbOptions();
+
+        // The real Compose stack configures AuthFacadeCertificates:* to point at two persisted
+        // certificates (scripts/setup/new-authfacade-certs.sh), so a state token encrypted before a
+        // restart is still decryptable after one (ADR 0045, closing the third gap ADR 0028 named). Nothing
+        // else configures that section -- tests, and a bare `dotnet run` outside Docker, fall back to
+        // OpenIddict's own per-process development certificates below, the same as before this ADR.
+        var certificates = configuration.GetSection(AuthFacadeCertificateOptions.SectionName).Get<AuthFacadeCertificateOptions>()
+            ?? new AuthFacadeCertificateOptions();
         // Computed once, here, rather than inside the AddDbContext callback below: that callback re-runs
         // on every new scope (AddDbContext's optionsLifetime defaults to Scoped, not Singleton), so a path
         // generated inside it would pick a fresh, schema-less file for every request after
@@ -123,16 +131,35 @@ public static class OpenIddictClientServiceCollectionExtensions
                 options.SessionStore = new AuthFacadeSessionStore(scopeFactory, dataProtectionProvider);
             });
 
+        // Silently renews an expired access token against OpenEMR's refresh grant (ADR 0045), for the BFF
+        // proxy's own request transform to call. Scoped: it resolves OpenIddictClientService and the
+        // current request's HttpContext through the usual per-request container, nothing it needs to
+        // outlive a single request.
+        services.AddScoped<AccessTokenRefresher>();
+
         services.AddOpenIddict()
             .AddCore(options => options.UseEntityFrameworkCore().UseDbContext<AuthFacadeDbContext>())
             .AddClient(options =>
             {
                 options.AllowAuthorizationCodeFlow();
+                // AccessTokenRefresher (ADR 0045) redeems the session's refresh token directly via
+                // AuthenticateWithRefreshTokenAsync, outside the browser-driven authorization-code flow.
+                options.AllowRefreshTokenFlow();
 
-                // Dev-only ephemeral certificates. A real deployment needs persisted ones; ADR 0020
-                // already treats this stack as local-only, so this matches its existing maturity level.
-                options.AddDevelopmentEncryptionCertificate()
-                       .AddDevelopmentSigningCertificate();
+                if (certificates.IsConfigured)
+                {
+                    using var encryptionStream = File.OpenRead(certificates.EncryptionCertificatePath);
+                    options.AddEncryptionCertificate(encryptionStream, certificates.Password);
+                    using var signingStream = File.OpenRead(certificates.SigningCertificatePath);
+                    options.AddSigningCertificate(signingStream, certificates.Password);
+                }
+                else
+                {
+                    // Dev-only, regenerated fresh every process start. Fine for tests and a bare
+                    // `dotnet run`; the real Compose stack always configures persisted ones above (ADR 0045).
+                    options.AddDevelopmentEncryptionCertificate()
+                           .AddDevelopmentSigningCertificate();
+                }
 
                 options.UseAspNetCore()
                        .EnableRedirectionEndpointPassthrough()
@@ -187,6 +214,14 @@ public static class OpenIddictClientServiceCollectionExtensions
     }
 
     /// <summary>
+    /// The exact issuer <see cref="BuildRegistration"/> registers the client under — no trailing slash, to
+    /// byte-for-byte match the <c>iss</c> claim OpenEMR actually writes into its tokens. Shared with
+    /// <see cref="AccessTokenRefresher"/> (ADR 0045), which must name the same registration to redeem a
+    /// refresh token against it; OpenIddict.Client matches a refresh request to a registration by issuer.
+    /// </summary>
+    internal static Uri NormalizeIssuer(OpenEmrOptions openEmr) => new(openEmr.Issuer.TrimEnd('/'), UriKind.Absolute);
+
+    /// <summary>
     /// Builds the one client registration against OpenEMR, with the discovery document's automatic
     /// endpoint lookup bypassed: the authorize endpoint must be the publicly-reachable <c>OpenEmr:Issuer</c>
     /// address (the browser follows it), while the token and JWKS endpoints must be the container-internal
@@ -199,8 +234,11 @@ public static class OpenIddictClientServiceCollectionExtensions
         // No trailing slash: this must byte-for-byte match the "iss" claim OpenEMR actually writes into its
         // tokens (confirmed against OpenEmrTokenVerifier, which already validates that successfully), or
         // id_token validation fails with ID2088 "issuer not valid" even though the token itself is genuine.
+        // The string form is kept separately, not derived from the Uri below: Uri.ToString() re-adds a
+        // trailing "/" for a bare-authority URI (no issue for OpenEMR's real issuer, which always has a
+        // path, but not a guarantee worth depending on here).
         var issuerString = openEmr.Issuer.TrimEnd('/');
-        var issuer = new Uri(issuerString, UriKind.Absolute);
+        var issuer = NormalizeIssuer(openEmr);
         var internalBase = openEmr.BaseUrl.TrimEnd('/') + "/oauth2/default";
         var jwksUri = new Uri($"{internalBase}/jwk", UriKind.Absolute);
 
@@ -209,7 +247,11 @@ public static class OpenIddictClientServiceCollectionExtensions
             Issuer = issuer,
             AuthorizationEndpoint = new Uri($"{issuerString}/authorize", UriKind.Absolute),
             TokenEndpoint = new Uri($"{internalBase}/token", UriKind.Absolute),
-            GrantTypesSupported = { GrantTypes.AuthorizationCode },
+            // RefreshToken, not just AuthorizationCode: AccessTokenRefresher (ADR 0045) redeems the
+            // refresh token OpenEMR issues alongside the original grant. Without this, OpenIddict.Client
+            // refuses AuthenticateWithRefreshTokenAsync outright -- this static configuration is what it
+            // consults to decide what the registration is even allowed to do, discovery being bypassed.
+            GrantTypesSupported = { GrantTypes.AuthorizationCode, GrantTypes.RefreshToken },
             ResponseTypesSupported = { ResponseTypes.Code },
             ResponseModesSupported = { ResponseModes.Query },
             CodeChallengeMethodsSupported = { CodeChallengeMethods.Sha256 }

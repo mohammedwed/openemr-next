@@ -50,6 +50,33 @@ internal sealed class FakeOpenEmrServer : IAsyncDisposable
     /// <summary>How many times <c>/oauth2/default/token</c> has been called, for the circuit breaker tests (ADR 0041).</summary>
     public int TokenEndpointCallCount { get; private set; }
 
+    /// <summary>
+    /// <c>expires_in</c>, in seconds, on a successful authorization-code grant response. Negative makes the
+    /// access token already expired the moment login completes, for the silent-refresh tests (ADR 0045) to
+    /// force a refresh on the very next proxied call without waiting out a real expiry.
+    /// </summary>
+    public int AccessTokenExpiresInSeconds { get; set; } = 3600;
+
+    /// <summary>The <c>refresh_token</c> a successful authorization-code grant response carries.</summary>
+    public string? InitialRefreshToken { get; set; } = "fake-refresh-token";
+
+    /// <summary>
+    /// When not 200, a <c>grant_type=refresh_token</c> request to <c>/oauth2/default/token</c> returns this
+    /// status with a generic OAuth error body instead of a token — the rejected/expired/revoked refresh
+    /// token case (ADR 0045).
+    /// </summary>
+    public int RefreshEndpointStatusCode { get; set; } = 200;
+
+    /// <summary>How many <c>grant_type=refresh_token</c> requests <c>/oauth2/default/token</c> has answered.</summary>
+    public int RefreshEndpointCallCount { get; private set; }
+
+    /// <summary>The <c>access_token</c> a successful refresh grant response carries — distinct from the
+    /// original login's, so a test can tell the two apart.</summary>
+    public string RefreshedAccessToken { get; set; } = "refreshed-access-token";
+
+    /// <summary>The <c>refresh_token</c> a successful refresh grant response carries.</summary>
+    public string? RefreshedRefreshToken { get; set; } = "refreshed-refresh-token";
+
     /// <summary>The status code <c>/apis/default/api/flaky</c> answers with, for the circuit breaker tests (ADR 0041).</summary>
     public int FlakyEndpointStatusCode { get; set; } = 200;
 
@@ -65,15 +92,32 @@ internal sealed class FakeOpenEmrServer : IAsyncDisposable
         var app = builder.Build();
         var server = new FakeOpenEmrServer(app, rsa);
 
-        app.MapPost("/oauth2/default/token", () =>
+        app.MapPost("/oauth2/default/token", async (HttpRequest request) =>
         {
+            var form = await request.ReadFormAsync();
+            if (form["grant_type"].ToString() == "refresh_token")
+            {
+                server.RefreshEndpointCallCount++;
+                return server.RefreshEndpointStatusCode == 200
+                    ? Results.Json(new
+                    {
+                        access_token = server.RefreshedAccessToken,
+                        token_type = "Bearer",
+                        expires_in = 3600,
+                        refresh_token = server.RefreshedRefreshToken,
+                        id_token = server.BuildIdToken()
+                    })
+                    : Results.Json(new { error = "invalid_grant" }, statusCode: server.RefreshEndpointStatusCode);
+            }
+
             server.TokenEndpointCallCount++;
             return server.TokenEndpointStatusCode == 200
                 ? Results.Json(new
                 {
                     access_token = "fake-access-token",
                     token_type = "Bearer",
-                    expires_in = 3600,
+                    expires_in = server.AccessTokenExpiresInSeconds,
+                    refresh_token = server.InitialRefreshToken,
                     id_token = server.BuildIdToken()
                 })
                 : Results.Json(new { error = "invalid_grant" }, statusCode: server.TokenEndpointStatusCode);

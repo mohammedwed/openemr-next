@@ -40,7 +40,7 @@ a compatibility constraint.
 | M0a | Database baseline, reproducible and tested | Done (cleanup pending) | Oct 4 |
 | M0b | AuthFacade login through OpenEMR's OAuth server, facade-issued JWT | Done | Oct 10, Oct 11 |
 | M0c | Black-box integration tests with readiness gate | Done | Oct 11 |
-| M1 | Harden the identity bridge | In progress | Oct 10, Oct 11, Oct 21, Oct 24, Oct 29, Oct 30, Oct 31 |
+| M1 | Harden the identity bridge | Done | Oct 10, Oct 11, Oct 21, Oct 24, Oct 29, Oct 30, Oct 31, Nov 1, Nov 2 |
 | M2 | Schema inventory for slice contexts | In progress | Oct 4 (entities scaffolded) |
 | M3 | Gateway and token validation | Not started | — |
 | M4 | Patient Management service | Not started | — |
@@ -83,7 +83,7 @@ ADR 0026) and the resulting session cookie (ADR 0027).
   and `/me` bearer coverage was removed with the password grant itself, ADR 0035)
 - The readiness gate checks four conditions under one deadline before tests run
 
-### M1: Harden the identity bridge (in progress)
+### M1: Harden the identity bridge (done)
 
 **Done**
 
@@ -143,26 +143,47 @@ ADR 0026) and the resulting session cookie (ADR 0027).
   for the caller's own subject, the self-service answer to a suspected stolen
   cookie that ADR 0028/0040 both named as missing — no cooperation needed
   from whichever browser holds the stolen copy
-- Unit tests (71), architecture tests (1) and live integration tests (5) pass
+- The BFF proxy silently refreshes an expired access token against OpenEMR's
+  refresh grant before the next proxied call needs it (ADR 0045), closing
+  the gap ADR 0029 explicitly deferred — the browser never notices. A failed
+  refresh falls back to the stale token rather than failing the request;
+  OpenEMR's own 401 decides, the same passthrough every other call already
+  uses
+- Admin-initiated session revocation (ADR 0045): a config-driven allowlist of
+  OpenEMR subjects (`Admin:Subjects`, empty by default) can revoke any other
+  subject's sessions via `POST /sessions/revoke/{subject}` — the admin-action
+  half of the gap ADR 0028/0040 both named, left open by ADR 0044's
+  self-service-only `/sessions/revoke-all`. Logged to the audit trail with
+  who did it and against whom
+- OpenIddict's own encryption/signing certificates are now persisted files too
+  (ADR 0046), the last of the three gaps ADR 0028 named — closed the same
+  way ADR 0039 already closed it for the gateway's own TLS certificate.
+  Verified live: a state token encrypted before restarting `auth-facade` was
+  still correctly decrypted after the restart, proceeding all the way to a
+  real token request to OpenEMR
+- Unit tests (81), architecture tests (1) and live integration tests (5) pass
   (down from this bullet's original counts: ADR 0035 removed the password
   grant, its tests, and the Domain/Application/Ports/Infrastructure layers)
+- ADR: identity bridge design (ADR 0047) — the capstone synthesizing every
+  ADR above into one description of the finished bridge, its guarantees, and
+  its accepted risks (below). Merged, satisfying this milestone's exit
+  criterion.
 
-**Remaining**
+**Accepted risks** (recorded, not fixed — see ADR 0047 for the full list)
 
-- OpenIddict's own encryption/signing certificates are still dev-only and
-  ephemeral (the third gap ADR 0028 named, explicitly not addressed by ADR
-  0043 — a separate, file-based follow-up mirroring the gateway's TLS cert
-  pattern, ADR 0039)
-- For browser sessions, silent refresh on an expired access token is explicitly
-  deferred rather than forgotten (ADR 0029). Revoking an *arbitrary other*
-  user's session (the admin-action half of the gap ADR 0040 named) is still
-  not possible — it needs an authorization model this project does not have
-  yet, the same gap `/api/v1/me` already has; ADR 0044 only closed the
-  self-service, stolen-cookie half
-- ADR: identity bridge design
+- Neither a refresh nor a revocation reaches OpenEMR's own side: it exposes
+  no server-to-server token revocation endpoint (confirmed against its own
+  discovery document and source, ADR 0044), so the underlying OpenEMR
+  refresh token is never invalidated there
+- Running more than one AuthFacade replica is still untested. ADR 0046
+  closed the last structural blocker ADR 0028 named against it, but closing
+  the blockers is not the same as proving it works
+- Authorization for OpenEMR data, and for admin-initiated session revocation
+  specifically, is not built — `/api/v1/me` confirms identity only, and
+  `Admin:Subjects` is a fixed allowlist, not a real authorization model
 
 **Exit criteria:** The security items above are either done or recorded as
-accepted risks. The ADR is merged.
+accepted risks. The ADR is merged. **Met.**
 
 ### M2: Schema inventory (in progress)
 

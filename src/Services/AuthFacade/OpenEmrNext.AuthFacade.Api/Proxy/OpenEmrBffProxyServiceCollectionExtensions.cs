@@ -75,12 +75,15 @@ public static class OpenEmrBffProxyServiceCollectionExtensions
                 {
                     // The only credential a browser session holds is the AuthFacadeSession cookie (ADR
                     // 0024/0026); the real OpenEMR token it carries (ADR 0027) is attached here, server-side, so
-                    // OpenEMR sees an ordinary bearer-authenticated request. No token on the session (a ticket
-                    // that predates ADR 0027, or one OpenEMR never issued a refresh/access pair for) means no
-                    // Authorization header is attached at all -- OpenEMR then rejects the request itself; this
-                    // proxy makes no auth decision of its own (ADR 0013's passthrough).
-                    var accessToken = await transformContext.HttpContext.GetTokenAsync(
-                        OpenIddictClientServiceCollectionExtensions.SessionScheme, "access_token");
+                    // OpenEMR sees an ordinary bearer-authenticated request. An expired one is silently
+                    // refreshed first (ADR 0045, the silent-refresh gap ADR 0029 deferred). No token on the
+                    // session at all (a ticket that predates ADR 0027, or one OpenEMR never issued a
+                    // refresh/access pair for) means no Authorization header is attached -- OpenEMR then
+                    // rejects the request itself; this proxy makes no auth decision of its own (ADR 0013's
+                    // passthrough).
+                    var refresher = transformContext.HttpContext.RequestServices.GetRequiredService<AccessTokenRefresher>();
+                    var accessToken = await refresher.GetValidAccessTokenAsync(
+                        transformContext.HttpContext, transformContext.HttpContext.RequestAborted);
 
                     if (!string.IsNullOrEmpty(accessToken))
                     {
