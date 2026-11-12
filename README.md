@@ -438,6 +438,24 @@ migration.
   for how AuthFacade's design fits together end to end; the rest are the individual decisions behind it
 - Changelogs (dated, one per working session)
 
+Reusable guides written out of this project's own experience, generalized so
+they apply outside this repository:
+
+- [Handbook: migrating authentication off a legacy system](docs/legacy-auth-migration-handbook.md)
+  — the comprehensive one. Everything from the four guides below in a single
+  self-contained document: orientation, the decisions, a ten-phase build
+  order, hardening/testing/pipeline/container reference, and the production
+  gate. Cites nothing; every decision is explained where it is made
+- [Migrating legacy authentication](docs/legacy-auth-migration-framework.md) —
+  the framework, with every claim cited back to the ADR it came from
+- [Migrating authentication behind a legacy system](docs/legacy-auth-facade-framework.md) —
+  the same framework restated generically, for a team in a different stack
+- [Building an authentication facade, step by step](docs/auth-facade-implementation-guide.md) —
+  a sequential build order, each step with a verifiable "done when"
+- [Starting a legacy system fast in a test pipeline](docs/fast-legacy-stack-startup.md) —
+  how this project's snapshot-and-restore cuts the legacy stack's CI boot from
+  twenty minutes to under one
+
 ## License
 
 OpenEMR Next is licensed under the [Apache License 2.0](LICENSE). It is an
