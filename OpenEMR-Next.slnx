@@ -28,5 +28,6 @@
     <Project Path="tests/Services/AuthFacade/OpenEmrNext.AuthFacade.IntegrationTests/OpenEmrNext.AuthFacade.IntegrationTests.csproj" />
     <Project Path="tests/Services/Gateway/OpenEmrNext.Gateway.IntegrationTests/OpenEmrNext.Gateway.IntegrationTests.csproj" />
     <Project Path="tests/Services/PatientManagement/OpenEmrNext.PatientManagement.UnitTests/OpenEmrNext.PatientManagement.UnitTests.csproj" />
+    <Project Path="tests/Services/PatientManagement/OpenEmrNext.PatientManagement.IntegrationTests/OpenEmrNext.PatientManagement.IntegrationTests.csproj" />
   </Folder>
 </Solution>

@@ -4,8 +4,9 @@ namespace OpenEmrNext.PatientManagement.Api.Domain;
 
 /// <summary>
 /// A registered patient. <see cref="Id"/> is the one value that's genuinely database-generated (ADR
-/// 0049) and stays unset until <see cref="AssignGeneratedIdentity"/> runs after the insert.
-/// <see cref="Pid"/>/<see cref="Pubpid"/> are generated here instead, eagerly, the same way
+/// 0049) -- EF Core's own <c>ValueGeneratedOnAdd()</c> populates it directly after insert (via the
+/// field access <c>PatientManagementDbContext</c> configures), so application code never assigns it
+/// itself. <see cref="Pid"/>/<see cref="Pubpid"/> are generated here instead, eagerly, the same way
 /// <see cref="Uuid"/> already is: <c>pid</c> is <c>NOT NULL DEFAULT 0</c> with a <c>UNIQUE KEY</c>
 /// (docs/m2-schema-inventory.md), so setting it only after an insert (<c>Pid = Id</c>, requiring a
 /// second write once <c>Id</c> is known) would leave two concurrent registrations both briefly holding
@@ -16,7 +17,7 @@ namespace OpenEmrNext.PatientManagement.Api.Domain;
 /// </summary>
 public sealed class Patient
 {
-    public long Id { get; private set; }
+    public long Id { get; }
     public long Pid { get; } = 0;
     public string Pubpid { get; } = null!;
     public Guid Uuid { get; }
@@ -24,8 +25,19 @@ public sealed class Patient
     public string LastName { get; } = null!;
     public string Sex { get; } = null!;
     public DateOnly DateOfBirth { get; }
-    public string? Email { get; }
-    public string? TrustedEmail { get; }
+
+    // Backed by their own fields, not auto-properties: the real email/email_direct columns are NOT NULL
+    // DEFAULT '' (no nullable representation exists in the database at all), so EF maps these two fields
+    // directly (PatientManagementDbContext's HasField) as plain non-null strings, while the properties
+    // above present the nicer string? to application code. A ValueConverter looked like the obvious fix
+    // but EF skips running a converter entirely when the source value is null by default -- confirmed
+    // the hard way, via a NOT NULL constraint violation against a real database -- so this sidesteps
+    // that pitfall rather than fighting it.
+    private readonly string _email = "";
+    private readonly string _trustedEmail = "";
+    public string? Email => string.IsNullOrEmpty(_email) ? null : _email;
+    public string? TrustedEmail => string.IsNullOrEmpty(_trustedEmail) ? null : _trustedEmail;
+
     public DateTime RegisteredAtUtc { get; }
     public long RegisteredBy { get; }
 
@@ -42,8 +54,8 @@ public sealed class Patient
         LastName = registration.LastName;
         Sex = registration.Sex;
         DateOfBirth = registration.DateOfBirth;
-        Email = registration.Email;
-        TrustedEmail = registration.TrustedEmail;
+        _email = registration.Email ?? "";
+        _trustedEmail = registration.TrustedEmail ?? "";
         RegisteredBy = registeredBy;
         RegisteredAtUtc = registeredAtUtc;
         Uuid = Guid.NewGuid();
@@ -55,7 +67,7 @@ public sealed class Patient
     /// Validates <paramref name="registration"/> against the same required/optional rules OpenEMR's own
     /// <c>PatientValidator::DATABASE_INSERT_CONTEXT</c> enforces (docs/m4-domain-notes.md) and, if valid,
     /// returns a new <see cref="Patient"/> with <see cref="Uuid"/>/<see cref="Pid"/>/<see cref="Pubpid"/>
-    /// already assigned. Only <see cref="Id"/> waits for <see cref="AssignGeneratedIdentity"/>.
+    /// already assigned. <see cref="Id"/> stays <c>0</c> until the database assigns it on insert.
     /// </summary>
     /// <exception cref="PatientValidationException">One or more fields fail validation.</exception>
     public static Patient Register(PatientRegistration registration, long registeredBy, DateTime registeredAtUtc)
@@ -81,19 +93,6 @@ public sealed class Patient
             throw new PatientValidationException(errors);
 
         return new Patient(registration, registeredBy, registeredAtUtc);
-    }
-
-    /// <summary>
-    /// Called once, by the persistence layer, right after the database assigns <paramref name="id"/> via
-    /// its own <c>AUTO_INCREMENT</c> on insert. <see cref="Pid"/>/<see cref="Pubpid"/> are already set
-    /// (see the constructor) and are untouched here.
-    /// </summary>
-    internal void AssignGeneratedIdentity(long id)
-    {
-        if (Id != 0)
-            throw new InvalidOperationException($"Patient {Uuid} already has an assigned identity.");
-
-        Id = id;
     }
 
     private static bool IsValidEmail(string email)

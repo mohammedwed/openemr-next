@@ -49,14 +49,15 @@ public sealed class PatientManagementDbContext(DbContextOptions<PatientManagemen
             entity.Property(p => p.LastName).HasColumnName("lname");
             entity.Property(p => p.Sex).HasColumnName("sex");
             entity.Property(p => p.DateOfBirth).HasColumnName("DOB");
-            // email/email_direct are NOT NULL DEFAULT '' in the real schema -- writing a .NET null
-            // there would fail the insert, so "no email" round-trips as "" in the database, matching
-            // the legacy column's own convention, while the domain model keeps the cleaner nullable
-            // string (docs/m4-domain-notes.md: validation treats a blank email as "not provided").
-            entity.Property(p => p.Email).HasColumnName("email")
-                .HasConversion(s => s ?? "", s => string.IsNullOrEmpty(s) ? null : s);
-            entity.Property(p => p.TrustedEmail).HasColumnName("email_direct")
-                .HasConversion(s => s ?? "", s => string.IsNullOrEmpty(s) ? null : s);
+            // email/email_direct are NOT NULL DEFAULT '' in the real schema. Patient maps its own
+            // _email/_trustedEmail fields here instead of the Email/TrustedEmail properties directly --
+            // those fields are always a real non-null string, matching the column exactly; the
+            // properties layer string? on top for application code. (A ValueConverter looked simpler at
+            // first, but EF skips running a converter whose source value is null by default, so it never
+            // avoided the NOT NULL violation -- confirmed against a real database, not just reasoned
+            // about.)
+            entity.Property<string>("_email").HasColumnName("email");
+            entity.Property<string>("_trustedEmail").HasColumnName("email_direct");
             entity.Property(p => p.RegisteredAtUtc).HasColumnName("regdate");
             entity.Property(p => p.RegisteredBy).HasColumnName("created_by");
 

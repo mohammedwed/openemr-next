@@ -31,7 +31,7 @@ public class PatientTests
     }
 
     [Fact]
-    public void Register_leaves_only_Id_unassigned_until_AssignGeneratedIdentity_runs()
+    public void Register_leaves_Id_at_zero_since_only_the_database_assigns_it()
     {
         var patient = Patient.Register(ValidRegistration(), registeredBy: 1, Now);
 
@@ -114,25 +114,4 @@ public class PatientTests
         Assert.Equal(3, ex.Errors.Count);
     }
 
-    [Fact]
-    public void AssignGeneratedIdentity_sets_only_Id_leaving_Pid_and_Pubpid_untouched()
-    {
-        var patient = Patient.Register(ValidRegistration(), 1, Now);
-        var (pidBefore, pubpidBefore) = (patient.Pid, patient.Pubpid);
-
-        patient.AssignGeneratedIdentity(42);
-
-        Assert.Equal(42, patient.Id);
-        Assert.Equal(pidBefore, patient.Pid);
-        Assert.Equal(pubpidBefore, patient.Pubpid);
-    }
-
-    [Fact]
-    public void AssignGeneratedIdentity_cannot_run_twice()
-    {
-        var patient = Patient.Register(ValidRegistration(), 1, Now);
-        patient.AssignGeneratedIdentity(42);
-
-        Assert.Throws<InvalidOperationException>(() => patient.AssignGeneratedIdentity(43));
-    }
 }
