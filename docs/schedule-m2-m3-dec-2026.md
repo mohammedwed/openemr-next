@@ -18,13 +18,22 @@ revise against, not a commitment to defend.
 
 | Week | Dates | Focus | Deliverable |
 |---|---|---|---|
-| 1 | Nov 12 – Nov 19 | M2: map every table in slice scope to a bounded context | Table → context map drafted |
+| 1 | Nov 12 – Nov 19 | **Reprioritized Nov 13: M3 Gateway work (test coverage + the AuthFacade-permanence ADR) instead of M2.** M2's table→context mapping has not started and now has no assigned week in this schedule — see note below. | Gateway integration test project; ADR 0048 drafted |
 | 2 | Nov 19 – Nov 26 | M2: list cross-context tables and FKs, decide reference ID / duplicated data / API call per FK. **Thanksgiving week — reduced capacity assumed.** | Cross-context list + decisions, partial |
 | 3 | Nov 26 – Dec 3 | M2: finish cross-context decisions, record legacy anti-patterns as ADR input, close out M2 | **M2 exit: decision gate — confirm Patient–Encounter boundary** |
 | 4 | Dec 3 – Dec 10 | M3: YARP gateway scaffold, routes to AuthFacade, Compose entry for the gateway | Gateway running in Compose, routing to AuthFacade |
 | 5 | Dec 10 – Dec 17 | M3: token validation at the gateway; BFF proxy adds the gateway cluster (per ADR 0030) | Token validation live at gateway |
 | 6 | Dec 17 – Dec 24 | M3: ADR — AuthFacade as permanent bridge vs. replaced by a dedicated identity service. **Christmas Eve — reduced capacity assumed.** | ADR drafted |
 | 7 | Dec 24 – Dec 31 | Buffer/catch-up from weeks 2 and 6; close M3 | **M3 exit: identity architecture ADR merged** |
+
+## Note: week 1 reprioritized (Nov 13)
+
+Week 1 was planned as M2 work. On Nov 13 it was deliberately replaced with M3 Gateway work instead
+(Gateway integration test coverage, previously zero, and the ADR settling M3's "AuthFacade permanent
+bridge vs. dedicated identity service" open question). M2's table-to-context mapping is now unscheduled
+within this plan rather than slipped by one week — it needs a week assigned once M3's remaining shape is
+clearer. This is the deviation the schedule's own framing anticipated ("a plan to revise against, not a
+commitment to defend"), not a silent drift.
 
 ## Risks specific to this schedule
 

@@ -42,7 +42,7 @@ a compatibility constraint.
 | M0c | Black-box integration tests with readiness gate | Done | Oct 11 |
 | M1 | Harden the identity bridge | Done | Oct 10, Oct 11, Oct 21, Oct 24, Oct 29, Oct 30, Oct 31, Nov 1, Nov 2 |
 | M2 | Schema inventory for slice contexts | In progress | Oct 4 (entities scaffolded) |
-| M3 | Gateway and token validation | Not started | — |
+| M3 | Gateway and token validation | In progress | Nov 13 |
 | M4 | Patient Management service | Not started | — |
 | M5 | Clinical Care service | Not started | — |
 | M6 | Portfolio polish | Not started | — |
@@ -202,19 +202,29 @@ accepted risks. The ADR is merged. **Met.**
 **Decision gate:** Confirm the Patient–Encounter boundary. If the schema forces a
 different split, update the design before writing service code.
 
-### M3: Gateway and token validation (not started)
+### M3: Gateway and token validation (in progress)
 
-- YARP gateway routing to AuthFacade and to the new services
-- Token validation at the gateway (AuthFacade currently validates its own tokens
-  on `/me` only)
-- Compose entry for the gateway
-- ADR: whether AuthFacade stays as the permanent legacy bridge or is replaced by
-  a dedicated identity service
-- AuthFacade's BFF proxy (ADR 0029) adds one cluster pointed at this gateway, as a single hop for any
-  browser-session call beyond OpenEMR, rather than growing a route per new service itself — decided ahead
-  of time in ADR 0030
+**Done, ahead of this milestone formally starting (landed during M1):**
 
-**Decision gate:** Record the identity architecture in an ADR.
+- YARP gateway routing to AuthFacade and to WebApp (ADR 0033)
+- Compose entry for the gateway (ADR 0033/0039)
+
+**Done:**
+
+- ADR 0048: AuthFacade stays the permanent legacy bridge; no dedicated identity service is built in this
+  scope. Gateway token validation is explicitly deferred until a real bearer token reaches the gateway
+  (two named triggers in the ADR), rather than attempted against a guessed contract.
+
+**Remaining**
+
+- Gateway integration test coverage (currently zero — unlike AuthFacade, which has unit, architecture, and
+  integration test projects)
+- Routes to the new services (Patient Management, Clinical Care) — blocked until M4/M5 exist; nothing to
+  route to yet
+- AuthFacade's BFF proxy gaining a cluster pointed at this gateway (ADR 0030) — blocked for the same reason
+- Gateway token validation itself — deferred per ADR 0048 until one of its two named triggers occurs
+
+**Decision gate:** Record the identity architecture in an ADR. **Met** (ADR 0048, pending acceptance).
 
 ### M4: Patient Management service (not started)
 

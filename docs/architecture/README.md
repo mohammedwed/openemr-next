@@ -53,3 +53,4 @@ old one's status is updated to point to it.
 | [0045](0045-silent-refresh-and-admin-session-revocation.md) | Silent token refresh, and admin-initiated session revocation | Accepted | 2026-11-02 |
 | [0046](0046-persisted-openiddict-certificates.md) | OpenIddict's encryption and signing certificates are persisted files | Accepted | 2026-11-02 |
 | [0047](0047-the-identity-bridge-design.md) | The identity bridge: AuthFacade's design, end to end | Accepted | 2026-11-02 |
+| [0048](0048-authfacade-stays-the-bridge-gateway-validation-deferred.md) | AuthFacade stays the identity bridge; the gateway's token validation is deferred | Proposed | 2026-11-13 |
