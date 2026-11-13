@@ -3,16 +3,22 @@ using System.Net.Mail;
 namespace OpenEmrNext.PatientManagement.Api.Domain;
 
 /// <summary>
-/// A registered patient. <see cref="Id"/>/<see cref="Pid"/>/<see cref="Pubpid"/> are database-generated
-/// (ADR 0049) and are unset until <see cref="AssignGeneratedIdentity"/> runs after the insert -- they are
-/// never chosen here, unlike OpenEMR's own <c>getFreshPid()</c> (docs/m4-domain-notes.md's race
-/// condition), which this aggregate deliberately does not reproduce.
+/// A registered patient. <see cref="Id"/> is the one value that's genuinely database-generated (ADR
+/// 0049) and stays unset until <see cref="AssignGeneratedIdentity"/> runs after the insert.
+/// <see cref="Pid"/>/<see cref="Pubpid"/> are generated here instead, eagerly, the same way
+/// <see cref="Uuid"/> already is: <c>pid</c> is <c>NOT NULL DEFAULT 0</c> with a <c>UNIQUE KEY</c>
+/// (docs/m2-schema-inventory.md), so setting it only after an insert (<c>Pid = Id</c>, requiring a
+/// second write once <c>Id</c> is known) would leave two concurrent registrations both briefly holding
+/// the default <c>0</c> at once -- exactly the kind of race OpenEMR's own <c>getFreshPid()</c>
+/// (docs/m4-domain-notes.md) already illustrates the cost of. <c>Pid</c> only needs to be unique, not
+/// sequential or derived from <c>Id</c>, so it is generated independently and never needs that second
+/// write at all.
 /// </summary>
 public sealed class Patient
 {
     public long Id { get; private set; }
-    public long Pid { get; private set; }
-    public string Pubpid { get; private set; } = "";
+    public long Pid { get; }
+    public string Pubpid { get; }
     public Guid Uuid { get; }
     public string FirstName { get; }
     public string LastName { get; }
@@ -34,12 +40,15 @@ public sealed class Patient
         RegisteredBy = registeredBy;
         RegisteredAtUtc = registeredAtUtc;
         Uuid = Guid.NewGuid();
+        Pid = Random.Shared.NextInt64(1, long.MaxValue);
+        Pubpid = Pid.ToString();
     }
 
     /// <summary>
     /// Validates <paramref name="registration"/> against the same required/optional rules OpenEMR's own
     /// <c>PatientValidator::DATABASE_INSERT_CONTEXT</c> enforces (docs/m4-domain-notes.md) and, if valid,
-    /// returns a new <see cref="Patient"/> with no identity yet assigned.
+    /// returns a new <see cref="Patient"/> with <see cref="Uuid"/>/<see cref="Pid"/>/<see cref="Pubpid"/>
+    /// already assigned. Only <see cref="Id"/> waits for <see cref="AssignGeneratedIdentity"/>.
     /// </summary>
     /// <exception cref="PatientValidationException">One or more fields fail validation.</exception>
     public static Patient Register(PatientRegistration registration, long registeredBy, DateTime registeredAtUtc)
@@ -69,12 +78,8 @@ public sealed class Patient
 
     /// <summary>
     /// Called once, by the persistence layer, right after the database assigns <paramref name="id"/> via
-    /// its own <c>AUTO_INCREMENT</c> on insert. <see cref="Pid"/> is set to the same value --
-    /// <c>patient_data</c>'s child tables join on <c>pid</c>, not <c>id</c> (docs/m2-schema-inventory.md),
-    /// but nothing requires it to be sequential or "fresh" the way OpenEMR's own code assumed; it only
-    /// needs to be unique, which a value copied from an already-atomic <c>AUTO_INCREMENT</c> guarantees
-    /// for free. <see cref="Pubpid"/> defaults to the same value, matching OpenEMR's own default when no
-    /// public ID is supplied at registration (docs/m4-domain-notes.md).
+    /// its own <c>AUTO_INCREMENT</c> on insert. <see cref="Pid"/>/<see cref="Pubpid"/> are already set
+    /// (see the constructor) and are untouched here.
     /// </summary>
     internal void AssignGeneratedIdentity(long id)
     {
@@ -82,8 +87,6 @@ public sealed class Patient
             throw new InvalidOperationException($"Patient {Uuid} already has an assigned identity.");
 
         Id = id;
-        Pid = id;
-        Pubpid = id.ToString();
     }
 
     private static bool IsValidEmail(string email)

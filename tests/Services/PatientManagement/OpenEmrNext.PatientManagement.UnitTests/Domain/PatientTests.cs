@@ -31,13 +31,22 @@ public class PatientTests
     }
 
     [Fact]
-    public void Register_leaves_no_identity_assigned_until_AssignGeneratedIdentity_runs()
+    public void Register_leaves_only_Id_unassigned_until_AssignGeneratedIdentity_runs()
     {
         var patient = Patient.Register(ValidRegistration(), registeredBy: 1, Now);
 
         Assert.Equal(0, patient.Id);
-        Assert.Equal(0, patient.Pid);
-        Assert.Equal("", patient.Pubpid);
+        Assert.NotEqual(0, patient.Pid);
+        Assert.Equal(patient.Pid.ToString(), patient.Pubpid);
+    }
+
+    [Fact]
+    public void Register_generates_a_different_Pid_each_time()
+    {
+        var first = Patient.Register(ValidRegistration(), 1, Now);
+        var second = Patient.Register(ValidRegistration(), 1, Now);
+
+        Assert.NotEqual(first.Pid, second.Pid);
     }
 
     [Theory]
@@ -106,15 +115,16 @@ public class PatientTests
     }
 
     [Fact]
-    public void AssignGeneratedIdentity_sets_pid_and_pubpid_to_the_same_value_as_id()
+    public void AssignGeneratedIdentity_sets_only_Id_leaving_Pid_and_Pubpid_untouched()
     {
         var patient = Patient.Register(ValidRegistration(), 1, Now);
+        var (pidBefore, pubpidBefore) = (patient.Pid, patient.Pubpid);
 
         patient.AssignGeneratedIdentity(42);
 
         Assert.Equal(42, patient.Id);
-        Assert.Equal(42, patient.Pid);
-        Assert.Equal("42", patient.Pubpid);
+        Assert.Equal(pidBefore, patient.Pid);
+        Assert.Equal(pubpidBefore, patient.Pubpid);
     }
 
     [Fact]
