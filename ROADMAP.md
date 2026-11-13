@@ -41,8 +41,8 @@ a compatibility constraint.
 | M0b | AuthFacade login through OpenEMR's OAuth server, facade-issued JWT | Done | Oct 10, Oct 11 |
 | M0c | Black-box integration tests with readiness gate | Done | Oct 11 |
 | M1 | Harden the identity bridge | Done | Oct 10, Oct 11, Oct 21, Oct 24, Oct 29, Oct 30, Oct 31, Nov 1, Nov 2 |
-| M2 | Schema inventory for slice contexts | In progress | Oct 4 (entities scaffolded) |
-| M3 | Gateway and token validation | Not started | — |
+| M2 | Schema inventory for slice contexts | Done | Oct 4 (entities scaffolded), Nov 13 (inventory) |
+| M3 | Gateway and token validation | In progress | Nov 13 |
 | M4 | Patient Management service | Not started | — |
 | M5 | Clinical Care service | Not started | — |
 | M6 | Portfolio polish | Not started | — |
@@ -185,36 +185,48 @@ ADR 0026) and the resulting session cookie (ADR 0027).
 **Exit criteria:** The security items above are either done or recorded as
 accepted risks. The ADR is merged. **Met.**
 
-### M2: Schema inventory (in progress)
+### M2: Schema inventory (done)
 
-**Done:** EF entities scaffolded from the live database.
+**Done:**
 
-**Remaining**
+- EF entities scaffolded from the live database.
+- Full inventory against `snapshots/db.sql` (283 tables, parsed directly): the in-scope table → bounded
+  context map, adjacent-but-deferred tables named explicitly, cross-context foreign keys with their
+  reference/duplicate/API-call decision, and five legacy anti-patterns recorded as ADR input — see
+  `docs/m2-schema-inventory.md`. Turned out not to need the full 3–4 week time-box: M4/M5 had already
+  scoped the slice down to four tables (`patient_data`, `form_encounter`, `form_vitals`, `forms`), not the
+  full schema.
 
-- Map every table in the slice's scope to a bounded context
-- List tables written by more than one context
-- List cross-context foreign keys, each with a decision: reference ID, duplicated
-  data, or API call
-- Record legacy anti-patterns as ADR input
+**Decision gate:** Confirm the Patient–Encounter boundary. **Met** — `patient_data` vs. `form_encounter` +
+`form_vitals` holds as a clean split; nothing in the inventory forces a different one. One open question
+is handed to M4: which of `patient_data.id`, `.pid`, or `.uuid` the `Patient` aggregate's public identity
+should actually use (`.id` carries no real uniqueness constraint in the legacy schema — see the inventory
+doc's anti-pattern #2).
 
-**Time-box:** 3–4 weeks beyond the scaffold. A good-enough inventory is acceptable.
+### M3: Gateway and token validation (in progress)
 
-**Decision gate:** Confirm the Patient–Encounter boundary. If the schema forces a
-different split, update the design before writing service code.
+**Done, ahead of this milestone formally starting (landed during M1):**
 
-### M3: Gateway and token validation (not started)
+- YARP gateway routing to AuthFacade and to WebApp (ADR 0033)
+- Compose entry for the gateway (ADR 0033/0039)
 
-- YARP gateway routing to AuthFacade and to the new services
-- Token validation at the gateway (AuthFacade currently validates its own tokens
-  on `/me` only)
-- Compose entry for the gateway
-- ADR: whether AuthFacade stays as the permanent legacy bridge or is replaced by
-  a dedicated identity service
-- AuthFacade's BFF proxy (ADR 0029) adds one cluster pointed at this gateway, as a single hop for any
-  browser-session call beyond OpenEMR, rather than growing a route per new service itself — decided ahead
-  of time in ADR 0030
+**Done:**
 
-**Decision gate:** Record the identity architecture in an ADR.
+- ADR 0048 (accepted): AuthFacade stays the permanent legacy bridge; no dedicated identity service is
+  built in this scope. Gateway token validation is explicitly deferred until a real bearer token reaches
+  the gateway (two named triggers in the ADR), rather than attempted against a guessed contract.
+- Gateway integration test coverage: 5 black-box tests covering routing, TLS redirect, and HSTS
+  (previously zero, unlike AuthFacade's unit/architecture/integration projects).
+
+**Remaining — both blocked on M4/M5 existing, nothing to build yet:**
+
+- Routes to the new services (Patient Management, Clinical Care)
+- AuthFacade's BFF proxy gaining a cluster pointed at this gateway (ADR 0030)
+
+Gateway token validation itself stays deferred per ADR 0048 until one of its two named triggers occurs —
+not tracked as remaining M3 work, since there is nothing to build against yet.
+
+**Decision gate:** Record the identity architecture in an ADR. **Met** (ADR 0048, accepted).
 
 ### M4: Patient Management service (not started)
 
