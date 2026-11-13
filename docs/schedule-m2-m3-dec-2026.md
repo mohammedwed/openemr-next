@@ -26,14 +26,17 @@ revise against, not a commitment to defend.
 | 6 | Dec 17 – Dec 24 | M3: ADR — AuthFacade as permanent bridge vs. replaced by a dedicated identity service. **Christmas Eve — reduced capacity assumed.** | ADR drafted |
 | 7 | Dec 24 – Dec 31 | Buffer/catch-up from weeks 2 and 6; close M3 | **M3 exit: identity architecture ADR merged** |
 
-## Note: week 1 reprioritized (Nov 13)
+## Note: week 1 reprioritized, then both milestones closed same week (Nov 13)
 
-Week 1 was planned as M2 work. On Nov 13 it was deliberately replaced with M3 Gateway work instead
-(Gateway integration test coverage, previously zero, and the ADR settling M3's "AuthFacade permanent
-bridge vs. dedicated identity service" open question). M2's table-to-context mapping is now unscheduled
-within this plan rather than slipped by one week — it needs a week assigned once M3's remaining shape is
-clearer. This is the deviation the schedule's own framing anticipated ("a plan to revise against, not a
-commitment to defend"), not a silent drift.
+Week 1 was planned as M2 work. On Nov 13 it was replaced with M3 Gateway work instead (integration test
+coverage, previously zero, and ADR 0048 settling the "AuthFacade permanent bridge vs. dedicated identity
+service" question). M2 was then done the same day anyway: its scope turned out to be four tables
+(`patient_data`, `form_encounter`, `form_vitals`, `forms`), not the full schema, since M4/M5 already
+named that scope in their own bullets — the 3–4 week time-box assumed a much larger sweep than the slice
+actually needed. See `docs/m2-schema-inventory.md` and ROADMAP.md's M2/M3 sections.
+
+Both of this schedule's milestones are now done ahead of the Dec 31 target. Weeks 2–7 below are stale;
+the next real planning question is M4 (Patient Management), which this schedule never covered.
 
 ## Risks specific to this schedule
 

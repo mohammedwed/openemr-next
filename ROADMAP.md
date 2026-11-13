@@ -41,7 +41,7 @@ a compatibility constraint.
 | M0b | AuthFacade login through OpenEMR's OAuth server, facade-issued JWT | Done | Oct 10, Oct 11 |
 | M0c | Black-box integration tests with readiness gate | Done | Oct 11 |
 | M1 | Harden the identity bridge | Done | Oct 10, Oct 11, Oct 21, Oct 24, Oct 29, Oct 30, Oct 31, Nov 1, Nov 2 |
-| M2 | Schema inventory for slice contexts | In progress | Oct 4 (entities scaffolded) |
+| M2 | Schema inventory for slice contexts | Done | Oct 4 (entities scaffolded), Nov 13 (inventory) |
 | M3 | Gateway and token validation | In progress | Nov 13 |
 | M4 | Patient Management service | Not started | — |
 | M5 | Clinical Care service | Not started | — |
@@ -185,22 +185,23 @@ ADR 0026) and the resulting session cookie (ADR 0027).
 **Exit criteria:** The security items above are either done or recorded as
 accepted risks. The ADR is merged. **Met.**
 
-### M2: Schema inventory (in progress)
+### M2: Schema inventory (done)
 
-**Done:** EF entities scaffolded from the live database.
+**Done:**
 
-**Remaining**
+- EF entities scaffolded from the live database.
+- Full inventory against `snapshots/db.sql` (283 tables, parsed directly): the in-scope table → bounded
+  context map, adjacent-but-deferred tables named explicitly, cross-context foreign keys with their
+  reference/duplicate/API-call decision, and five legacy anti-patterns recorded as ADR input — see
+  `docs/m2-schema-inventory.md`. Turned out not to need the full 3–4 week time-box: M4/M5 had already
+  scoped the slice down to four tables (`patient_data`, `form_encounter`, `form_vitals`, `forms`), not the
+  full schema.
 
-- Map every table in the slice's scope to a bounded context
-- List tables written by more than one context
-- List cross-context foreign keys, each with a decision: reference ID, duplicated
-  data, or API call
-- Record legacy anti-patterns as ADR input
-
-**Time-box:** 3–4 weeks beyond the scaffold. A good-enough inventory is acceptable.
-
-**Decision gate:** Confirm the Patient–Encounter boundary. If the schema forces a
-different split, update the design before writing service code.
+**Decision gate:** Confirm the Patient–Encounter boundary. **Met** — `patient_data` vs. `form_encounter` +
+`form_vitals` holds as a clean split; nothing in the inventory forces a different one. One open question
+is handed to M4: which of `patient_data.id`, `.pid`, or `.uuid` the `Patient` aggregate's public identity
+should actually use (`.id` carries no real uniqueness constraint in the legacy schema — see the inventory
+doc's anti-pattern #2).
 
 ### M3: Gateway and token validation (in progress)
 
