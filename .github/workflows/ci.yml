@@ -93,7 +93,7 @@ jobs:
         run: bash scripts/setup/new-authfacade-certs.sh
 
       - name: Start stack
-        run: docker compose up -d --build --wait --wait-timeout 1200 openemr auth-facade phpmyadmin
+        run: docker compose up -d --build --wait --wait-timeout 1200 openemr auth-facade webapp gateway phpmyadmin
 
       - name: Probe endpoints
         if: always()
@@ -101,7 +101,8 @@ jobs:
           source scripts/lib/env.sh
           oe_port=$(env_get OPENEMR_HTTPS_PORT 9300)
           facade_port=$(env_get AUTHFACADE_HTTP_PORT 7128)
-          for url in "https://localhost:$oe_port/meta/health/readyz" "http://localhost:$facade_port/health"; do
+          gateway_port=$(env_get GATEWAY_HTTPS_PORT 7131)
+          for url in "https://localhost:$oe_port/meta/health/readyz" "http://localhost:$facade_port/health" "https://localhost:$gateway_port/health"; do
             code=$(curl -k -s -o /dev/null --max-time 10 -w "%{http_code}" "$url" || true)
             echo "$url -> ${code:-no response}"
           done
