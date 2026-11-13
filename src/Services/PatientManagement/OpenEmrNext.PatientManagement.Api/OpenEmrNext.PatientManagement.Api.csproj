@@ -19,6 +19,7 @@
     <ProjectReference Include="..\OpenEmrNext.PatientManagement.Composition\OpenEmrNext.PatientManagement.Composition.csproj" />
     <ProjectReference Include="..\OpenEmrNext.PatientManagement.Domain\OpenEmrNext.PatientManagement.Domain.csproj" />
     <ProjectReference Include="..\OpenEmrNext.PatientManagement.Application\OpenEmrNext.PatientManagement.Application.csproj" />
+    <ProjectReference Include="..\OpenEmrNext.PatientManagement.Application.Ports\OpenEmrNext.PatientManagement.Application.Ports.csproj" />
     <ProjectReference Include="..\OpenEmrNext.PatientManagement.Infrastructure\OpenEmrNext.PatientManagement.Infrastructure.csproj" />
   </ItemGroup>
 

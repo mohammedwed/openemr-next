@@ -1,16 +1,15 @@
-using System.Text.Json;
+using OpenEmrNext.PatientManagement.Application.Ports;
 using OpenEmrNext.PatientManagement.Domain;
-using OpenEmrNext.PatientManagement.Infrastructure;
 
 namespace OpenEmrNext.PatientManagement.Application;
 
 /// <summary>
-/// Registers a new patient: validates via <see cref="Patient.Register"/>, then persists the patient
-/// row and its <c>PatientRegistered</c> outbox row in one transaction (one <see cref="PatientManagementDbContext.SaveChangesAsync"/>
-/// call) -- the entire point of the outbox pattern (ADR 0049), achieved here rather than left to
-/// whatever calls this use case.
+/// Registers a new patient: validates via <see cref="Patient.Register"/>, then hands the patient and
+/// its <see cref="PatientRegisteredEvent"/> to <see cref="IPatientRegistry"/> -- the port, not a
+/// concrete database -- to commit together. This class knows nothing about EF Core, MariaDB, or the
+/// outbox table; that is entirely the adapter's job (Infrastructure's <c>EfPatientRegistry</c>).
 /// </summary>
-public sealed class RegisterPatientUseCase(PatientManagementDbContext db)
+public sealed class RegisterPatientUseCase(IPatientRegistry registry)
 {
     /// <exception cref="PatientValidationException">One or more fields fail validation. Nothing is persisted.</exception>
     public async Task<Patient> ExecuteAsync(
@@ -21,10 +20,7 @@ public sealed class RegisterPatientUseCase(PatientManagementDbContext db)
         var @event = new PatientRegisteredEvent(
             patient.Uuid, patient.Pid, patient.FirstName, patient.LastName, patient.RegisteredAtUtc);
 
-        db.Patients.Add(patient);
-        db.OutboxMessages.Add(OutboxMessage.For(
-            PatientRegisteredEvent.EventType, JsonSerializer.Serialize(@event), registeredAtUtc));
-        await db.SaveChangesAsync(ct);
+        await registry.RegisterAsync(patient, @event, ct);
 
         return patient;
     }

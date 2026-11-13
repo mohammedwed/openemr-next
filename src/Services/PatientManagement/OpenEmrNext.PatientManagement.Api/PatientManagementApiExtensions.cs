@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OpenEmrNext.PatientManagement.Application;
+using OpenEmrNext.PatientManagement.Application.Ports;
 using OpenEmrNext.PatientManagement.Infrastructure;
 using OpenEmrNext.PatientManagement.Composition;
 
@@ -26,6 +27,9 @@ public static class PatientManagementApiExtensions
             options.UseMySql(connectionString, new MariaDbServerVersion(new Version(12, 3, 3)));
         });
 
+        // The only place the port (Application.Ports.IPatientRegistry) is wired to its real adapter
+        // (Infrastructure's EfPatientRegistry) -- Application itself never sees this choice.
+        builder.Services.AddScoped<IPatientRegistry, EfPatientRegistry>();
         builder.Services.AddScoped<RegisterPatientUseCase>();
 
         builder.Services.AddOpenApi();

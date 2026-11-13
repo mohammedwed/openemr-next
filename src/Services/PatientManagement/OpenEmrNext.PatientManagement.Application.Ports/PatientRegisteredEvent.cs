@@ -1,4 +1,4 @@
-namespace OpenEmrNext.PatientManagement.Application;
+namespace OpenEmrNext.PatientManagement.Application.Ports;
 
 /// <summary>
 /// The outbox payload for <c>PatientRegistered</c> -- a deliberately curated set of fields, not the

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Domain;
+using OpenEmrNext.PatientManagement.Infrastructure;
 using Xunit;
 
 namespace OpenEmrNext.PatientManagement.IntegrationTests;
@@ -23,7 +24,8 @@ public class PatientRegistrationTests(PatientDataContainerFixture fixture)
         var registration = new PatientRegistration("Ada", "Lovelace", "Female", new DateOnly(1990, 1, 1));
 
         await using var context = fixture.CreateDbContext();
-        var patient = await new RegisterPatientUseCase(context).ExecuteAsync(registration, registeredBy: 1, Now, CancellationToken.None);
+        var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context))
+            .ExecuteAsync(registration, registeredBy: 1, Now, CancellationToken.None);
 
         // EF Core's own ValueGeneratedOnAdd() already populated this via the database's AUTO_INCREMENT --
         // nothing in application code needs to copy it over manually.
@@ -51,7 +53,7 @@ public class PatientRegistrationTests(PatientDataContainerFixture fixture)
         var outboxCountBefore = await context.OutboxMessages.CountAsync();
 
         var badRegistration = new PatientRegistration("Ada", "A", "F", new DateOnly(1990, 1, 1));
-        var useCase = new RegisterPatientUseCase(context);
+        var useCase = new RegisterPatientUseCase(new EfPatientRegistry(context));
         await Assert.ThrowsAsync<PatientValidationException>(
             () => useCase.ExecuteAsync(badRegistration, 1, Now, CancellationToken.None));
 
@@ -65,7 +67,8 @@ public class PatientRegistrationTests(PatientDataContainerFixture fixture)
         var registration = new PatientRegistration("Grace", "Hopper", "Female", new DateOnly(1985, 5, 5));
 
         await using var context = fixture.CreateDbContext();
-        var patient = await new RegisterPatientUseCase(context).ExecuteAsync(registration, registeredBy: 1, Now, CancellationToken.None);
+        var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context))
+            .ExecuteAsync(registration, registeredBy: 1, Now, CancellationToken.None);
 
         await using var verify = fixture.CreateDbContext();
         var reloaded = await verify.Patients.SingleAsync(p => p.Pid == patient.Pid);
