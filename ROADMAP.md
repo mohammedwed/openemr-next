@@ -243,7 +243,10 @@ is no concurrent-writer race to design around.
 - A safe identity-allocation scheme for new rows (a real transaction or sequence) — not OpenEMR's own
   `getFreshPid()` (`SELECT MAX(pid)+1`, a read-then-write race — `docs/m4-domain-notes.md`). No longer a
   concurrency risk now that the legacy UI is retired, just a normal design choice to get right.
-- Unit and integration tests (Testcontainers)
+- Its own least-privilege MariaDB user, scoped to `patient_data` and its own outbox table only — not
+  OpenEMR's existing broader credentials (ADR 0050)
+- Unit and integration tests, via Testcontainers rather than the black-box-against-the-running-stack
+  pattern AuthFacade/Gateway use (ADR 0050 — a deliberate departure, not an oversight)
 
 **Exit criteria:** A patient is registered through the gateway. The event is
 published exactly once. Tests pass.
