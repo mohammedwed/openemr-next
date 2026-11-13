@@ -230,12 +230,24 @@ not tracked as remaining M3 work, since there is nothing to build against yet.
 
 ### M4: Patient Management service (not started)
 
-- Own database and EF Core migrations, with a slim model scaffolded from
-  `patient_data` only
+Writes directly into OpenEMR's own `patient_data` table (ADR 0049) — no new database of its own.
+
+- A slim EF model mapped onto the existing `patient_data` table (not owned or migrated by this service —
+  the table already exists)
 - `Patient` aggregate and registration use case
-- Read-only anti-corruption adapter for `patient_data`
-- Transactional outbox publishing `PatientRegistered`
+- Anti-corruption adapter for `patient_data` — reads **and writes** (no longer read-only, per ADR 0049)
+- Transactional outbox publishing `PatientRegistered`, as a table inside the `openemr` database itself
+  (ADR 0049) — not a separate store, so the insert and the outbox row commit together in one transaction
 - Unit and integration tests (Testcontainers)
+
+**Two open risks to resolve before the insert path is coded (ADR 0049's consequences, not yet decided):**
+
+- Whether OpenEMR's own legacy PHP registration UI stays live alongside the new service, writing to the
+  same table with no database-level constraint to catch a disagreement (`patient_data` has no `PRIMARY
+  KEY`; the schema declares zero `FOREIGN KEY`/`CONSTRAINT` clauses anywhere — `docs/m2-schema-inventory.md`)
+- A safe, concurrency-correct replacement for `pid` allocation — OpenEMR's own `getFreshPid()` is a
+  `SELECT MAX(pid)+1` race (`docs/m4-domain-notes.md`); the new service must not reuse that pattern, and a
+  fix on its side alone doesn't fully close the race if the legacy path can still insert concurrently
 
 **Exit criteria:** A patient is registered through the gateway. The event is
 published exactly once. Tests pass.

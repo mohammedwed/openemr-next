@@ -54,3 +54,4 @@ old one's status is updated to point to it.
 | [0046](0046-persisted-openiddict-certificates.md) | OpenIddict's encryption and signing certificates are persisted files | Accepted | 2026-11-02 |
 | [0047](0047-the-identity-bridge-design.md) | The identity bridge: AuthFacade's design, end to end | Accepted | 2026-11-02 |
 | [0048](0048-authfacade-stays-the-bridge-gateway-validation-deferred.md) | AuthFacade stays the identity bridge; the gateway's token validation is deferred | Accepted | 2026-11-13 |
+| [0049](0049-patient-management-writes-into-the-legacy-database.md) | Patient Management writes into OpenEMR's own database, not a new one | Accepted | 2026-11-13 |

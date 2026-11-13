@@ -66,15 +66,15 @@ patient is created" is already a recognized concept in the legacy system's own l
 the entire raw `patient_data` row as their payload, though — not a model to copy structurally; M4's event
 should carry a deliberately curated set of fields, not the whole row.
 
-## Open question this doc does NOT resolve
+## Resolved: M4 writes into the legacy database
 
-M4's roadmap bullets say both "own database... scaffolded from `patient_data` only" **and** "read-only
-anti-corruption adapter for `patient_data`." That's consistent with one reading — new registrations are
-written into the new service's own database, and the read-only adapter exists only to let the new service
-see patients that already exist in OpenEMR's legacy data (for coexistence, not for writing new rows back
-into `patient_data`) — but this doc doesn't confirm that's the intended design. It matters directly for
-the aggregate's shape (does `Patient.Register()` ever touch OpenEMR's own database at all, or only the new
-one?) and should be settled explicitly before the aggregate is coded, not assumed from the bullet list.
+**Settled 2026-11-13, [ADR 0049](architecture/0049-patient-management-writes-into-the-legacy-database.md).**
+`Patient.Register()` writes directly into OpenEMR's own `patient_data` table — there is no separate
+database for Patient Management. This means the anti-corruption adapter is read **and** write, not
+read-only, and the transactional outbox lives as a table inside the same `openemr` database (required for
+the insert-plus-outbox-row atomicity the pattern depends on). See the ADR for the two risks this still
+leaves open: concurrent writes from OpenEMR's legacy PHP UI, and safe `pid` allocation under that
+concurrency (the `getFreshPid()` race noted above is exactly what the new service must not reproduce).
 
 ## Scope note
 
