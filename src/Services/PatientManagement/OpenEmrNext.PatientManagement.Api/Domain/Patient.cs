@@ -17,17 +17,24 @@ namespace OpenEmrNext.PatientManagement.Api.Domain;
 public sealed class Patient
 {
     public long Id { get; private set; }
-    public long Pid { get; }
-    public string Pubpid { get; }
+    public long Pid { get; } = 0;
+    public string Pubpid { get; } = null!;
     public Guid Uuid { get; }
-    public string FirstName { get; }
-    public string LastName { get; }
-    public string Sex { get; }
+    public string FirstName { get; } = null!;
+    public string LastName { get; } = null!;
+    public string Sex { get; } = null!;
     public DateOnly DateOfBirth { get; }
     public string? Email { get; }
     public string? TrustedEmail { get; }
     public DateTime RegisteredAtUtc { get; }
     public long RegisteredBy { get; }
+
+    /// <summary>EF Core's own materialization path only -- reads from the database via backing fields
+    /// (see <c>PatientManagementDbContext</c>'s <c>UsePropertyAccessMode(Field)</c>), never application
+    /// code. <see cref="Register"/> is the only way application code ever creates a valid instance.</summary>
+    private Patient()
+    {
+    }
 
     private Patient(PatientRegistration registration, long registeredBy, DateTime registeredAtUtc)
     {
