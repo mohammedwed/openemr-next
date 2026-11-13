@@ -30,6 +30,9 @@ ROADMAP.md's M4 bullets, which were written assuming the other answer.
    patient insert and the outbox insert across two different databases turns "published exactly once"
    into a distributed-transaction problem nobody is proposing to solve here. So the outbox becomes a new
    table inside `openemr` (e.g. `patient_management_outbox`), not a table in some other store.
+5. **OpenEMR's own legacy PHP registration UI is retired, not kept running alongside the new service.**
+   Confirmed by the user directly. From that point on, the new service is the only thing that ever inserts
+   a new row into `patient_data` — there is no second writer to race against.
 
 ## Consequences
 
@@ -38,19 +41,16 @@ ROADMAP.md's M4 bullets, which were written assuming the other answer.
   insert happen in the same database, atomicity is free. Had M4 kept its own separate database, this
   criterion would have needed an outbox-per-database plus a relay, or a distributed transaction — real
   extra complexity this decision avoids.
-- **Two open risks this ADR does not resolve, both needing a decision before the insert path is coded:**
-  - *Concurrent writes from two code paths.* If OpenEMR's own legacy PHP registration UI stays live
-    alongside the new service, both now write to the same `patient_data` table. `docs/m2-schema-inventory.md`
-    already found this table has **no `PRIMARY KEY`**, **no `FOREIGN KEY` or `CONSTRAINT` anywhere in the
-    schema** — nothing at the database level catches two code paths disagreeing about an invariant. Whether
-    the legacy UI's registration path is turned off, kept as a fallback, or left running alongside the new
-    one is a real product decision, not an engineering detail.
-  - *Safe identity allocation under concurrency.* `docs/m4-domain-notes.md` already flagged that OpenEMR's
-    own `PatientService::getFreshPid()` (`SELECT MAX(pid)+1`) is a read-then-write race. The new service
-    must not reuse that pattern for its own inserts — but if the legacy PHP app can still insert
-    concurrently (per the risk above), a safe allocation scheme on the new service's side alone does not
-    fully close the race unless the legacy path is also accounted for. This needs its own resolution when
-    the actual insert logic is written, not here.
+- **The concurrent-writer risk is closed.** With the legacy registration UI retired, nothing races the new
+  service's inserts into `patient_data` — `docs/m2-schema-inventory.md`'s finding that the table has no
+  `PRIMARY KEY` and no `FOREIGN KEY`/`CONSTRAINT` anywhere stops mattering for *this* specific risk, since
+  there is only ever one writer now.
+- **One simplified item remains, not a risk anymore, just a normal design choice:** the new service still
+  needs its own identity-allocation scheme for new `patient_data` rows. It must not reuse OpenEMR's own
+  `PatientService::getFreshPid()` (`SELECT MAX(pid)+1`, a read-then-write race — `docs/m4-domain-notes.md`),
+  but with no concurrent legacy writer to account for, any ordinary safe approach (a real transaction, a
+  proper sequence) is sufficient — this no longer needs to be "race-aware against code we don't control,"
+  just correct on its own.
 - The identity-glossary conclusion from `docs/m4-domain-notes.md` is unaffected and still holds: `uuid` is
   the aggregate's public identity (matching OpenEMR's own FHIR API), `id` carries no real uniqueness
   guarantee and should not be relied on.

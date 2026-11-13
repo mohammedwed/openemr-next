@@ -72,9 +72,11 @@ should carry a deliberately curated set of fields, not the whole row.
 `Patient.Register()` writes directly into OpenEMR's own `patient_data` table — there is no separate
 database for Patient Management. This means the anti-corruption adapter is read **and** write, not
 read-only, and the transactional outbox lives as a table inside the same `openemr` database (required for
-the insert-plus-outbox-row atomicity the pattern depends on). See the ADR for the two risks this still
-leaves open: concurrent writes from OpenEMR's legacy PHP UI, and safe `pid` allocation under that
-concurrency (the `getFreshPid()` race noted above is exactly what the new service must not reproduce).
+the insert-plus-outbox-row atomicity the pattern depends on). OpenEMR's legacy PHP registration UI is
+retired once this ships, confirmed by the user — so the new service becomes the only writer, and the
+concurrent-writer risk the ADR originally flagged doesn't apply. The `getFreshPid()` race noted above is
+still worth avoiding (any ordinary safe allocation scheme works now that nothing else can race it), just
+not for the reason originally thought.
 
 ## Scope note
 
