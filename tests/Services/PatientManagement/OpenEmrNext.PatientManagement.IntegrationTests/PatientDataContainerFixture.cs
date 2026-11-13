@@ -17,11 +17,28 @@ namespace OpenEmrNext.PatientManagement.IntegrationTests;
 /// </summary>
 public sealed class PatientDataContainerFixture : IAsyncLifetime
 {
+    private const string Username = "patient_management_test";
+    private const string Password = "patient_management_test_password";
+    private const string DatabaseName = "openemr_test";
+
     // Same image this repo's own Compose stack runs (.env.example's MARIADB_IMAGE) -- testing against
     // a different default version would prove less about what this service actually runs against.
-    private readonly MariaDbContainer _container = new MariaDbBuilder().WithImage("mariadb:12.3.3").Build();
+    // Credentials are fixed explicitly (not Testcontainers' own generated defaults) so the
+    // WebApplicationFactory-based endpoint tests can configure PatientManagementDb:* directly, without
+    // needing to parse them back out of a connection string.
+    private readonly MariaDbContainer _container = new MariaDbBuilder()
+        .WithImage("mariadb:12.3.3")
+        .WithUsername(Username)
+        .WithPassword(Password)
+        .WithDatabase(DatabaseName)
+        .Build();
 
     public string ConnectionString => _container.GetConnectionString();
+    public string Hostname => _container.Hostname;
+    public ushort Port => _container.GetMappedPublicPort(3306);
+    public string Database => DatabaseName;
+    public string User => Username;
+    public string DbPassword => Password;
 
     public async Task InitializeAsync()
     {

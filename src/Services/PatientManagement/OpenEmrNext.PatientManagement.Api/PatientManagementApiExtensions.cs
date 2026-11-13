@@ -25,6 +25,8 @@ public static class PatientManagementApiExtensions
             options.UseMySql(connectionString, new MariaDbServerVersion(new Version(12, 3, 3)));
         });
 
+        builder.Services.AddOpenApi();
+
         return builder;
     }
 }
