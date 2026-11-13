@@ -224,7 +224,7 @@ different split, update the design before writing service code.
 - AuthFacade's BFF proxy gaining a cluster pointed at this gateway (ADR 0030) — blocked for the same reason
 - Gateway token validation itself — deferred per ADR 0048 until one of its two named triggers occurs
 
-**Decision gate:** Record the identity architecture in an ADR. **Met** (ADR 0048, pending acceptance).
+**Decision gate:** Record the identity architecture in an ADR. **Met** (ADR 0048, accepted).
 
 ### M4: Patient Management service (not started)
 

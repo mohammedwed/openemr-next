@@ -1,6 +1,6 @@
 # 0048. AuthFacade stays the identity bridge; the gateway's token validation is deferred
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Builds on:** [0029](0029-yarp-proxies-browser-sessions-to-openemrs-api.md), [0030](0030-bff-proxy-forwards-to-the-gateway-not-each-service.md), [0033](0033-gateway-fronts-webapp-and-authfacade.md), [0047](0047-the-identity-bridge-design.md)
 
