@@ -211,18 +211,19 @@ different split, update the design before writing service code.
 
 **Done:**
 
-- ADR 0048: AuthFacade stays the permanent legacy bridge; no dedicated identity service is built in this
-  scope. Gateway token validation is explicitly deferred until a real bearer token reaches the gateway
-  (two named triggers in the ADR), rather than attempted against a guessed contract.
+- ADR 0048 (accepted): AuthFacade stays the permanent legacy bridge; no dedicated identity service is
+  built in this scope. Gateway token validation is explicitly deferred until a real bearer token reaches
+  the gateway (two named triggers in the ADR), rather than attempted against a guessed contract.
+- Gateway integration test coverage: 5 black-box tests covering routing, TLS redirect, and HSTS
+  (previously zero, unlike AuthFacade's unit/architecture/integration projects).
 
-**Remaining**
+**Remaining — both blocked on M4/M5 existing, nothing to build yet:**
 
-- Gateway integration test coverage (currently zero — unlike AuthFacade, which has unit, architecture, and
-  integration test projects)
-- Routes to the new services (Patient Management, Clinical Care) — blocked until M4/M5 exist; nothing to
-  route to yet
-- AuthFacade's BFF proxy gaining a cluster pointed at this gateway (ADR 0030) — blocked for the same reason
-- Gateway token validation itself — deferred per ADR 0048 until one of its two named triggers occurs
+- Routes to the new services (Patient Management, Clinical Care)
+- AuthFacade's BFF proxy gaining a cluster pointed at this gateway (ADR 0030)
+
+Gateway token validation itself stays deferred per ADR 0048 until one of its two named triggers occurs —
+not tracked as remaining M3 work, since there is nothing to build against yet.
 
 **Decision gate:** Record the identity architecture in an ADR. **Met** (ADR 0048, accepted).
 
