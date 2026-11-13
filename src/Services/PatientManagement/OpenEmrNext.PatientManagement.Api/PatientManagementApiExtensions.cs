@@ -32,6 +32,10 @@ public static class PatientManagementApiExtensions
         builder.Services.AddScoped<IPatientRegistry, EfPatientRegistry>();
         builder.Services.AddScoped<RegisterPatientUseCase>();
 
+        // Same pattern for the duplicate-detection port: Application only ever sees IDuplicateScorer.
+        builder.Services.AddScoped<IDuplicateScorer, EfDuplicateScorer>();
+        builder.Services.AddScoped<ScorePatientForDuplicatesUseCase>();
+
         builder.Services.AddOpenApi();
 
         return builder;
