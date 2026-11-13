@@ -17,7 +17,9 @@ namespace OpenEmrNext.PatientManagement.IntegrationTests;
 /// </summary>
 public sealed class PatientDataContainerFixture : IAsyncLifetime
 {
-    private readonly MariaDbContainer _container = new MariaDbBuilder().Build();
+    // Same image this repo's own Compose stack runs (.env.example's MARIADB_IMAGE) -- testing against
+    // a different default version would prove less about what this service actually runs against.
+    private readonly MariaDbContainer _container = new MariaDbBuilder().WithImage("mariadb:12.3.3").Build();
 
     public string ConnectionString => _container.GetConnectionString();
 
@@ -70,7 +72,7 @@ public sealed class PatientDataContainerFixture : IAsyncLifetime
     public PatientManagementDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<PatientManagementDbContext>()
-            .UseMySql(ConnectionString, new MariaDbServerVersion(new Version(11, 0, 0)))
+            .UseMySql(ConnectionString, new MariaDbServerVersion(new Version(12, 3, 3)))
             .Options;
         return new PatientManagementDbContext(options);
     }
