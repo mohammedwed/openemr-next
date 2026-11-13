@@ -41,6 +41,14 @@ public sealed class Patient
     public DateTime RegisteredAtUtc { get; }
     public long RegisteredBy { get; }
 
+    // patient_data.date is the table's own last-updated timestamp, not tied to any one concept
+    // (docs/m4-domain-notes.md's naming trap) -- legacy's own databaseInsert() sets it to the same
+    // moment as regdate on insert, which this field replicates. No public property: nothing in this
+    // service reads it back through the Patient aggregate itself (the FHIR Patient mapping reads it
+    // directly via raw SQL instead, as last_updated), so it stays a write-only backing field, mapped
+    // the same shadow-field way _email/_trustedEmail already are.
+    private readonly DateTime _date;
+
     /// <summary>EF Core's own materialization path only -- reads from the database via backing fields
     /// (see <c>PatientManagementDbContext</c>'s <c>UsePropertyAccessMode(Field)</c>), never application
     /// code. <see cref="Register"/> is the only way application code ever creates a valid instance.</summary>
@@ -58,6 +66,7 @@ public sealed class Patient
         _trustedEmail = registration.TrustedEmail ?? "";
         RegisteredBy = registeredBy;
         RegisteredAtUtc = registeredAtUtc;
+        _date = registeredAtUtc;
         Uuid = Guid.NewGuid();
         Pid = Random.Shared.NextInt64(1, long.MaxValue);
         Pubpid = Pid.ToString();

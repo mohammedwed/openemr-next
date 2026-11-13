@@ -43,7 +43,7 @@ a compatibility constraint.
 | M1 | Harden the identity bridge | Done | Oct 10, Oct 11, Oct 21, Oct 24, Oct 29, Oct 30, Oct 31, Nov 1, Nov 2 |
 | M2 | Schema inventory for slice contexts | Done | Oct 4 (entities scaffolded), Nov 13 (inventory) |
 | M3 | Gateway and token validation | In progress | Nov 13 |
-| M4 | Patient Management service | In progress | Nov 13 (registration done; scope expanded to full legacy parity minus portal, ADR 0051) |
+| M4 | Patient Management service | In progress | Nov 14 (registration, duplicate detection, insurance, advance directives, and the FHIR Patient API all done; only patient merge remains, deferred to M5+, ADR 0051) |
 | M5 | Clinical Care service | Not started | — |
 | M6 | Portfolio polish | Not started | — |
 
@@ -230,9 +230,10 @@ not tracked as remaining M3 work, since there is nothing to build against yet.
 
 ### M4: Patient Management service (in progress)
 
-**Done:** registration (below). **Scope expanded (ADR 0051):** full legacy patient parity minus the
-portal, before moving to M5 — duplicate detection, insurance data, advance directives, and the FHIR
-Patient API, each as its own hexagonal slice; patient merge deferred until M5+ exist. See
+**Done:** registration (below), plus all four remaining slices of the full legacy parity plan's scope
+expansion (ADR 0051) — duplicate detection, insurance data, advance directives, and the FHIR Patient
+API, each its own hexagonal slice. **Remaining:** patient merge, deferred until M5+ exist (it reaches
+into tables those services own, and isn't transactional in legacy — a risk not to copy as-is). See
 `docs/m4-full-legacy-parity-plan.md` for the researched detail and build order.
 
 Writes directly into OpenEMR's own `patient_data` table (ADR 0049) — no new database of its own. OpenEMR's

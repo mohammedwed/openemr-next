@@ -13,6 +13,7 @@ public static class PatientManagementEndpoints
         v1.MapPatientEndpoints();
         v1.MapInsuranceEndpoints();
         v1.MapAdvanceDirectiveEndpoints();
+        app.MapFhirPatientEndpoints();
         return app;
     }
 }

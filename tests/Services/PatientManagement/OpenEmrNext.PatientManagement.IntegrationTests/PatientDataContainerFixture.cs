@@ -71,12 +71,72 @@ public sealed class PatientDataContainerFixture : IAsyncLifetime
                 completed_ad varchar(3) NOT NULL DEFAULT 'NO',
                 ad_reviewed datetime DEFAULT NULL,
                 advance_directive_user_authenticator bigint(20) DEFAULT NULL,
+                title varchar(255) NOT NULL DEFAULT '',
+                mname varchar(255) NOT NULL DEFAULT '',
+                suffix tinytext,
+                street varchar(255) NOT NULL DEFAULT '',
+                street_line_2 tinytext,
+                city varchar(255) NOT NULL DEFAULT '',
+                state varchar(255) NOT NULL DEFAULT '',
+                postal_code varchar(255) NOT NULL DEFAULT '',
+                country_code varchar(255) NOT NULL DEFAULT '',
+                ss varchar(255) NOT NULL DEFAULT '',
+                language varchar(255) NOT NULL DEFAULT '',
+                providerID int(11) DEFAULT NULL,
+                race varchar(255) NOT NULL DEFAULT '',
+                ethnicity varchar(255) NOT NULL DEFAULT '',
+                gender_identity text,
+                sex_identified text,
+                tribal_affiliations text,
+                interpreter_needed text,
+                deceased_date datetime DEFAULT NULL,
                 UNIQUE KEY pid (pid),
                 UNIQUE KEY uuid (uuid),
                 KEY id (id)
             );
             """;
         await createPatientData.ExecuteNonQueryAsync();
+
+        await using var createUsers = connection.CreateCommand();
+        createUsers.CommandText = """
+            CREATE TABLE users (
+                id bigint(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                uuid binary(16) DEFAULT NULL
+            );
+            """;
+        await createUsers.ExecuteNonQueryAsync();
+
+        // The handful of list_options rows the FHIR Patient mapping actually resolves against,
+        // trimmed from the real seed data in sql/7_0_3-to-7_0_4_upgrade.sql and sql/database.sql --
+        // not invented, so a test asserting on a specific code/display is asserting against the real
+        // values an actual install would also resolve.
+        await using var createListOptions = connection.CreateCommand();
+        createListOptions.CommandText = """
+            CREATE TABLE list_options (
+                list_id varchar(100) NOT NULL DEFAULT '',
+                option_id varchar(100) NOT NULL DEFAULT '',
+                title varchar(255) NOT NULL DEFAULT '',
+                notes text,
+                codes varchar(255) NOT NULL DEFAULT '',
+                PRIMARY KEY (list_id, option_id)
+            );
+            """;
+        await createListOptions.ExecuteNonQueryAsync();
+
+        await using var seedListOptions = connection.CreateCommand();
+        seedListOptions.CommandText = """
+            INSERT INTO list_options (list_id, option_id, title, notes, codes) VALUES
+                ('race', 'white', 'White', '2106-3', ''),
+                ('ethnicity', 'hispanic', 'Hispanic or Latino', '2135-2', ''),
+                ('ethnicity', 'decline_to_specify', 'Declined To Specify', NULL, ''),
+                ('administrative_sex', 'Male', 'Male', NULL, 'SNOMED-CT:248152002'),
+                ('administrative_sex', 'Female', 'Female', NULL, 'SNOMED-CT:248153007'),
+                ('yes_no_unknown', 'yes', 'Yes', NULL, 'SNOMED-CT:373066001'),
+                ('yes_no_unknown', 'no', 'No', NULL, 'SNOMED-CT:373067005'),
+                ('tribal_affiliations', 'navajo_nation', 'Navajo Nation (AZ/NM/UT)', NULL, '170'),
+                ('language', 'english', 'English', 'en', '');
+            """;
+        await seedListOptions.ExecuteNonQueryAsync();
 
         await using var createInsuranceData = connection.CreateCommand();
         createInsuranceData.CommandText = """

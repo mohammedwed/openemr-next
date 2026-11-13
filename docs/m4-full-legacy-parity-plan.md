@@ -63,3 +63,12 @@ Testcontainers integration, and architecture-layering tests.
 4. FHIR Patient API (read + search first; write reusing the existing registration path; extension
    mapping)
 5. Patient merge — once M5+ exist, revisit with a real cross-service strategy, not before
+
+## Status: 1–4 done, 5 still deferred
+
+Built 2026-11-13/14, each as its own branch/PR, in the order above. One correction surfaced while
+building 4: this service's own registration path turned out to have no `update()` equivalent at all
+(only create) — the assumption above that write would "reuse the existing registration path" held for
+create, not update. `PUT` (update) was deferred rather than built, alongside legacy's own admitted incompleteness in its
+write-direction field mapping (see `docs/m4-domain-notes.md`'s FHIR section for the detail). Patient
+merge (5) remains deferred until M5+ services exist, as planned.
