@@ -131,6 +131,48 @@ while building the third slice. Two independent legacy facts get bundled under o
   remote-storage hook — real options, but deployment-specific extras most installs don't use; **decided
   2026-11-14: local disk only**, the same path real installs actually take, not a reduced-parity call.
 
+## FHIR Patient API: read is real, write is legacy's own admitted gap
+
+Grounded in `FhirPatientService.php` (1080 lines) and `FhirPatientRestController.php` while building
+the fourth and final slice of the full-legacy-parity plan.
+
+- **Legacy's own code admits its write path is incomplete.** A comment directly in
+  `parseFhirResource()`: *"ONC certification only deals with READ operations, the mapping of FHIR
+  values such as language, ethnicity etc are NOT being done here and so the creation/updating of
+  resources is currently NOT correct."* Race, ethnicity, and language are read on output but never
+  mapped back on input (ethnicity/race's reverse-mapping calls are literally commented out in the
+  source). This service's own create path matches that same gap deliberately, not as a new reduction.
+- **`PUT` (update) is deferred, not built.** The plan's own assumption — "create/update already reuse
+  the same `PatientService::insert()`/`update()` the plain registration path uses" — turned out to be
+  wrong for *this* service: only `RegisterPatientUseCase`/`IPatientRegistry.RegisterAsync` exist here
+  (create-only). Legacy's `update()` has no equivalent yet, so building `PUT` would mean a genuinely
+  new `Patient.Update()`/persistence capability, not reusing what exists. Given legacy's own `PUT` is
+  also one of the admittedly-incorrect write paths above, `GET` (read + search) and `POST` (create)
+  were the ones worth building first.
+- **Three coding systems resolve through `list_options`, differently.** Race/ethnicity store their
+  code directly in `list_options.notes` (no `:` separator, a fixed system constant per list). Every
+  other coded extension (administrative sex, gender identity, tribal affiliation, interpreter-needed,
+  language) stores `SYSTEM:CODE` in `list_options.codes` (`CodeTypesService::parseCode()`), with only
+  two code types actually seeded anywhere: `SNOMED-CT` and `DataAbsentReason`.
+- **"Omitted" and "added with an Unknown/absent default" are two different legacy behaviors, not
+  interchangeable.** Race, administrative sex, and interpreter-needed always add their extension
+  (defaulting to `UNK`/`unknown` when blank). Ethnicity, gender identity, and tribal affiliation are
+  *entirely absent* from the resource when their source column is blank — a real distinction, confirmed
+  against each function's own `if (!empty(...))` guard (or its absence), not inferred from behavior.
+- **A real, previously-latent gap surfaced and got fixed along the way**: `patient_data.date` (the
+  table's own last-updated timestamp, see the naming trap above) was never actually written by
+  `Patient.Register()` — nothing had read it back yet to notice. The FHIR mapping is the first consumer
+  (as `last_updated`), which is what surfaced it; `Patient` now sets it at registration, the same moment
+  as `regdate`, matching legacy's own `databaseInsert()`.
+- **Scope reductions, decided deliberately:** a single target US Core profile version (8.0.0 — legacy
+  branches across three; this service has no installed base to stay compatible with). Previous-names
+  history (`patient_history`) and additional/historical addresses (`patient_additional_addresses`) are
+  not mapped — only the current name and current address, satisfying US Core's "must support one name,
+  one address" bar. Search supports the same ~15 parameters as exact-or-contains matches combined with
+  AND, not legacy's own search modifiers (`:missing`, `:exact`, date comparators). `$export`, `DELETE`,
+  `$everything`, and `$match` are out of scope (the first per the plan; the rest because legacy doesn't
+  implement them either).
+
 ## Scope note
 
 This is vocabulary and rules, not a formal bounded-context diagram or conceptual class model. Per the

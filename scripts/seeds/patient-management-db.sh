@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Creates the patient_management_outbox table inside OpenEMR's own database, and a least-privilege
 # user scoped to exactly that table plus patient_data, insurance_data, documents, categories,
-# categories_to_documents, and sequences (ADR 0049, ADR 0050) -- never OpenEMR's existing app user, and
-# never GRANT ... ON db.*, so every other table's privileges stay exactly as they are.
+# categories_to_documents, sequences, users, and list_options (ADR 0049, ADR 0050) -- never OpenEMR's
+# existing app user, and never GRANT ... ON db.*, so every other table's privileges stay exactly as
+# they are.
 # Runs as a one-shot Compose service (seed-patient-management-db), against the bare MariaDB image
 # already used for the mysql service itself -- no extra image to pull.
 #
@@ -59,6 +60,10 @@ GRANT SELECT, INSERT, DELETE ON \`${DB_NAME}\`.categories_to_documents TO '${PAT
 -- The single shared id-generation counter (legacy's own QueryUtils::generateId()) -- UPDATE alone
 -- covers "SET id = LAST_INSERT_ID(id + 1)", since it reads the row being updated, not a separate one.
 GRANT UPDATE ON \`${DB_NAME}\`.sequences TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
+-- FHIR Patient API: read-only lookups for generalPractitioner (users.uuid) and every coded extension
+-- (list_options) -- this service never writes to either.
+GRANT SELECT ON \`${DB_NAME}\`.users TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
+GRANT SELECT ON \`${DB_NAME}\`.list_options TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.patient_management_outbox TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 FLUSH PRIVILEGES;
 SQL

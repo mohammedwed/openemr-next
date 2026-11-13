@@ -56,6 +56,12 @@ public static class PatientManagementApiExtensions
         builder.Services.AddScoped<SetAdvanceDirectiveStatusUseCase>();
         builder.Services.AddScoped<GetAdvanceDirectiveStatusUseCase>();
 
+        // Same pattern again for the FHIR Patient API. Create/update go through IPatientRegistry
+        // above -- this port is read-only.
+        builder.Services.AddScoped<IPatientFhirRepository, EfPatientFhirRepository>();
+        builder.Services.AddScoped<GetPatientFhirRecordUseCase>();
+        builder.Services.AddScoped<SearchPatientFhirRecordsUseCase>();
+
         builder.Services.AddOpenApi();
 
         return builder;

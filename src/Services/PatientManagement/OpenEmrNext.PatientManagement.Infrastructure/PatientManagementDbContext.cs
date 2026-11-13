@@ -63,9 +63,10 @@ public sealed class PatientManagementDbContext(DbContextOptions<PatientManagemen
 
             // "date" is patient_data's own last-updated timestamp, not a date tied to any one concept
             // (docs/m4-domain-notes.md's naming trap) -- registration sets it once, to the same moment
-            // as regdate, exactly as OpenEMR's own databaseInsert() does, but nothing here ever reads
-            // it back, so it isn't mapped as a property at all; a raw SQL default covers the insert
-            // (see the seed/migration step, not yet written).
+            // as regdate, exactly as OpenEMR's own databaseInsert() does. The FHIR Patient mapping is
+            // the first thing that reads it back (as last_updated), via its own raw SQL, not through
+            // this property -- mapped here only so it actually gets written on insert.
+            entity.Property<DateTime>("_date").HasColumnName("date");
         });
     }
 }
