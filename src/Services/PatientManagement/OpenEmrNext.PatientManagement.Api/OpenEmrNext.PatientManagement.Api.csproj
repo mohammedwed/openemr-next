@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.18.3" />
+    <PackageReference Include="Microting.EntityFrameworkCore.MySql" Version="10.0.3" />
+    <!-- Pins past the transitive MySqlConnector 2.5.0's known moderate vulnerability (GHSA-473q-m89c-ghf8),
+         matching AuthFacade's own pin for the same reason. -->
+    <PackageReference Include="MySqlConnector" Version="2.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenEmrNext.PatientManagement.Composition\OpenEmrNext.PatientManagement.Composition.csproj" />
+    <ProjectReference Include="..\OpenEmrNext.PatientManagement.Domain\OpenEmrNext.PatientManagement.Domain.csproj" />
+    <ProjectReference Include="..\OpenEmrNext.PatientManagement.Application\OpenEmrNext.PatientManagement.Application.csproj" />
+    <ProjectReference Include="..\OpenEmrNext.PatientManagement.Application.Ports\OpenEmrNext.PatientManagement.Application.Ports.csproj" />
+    <ProjectReference Include="..\OpenEmrNext.PatientManagement.Infrastructure\OpenEmrNext.PatientManagement.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

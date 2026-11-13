@@ -132,6 +132,27 @@ services:
       - ./scripts/seeds/authfacade-db.sh:/seed/authfacade-db.sh:ro
     entrypoint: ["bash", "/seed/authfacade-db.sh"]
 
+  # ---- One-shot: creates the patient_management_outbox table and a least-privilege user ----
+  # Runs the bare MariaDB image already used for the mysql service itself (ADR 0049, ADR 0050): the
+  # new user is scoped to exactly patient_data (read/write) and patient_management_outbox (fully
+  # owned), inside OpenEMR's own database -- never OpenEMR's own broader app user, and never a grant
+  # on the whole database. Depends on openemr itself, not just mysql, since patient_data only exists
+  # once OpenEMR's own installer has created it.
+  seed-patient-management-db:
+    image: ${MARIADB_IMAGE}
+    restart: "no"
+    depends_on:
+      openemr:
+        condition: service_healthy
+    environment:
+      MYSQL_PWD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
+      DB_NAME: ${DB_NAME:-openemr}
+      PATIENT_MANAGEMENT_DB_USER: ${PATIENT_MANAGEMENT_DB_USER:-patient_management}
+      PATIENT_MANAGEMENT_DB_PASSWORD: ${PATIENT_MANAGEMENT_DB_PASSWORD:?Set PATIENT_MANAGEMENT_DB_PASSWORD in .env}
+    volumes:
+      - ./scripts/seeds/patient-management-db.sh:/seed/patient-management-db.sh:ro
+    entrypoint: ["bash", "/seed/patient-management-db.sh"]
+
   # ---- AuthFacade (.NET) ----
   auth-facade:
     build:

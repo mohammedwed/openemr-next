@@ -13,6 +13,14 @@
   <Folder Name="/src/Services/Gateway/">
     <Project Path="src/Services/Gateway/OpenEmrNext.Gateway/OpenEmrNext.Gateway.csproj" />
   </Folder>
+  <Folder Name="/src/Services/PatientManagement/">
+    <Project Path="src/Services/PatientManagement/OpenEmrNext.PatientManagement.Domain/OpenEmrNext.PatientManagement.Domain.csproj" />
+    <Project Path="src/Services/PatientManagement/OpenEmrNext.PatientManagement.Application/OpenEmrNext.PatientManagement.Application.csproj" />
+    <Project Path="src/Services/PatientManagement/OpenEmrNext.PatientManagement.Application.Ports/OpenEmrNext.PatientManagement.Application.Ports.csproj" />
+    <Project Path="src/Services/PatientManagement/OpenEmrNext.PatientManagement.Infrastructure/OpenEmrNext.PatientManagement.Infrastructure.csproj" />
+    <Project Path="src/Services/PatientManagement/OpenEmrNext.PatientManagement.Composition/OpenEmrNext.PatientManagement.Composition.csproj" />
+    <Project Path="src/Services/PatientManagement/OpenEmrNext.PatientManagement.Api/OpenEmrNext.PatientManagement.Api.csproj" />
+  </Folder>
   <Folder Name="/src/Services/LoginUi/">
     <Project Path="src/Services/LoginUi/OpenEmrNext.LoginUi/OpenEmrNext.LoginUi.csproj" />
   </Folder>
@@ -24,5 +32,8 @@
     <Project Path="tests/Services/AuthFacade/OpenEmrNext.AuthFacade.ArchitectureTests/OpenEmrNext.AuthFacade.ArchitectureTests.csproj" />
     <Project Path="tests/Services/AuthFacade/OpenEmrNext.AuthFacade.IntegrationTests/OpenEmrNext.AuthFacade.IntegrationTests.csproj" />
     <Project Path="tests/Services/Gateway/OpenEmrNext.Gateway.IntegrationTests/OpenEmrNext.Gateway.IntegrationTests.csproj" />
+    <Project Path="tests/Services/PatientManagement/OpenEmrNext.PatientManagement.UnitTests/OpenEmrNext.PatientManagement.UnitTests.csproj" />
+    <Project Path="tests/Services/PatientManagement/OpenEmrNext.PatientManagement.ArchitectureTests/OpenEmrNext.PatientManagement.ArchitectureTests.csproj" />
+    <Project Path="tests/Services/PatientManagement/OpenEmrNext.PatientManagement.IntegrationTests/OpenEmrNext.PatientManagement.IntegrationTests.csproj" />
   </Folder>
 </Solution>
