@@ -11,6 +11,7 @@ public static class PatientManagementEndpoints
     {
         var v1 = app.MapGroup("/api/v1");
         v1.MapPatientEndpoints();
+        v1.MapInsuranceEndpoints();
         return app;
     }
 }

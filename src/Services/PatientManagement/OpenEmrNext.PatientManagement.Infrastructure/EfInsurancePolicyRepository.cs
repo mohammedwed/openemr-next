@@ -75,7 +75,8 @@ public sealed class EfInsurancePolicyRepository(PatientManagementDbContext db) :
             // full rows once, then issues writes from the in-memory copies).
             var source = await db.Database.SqlQueryRaw<RawOccupant>(
                 "SELECT uuid AS Uuid, type AS Type, date AS Date FROM insurance_data WHERE uuid = {0}",
-                sourceUuidBytes).SingleAsync(ct);
+                sourceUuidBytes).SingleOrDefaultAsync(ct)
+                ?? throw new KeyNotFoundException($"No insurance policy with uuid {policyUuid}.");
 
             // The row (if any) currently occupying the target level -- it trades places with the
             // source policy. "ORDER BY (date IS NULL) ASC, date DESC" matches legacy exactly: a real
