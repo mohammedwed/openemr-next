@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Creates the patient_management_outbox table inside OpenEMR's own database, and a least-privilege
-# user scoped to exactly that table plus patient_data (ADR 0049, ADR 0050) -- never OpenEMR's existing
-# app user, and never GRANT ... ON db.*, so every other table's privileges stay exactly as they are.
+# user scoped to exactly that table plus patient_data and insurance_data (ADR 0049, ADR 0050) -- never
+# OpenEMR's existing app user, and never GRANT ... ON db.*, so every other table's privileges stay
+# exactly as they are.
 # Runs as a one-shot Compose service (seed-patient-management-db), against the bare MariaDB image
 # already used for the mysql service itself -- no extra image to pull.
 #
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS \`${DB_NAME}\`.\`patient_management_outbox\` (
 CREATE USER IF NOT EXISTS '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 ALTER USER '${PATIENT_MANAGEMENT_DB_USER}'@'%' IDENTIFIED BY $(sql_quote "$PATIENT_MANAGEMENT_DB_PASSWORD");
 GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.patient_data TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
+GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.insurance_data TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.patient_management_outbox TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 FLUSH PRIVILEGES;
 SQL

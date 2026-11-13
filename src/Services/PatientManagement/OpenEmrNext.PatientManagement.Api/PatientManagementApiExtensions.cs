@@ -36,6 +36,12 @@ public static class PatientManagementApiExtensions
         builder.Services.AddScoped<IDuplicateScorer, EfDuplicateScorer>();
         builder.Services.AddScoped<ScorePatientForDuplicatesUseCase>();
 
+        // Same pattern again for insurance.
+        builder.Services.AddScoped<IInsurancePolicyRepository, EfInsurancePolicyRepository>();
+        builder.Services.AddScoped<AddInsurancePolicyUseCase>();
+        builder.Services.AddScoped<GetEffectiveInsuranceUseCase>();
+        builder.Services.AddScoped<SwapInsuranceUseCase>();
+
         builder.Services.AddOpenApi();
 
         return builder;

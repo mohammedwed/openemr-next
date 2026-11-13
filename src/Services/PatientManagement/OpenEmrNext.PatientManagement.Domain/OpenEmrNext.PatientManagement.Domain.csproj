@@ -6,4 +6,16 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- InsurancePolicy.AssignGeneratedIdentity is internal: only the Infrastructure adapter that
+         actually persists a new policy (EfInsurancePolicyRepository, which inserts via raw SQL, not
+         an EF-tracked entity, so nothing else populates Id automatically) should ever call it. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>OpenEmrNext.PatientManagement.Infrastructure</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>OpenEmrNext.PatientManagement.UnitTests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>

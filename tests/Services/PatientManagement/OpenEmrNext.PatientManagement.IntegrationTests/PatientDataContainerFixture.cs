@@ -75,6 +75,26 @@ public sealed class PatientDataContainerFixture : IAsyncLifetime
             """;
         await createPatientData.ExecuteNonQueryAsync();
 
+        await using var createInsuranceData = connection.CreateCommand();
+        createInsuranceData.CommandText = """
+            CREATE TABLE insurance_data (
+                id bigint(20) NOT NULL AUTO_INCREMENT,
+                uuid binary(16) DEFAULT NULL,
+                type enum('primary','secondary','tertiary') DEFAULT NULL,
+                provider varchar(255) DEFAULT NULL,
+                plan_name varchar(255) DEFAULT NULL,
+                policy_number varchar(255) DEFAULT NULL,
+                group_number varchar(255) DEFAULT NULL,
+                date date DEFAULT NULL,
+                pid bigint(20) NOT NULL DEFAULT 0,
+                date_end date DEFAULT NULL,
+                PRIMARY KEY (id),
+                UNIQUE KEY uuid (uuid),
+                UNIQUE KEY pid_type_date (pid, type, date)
+            );
+            """;
+        await createInsuranceData.ExecuteNonQueryAsync();
+
         await using var createOutbox = connection.CreateCommand();
         createOutbox.CommandText = """
             CREATE TABLE patient_management_outbox (
