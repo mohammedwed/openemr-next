@@ -92,6 +92,9 @@ jobs:
       - name: Generate AuthFacade's persisted certificates
         run: bash scripts/setup/new-authfacade-certs.sh
 
+      - name: Generate the gateway's dev TLS certificate
+        run: bash scripts/setup/new-dev-cert.sh
+
       - name: Start stack
         run: docker compose up -d --build --wait --wait-timeout 1200 openemr auth-facade webapp gateway phpmyadmin
 
