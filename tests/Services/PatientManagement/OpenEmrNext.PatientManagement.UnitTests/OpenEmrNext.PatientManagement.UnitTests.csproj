@@ -22,7 +22,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\src\Services\PatientManagement\OpenEmrNext.PatientManagement.Api\OpenEmrNext.PatientManagement.Api.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Services\PatientManagement\OpenEmrNext.PatientManagement.Domain\OpenEmrNext.PatientManagement.Domain.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Services\PatientManagement\OpenEmrNext.PatientManagement.Infrastructure\OpenEmrNext.PatientManagement.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

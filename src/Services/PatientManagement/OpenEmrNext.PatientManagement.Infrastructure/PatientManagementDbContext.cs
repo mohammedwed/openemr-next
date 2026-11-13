@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using OpenEmrNext.PatientManagement.Api.Domain;
+using OpenEmrNext.PatientManagement.Domain;
 
-namespace OpenEmrNext.PatientManagement.Api.Persistence;
+namespace OpenEmrNext.PatientManagement.Infrastructure;
 
 /// <summary>
 /// Reads and writes against the shared <c>openemr</c> database, through the least-privilege user ADR

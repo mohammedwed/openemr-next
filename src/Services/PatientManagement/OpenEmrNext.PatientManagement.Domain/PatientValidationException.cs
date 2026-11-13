@@ -1,4 +1,4 @@
-namespace OpenEmrNext.PatientManagement.Api.Domain;
+namespace OpenEmrNext.PatientManagement.Domain;
 
 /// <summary>Raised when a <see cref="PatientRegistration"/> fails <see cref="Patient.Register"/>'s rules.</summary>
 public sealed class PatientValidationException(IReadOnlyList<string> errors)

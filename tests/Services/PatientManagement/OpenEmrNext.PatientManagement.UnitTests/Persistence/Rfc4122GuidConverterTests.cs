@@ -1,4 +1,4 @@
-using OpenEmrNext.PatientManagement.Api.Persistence;
+using OpenEmrNext.PatientManagement.Infrastructure;
 
 namespace OpenEmrNext.PatientManagement.UnitTests.Persistence;
 

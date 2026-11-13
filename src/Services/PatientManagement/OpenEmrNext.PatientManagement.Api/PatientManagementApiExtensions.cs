@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using OpenEmrNext.PatientManagement.Api.Persistence;
+using OpenEmrNext.PatientManagement.Infrastructure;
 using OpenEmrNext.PatientManagement.Composition;
 
 namespace OpenEmrNext.PatientManagement.Api;

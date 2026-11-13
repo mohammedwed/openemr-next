@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using OpenEmrNext.PatientManagement.Api.Domain;
-using OpenEmrNext.PatientManagement.Api.Persistence;
+using OpenEmrNext.PatientManagement.Domain;
+using OpenEmrNext.PatientManagement.Infrastructure;
 using Xunit;
 
 namespace OpenEmrNext.PatientManagement.IntegrationTests;

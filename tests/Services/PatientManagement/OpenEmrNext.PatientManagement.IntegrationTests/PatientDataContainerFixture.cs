@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MySqlConnector;
-using OpenEmrNext.PatientManagement.Api.Persistence;
+using OpenEmrNext.PatientManagement.Infrastructure;
 using Testcontainers.MariaDb;
 using Xunit;
 

@@ -1,9 +1,9 @@
 using System.Text.Json;
 using OpenEmrNext.PatientManagement.Api.Contracts.Requests;
 using OpenEmrNext.PatientManagement.Api.Contracts.Responses;
-using OpenEmrNext.PatientManagement.Api.Domain;
+using OpenEmrNext.PatientManagement.Domain;
 using OpenEmrNext.PatientManagement.Api.Events;
-using OpenEmrNext.PatientManagement.Api.Persistence;
+using OpenEmrNext.PatientManagement.Infrastructure;
 
 namespace OpenEmrNext.PatientManagement.Api.Endpoints;
 

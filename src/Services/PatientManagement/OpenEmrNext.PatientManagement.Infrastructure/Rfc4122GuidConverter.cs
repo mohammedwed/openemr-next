@@ -1,4 +1,4 @@
-namespace OpenEmrNext.PatientManagement.Api.Persistence;
+namespace OpenEmrNext.PatientManagement.Infrastructure;
 
 /// <summary>
 /// Converts between <see cref="Guid"/> and the 16-byte layout OpenEMR's own PHP code actually stores in

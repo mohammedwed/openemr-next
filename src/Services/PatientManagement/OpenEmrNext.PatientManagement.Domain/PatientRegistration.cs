@@ -1,4 +1,4 @@
-namespace OpenEmrNext.PatientManagement.Api.Domain;
+namespace OpenEmrNext.PatientManagement.Domain;
 
 /// <summary>
 /// The fields a caller supplies to register a new patient. Mirrors the required/optional split

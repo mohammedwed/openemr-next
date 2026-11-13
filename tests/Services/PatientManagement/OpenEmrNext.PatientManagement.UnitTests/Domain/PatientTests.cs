@@ -1,4 +1,4 @@
-using OpenEmrNext.PatientManagement.Api.Domain;
+using OpenEmrNext.PatientManagement.Domain;
 
 namespace OpenEmrNext.PatientManagement.UnitTests.Domain;
 

@@ -1,6 +1,6 @@
 using System.Net.Mail;
 
-namespace OpenEmrNext.PatientManagement.Api.Domain;
+namespace OpenEmrNext.PatientManagement.Domain;
 
 /// <summary>
 /// A registered patient. <see cref="Id"/> is the one value that's genuinely database-generated (ADR

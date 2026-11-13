@@ -1,4 +1,4 @@
-namespace OpenEmrNext.PatientManagement.Api.Persistence;
+namespace OpenEmrNext.PatientManagement.Infrastructure;
 
 /// <summary>
 /// One row of the transactional outbox (ADR 0049): written in the same transaction as the business

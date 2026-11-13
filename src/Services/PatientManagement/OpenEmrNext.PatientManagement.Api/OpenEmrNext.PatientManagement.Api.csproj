@@ -17,15 +17,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenEmrNext.PatientManagement.Composition\OpenEmrNext.PatientManagement.Composition.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-      <_Parameter1>OpenEmrNext.PatientManagement.UnitTests</_Parameter1>
-    </AssemblyAttribute>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-      <_Parameter1>OpenEmrNext.PatientManagement.IntegrationTests</_Parameter1>
-    </AssemblyAttribute>
+    <ProjectReference Include="..\OpenEmrNext.PatientManagement.Domain\OpenEmrNext.PatientManagement.Domain.csproj" />
+    <ProjectReference Include="..\OpenEmrNext.PatientManagement.Infrastructure\OpenEmrNext.PatientManagement.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
