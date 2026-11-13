@@ -21,7 +21,8 @@ public static class PatientEndpoints
     }
 
     private static async Task<IResult> RegisterPatient(
-        RegisterPatientRequest request, RegisterPatientUseCase useCase, CancellationToken ct)
+        RegisterPatientRequest request, RegisterPatientUseCase useCase,
+        ScorePatientForDuplicatesUseCase scoreUseCase, CancellationToken ct)
     {
         Patient patient;
         try
@@ -38,6 +39,11 @@ public static class PatientEndpoints
         {
             return Results.ValidationProblem(new Dictionary<string, string[]> { ["errors"] = [.. ex.Errors] });
         }
+
+        // Matches legacy OpenEMR's own behavior: scored synchronously right after insert, cached for
+        // a later report, never surfaced in the registration response itself (legacy doesn't either --
+        // there is no report endpoint yet to make this actionable to a caller).
+        await scoreUseCase.ExecuteAsync(patient.Pid, ct);
 
         return Results.Created(
             $"/api/v1/patients/{patient.Uuid}",
