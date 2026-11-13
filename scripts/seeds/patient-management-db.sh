@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Creates the patient_management_outbox table inside OpenEMR's own database, and a least-privilege
-# user scoped to exactly that table plus patient_data and insurance_data (ADR 0049, ADR 0050) -- never
-# OpenEMR's existing app user, and never GRANT ... ON db.*, so every other table's privileges stay
-# exactly as they are.
+# user scoped to exactly that table plus patient_data, insurance_data, documents, categories,
+# categories_to_documents, and sequences (ADR 0049, ADR 0050) -- never OpenEMR's existing app user, and
+# never GRANT ... ON db.*, so every other table's privileges stay exactly as they are.
 # Runs as a one-shot Compose service (seed-patient-management-db), against the bare MariaDB image
 # already used for the mysql service itself -- no extra image to pull.
 #
@@ -47,6 +47,18 @@ CREATE USER IF NOT EXISTS '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 ALTER USER '${PATIENT_MANAGEMENT_DB_USER}'@'%' IDENTIFIED BY $(sql_quote "$PATIENT_MANAGEMENT_DB_PASSWORD");
 GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.patient_data TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.insurance_data TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
+-- Advance directive documents: this service only ever inserts a new documents row and reads rows
+-- back, never updates or deletes one, so no UPDATE/DELETE grant here.
+GRANT SELECT, INSERT ON \`${DB_NAME}\`.documents TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
+-- Read-only: only ever looked up by name to find the "Advance Directive" category's id.
+GRANT SELECT ON \`${DB_NAME}\`.categories TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
+-- REPLACE INTO (used to tag a new document under its category) is an INSERT that falls back to a
+-- DELETE+INSERT on a duplicate key, so both privileges are needed even though this service never
+-- issues a bare DELETE itself.
+GRANT SELECT, INSERT, DELETE ON \`${DB_NAME}\`.categories_to_documents TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
+-- The single shared id-generation counter (legacy's own QueryUtils::generateId()) -- UPDATE alone
+-- covers "SET id = LAST_INSERT_ID(id + 1)", since it reads the row being updated, not a separate one.
+GRANT UPDATE ON \`${DB_NAME}\`.sequences TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.patient_management_outbox TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 FLUSH PRIVILEGES;
 SQL

@@ -68,6 +68,9 @@ public sealed class PatientDataContainerFixture : IAsyncLifetime
                 regdate datetime DEFAULT NULL,
                 created_by bigint(20) DEFAULT NULL,
                 updated_by bigint(20) DEFAULT NULL,
+                completed_ad varchar(3) NOT NULL DEFAULT 'NO',
+                ad_reviewed datetime DEFAULT NULL,
+                advance_directive_user_authenticator bigint(20) DEFAULT NULL,
                 UNIQUE KEY pid (pid),
                 UNIQUE KEY uuid (uuid),
                 KEY id (id)
@@ -94,6 +97,74 @@ public sealed class PatientDataContainerFixture : IAsyncLifetime
             );
             """;
         await createInsuranceData.ExecuteNonQueryAsync();
+
+        // The three tables advance-directive document storage writes into (ADR 0049 -- no new table),
+        // trimmed to the columns this service's own reads/writes ever touch, but matching the real
+        // shape where it matters: `documents.id` is NOT AUTO_INCREMENT (it's allocated from
+        // `sequences`, same as legacy), and `sequences` really does hold exactly one row.
+        await using var createDocuments = connection.CreateCommand();
+        createDocuments.CommandText = """
+            CREATE TABLE documents (
+                id int(11) NOT NULL,
+                uuid binary(16) DEFAULT NULL,
+                type enum('file_url','blob','web_url') DEFAULT NULL,
+                size int(11) DEFAULT NULL,
+                date datetime DEFAULT NULL,
+                url varchar(255) DEFAULT NULL,
+                mimetype varchar(255) DEFAULT NULL,
+                owner int(11) DEFAULT NULL,
+                revision timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                foreign_id bigint(20) DEFAULT NULL,
+                docdate date DEFAULT NULL,
+                hash varchar(255) DEFAULT NULL,
+                name varchar(255) DEFAULT NULL,
+                drive_uuid binary(16) DEFAULT NULL,
+                storagemethod tinyint(4) NOT NULL DEFAULT 0,
+                path_depth tinyint DEFAULT 1,
+                encounter_id bigint(20) NOT NULL DEFAULT 0,
+                deleted tinyint(1) NOT NULL DEFAULT 0,
+                PRIMARY KEY (id),
+                UNIQUE KEY drive_uuid (drive_uuid),
+                UNIQUE KEY uuid (uuid),
+                KEY foreign_id (foreign_id)
+            );
+            """;
+        await createDocuments.ExecuteNonQueryAsync();
+
+        await using var createCategories = connection.CreateCommand();
+        createCategories.CommandText = """
+            CREATE TABLE categories (
+                id int(11) NOT NULL AUTO_INCREMENT,
+                name varchar(255) DEFAULT NULL,
+                parent int(11) NOT NULL DEFAULT 0,
+                codes varchar(255) NOT NULL DEFAULT '',
+                PRIMARY KEY (id)
+            );
+            """;
+        await createCategories.ExecuteNonQueryAsync();
+
+        // Same id and seed data as a real fresh legacy install (sql/database.sql).
+        await using var seedCategories = connection.CreateCommand();
+        seedCategories.CommandText = "INSERT INTO categories (id, name, parent, codes) VALUES (6, 'Advance Directive', 1, 'LOINC:42348-3')";
+        await seedCategories.ExecuteNonQueryAsync();
+
+        await using var createCategoriesToDocuments = connection.CreateCommand();
+        createCategoriesToDocuments.CommandText = """
+            CREATE TABLE categories_to_documents (
+                category_id int(11) NOT NULL DEFAULT 0,
+                document_id int(11) NOT NULL DEFAULT 0,
+                PRIMARY KEY (category_id, document_id)
+            );
+            """;
+        await createCategoriesToDocuments.ExecuteNonQueryAsync();
+
+        await using var createSequences = connection.CreateCommand();
+        createSequences.CommandText = "CREATE TABLE sequences (id int(11) unsigned NOT NULL DEFAULT 0)";
+        await createSequences.ExecuteNonQueryAsync();
+
+        await using var seedSequences = connection.CreateCommand();
+        seedSequences.CommandText = "INSERT INTO sequences VALUES (1)";
+        await seedSequences.ExecuteNonQueryAsync();
 
         await using var createOutbox = connection.CreateCommand();
         createOutbox.CommandText = """

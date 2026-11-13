@@ -42,6 +42,20 @@ public static class PatientManagementApiExtensions
         builder.Services.AddScoped<GetEffectiveInsuranceUseCase>();
         builder.Services.AddScoped<SwapInsuranceUseCase>();
 
+        // Advance directives: the file store is a plain adapter (no Composition dependency allowed
+        // from Infrastructure), so its one config value is read here, at the composition root, and
+        // handed in directly -- the same way the DbContext's connection string above is built from
+        // options and handed to EF Core rather than EF reaching into Composition itself.
+        builder.Services.AddScoped<IAdvanceDirectiveFileStore>(provider =>
+            new LocalDiskAdvanceDirectiveFileStore(
+                provider.GetRequiredService<IOptions<AdvanceDirectiveStorageOptions>>().Value.RepositoryRoot));
+        builder.Services.AddScoped<IAdvanceDirectiveRepository, EfAdvanceDirectiveRepository>();
+        builder.Services.AddScoped<UploadAdvanceDirectiveDocumentUseCase>();
+        builder.Services.AddScoped<GetAdvanceDirectiveDocumentsUseCase>();
+        builder.Services.AddScoped<DownloadAdvanceDirectiveDocumentUseCase>();
+        builder.Services.AddScoped<SetAdvanceDirectiveStatusUseCase>();
+        builder.Services.AddScoped<GetAdvanceDirectiveStatusUseCase>();
+
         builder.Services.AddOpenApi();
 
         return builder;

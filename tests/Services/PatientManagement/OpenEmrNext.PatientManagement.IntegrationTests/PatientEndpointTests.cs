@@ -30,7 +30,8 @@ public class PatientEndpointTests(PatientDataContainerFixture fixture) : IAsyncL
                 new("PatientManagementDb:Port", fixture.Port.ToString()),
                 new("PatientManagementDb:Database", fixture.Database),
                 new("PatientManagementDb:User", fixture.User),
-                new("PatientManagementDb:Password", fixture.DbPassword)
+                new("PatientManagementDb:Password", fixture.DbPassword),
+                new("AdvanceDirectiveStorage:RepositoryRoot", Path.GetTempPath())
             ])));
         _client = _factory.CreateClient();
         return Task.CompletedTask;
