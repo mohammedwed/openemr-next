@@ -1,4 +1,4 @@
-namespace OpenEmrNext.PatientManagement.Api.Events;
+namespace OpenEmrNext.PatientManagement.Application;
 
 /// <summary>
 /// The outbox payload for <c>PatientRegistered</c> -- a deliberately curated set of fields, not the

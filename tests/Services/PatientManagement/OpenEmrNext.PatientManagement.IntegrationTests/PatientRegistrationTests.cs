@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Domain;
-using OpenEmrNext.PatientManagement.Infrastructure;
 using Xunit;
 
 namespace OpenEmrNext.PatientManagement.IntegrationTests;
@@ -8,7 +8,9 @@ namespace OpenEmrNext.PatientManagement.IntegrationTests;
 /// <summary>
 /// Proves the one thing that's genuinely new in this slice against a real MariaDB: the patient insert
 /// and its outbox row commit together, in one transaction, via one <c>SaveChangesAsync</c> call
-/// (ADR 0049) -- not that the business rules hold, which the unit tests already cover.
+/// (ADR 0049) -- not that the business rules hold, which the unit tests already cover. Calls
+/// <see cref="RegisterPatientUseCase"/> directly rather than reproducing its logic here, so this keeps
+/// testing the real orchestration rather than a copy of it that could silently drift from it.
 /// </summary>
 [Collection("PatientDataContainer")]
 public class PatientRegistrationTests(PatientDataContainerFixture fixture)
@@ -19,16 +21,9 @@ public class PatientRegistrationTests(PatientDataContainerFixture fixture)
     public async Task Registering_a_patient_commits_the_patient_row_and_its_outbox_row_together()
     {
         var registration = new PatientRegistration("Ada", "Lovelace", "Female", new DateOnly(1990, 1, 1));
-        var patient = Patient.Register(registration, registeredBy: 1, Now);
 
         await using var context = fixture.CreateDbContext();
-        context.Patients.Add(patient);
-        context.OutboxMessages.Add(OutboxMessage.For(
-            "PatientRegistered",
-            $"{{\"pid\":{patient.Pid},\"uuid\":\"{patient.Uuid}\"}}",
-            Now));
-
-        await context.SaveChangesAsync();
+        var patient = await new RegisterPatientUseCase(context).ExecuteAsync(registration, registeredBy: 1, Now, CancellationToken.None);
 
         // EF Core's own ValueGeneratedOnAdd() already populated this via the database's AUTO_INCREMENT --
         // nothing in application code needs to copy it over manually.
@@ -56,7 +51,9 @@ public class PatientRegistrationTests(PatientDataContainerFixture fixture)
         var outboxCountBefore = await context.OutboxMessages.CountAsync();
 
         var badRegistration = new PatientRegistration("Ada", "A", "F", new DateOnly(1990, 1, 1));
-        Assert.Throws<PatientValidationException>(() => Patient.Register(badRegistration, 1, Now));
+        var useCase = new RegisterPatientUseCase(context);
+        await Assert.ThrowsAsync<PatientValidationException>(
+            () => useCase.ExecuteAsync(badRegistration, 1, Now, CancellationToken.None));
 
         Assert.Equal(patientCountBefore, await context.Patients.CountAsync());
         Assert.Equal(outboxCountBefore, await context.OutboxMessages.CountAsync());
@@ -66,11 +63,9 @@ public class PatientRegistrationTests(PatientDataContainerFixture fixture)
     public async Task Uuid_round_trips_through_the_database_in_rfc4122_byte_order()
     {
         var registration = new PatientRegistration("Grace", "Hopper", "Female", new DateOnly(1985, 5, 5));
-        var patient = Patient.Register(registration, registeredBy: 1, Now);
 
         await using var context = fixture.CreateDbContext();
-        context.Patients.Add(patient);
-        await context.SaveChangesAsync();
+        var patient = await new RegisterPatientUseCase(context).ExecuteAsync(registration, registeredBy: 1, Now, CancellationToken.None);
 
         await using var verify = fixture.CreateDbContext();
         var reloaded = await verify.Patients.SingleAsync(p => p.Pid == patient.Pid);

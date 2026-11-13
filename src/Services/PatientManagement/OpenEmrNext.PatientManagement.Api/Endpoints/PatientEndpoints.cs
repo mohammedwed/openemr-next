@@ -1,9 +1,7 @@
-using System.Text.Json;
 using OpenEmrNext.PatientManagement.Api.Contracts.Requests;
 using OpenEmrNext.PatientManagement.Api.Contracts.Responses;
+using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Domain;
-using OpenEmrNext.PatientManagement.Api.Events;
-using OpenEmrNext.PatientManagement.Infrastructure;
 
 namespace OpenEmrNext.PatientManagement.Api.Endpoints;
 
@@ -23,32 +21,23 @@ public static class PatientEndpoints
     }
 
     private static async Task<IResult> RegisterPatient(
-        RegisterPatientRequest request, PatientManagementDbContext db, CancellationToken ct)
+        RegisterPatientRequest request, RegisterPatientUseCase useCase, CancellationToken ct)
     {
         Patient patient;
         try
         {
-            patient = Patient.Register(
+            patient = await useCase.ExecuteAsync(
                 new PatientRegistration(
                     request.FirstName, request.LastName, request.Sex, request.DateOfBirth,
                     request.Email, request.TrustedEmail),
                 request.RegisteredBy,
-                DateTime.UtcNow);
+                DateTime.UtcNow,
+                ct);
         }
         catch (PatientValidationException ex)
         {
             return Results.ValidationProblem(new Dictionary<string, string[]> { ["errors"] = [.. ex.Errors] });
         }
-
-        var @event = new PatientRegisteredEvent(
-            patient.Uuid, patient.Pid, patient.FirstName, patient.LastName, patient.RegisteredAtUtc);
-
-        // One SaveChangesAsync across both tables is the whole point (ADR 0049): the patient row and
-        // the fact that PatientRegistered needs publishing commit together, or neither does.
-        db.Patients.Add(patient);
-        db.OutboxMessages.Add(OutboxMessage.For(
-            PatientRegisteredEvent.EventType, JsonSerializer.Serialize(@event), DateTime.UtcNow));
-        await db.SaveChangesAsync(ct);
 
         return Results.Created(
             $"/api/v1/patients/{patient.Uuid}",

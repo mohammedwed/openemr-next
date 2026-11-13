@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Infrastructure;
 using OpenEmrNext.PatientManagement.Composition;
 
@@ -24,6 +25,8 @@ public static class PatientManagementApiExtensions
             // same pin AuthFacade's own DbContext already uses.
             options.UseMySql(connectionString, new MariaDbServerVersion(new Version(12, 3, 3)));
         });
+
+        builder.Services.AddScoped<RegisterPatientUseCase>();
 
         builder.Services.AddOpenApi();
 
