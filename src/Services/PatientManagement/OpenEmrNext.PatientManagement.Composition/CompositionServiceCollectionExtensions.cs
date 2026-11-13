@@ -20,6 +20,11 @@ public static class CompositionServiceCollectionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddOptions<AdvanceDirectiveStorageOptions>()
+            .Bind(configuration.GetSection(AdvanceDirectiveStorageOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         return services;
     }
 }
