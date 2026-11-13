@@ -230,11 +230,19 @@ not tracked as remaining M3 work, since there is nothing to build against yet.
 
 ### M4: Patient Management service (not started)
 
-- Own database and EF Core migrations, with a slim model scaffolded from
-  `patient_data` only
+Writes directly into OpenEMR's own `patient_data` table (ADR 0049) — no new database of its own. OpenEMR's
+legacy PHP registration UI is retired once this ships: the new service becomes the only writer, so there
+is no concurrent-writer race to design around.
+
+- A slim EF model mapped onto the existing `patient_data` table (not owned or migrated by this service —
+  the table already exists)
 - `Patient` aggregate and registration use case
-- Read-only anti-corruption adapter for `patient_data`
-- Transactional outbox publishing `PatientRegistered`
+- Anti-corruption adapter for `patient_data` — reads **and writes** (no longer read-only, per ADR 0049)
+- Transactional outbox publishing `PatientRegistered`, as a table inside the `openemr` database itself
+  (ADR 0049) — not a separate store, so the insert and the outbox row commit together in one transaction
+- A safe identity-allocation scheme for new rows (a real transaction or sequence) — not OpenEMR's own
+  `getFreshPid()` (`SELECT MAX(pid)+1`, a read-then-write race — `docs/m4-domain-notes.md`). No longer a
+  concurrency risk now that the legacy UI is retired, just a normal design choice to get right.
 - Unit and integration tests (Testcontainers)
 
 **Exit criteria:** A patient is registered through the gateway. The event is
