@@ -76,6 +76,15 @@ public static class PatientManagementApiExtensions
 
         builder.Services.AddOpenApi();
 
+        // Every endpoint catches its own known Domain validation exceptions and maps them to a clean
+        // ValidationProblem/NotFound response -- but anything unanticipated (a bug, a DB error that
+        // exhausted EnableRetryOnFailure's retries) previously fell through to ASP.NET's bare default
+        // 500, not the ProblemDetails shape every other error path here already returns. AddProblemDetails
+        // plus app.UseExceptionHandler() (Program.cs) is the minimal fix: ASP.NET Core's own exception
+        // middleware already logs the exception at Error level and writes a ProblemDetails body for
+        // whatever status code is current (500 here) -- no custom IExceptionHandler needed for that.
+        builder.Services.AddProblemDetails();
+
         return builder;
     }
 }

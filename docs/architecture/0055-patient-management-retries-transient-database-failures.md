@@ -54,9 +54,9 @@ transient failure occurs in production.
   inside the retried delegate using a value generated during that same delegate -- both easy to get
   wrong silently (the failure mode only appears under an actual transient fault, not in normal testing
   against a stable database).
-- Global exception-handling middleware (`UseExceptionHandler`/`ProblemDetails`) remains a separate,
-  unaddressed finding from the same review -- confirmed as a repo-wide gap (`AuthFacade`/`Gateway` lack
-  it too), tracked in `m4-domain-notes.md`, not fixed here.
+- Global exception-handling middleware (`UseExceptionHandler`/`ProblemDetails`) was a separate finding
+  from the same review, deprioritized below this one at the time -- fixed immediately after, in
+  [0056](0056-patient-management-adds-global-exception-handling-middleware.md).
 
 ## Alternatives considered
 

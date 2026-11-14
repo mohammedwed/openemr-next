@@ -257,6 +257,18 @@ repository exists to provide has no clean EF-native equivalent, and the legacy-s
 - `AddAsync`/`AddDocumentAsync` moved `AssignGeneratedIdentity` outside the retried delegate (returning
   the generated id instead, assigned exactly once after a successful commit) — otherwise a retried
   attempt would call it twice on the same aggregate and throw.
-- The global exception-handling gap remains tracked, not fixed — a response-shaping concern, not a
-  correctness/availability one, so it stayed lower priority than the retry fix.
+- The global exception-handling gap stayed lower priority than the retry fix at the time (a
+  response-shaping concern, not correctness/availability) but is now also fixed, below.
 - Verified against a real Testcontainers MariaDB: all 46 integration tests still pass.
+
+## Fixed — no global exception-handling middleware anywhere in PatientManagement's Api
+
+- `builder.Services.AddProblemDetails()` + `app.UseExceptionHandler()` — the minimal built-in ASP.NET
+  Core pattern, no custom `IExceptionHandler` needed. Was a repo-wide gap (`AuthFacade`/`Gateway` still
+  don't have it); now fixed here.
+- Every endpoint's own inline validation-exception handling is unchanged — this only catches what
+  wasn't already anticipated.
+- New test (`GlobalExceptionHandlingTests`) swaps in an always-throwing `IPatientFhirRepository` via
+  `ConfigureTestServices` and confirms `GET /fhir/Patient/{uuid}` now returns a 500 with an
+  `application/problem+json` body through the real HTTP pipeline, not a bare empty response.
+- Full solution: 121 unit, 47 integration (up from 46), 17 architecture tests all pass.

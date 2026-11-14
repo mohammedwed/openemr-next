@@ -396,12 +396,19 @@ dimension only ever measures "failing fast," not resilience. Two real findings; 
   running. Verified against a real Testcontainers MariaDB: all 46 integration tests pass, including
   every transactional path -- a wrong wrapping would have thrown immediately on any transaction use,
   not only during an actual retry, so this is real confirmation, not just "it compiled."
-- **Tracked, not fixed -- no global exception-handling middleware anywhere in PatientManagement's Api.** Confirmed this is a
-  repo-wide gap, not specific to this service -- `AuthFacade` and `Gateway` don't have
-  `UseExceptionHandler`/`ProblemDetails` either. Every endpoint catches its own known validation
-  exceptions inline, consistently -- but anything unanticipated (a transient DB error, a real bug)
-  produces ASP.NET's bare default 500, not the `ProblemDetails`-shaped response every other error path
-  in this API already returns.
+- **Fixed -- no global exception-handling middleware anywhere in PatientManagement's Api.** Confirmed
+  this was a repo-wide gap, not specific to this service -- `AuthFacade` and `Gateway` still don't have
+  `UseExceptionHandler`/`ProblemDetails` either, only this service does now. Every endpoint already
+  caught its own known validation exceptions inline, consistently; anything unanticipated (a transient
+  DB error that exhausted ADR 0055's retries, a real bug) previously fell through to ASP.NET's bare
+  default 500. Fixed with the minimal built-in pattern -- `builder.Services.AddProblemDetails()`
+  (`PatientManagementApiExtensions`) plus `app.UseExceptionHandler()` (`Program.cs`), no custom
+  `IExceptionHandler` needed: ASP.NET Core's own exception middleware already logs the exception at
+  Error level and writes a `ProblemDetails` body for the current status code once `IProblemDetailsService`
+  is registered. Verified against the real HTTP pipeline, not just by reasoning about the framework
+  API: a new test (`GlobalExceptionHandlingTests`) swaps in an always-throwing `IPatientFhirRepository`
+  via `ConfigureTestServices` and confirms `GET /fhir/Patient/{uuid}` now returns a 500 with an
+  `application/problem+json` body, not a bare empty response.
 
 **Already a genuine strength, confirmed not assumed**: startup configuration fails fast correctly --
 `[Required]` DataAnnotations plus `.ValidateOnStart()` on both `PatientManagementDbOptions` and
