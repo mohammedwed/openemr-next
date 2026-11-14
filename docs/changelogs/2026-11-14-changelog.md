@@ -173,3 +173,26 @@ Closes out every item the 2026-11-14 self-assessment flagged, in the order addre
   indirection to remove a theoretical violation that never bites in practice.
 - Full solution build stays clean (0 errors, same 5 pre-existing nullable warnings) after all four
   changes.
+
+## Fixed — Application layer: InsuranceCoverage's cluster invariant wasn't enforced on add
+
+A grounded review of `Application`/`Application.Ports` (all 11 use cases, all 7 ports) found one real
+bug and three lower-priority shortcomings, tracked in full in `m4-domain-notes.md`.
+
+- `AddInsurancePolicyUseCase` called `InsurancePolicy.Add` directly instead of going through
+  `InsuranceCoverage.AddPolicy` — the cluster-wide uniqueness invariant ADR 0053 built `InsuranceCoverage`
+  specifically to enforce was only ever reachable through the swap path, never through plain add, and
+  untested. Fixed by routing it through `InsuranceCoverage.For`/`.AddPolicy`, same as
+  `SwapInsuranceUseCase`.
+- That fix surfaced a second bug: `EfInsurancePolicyRepository.GetPoliciesAsync` read `date`/`date_end`
+  as typed columns, which throws on a pre-existing row with a legacy zero/partial date — "safe" only
+  while the method was swap-only, since every row swap touches is one this service created itself.
+  Routing add through the same method would have broken any add for a patient with *any* unrelated
+  malformed row on file. Fixed by reading dates as strings (matching `GetRowsAsync`'s existing pattern)
+  and skipping, not throwing on, a row that can't become a typed entity.
+- Two new integration tests against a real Testcontainers MariaDB: duplicate-policy rejection, and
+  tolerance of an unrelated pre-existing zero-date row during an add.
+- Tracked, not fixed: `IAdvanceDirectiveFileStore` sits in `Application.Ports` but is only ever
+  consumed by two Infrastructure classes, never by `Application` itself; documentation is sharply
+  asymmetric between the two projects (7/7 ports documented, 2/11 use cases); 6 dead `using` statements
+  left over from the earlier reorg.
