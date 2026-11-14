@@ -211,3 +211,64 @@ bug and three lower-priority shortcomings, tracked in full in `m4-domain-notes.m
 - **SOLID**: removed the 6 dead `using` statements left over from the ValueObjects/Rules/ReadModels
   reorg.
 - Full solution build stays clean (0 errors, same 5 pre-existing nullable warnings).
+
+## Fixed — all four Infrastructure findings
+
+A grounded review of `Infrastructure` (all 10 files) found Security and Documentation already strong
+(every raw SQL call properly parameterized, every file well-documented against the real legacy
+source), plus four real findings — all four addressed. Also prompted a side discussion on replacing
+raw SQL with EF Core here; decided against a rewrite, since the zero/partial-date tolerance every
+repository exists to provide has no clean EF-native equivalent, and the legacy-specific SQL
+(`SOUNDEX()`, the `sequences` counter, the sentinel-date swap workaround) would stay raw regardless.
+
+- **Performance**: `EfPatientFhirRepository`'s up-to-7-queries-per-patient `list_options` resolution
+  (a 50-patient search could issue ~350 queries) is now one batched query per
+  `GetByUuidAsync`/`SearchAsync` call, resolved in-memory from there. No EF needed — `list_options` is
+  bounded configuration data, not scaled by patient count.
+- **Security (defense-in-depth)**: `LocalDiskAdvanceDirectiveFileStore.ReadAsync` now rejects any
+  resolved path outside `repositoryRoot`.
+- **SOLID**: the duplicated transaction/`LAST_INSERT_ID()` sequence is now one shared
+  `DatabaseFacadeExtensions.GetLastInsertIdAsync` helper.
+- **DDD/consistency**: `EfAdvanceDirectiveRepository.AddDocumentAsync` now best-effort deletes the
+  file it already wrote (via a new `IAdvanceDirectiveFileStore.DeleteAsync`) if the database write
+  that follows fails, instead of leaving a silent orphan. Deliberately partial — only compensates for
+  a handled exception, not a killed process — and the compensating path itself has no automated test
+  (forcing a real DB failure through the public API isn't straightforward here); `DeleteAsync` itself
+  is covered directly.
+- New unit tests (`LocalDiskAdvanceDirectiveFileStoreTests`, 6 cases) need no database at all.
+- Full solution: 121 unit (up from 115), 46 integration (unchanged), 17 architecture (unchanged) tests
+  all pass; build stays clean (0 errors, same 5 pre-existing warnings).
+
+## Added — a sixth review dimension: Resilience and failing fast
+
+- Two findings logged: no `EnableRetryOnFailure()` on the database connection, and no global
+  exception-handling middleware anywhere in PatientManagement's Api (confirmed a repo-wide gap, not
+  specific to this service — `AuthFacade`/`Gateway` don't have one either).
+- Confirmed, not assumed, as a genuine existing strength: startup configuration fails fast correctly
+  via `[Required]` + `.ValidateOnStart()` on both options classes.
+
+## Fixed — no transient-fault retry on the database connection (ADR 0055)
+
+- `EnableRetryOnFailure()` is now on for `PatientManagementDbContext`'s MySQL connection.
+- All three explicit transactions (`EfInsurancePolicyRepository.AddAsync`/`PersistSwapAsync`,
+  `EfAdvanceDirectiveRepository.AddDocumentAsync`) now run through
+  `Database.CreateExecutionStrategy().ExecuteAsync(...)`, required for EF's retry to work with a
+  user-initiated transaction at all.
+- `AddAsync`/`AddDocumentAsync` moved `AssignGeneratedIdentity` outside the retried delegate (returning
+  the generated id instead, assigned exactly once after a successful commit) — otherwise a retried
+  attempt would call it twice on the same aggregate and throw.
+- The global exception-handling gap stayed lower priority than the retry fix at the time (a
+  response-shaping concern, not correctness/availability) but is now also fixed, below.
+- Verified against a real Testcontainers MariaDB: all 46 integration tests still pass.
+
+## Fixed — no global exception-handling middleware anywhere in PatientManagement's Api
+
+- `builder.Services.AddProblemDetails()` + `app.UseExceptionHandler()` — the minimal built-in ASP.NET
+  Core pattern, no custom `IExceptionHandler` needed. Was a repo-wide gap (`AuthFacade`/`Gateway` still
+  don't have it); now fixed here.
+- Every endpoint's own inline validation-exception handling is unchanged — this only catches what
+  wasn't already anticipated.
+- New test (`GlobalExceptionHandlingTests`) swaps in an always-throwing `IPatientFhirRepository` via
+  `ConfigureTestServices` and confirms `GET /fhir/Patient/{uuid}` now returns a 500 with an
+  `application/problem+json` body through the real HTTP pipeline, not a bare empty response.
+- Full solution: 121 unit, 47 integration (up from 46), 17 architecture tests all pass.

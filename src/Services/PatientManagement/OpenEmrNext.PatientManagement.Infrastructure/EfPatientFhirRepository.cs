@@ -25,12 +25,22 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
     private const string TribalAffiliationSystem = "http://terminology.hl7.org/CodeSystem/v3-TribalEntityUS";
     private const string DataAbsentCode = "unknown";
 
+    /// <summary>Every <c>list_options</c> row this mapping could ever need, for the lists it resolves
+    /// against (race, ethnicity, administrative sex, gender identity, tribal affiliation,
+    /// interpreter-needed, language).</summary>
+    private static readonly string[] ResolvedListIds =
+        ["race", "ethnicity", "administrative_sex", "gender", "tribal_affiliations", "yes_no_unknown", "language"];
+
     public async Task<PatientFhirView?> GetByUuidAsync(Guid uuid, CancellationToken ct)
     {
         var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(uuid);
         var row = await db.Database.SqlQueryRaw<RawPatientRow>(BaseSelect + " WHERE patient_data.uuid = {0}", uuidBytes)
             .SingleOrDefaultAsync(ct);
-        return row is null ? null : await BuildViewAsync(row, ct);
+        if (row is null)
+            return null;
+
+        var listOptions = await LoadListOptionsAsync(ct);
+        return BuildView(row, listOptions);
     }
 
     public async Task<IReadOnlyList<PatientFhirView>> SearchAsync(PatientFhirSearchCriteria criteria, CancellationToken ct)
@@ -102,10 +112,11 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
         }
 
         var rows = await db.Database.SqlQueryRaw<RawPatientRow>(sql, parameters.ToArray()).ToListAsync(ct);
-        var views = new List<PatientFhirView>(rows.Count);
-        foreach (var row in rows)
-            views.Add(await BuildViewAsync(row, ct));
-        return views;
+        if (rows.Count == 0)
+            return [];
+
+        var listOptions = await LoadListOptionsAsync(ct);
+        return [.. rows.Select(row => BuildView(row, listOptions))];
     }
 
     private const string BaseSelect =
@@ -126,17 +137,17 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
         LEFT JOIN (SELECT id, uuid FROM users) provider ON patient_data.providerID = provider.id
         """;
 
-    private async Task<PatientFhirView> BuildViewAsync(RawPatientRow row, CancellationToken ct)
+    private PatientFhirView BuildView(RawPatientRow row, IReadOnlyDictionary<(string ListId, string OptionId), RawListOption> listOptions)
     {
         var (gender, birthSexCode) = PatientGenderMapping.Resolve(row.Sex);
 
-        var race = await ResolveRaceAsync(row.Race, ct);
-        var (ethnicityCategory, ethnicityText) = await ResolveEthnicityAsync(row.Ethnicity, ct);
-        var sexIdentified = await ResolveCodedListAsync("administrative_sex", row.SexIdentified, DataAbsentReasonSystem, ct);
-        var genderIdentity = await ResolveGenderIdentityAsync(row.GenderIdentity, ct);
-        var tribalAffiliation = await ResolveTribalAffiliationAsync(row.TribalAffiliations, ct);
-        var interpreterNeeded = await ResolveCodedListAsync("yes_no_unknown", row.InterpreterNeeded, DataAbsentReasonSystem, ct);
-        var language = await ResolveLanguageAsync(row.Language, ct);
+        var race = ResolveRace(row.Race, listOptions);
+        var (ethnicityCategory, ethnicityText) = ResolveEthnicity(row.Ethnicity, listOptions);
+        var sexIdentified = ResolveCodedList("administrative_sex", row.SexIdentified, DataAbsentReasonSystem, listOptions);
+        var genderIdentity = ResolveGenderIdentity(row.GenderIdentity, listOptions);
+        var tribalAffiliation = ResolveTribalAffiliation(row.TribalAffiliations, listOptions);
+        var interpreterNeeded = ResolveCodedList("yes_no_unknown", row.InterpreterNeeded, DataAbsentReasonSystem, listOptions);
+        var language = ResolveLanguage(row.Language, listOptions);
 
         return new PatientFhirView(
             Rfc4122GuidConverter.FromRfc4122Bytes(row.Uuid), row.LastUpdated,
@@ -155,7 +166,7 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
     /// <summary>Ports <c>parseOpenEMRRaceRecord()</c>: unlike ethnicity, race always resolves to
     /// something -- "Unknown" when blank, "Asked but no answer" for a decline, the real OMB code
     /// otherwise.</summary>
-    private async Task<ResolvedCode> ResolveRaceAsync(string? race, CancellationToken ct)
+    private static ResolvedCode ResolveRace(string? race, IReadOnlyDictionary<(string, string), RawListOption> listOptions)
     {
         if (string.IsNullOrEmpty(race))
             return ResolvedCode.Create(NullFlavorSystem, "UNK", "Unknown");
@@ -163,7 +174,7 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
         if (race is "decline_to_specify" or "declne_to_specfy")
             return ResolvedCode.Create(NullFlavorSystem, "ASKU", "Asked but no answer");
 
-        var option = await LookupListOptionAsync("race", race, ct);
+        var option = LookupListOption(listOptions, "race", race);
         return option is null
             ? ResolvedCode.Create(NullFlavorSystem, "UNK", "Unknown")
             : ResolvedCode.Create(RaceEthnicitySystem, option.Notes ?? "UNK", option.Title ?? "Unknown");
@@ -172,12 +183,12 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
     /// <summary>Ports <c>parseOpenEMREthnicityRecord()</c>: unlike race, a blank ethnicity gets no
     /// extension at all (a <c>null</c> ombCategory signals "omit"); a decline gets text only, no
     /// ombCategory coding.</summary>
-    private async Task<(ResolvedCode? Category, string Text)> ResolveEthnicityAsync(string? ethnicity, CancellationToken ct)
+    private static (ResolvedCode? Category, string Text) ResolveEthnicity(string? ethnicity, IReadOnlyDictionary<(string, string), RawListOption> listOptions)
     {
         if (string.IsNullOrEmpty(ethnicity))
             return (null, "");
 
-        var option = await LookupListOptionAsync("ethnicity", ethnicity, ct);
+        var option = LookupListOption(listOptions, "ethnicity", ethnicity);
         if (option is null)
             return (null, "");
 
@@ -191,7 +202,7 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
     /// <summary>A <c>null</c> result means the gender-identity extension is omitted entirely (legacy's
     /// own <c>if (!empty($dataRecord['gender_identity']))</c> guard) -- a literal stored value of
     /// <c>"UNK"</c> is still non-empty, so it resolves to a real (if unknown-coded) value instead.</summary>
-    private async Task<ResolvedCode?> ResolveGenderIdentityAsync(string? genderIdentity, CancellationToken ct)
+    private static ResolvedCode? ResolveGenderIdentity(string? genderIdentity, IReadOnlyDictionary<(string, string), RawListOption> listOptions)
     {
         if (string.IsNullOrEmpty(genderIdentity))
             return null;
@@ -203,7 +214,7 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
         if (genderIdentity == "UNK")
             return ResolvedCode.Create(NullFlavorSystem, "UNK", "Unknown");
 
-        var option = await LookupListOptionAsync("gender", genderIdentity, ct);
+        var option = LookupListOption(listOptions, "gender", genderIdentity);
         if (option is null)
             return ResolvedCode.Create(NullFlavorSystem, "UNK", "Unknown");
 
@@ -211,33 +222,34 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
         return ResolvedCode.Create(system, code, option.Title ?? "Unknown");
     }
 
-    private async Task<ResolvedCode?> ResolveTribalAffiliationAsync(string? tribalAffiliations, CancellationToken ct)
+    private static ResolvedCode? ResolveTribalAffiliation(string? tribalAffiliations, IReadOnlyDictionary<(string, string), RawListOption> listOptions)
     {
         if (string.IsNullOrEmpty(tribalAffiliations))
             return null;
 
-        var option = await LookupListOptionAsync("tribal_affiliations", tribalAffiliations, ct);
+        var option = LookupListOption(listOptions, "tribal_affiliations", tribalAffiliations);
         return option is null ? null : ResolvedCode.Create(TribalAffiliationSystem, option.OptionId ?? "", option.Title);
     }
 
-    private async Task<ResolvedCode?> ResolveLanguageAsync(string? language, CancellationToken ct)
+    private static ResolvedCode? ResolveLanguage(string? language, IReadOnlyDictionary<(string, string), RawListOption> listOptions)
     {
         if (string.IsNullOrEmpty(language))
             return null;
 
-        var option = await LookupListOptionAsync("language", language, ct);
+        var option = LookupListOption(listOptions, "language", language);
         return option is null || option.Notes is null ? null : ResolvedCode.Create(LanguageBcp47System, option.Notes, option.Title);
     }
 
     /// <summary>Shared shape for administrative-sex/interpreter-needed: both resolve via
     /// <c>list_options.codes</c> (<c>SYSTEM:CODE</c>), defaulting to a data-absent-reason "unknown"
     /// when blank or not found.</summary>
-    private async Task<ResolvedCode> ResolveCodedListAsync(string listId, string? optionId, string defaultSystem, CancellationToken ct)
+    private static ResolvedCode ResolveCodedList(
+        string listId, string? optionId, string defaultSystem, IReadOnlyDictionary<(string, string), RawListOption> listOptions)
     {
         if (string.IsNullOrEmpty(optionId))
             return ResolvedCode.Create(defaultSystem, DataAbsentCode, "Unknown");
 
-        var option = await LookupListOptionAsync(listId, optionId, ct);
+        var option = LookupListOption(listOptions, listId, optionId);
         if (option is null)
             return ResolvedCode.Create(defaultSystem, DataAbsentCode, "Unknown");
 
@@ -262,15 +274,33 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
         return (system, parts[1]);
     }
 
-    private async Task<RawListOption?> LookupListOptionAsync(string listId, string? optionId, CancellationToken ct)
+    /// <summary>
+    /// Every <c>list_options</c> row this mapping could possibly need, loaded once per
+    /// <see cref="GetByUuidAsync"/>/<see cref="SearchAsync"/> call instead of once per patient per
+    /// coded field -- the previous per-field lookup made a 50-patient search issue ~350 queries (up to
+    /// 7 per patient). <c>list_options</c> is configuration data (bounded, not scaled by patient
+    /// count), so loading every row for the lists this mapping touches, once, is always cheaper than
+    /// even a handful of per-patient lookups.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<(string ListId, string OptionId), RawListOption>> LoadListOptionsAsync(CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(optionId))
-            return null;
+        // The {0}..{6} placeholders are static, matching ResolvedListIds' own fixed length exactly --
+        // not runtime-built from any value this query ever sees, unlike the actual list ids themselves,
+        // which only ever reach the database as SqlQueryRaw's own positional parameters below.
+        const string placeholders = "{0}, {1}, {2}, {3}, {4}, {5}, {6}";
+        var rows = await db.Database.SqlQueryRaw<RawListOptionRow>(
+            "SELECT list_id AS ListId, option_id AS OptionId, title AS Title, notes AS Notes, codes AS Codes "
+                + "FROM list_options WHERE list_id IN (" + placeholders + ")",
+            ResolvedListIds).ToListAsync(ct);
 
-        return await db.Database.SqlQueryRaw<RawListOption>(
-            "SELECT option_id AS OptionId, title AS Title, notes AS Notes, codes AS Codes FROM list_options WHERE list_id = {0} AND option_id = {1}",
-            listId, optionId).SingleOrDefaultAsync(ct);
+        return rows.ToDictionary(
+            r => (r.ListId ?? "", r.OptionId ?? ""),
+            r => new RawListOption { OptionId = r.OptionId, Title = r.Title, Notes = r.Notes, Codes = r.Codes });
     }
+
+    private static RawListOption? LookupListOption(
+        IReadOnlyDictionary<(string, string), RawListOption> listOptions, string listId, string? optionId) =>
+        !string.IsNullOrEmpty(optionId) && listOptions.TryGetValue((listId, optionId), out var option) ? option : null;
 
     private static DateOnly? TryParseDate(string? stored) =>
         DateOnly.TryParseExact(stored, "yyyy-MM-dd", out var day) ? day : null;
@@ -312,6 +342,15 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
 
     private sealed class RawListOption
     {
+        public string? OptionId { get; set; }
+        public string? Title { get; set; }
+        public string? Notes { get; set; }
+        public string? Codes { get; set; }
+    }
+
+    private sealed class RawListOptionRow
+    {
+        public string? ListId { get; set; }
         public string? OptionId { get; set; }
         public string? Title { get; set; }
         public string? Notes { get; set; }

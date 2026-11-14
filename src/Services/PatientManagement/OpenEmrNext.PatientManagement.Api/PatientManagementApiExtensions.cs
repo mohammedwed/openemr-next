@@ -24,7 +24,15 @@ public static class PatientManagementApiExtensions
                 ";Password=" + db.Password + ";";
             // Matches the real mariadb:12.3.3 image this stack runs (.env.example's MARIADB_IMAGE),
             // same pin AuthFacade's own DbContext already uses.
-            options.UseMySql(connectionString, new MariaDbServerVersion(new Version(12, 3, 3)));
+            //
+            // EnableRetryOnFailure means every explicit transaction in this layer (EfInsurancePolicyRepository.
+            // AddAsync/PersistSwapAsync, EfAdvanceDirectiveRepository.AddDocumentAsync) must run inside
+            // Database.CreateExecutionStrategy().ExecuteAsync(...), not just BeginTransactionAsync/
+            // CommitAsync directly -- EF throws InvalidOperationException the first time a retry actually
+            // fires otherwise, since a user-initiated transaction can't be silently replayed by the
+            // strategy on its own. Every one of those methods already does this.
+            options.UseMySql(connectionString, new MariaDbServerVersion(new Version(12, 3, 3)),
+                mySqlOptions => mySqlOptions.EnableRetryOnFailure());
         });
 
         // The only place the port (Application.Ports.IPatientRegistry) is wired to its real adapter
@@ -67,6 +75,15 @@ public static class PatientManagementApiExtensions
         builder.Services.AddSingleton<Endpoints.FhirProfileValidator>();
 
         builder.Services.AddOpenApi();
+
+        // Every endpoint catches its own known Domain validation exceptions and maps them to a clean
+        // ValidationProblem/NotFound response -- but anything unanticipated (a bug, a DB error that
+        // exhausted EnableRetryOnFailure's retries) previously fell through to ASP.NET's bare default
+        // 500, not the ProblemDetails shape every other error path here already returns. AddProblemDetails
+        // plus app.UseExceptionHandler() (Program.cs) is the minimal fix: ASP.NET Core's own exception
+        // middleware already logs the exception at Error level and writes a ProblemDetails body for
+        // whatever status code is current (500 here) -- no custom IExceptionHandler needed for that.
+        builder.Services.AddProblemDetails();
 
         return builder;
     }

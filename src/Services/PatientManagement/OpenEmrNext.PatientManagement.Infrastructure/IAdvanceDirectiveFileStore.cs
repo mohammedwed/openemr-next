@@ -28,4 +28,12 @@ public interface IAdvanceDirectiveFileStore
 
     /// <summary>Reads back the bytes at a <c>file://</c> url previously returned by <see cref="SaveAsync"/>.</summary>
     Task<byte[]> ReadAsync(string url, CancellationToken ct);
+
+    /// <summary>
+    /// Deletes the file at a <c>file://</c> url previously returned by <see cref="SaveAsync"/> --
+    /// the compensating half of that write, for a caller (<see cref="EfAdvanceDirectiveRepository"/>)
+    /// whose own database write failed after the file one already succeeded. A no-op if the file is
+    /// already gone.
+    /// </summary>
+    Task DeleteAsync(string url, CancellationToken ct);
 }
