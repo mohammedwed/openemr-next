@@ -61,8 +61,16 @@ public sealed class InsurancePolicy
         EndDate = endDate;
     }
 
+    /// <summary>
+    /// Validates and constructs one policy. <c>internal</c>, not <c>public</c>: the only correct way
+    /// to add a policy to a patient's coverage is <see cref="InsuranceCoverage.AddPolicy"/>, which also
+    /// enforces the cluster-wide "no two policies at the same level and start date" invariant --
+    /// calling this directly from outside <c>Domain</c> would silently skip that check (a real bug,
+    /// found and fixed: <c>AddInsurancePolicyUseCase</c> once did exactly this). Guarded against
+    /// regressing by <c>ClusterInvariantEnforcementTests</c>.
+    /// </summary>
     /// <exception cref="InsurancePolicyValidationException">One or more fields fail validation.</exception>
-    public static InsurancePolicy Add(
+    internal static InsurancePolicy Add(
         long pid, InsuranceLevel level, long companyId, string policyNumber,
         string? groupNumber, string? planName, DateOnly startDate, DateOnly? endDate)
     {
