@@ -112,4 +112,46 @@ public class InsurancePolicyTests(PatientDataContainerFixture fixture)
             "SELECT date AS Value FROM insurance_data WHERE id = {0}", secondary.Id).SingleAsync();
         Assert.Equal(sameDate, DateOnly.FromDateTime(secondaryDate));
     }
+
+    [Fact]
+    public async Task Adding_a_second_policy_at_the_same_level_and_start_date_is_rejected()
+    {
+        // AddInsurancePolicyUseCase must route through InsuranceCoverage.AddPolicy, not
+        // InsurancePolicy.Add directly -- otherwise this collides with the (pid, type, date) unique
+        // constraint as a raw, unhandled database exception instead of a clean validation error.
+        var pid = NextPid();
+        var sameDate = new DateOnly(2023, 3, 1);
+        await using var context = fixture.CreateDbContext();
+        var repository = new EfInsurancePolicyRepository(context);
+
+        await new AddInsurancePolicyUseCase(repository).ExecuteAsync(
+            pid, InsuranceLevel.Primary, 7, "POL1", null, null, sameDate, null, CancellationToken.None);
+
+        await Assert.ThrowsAsync<InsurancePolicyValidationException>(() =>
+            new AddInsurancePolicyUseCase(repository).ExecuteAsync(
+                pid, InsuranceLevel.Primary, 9, "POL2", null, null, sameDate, null, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Adding_a_policy_tolerates_an_unrelated_pre_existing_row_with_a_malformed_date()
+    {
+        // A row written before this service existed (or by legacy's own PHP) can hold a zero date --
+        // GetPoliciesAsync must skip that row, not throw, so it never breaks an unrelated add for the
+        // same patient.
+        var pid = NextPid();
+        await using var context = fixture.CreateDbContext();
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO insurance_data (pid, type, provider, policy_number, date, date_end, uuid)
+            VALUES ({pid}, 'tertiary', '7', 'LEGACY-ROW', '0000-00-00', NULL, {Guid.NewGuid().ToByteArray()})
+            """);
+
+        var repository = new EfInsurancePolicyRepository(context);
+
+        var policy = await new AddInsurancePolicyUseCase(repository).ExecuteAsync(
+            pid, InsuranceLevel.Primary, 7, "POL1", null, null, new DateOnly(2024, 1, 1), null, CancellationToken.None);
+
+        Assert.Equal(InsuranceLevel.Primary, policy.Level);
+    }
 }

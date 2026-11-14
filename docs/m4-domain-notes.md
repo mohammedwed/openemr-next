@@ -263,6 +263,50 @@ deliberately accepted, in the order addressed:
 - **Documentation — resolved** for the whole segment this rating covered, across this entry and ADRs
   0052/0053/0054.
 
+## Application/Application.Ports self-assessment: one real bug fixed, three shortcomings tracked
+
+Recorded 2026-11-14, from the same kind of grounded, evidence-based pass as the Domain layer
+self-assessment above, this time over all 11 use cases in `Application` and all 7 ports in
+`Application.Ports`.
+
+**Fixed**: `AddInsurancePolicyUseCase` called `InsurancePolicy.Add(...)` directly instead of going
+through `InsuranceCoverage.AddPolicy` — the cluster-wide "no two policies at the same level and start
+date" invariant `InsuranceCoverage` exists to enforce (ADR 0053) was only ever reachable through
+`SwapInsuranceUseCase`, never through plain add, and nothing exercised this in any test. The
+`(pid, type, date)` SQL unique constraint backstopped the actual data integrity, so this was never
+silent corruption — but a caller hit a raw, unhandled database exception instead of a clean
+`InsurancePolicyValidationException`. Fixed by routing `AddInsurancePolicyUseCase` through
+`InsuranceCoverage.For`/`.AddPolicy`, the same shape `SwapInsuranceUseCase` already uses.
+
+That fix surfaced a second, real latent bug in `EfInsurancePolicyRepository.GetPoliciesAsync`: it read
+`date`/`date_end` as typed `DateTime` columns directly, which throws when a pre-existing row (written
+before this service existed, or by legacy's own PHP) holds a zero or partial date — previously "safe"
+only because `GetPoliciesAsync` was only ever called from the swap path, where ADR 0053 reasoned every
+row touched was one this service itself created. Routing *add* through the same method made that
+reasoning false: an unrelated malformed row anywhere on a patient's record would now break every new
+insurance add for that patient. Fixed by reading dates as `CAST(... AS CHAR(10))` strings (the same
+pattern `GetRowsAsync` already uses) and skipping, not throwing on, a row whose type or date doesn't
+parse — losing nothing a caller could observe, since such a row could never collide with a new policy's
+real date anyway. Covered by two new integration tests against a real Testcontainers MariaDB:
+duplicate-policy rejection, and tolerance of an unrelated pre-existing zero-date row.
+
+**Tracked, not fixed — real but lower-priority**:
+
+- `IAdvanceDirectiveFileStore` lives in `Application.Ports` but nothing in `Application` ever
+  references it (confirmed by grep: its only consumers are `EfAdvanceDirectiveRepository` and
+  `LocalDiskAdvanceDirectiveFileStore`, both Infrastructure). It's really an internal collaboration
+  between two adapters wearing a "port" costume, not a true hexagonal port — a stricter reading would
+  move it into Infrastructure.
+- Documentation is sharply asymmetric between the two projects: every one of the 7 `Application.Ports`
+  interfaces has a real XML doc comment explaining *why*; only 2 of the 11 `Application` use cases
+  (`RegisterPatientUseCase`, `ScorePatientForDuplicatesUseCase`) do. The other 9 — `SwapInsuranceUseCase`
+  included — are bare one-liners.
+- 6 dead `using` statements across 3 files (`GetPatientFhirRecordUseCase.cs`,
+  `SearchPatientFhirRecordsUseCase.cs`, `IPatientFhirRepository.cs` each import both
+  `OpenEmrNext.PatientManagement.Domain.Fhir` and `...Fhir.Rules`, neither used) — leftover from the
+  bulk `using`-injection during the ValueObjects/Rules/ReadModels reorg, never cleaned up. `Domain.Fhir`
+  itself has had zero types in it since the read-model extraction (ADR 0054).
+
 ## Scope note
 
 This is vocabulary and rules, not a formal bounded-context diagram or conceptual class model. Per the

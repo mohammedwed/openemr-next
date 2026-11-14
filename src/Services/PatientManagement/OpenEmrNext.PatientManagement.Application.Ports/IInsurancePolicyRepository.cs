@@ -19,12 +19,14 @@ public interface IInsurancePolicyRepository
 
     /// <summary>
     /// The same patient's policies as real reconstituted <see cref="InsurancePolicy"/> entities, for
-    /// loading an <see cref="InsuranceCoverage"/> cluster -- unlike <see cref="GetRowsAsync"/>, this
-    /// requires every row to have a real, parseable <see cref="DateOnly"/> (a pre-existing row with a
-    /// legacy zero/partial date can't become a strict-typed entity), which is fine for the swap
-    /// operation this exists for: both the policy being moved and whatever already occupies the
-    /// target level are rows this service itself created, through <see cref="InsurancePolicy.Add"/>,
-    /// which never allows a bad date through in the first place.
+    /// loading an <see cref="InsuranceCoverage"/> cluster -- used by both the swap path and
+    /// <see cref="InsuranceCoverage.AddPolicy"/>'s cluster-wide uniqueness check. Unlike
+    /// <see cref="GetRowsAsync"/>, a row that can't become a strict-typed entity (an unrecognized
+    /// <c>type</c>, or a legacy zero/partial date) is silently excluded rather than included as a loose
+    /// string -- it could never collide with a new policy's own real date or be a valid swap target
+    /// under this service's own rules, so excluding it from the typed cluster loses nothing a caller
+    /// could have observed. Does not throw on a patient whose record happens to have unrelated
+    /// malformed rows elsewhere.
     /// </summary>
     Task<IReadOnlyList<InsurancePolicy>> GetPoliciesAsync(long pid, CancellationToken ct);
 

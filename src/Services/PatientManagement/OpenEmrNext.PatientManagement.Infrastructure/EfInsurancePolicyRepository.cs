@@ -65,24 +65,48 @@ public sealed class EfInsurancePolicyRepository(PatientManagementDbContext db) :
             r.DateEnd ?? ""))];
     }
 
+    /// <summary>
+    /// Builds the typed cluster <see cref="InsuranceCoverage"/> loads from. A pre-existing legacy row
+    /// can hold a <c>type</c> this service doesn't recognize, or a zero/partial date (<c>0000-00-00</c>,
+    /// <c>2026-05-00</c>) that isn't a real <see cref="DateOnly"/> at all -- such a row is skipped, not
+    /// thrown on, so one malformed row elsewhere on a patient's record never breaks every operation on
+    /// their coverage (adding a policy included, not just the swap path this method originally existed
+    /// for). Losing nothing a caller could have observed either way: a row that can't become a typed
+    /// entity could never collide with a new policy's own real start date, or be a valid swap target,
+    /// under this service's own rules.
+    /// </summary>
     public async Task<IReadOnlyList<InsurancePolicy>> GetPoliciesAsync(long pid, CancellationToken ct)
     {
         var rows = await db.Database.SqlQueryRaw<RawTypedRow>(
             """
             SELECT id AS Id, uuid AS Uuid, type AS Type, provider AS Provider,
                    policy_number AS PolicyNumber, group_number AS GroupNumber, plan_name AS PlanName,
-                   date AS Date, date_end AS DateEnd
+                   CAST(date AS CHAR(10)) AS Date, CAST(date_end AS CHAR(10)) AS DateEnd
             FROM insurance_data
             WHERE pid = {0}
             """, pid).ToListAsync(ct);
 
-        return [.. rows.Select(r => InsurancePolicy.Reconstitute(
-            r.Id, Rfc4122GuidConverter.FromRfc4122Bytes(r.Uuid), pid,
-            InsuranceLevelExtensions.TryParse(r.Type) ?? throw new InvalidOperationException($"Unknown insurance level '{r.Type}' on policy {r.Id}."),
-            long.TryParse(r.Provider, out var companyId) ? companyId : 0,
-            r.PolicyNumber ?? "", r.GroupNumber, r.PlanName,
-            DateOnly.FromDateTime(r.Date), r.DateEnd is { } end ? DateOnly.FromDateTime(end) : null))];
+        var policies = new List<InsurancePolicy>();
+        foreach (var r in rows)
+        {
+            if (InsuranceLevelExtensions.TryParse(r.Type) is not { } level)
+                continue;
+
+            if (TryParseDateOnly(r.Date) is not { } startDate)
+                continue;
+
+            policies.Add(InsurancePolicy.Reconstitute(
+                r.Id, Rfc4122GuidConverter.FromRfc4122Bytes(r.Uuid), pid, level,
+                long.TryParse(r.Provider, out var companyId) ? companyId : 0,
+                r.PolicyNumber ?? "", r.GroupNumber, r.PlanName,
+                startDate, TryParseDateOnly(r.DateEnd)));
+        }
+
+        return policies;
     }
+
+    private static DateOnly? TryParseDateOnly(string? stored) =>
+        DateOnly.TryParseExact(stored, "yyyy-MM-dd", out var day) ? day : null;
 
     public async Task PersistSwapAsync(InsuranceSwapResult result, CancellationToken ct)
     {
@@ -166,7 +190,7 @@ public sealed class EfInsurancePolicyRepository(PatientManagementDbContext db) :
         public string? PolicyNumber { get; set; }
         public string? GroupNumber { get; set; }
         public string? PlanName { get; set; }
-        public DateTime Date { get; set; }
-        public DateTime? DateEnd { get; set; }
+        public string? Date { get; set; }
+        public string? DateEnd { get; set; }
     }
 }
