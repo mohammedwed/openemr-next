@@ -211,3 +211,30 @@ bug and three lower-priority shortcomings, tracked in full in `m4-domain-notes.m
 - **SOLID**: removed the 6 dead `using` statements left over from the ValueObjects/Rules/ReadModels
   reorg.
 - Full solution build stays clean (0 errors, same 5 pre-existing nullable warnings).
+
+## Fixed — all four Infrastructure findings
+
+A grounded review of `Infrastructure` (all 10 files) found Security and Documentation already strong
+(every raw SQL call properly parameterized, every file well-documented against the real legacy
+source), plus four real findings — all four addressed. Also prompted a side discussion on replacing
+raw SQL with EF Core here; decided against a rewrite, since the zero/partial-date tolerance every
+repository exists to provide has no clean EF-native equivalent, and the legacy-specific SQL
+(`SOUNDEX()`, the `sequences` counter, the sentinel-date swap workaround) would stay raw regardless.
+
+- **Performance**: `EfPatientFhirRepository`'s up-to-7-queries-per-patient `list_options` resolution
+  (a 50-patient search could issue ~350 queries) is now one batched query per
+  `GetByUuidAsync`/`SearchAsync` call, resolved in-memory from there. No EF needed — `list_options` is
+  bounded configuration data, not scaled by patient count.
+- **Security (defense-in-depth)**: `LocalDiskAdvanceDirectiveFileStore.ReadAsync` now rejects any
+  resolved path outside `repositoryRoot`.
+- **SOLID**: the duplicated transaction/`LAST_INSERT_ID()` sequence is now one shared
+  `DatabaseFacadeExtensions.GetLastInsertIdAsync` helper.
+- **DDD/consistency**: `EfAdvanceDirectiveRepository.AddDocumentAsync` now best-effort deletes the
+  file it already wrote (via a new `IAdvanceDirectiveFileStore.DeleteAsync`) if the database write
+  that follows fails, instead of leaving a silent orphan. Deliberately partial — only compensates for
+  a handled exception, not a killed process — and the compensating path itself has no automated test
+  (forcing a real DB failure through the public API isn't straightforward here); `DeleteAsync` itself
+  is covered directly.
+- New unit tests (`LocalDiskAdvanceDirectiveFileStoreTests`, 6 cases) need no database at all.
+- Full solution: 121 unit (up from 115), 46 integration (unchanged), 17 architecture (unchanged) tests
+  all pass; build stays clean (0 errors, same 5 pre-existing warnings).

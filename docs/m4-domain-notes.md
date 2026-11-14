@@ -323,6 +323,54 @@ review dimensions**:
   the real fix is almost certainly giving each test's "unique" demographic fields a prefix that doesn't
   collide under `SOUNDEX()`, e.g. randomizing the leading letters too, not just appending a GUID suffix.
 
+## Infrastructure self-assessment: all four findings addressed
+
+Recorded 2026-11-14, same grounded pass over all 10 files in `Infrastructure`. Security and
+Documentation came back strong from the start (every raw SQL call is properly parameterized --
+confirmed by reading every call site, not just the obviously risky ones; every file has a real doc
+comment grounded in the actual legacy source). Also prompted a side discussion on whether to replace
+raw SQL with EF Core here -- decided against a rewrite: the zero/partial-date tolerance every
+repository exists to provide has no clean EF-native equivalent (a `ValueConverter` can't help, since
+the MySQL driver throws before it would ever run), and the legacy-specific SQL (`SOUNDEX()`, the
+`sequences` global counter, the sentinel-date swap workaround) would stay raw regardless, making a
+"full EF" rewrite a hybrid, not a clean win, for real migration risk.
+
+**Fixed**:
+
+- **Performance -- N+1 queries in `EfPatientFhirRepository.SearchAsync`.** `BuildViewAsync` ran up to
+  7 separate `list_options` lookups per patient (race, ethnicity, administrative sex, gender identity,
+  tribal affiliation, interpreter-needed, language), each its own round trip, called once per row in
+  the search loop -- a 50-patient search could issue ~350 queries. Fixed within the same raw-SQL
+  approach, no EF needed: `LoadListOptionsAsync` now loads every row for the 7 lists this mapping
+  touches in one query per `GetByUuidAsync`/`SearchAsync` call (`list_options` is bounded configuration
+  data, not scaled by patient count), and every resolver became a synchronous in-memory dictionary
+  lookup instead of its own round trip.
+- **Security (defense-in-depth) -- `LocalDiskAdvanceDirectiveFileStore.ReadAsync`.** Now resolves the
+  full path and rejects (throwing `UnauthorizedAccessException`) anything that lands outside
+  `repositoryRoot`, covering both a `file://`-prefixed and a bare traversal attempt. Covered by new
+  unit tests (`LocalDiskAdvanceDirectiveFileStoreTests`) that don't need Testcontainers at all --
+  `LocalDiskAdvanceDirectiveFileStore` has no DB dependency.
+- **SOLID -- duplicated transaction/`LAST_INSERT_ID()` boilerplate.** Extracted into
+  `DatabaseFacadeExtensions.GetLastInsertIdAsync`, a single shared extension method (with the
+  connection-pinning explanation that used to be duplicated in both doc comments) now used by both
+  `EfInsurancePolicyRepository.AddAsync` and `EfAdvanceDirectiveRepository.AddDocumentAsync`.
+
+- **DDD/consistency -- `EfAdvanceDirectiveRepository.AddDocumentAsync` isn't atomic across disk and
+  database.** Still writes the file first, then opens the DB transaction (the safer of the two naive
+  orderings), but now wraps the DB portion in try/catch: on any failure, it best-effort deletes the
+  file it already wrote via a new `IAdvanceDirectiveFileStore.DeleteAsync`
+  (`LocalDiskAdvanceDirectiveFileStore`'s implementation reuses the same path-containment check as
+  `ReadAsync`), then rethrows -- a cleanup attempt that fails must never replace or hide the real
+  exception. **Deliberately partial, not a full fix**: this only compensates for a *handled* exception
+  during the DB write; a process killed between the file write and the DB commit still leaves an
+  orphan behind, which would need a real background reconciliation job, out of scope for this round.
+  **Test-coverage gap, stated plainly**: the compensating-delete path itself (the `catch` block
+  actually firing) has no automated test -- forcing a genuine database failure through the public API
+  isn't straightforward here, since both unique-constrained columns that could trigger one
+  (`documents.uuid`, `documents.drive_uuid`) are generated inside `AdvanceDirectiveDocument`'s own
+  constructor, not settable by a caller. `DeleteAsync` itself (the new, reusable piece) is covered by
+  direct unit tests (`LocalDiskAdvanceDirectiveFileStoreTests`) that don't need a database at all.
+
 ## Scope note
 
 This is vocabulary and rules, not a formal bounded-context diagram or conceptual class model. Per the

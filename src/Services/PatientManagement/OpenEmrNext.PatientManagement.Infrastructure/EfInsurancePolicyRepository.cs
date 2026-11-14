@@ -23,11 +23,9 @@ public sealed class EfInsurancePolicyRepository(PatientManagementDbContext db) :
     {
         var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(policy.Uuid);
 
-        // LAST_INSERT_ID() is scoped to the connection session, not the statement -- without an
-        // explicit transaction here, EF Core is free to run the INSERT and the follow-up SELECT on
-        // two different pooled connections, reading back someone else's id or none at all (caught
-        // the hard way: against a real database, not by reasoning about it). A transaction pins the
-        // connection for both statements, the same way SwapAsync below already needs one anyway.
+        // A transaction pins the connection for both statements below -- see
+        // DatabaseFacadeExtensions.GetLastInsertIdAsync for why that's required -- the same way
+        // SwapAsync below already needs one anyway.
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
         await db.Database.ExecuteSqlInterpolatedAsync(
@@ -40,7 +38,7 @@ public sealed class EfInsurancePolicyRepository(PatientManagementDbContext db) :
                  {policy.EndDate?.ToString("yyyy-MM-dd")}, {uuidBytes})
             """, ct);
 
-        var id = await db.Database.SqlQueryRaw<long>("SELECT LAST_INSERT_ID() AS Value").SingleAsync(ct);
+        var id = await db.Database.GetLastInsertIdAsync(ct);
         policy.AssignGeneratedIdentity(id);
 
         await transaction.CommitAsync(ct);
