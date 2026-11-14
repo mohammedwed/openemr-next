@@ -196,3 +196,18 @@ bug and three lower-priority shortcomings, tracked in full in `m4-domain-notes.m
   consumed by two Infrastructure classes, never by `Application` itself; documentation is sharply
   asymmetric between the two projects (7/7 ports documented, 2/11 use cases); 6 dead `using` statements
   left over from the earlier reorg.
+- PR #64's CI run hit one unrelated failure, `DuplicateScoringTests.A_new_patient_with_no_one_to_compare_against_scores_zero`;
+  a re-run of the same commit passed clean. Root-caused and logged, not fixed: two tests' "unique"
+  last names both start with `Patient`, and MySQL's `SOUNDEX()` only encodes a short prefix, so they
+  can collapse to the same code and score a false match in the shared Testcontainers database.
+
+## Fixed — the three remaining Application/Application.Ports shortcomings
+
+- **Clean Architecture**: `IAdvanceDirectiveFileStore` moved from `Application.Ports` into
+  `Infrastructure`, where its only two consumers already lived — it was never a true hexagonal port,
+  just two adapters collaborating internally.
+- **Documentation**: all 11 `Application` use cases now have a real XML doc comment, closing the
+  7/7-vs-2/11 asymmetry against `Application.Ports`.
+- **SOLID**: removed the 6 dead `using` statements left over from the ValueObjects/Rules/ReadModels
+  reorg.
+- Full solution build stays clean (0 errors, same 5 pre-existing nullable warnings).

@@ -6,6 +6,13 @@ using OpenEmrNext.PatientManagement.Domain.Insurance.ReadModels;
 
 namespace OpenEmrNext.PatientManagement.Application;
 
+/// <summary>
+/// Moves one policy to <c>targetLevel</c>, trading places with whatever already occupies it --
+/// orchestrates loading the patient's whole <see cref="InsuranceCoverage"/> cluster, letting
+/// <see cref="InsuranceCoverage.Swap"/> decide both policies' new levels, then persisting that
+/// decision (ADR 0053). The decision logic itself lives entirely in the aggregate; this use case is
+/// just the load/decide/persist orchestration.
+/// </summary>
 public sealed class SwapInsuranceUseCase(IInsurancePolicyRepository repository)
 {
     public async Task ExecuteAsync(long pid, InsuranceLevel targetLevel, Guid policyUuid, CancellationToken ct)

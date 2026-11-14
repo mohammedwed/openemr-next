@@ -263,7 +263,7 @@ deliberately accepted, in the order addressed:
 - **Documentation — resolved** for the whole segment this rating covered, across this entry and ADRs
   0052/0053/0054.
 
-## Application/Application.Ports self-assessment: one real bug fixed, three shortcomings tracked
+## Application/Application.Ports self-assessment: one bug and three shortcomings, all closed
 
 Recorded 2026-11-14, from the same kind of grounded, evidence-based pass as the Domain layer
 self-assessment above, this time over all 11 use cases in `Application` and all 7 ports in
@@ -290,22 +290,38 @@ parse — losing nothing a caller could observe, since such a row could never co
 real date anyway. Covered by two new integration tests against a real Testcontainers MariaDB:
 duplicate-policy rejection, and tolerance of an unrelated pre-existing zero-date row.
 
-**Tracked, not fixed — real but lower-priority**:
+**Also fixed, in order (2026-11-14)**:
 
-- `IAdvanceDirectiveFileStore` lives in `Application.Ports` but nothing in `Application` ever
-  references it (confirmed by grep: its only consumers are `EfAdvanceDirectiveRepository` and
-  `LocalDiskAdvanceDirectiveFileStore`, both Infrastructure). It's really an internal collaboration
-  between two adapters wearing a "port" costume, not a true hexagonal port — a stricter reading would
-  move it into Infrastructure.
-- Documentation is sharply asymmetric between the two projects: every one of the 7 `Application.Ports`
-  interfaces has a real XML doc comment explaining *why*; only 2 of the 11 `Application` use cases
-  (`RegisterPatientUseCase`, `ScorePatientForDuplicatesUseCase`) do. The other 9 — `SwapInsuranceUseCase`
-  included — are bare one-liners.
-- 6 dead `using` statements across 3 files (`GetPatientFhirRecordUseCase.cs`,
-  `SearchPatientFhirRecordsUseCase.cs`, `IPatientFhirRepository.cs` each import both
-  `OpenEmrNext.PatientManagement.Domain.Fhir` and `...Fhir.Rules`, neither used) — leftover from the
-  bulk `using`-injection during the ValueObjects/Rules/ReadModels reorg, never cleaned up. `Domain.Fhir`
-  itself has had zero types in it since the read-model extraction (ADR 0054).
+- **Clean Architecture**: `IAdvanceDirectiveFileStore` moved from `Application.Ports` into
+  `Infrastructure`, where its only two consumers (`EfAdvanceDirectiveRepository`,
+  `LocalDiskAdvanceDirectiveFileStore`) already lived — nothing in `Application` ever referenced it,
+  so it was never a true hexagonal port, just an internal adapter-to-adapter collaboration wearing a
+  port's naming convention. The composition root's DI wiring (`PatientManagementApiExtensions`) needed
+  no change: it already imported `Infrastructure`'s namespace.
+- **Documentation**: all 11 `Application` use cases now have a real XML doc comment explaining *why*,
+  matching `Application.Ports`' existing 7/7 — closing the asymmetry the self-assessment flagged.
+- **SOLID**: removed the 6 dead `using` statements (`GetPatientFhirRecordUseCase.cs`,
+  `SearchPatientFhirRecordsUseCase.cs`, `IPatientFhirRepository.cs` each importing the unused, now-empty
+  `OpenEmrNext.PatientManagement.Domain.Fhir` and `...Fhir.Rules` namespaces).
+
+**Tracked separately, not fixed — a test-quality issue found along the way, not one of the five
+review dimensions**:
+
+- **`DuplicateScoringTests` is flaky via a SOUNDEX collision across tests, not just this test
+  file's own assumption.** Found when PR #64's first CI run failed
+  `A_new_patient_with_no_one_to_compare_against_scores_zero` (expected score `0`, got `2`) on a run
+  that touched nothing in duplicate-scoring code at all; a re-run of the same commit passed clean,
+  confirming it's pre-existing flakiness, not a regression. Root cause: the test's own comment claims
+  "every field here (sex included) is unique to this test," but the "Solo" patient's last name is
+  `Patient{Guid.NewGuid():N}` — MySQL's `SOUNDEX()` only encodes a short prefix of the string, so two
+  different tests' GUID-suffixed last names that both start with `"Patient"` collapse to the *same*
+  soundex code and score 2 points against each other, even though the full strings are unique. Given
+  `DuplicateScoringTests`' own fixture doc comment ("the database is shared across every test in this
+  collection, not reset between them"), this can trigger whenever another concurrently-run test's
+  last name happens to share enough of a soundex-equivalent prefix -- not deterministic, so it won't
+  reproduce on every run. Not fixed here (out of scope for the Application-layer PR that surfaced it);
+  the real fix is almost certainly giving each test's "unique" demographic fields a prefix that doesn't
+  collide under `SOUNDEX()`, e.g. randomizing the leading letters too, not just appending a GUID suffix.
 
 ## Scope note
 

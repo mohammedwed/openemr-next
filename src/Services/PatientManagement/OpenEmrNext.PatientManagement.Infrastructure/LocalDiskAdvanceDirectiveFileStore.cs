@@ -1,5 +1,3 @@
-using OpenEmrNext.PatientManagement.Application.Ports;
-
 namespace OpenEmrNext.PatientManagement.Infrastructure;
 
 /// <summary>
