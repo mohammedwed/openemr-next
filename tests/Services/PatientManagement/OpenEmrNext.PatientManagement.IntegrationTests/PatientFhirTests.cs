@@ -40,11 +40,11 @@ public class PatientFhirTests(PatientDataContainerFixture fixture)
         Assert.NotNull(view);
         Assert.Equal("male", view!.Gender);
         Assert.Equal("M", view.BirthSexCode);
-        Assert.Equal("UNK", view.Race.Code);
+        Assert.Equal("UNK", view.Race.CodeValue);
         Assert.Equal("", view.EthnicityText);
         Assert.Null(view.GenderIdentity);
-        Assert.Equal("unknown", view.SexIdentified.Code);
-        Assert.Equal("unknown", view.InterpreterNeeded.Code);
+        Assert.Equal("unknown", view.SexIdentified.CodeValue);
+        Assert.Equal("unknown", view.InterpreterNeeded.CodeValue);
         Assert.Null(view.Language);
         Assert.Null(view.DeceasedDateTime);
         Assert.Null(view.GeneralPractitionerUuid);
@@ -70,16 +70,16 @@ public class PatientFhirTests(PatientDataContainerFixture fixture)
         var view = await repository.GetByUuidAsync(patient.Uuid, CancellationToken.None);
 
         Assert.NotNull(view);
-        Assert.Equal("2106-3", view!.Race.Code);
-        Assert.Equal("White", view.Race.Display);
-        Assert.Equal("2135-2", view.EthnicityOmb?.Code);
+        Assert.Equal("2106-3", view!.Race.CodeValue);
+        Assert.Equal("White", view.Race.DisplayText);
+        Assert.Equal("2135-2", view.EthnicityCategory?.CodeValue);
         Assert.Equal("Hispanic or Latino", view.EthnicityText);
-        Assert.Equal("248152002", view.SexIdentified.Code);
-        Assert.Equal("http://snomed.info/sct", view.SexIdentified.System);
-        Assert.Equal("Navajo Nation (AZ/NM/UT)", view.TribalAffiliation?.Display);
-        Assert.Equal("373067005", view.InterpreterNeeded.Code);
+        Assert.Equal("248152002", view.SexIdentified.CodeValue);
+        Assert.Equal("http://snomed.info/sct", view.SexIdentified.CodeSystem);
+        Assert.Equal("Navajo Nation (AZ/NM/UT)", view.TribalAffiliation?.DisplayText);
+        Assert.Equal("373067005", view.InterpreterNeeded.CodeValue);
         Assert.NotNull(view.Language);
-        Assert.Equal("en", view.Language!.Code);
+        Assert.Equal("en", view.Language!.CodeValue);
         Assert.Equal("123-45-6789", view.Ssn);
 
         var fhirPatient = FhirPatientMapper.ToFhirPatient(view);
@@ -105,7 +105,7 @@ public class PatientFhirTests(PatientDataContainerFixture fixture)
         var view = await repository.GetByUuidAsync(patient.Uuid, CancellationToken.None);
 
         Assert.NotNull(view);
-        Assert.Null(view!.EthnicityOmb);
+        Assert.Null(view!.EthnicityCategory);
         Assert.Equal("Declined To Specify", view.EthnicityText);
     }
 

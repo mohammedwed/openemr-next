@@ -19,6 +19,11 @@ namespace OpenEmrNext.PatientManagement.Domain.AdvanceDirectives;
 /// </remarks>
 public sealed class AdvanceDirectiveDocument
 {
+    /// <summary>Matches legacy's own production <c>upload_max_filesize</c>/<c>post_max_size</c>
+    /// (<c>docker/release/php.ini</c>: both 30M) -- without this, nothing stops constructing a document
+    /// with an arbitrarily large payload held in memory.</summary>
+    public const int MaxContentBytes = 30 * 1024 * 1024;
+
     public long Id { get; private set; }
     public Guid Uuid { get; }
     public Guid DriveUuid { get; }
@@ -70,6 +75,8 @@ public sealed class AdvanceDirectiveDocument
 
         if (content.Length == 0)
             errors.Add("Content must not be empty.");
+        else if (content.Length > MaxContentBytes)
+            errors.Add($"Content must not exceed {MaxContentBytes} bytes.");
 
         if (errors.Count > 0)
             throw new AdvanceDirectiveDocumentValidationException(errors);

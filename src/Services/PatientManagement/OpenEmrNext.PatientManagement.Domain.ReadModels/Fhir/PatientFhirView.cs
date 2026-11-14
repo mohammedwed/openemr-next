@@ -8,9 +8,12 @@ namespace OpenEmrNext.PatientManagement.Domain.Fhir.ReadModels;
 /// affiliation, interpreter-needed, language) is pulled from <c>list_options</c> and defaulted to
 /// legacy's own "Unknown"/data-absent-reason fallback by <c>EfPatientFhirRepository</c>, not here:
 /// this is a flat read-model, not a place for further lookups. Mirrors the shape (not the exact fields)
-/// of <see cref="OpenEmrNext.PatientManagement.Domain.AdvanceDirectives.AdvanceDirectiveDocumentSummary"/>
-/// and <see cref="OpenEmrNext.PatientManagement.Domain.Insurance.EffectiveInsurancePolicy"/> -- a
-/// Domain-level output type for data this service reads back, not a write-side aggregate.
+/// of <see cref="OpenEmrNext.PatientManagement.Domain.AdvanceDirectives.ReadModels.AdvanceDirectiveDocumentSummary"/>
+/// and <see cref="OpenEmrNext.PatientManagement.Domain.Insurance.ReadModels.EffectiveInsurancePolicy"/> --
+/// data this service reads back, not a write-side aggregate. Lives in the separate
+/// <c>OpenEmrNext.PatientManagement.Domain.ReadModels</c> project, not <c>Domain</c> itself (ADR 0054):
+/// the read side depends on <c>Domain</c>'s value objects (<see cref="ResolvedCode"/>), never the
+/// reverse, so nothing here can ever be mistaken for part of an aggregate's own write-side invariants.
 /// </summary>
 /// <remarks>
 /// Deliberately excludes legacy's previous-names history (<c>patient_history</c>) and
@@ -42,7 +45,7 @@ public sealed record PatientFhirView(
     string Gender,
     string BirthSexCode,
     ResolvedCode Race,
-    ResolvedCode? EthnicityOmb,
+    ResolvedCode? EthnicityCategory,
     string EthnicityText,
     string? Ssn,
     string? PublicPatientId,

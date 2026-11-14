@@ -127,7 +127,7 @@ public static class FhirPatientMapper
     private static Patient.CommunicationComponent BuildCommunication(PatientFhirView view) => new()
     {
         Language = view.Language is { } language
-            ? new CodeableConcept { Coding = [ToCoding(language)], Text = language.Display }
+            ? new CodeableConcept { Coding = [ToCoding(language)], Text = language.DisplayText }
             : DataAbsentUnknown()
     };
 
@@ -176,7 +176,7 @@ public static class FhirPatientMapper
     {
         var race = new Extension { Url = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-race" };
         race.Extension.Add(new Extension("ombCategory", ToCoding(view.Race)));
-        race.Extension.Add(new Extension("text", new FhirString(view.Race.Display)));
+        race.Extension.Add(new Extension("text", new FhirString(view.Race.DisplayText)));
         return race;
     }
 
@@ -189,11 +189,13 @@ public static class FhirPatientMapper
             return null;
 
         var ethnicity = new Extension { Url = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-ethnicity" };
-        if (view.EthnicityOmb is { } ombCategory)
+        if (view.EthnicityCategory is { } ombCategory)
             ethnicity.Extension.Add(new Extension("ombCategory", ToCoding(ombCategory)));
         ethnicity.Extension.Add(new Extension("text", new FhirString(view.EthnicityText)));
         return ethnicity;
     }
 
-    private static Coding ToCoding(ResolvedCode code) => new(code.System, code.Code, code.Display);
+    /// <summary>The one place <see cref="ResolvedCode"/>'s Domain-native fields become an actual FHIR
+    /// <c>Coding</c> -- Domain itself never names anything <c>system</c>/<c>code</c>/<c>display</c>.</summary>
+    private static Coding ToCoding(ResolvedCode code) => new(code.CodeSystem, code.CodeValue, code.DisplayText);
 }

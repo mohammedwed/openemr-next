@@ -131,7 +131,7 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
         var (gender, birthSexCode) = PatientGenderMapping.Resolve(row.Sex);
 
         var race = await ResolveRaceAsync(row.Race, ct);
-        var (ethnicityOmb, ethnicityText) = await ResolveEthnicityAsync(row.Ethnicity, ct);
+        var (ethnicityCategory, ethnicityText) = await ResolveEthnicityAsync(row.Ethnicity, ct);
         var sexIdentified = await ResolveCodedListAsync("administrative_sex", row.SexIdentified, DataAbsentReasonSystem, ct);
         var genderIdentity = await ResolveGenderIdentityAsync(row.GenderIdentity, ct);
         var tribalAffiliation = await ResolveTribalAffiliationAsync(row.TribalAffiliations, ct);
@@ -144,7 +144,7 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
             row.Street, row.StreetLine2, row.City, row.State, row.PostalCode, row.CountryCode,
             row.PhoneHome, row.PhoneBiz, row.PhoneCell, row.Email, row.EmailDirect,
             TryParseDate(row.DateOfBirth), gender, birthSexCode,
-            race, ethnicityOmb, ethnicityText,
+            race, ethnicityCategory, ethnicityText,
             row.Ssn, row.PublicPatientId,
             language,
             row.ProviderUuid is { Length: 16 } pu ? Rfc4122GuidConverter.FromRfc4122Bytes(pu) : null,
@@ -172,7 +172,7 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
     /// <summary>Ports <c>parseOpenEMREthnicityRecord()</c>: unlike race, a blank ethnicity gets no
     /// extension at all (a <c>null</c> ombCategory signals "omit"); a decline gets text only, no
     /// ombCategory coding.</summary>
-    private async Task<(ResolvedCode? OmbCategory, string Text)> ResolveEthnicityAsync(string? ethnicity, CancellationToken ct)
+    private async Task<(ResolvedCode? Category, string Text)> ResolveEthnicityAsync(string? ethnicity, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(ethnicity))
             return (null, "");
