@@ -62,6 +62,10 @@ public static class PatientManagementApiExtensions
         builder.Services.AddScoped<GetPatientFhirRecordUseCase>();
         builder.Services.AddScoped<SearchPatientFhirRecordsUseCase>();
 
+        // Singleton: building the resolver chain scans thousands of StructureDefinition files, and
+        // Firely's own Validator/resolvers are meant to be built once and reused, not once per request.
+        builder.Services.AddSingleton<Endpoints.FhirProfileValidator>();
+
         builder.Services.AddOpenApi();
 
         return builder;

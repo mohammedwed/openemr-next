@@ -2,7 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using OpenEmrNext.PatientManagement.Api.Endpoints;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Domain;
+using OpenEmrNext.PatientManagement.Domain.ValueObjects;
 using OpenEmrNext.PatientManagement.Domain.Fhir;
+using OpenEmrNext.PatientManagement.Domain.Fhir.ReadModels;
+using OpenEmrNext.PatientManagement.Domain.Fhir.Rules;
 using OpenEmrNext.PatientManagement.Infrastructure;
 using Xunit;
 
@@ -18,7 +21,7 @@ public class PatientFhirTests(PatientDataContainerFixture fixture)
 {
     private static async Task<Patient> RegisterAsync(PatientManagementDbContext context, string? sex = "Male")
     {
-        var registration = new PatientRegistration(
+        var registration = PatientRegistration.Create(
             "Test", $"Patient{Guid.NewGuid():N}", sex ?? "Male", new DateOnly(2000, 1, 1),
             $"{Guid.NewGuid():N}@example.com", null);
         return await new RegisterPatientUseCase(new EfPatientRegistry(context))
@@ -37,12 +40,12 @@ public class PatientFhirTests(PatientDataContainerFixture fixture)
         Assert.NotNull(view);
         Assert.Equal("male", view!.Gender);
         Assert.Equal("M", view.BirthSexCode);
-        Assert.Equal("UNK", view.RaceCode);
+        Assert.Equal("UNK", view.Race.Code);
         Assert.Equal("", view.EthnicityText);
-        Assert.False(view.HasGenderIdentity);
-        Assert.Equal("unknown", view.SexIdentifiedCode);
-        Assert.Equal("unknown", view.InterpreterNeededCode);
-        Assert.False(view.LanguageKnown);
+        Assert.Null(view.GenderIdentity);
+        Assert.Equal("unknown", view.SexIdentified.Code);
+        Assert.Equal("unknown", view.InterpreterNeeded.Code);
+        Assert.Null(view.Language);
         Assert.Null(view.DeceasedDateTime);
         Assert.Null(view.GeneralPractitionerUuid);
     }
@@ -67,16 +70,16 @@ public class PatientFhirTests(PatientDataContainerFixture fixture)
         var view = await repository.GetByUuidAsync(patient.Uuid, CancellationToken.None);
 
         Assert.NotNull(view);
-        Assert.Equal("2106-3", view!.RaceCode);
-        Assert.Equal("White", view.RaceDisplay);
-        Assert.Equal("2135-2", view.EthnicityOmbCode);
+        Assert.Equal("2106-3", view!.Race.Code);
+        Assert.Equal("White", view.Race.Display);
+        Assert.Equal("2135-2", view.EthnicityOmb?.Code);
         Assert.Equal("Hispanic or Latino", view.EthnicityText);
-        Assert.Equal("248152002", view.SexIdentifiedCode);
-        Assert.Equal("http://snomed.info/sct", view.SexIdentifiedSystem);
-        Assert.Equal("Navajo Nation (AZ/NM/UT)", view.TribalAffiliationDisplay);
-        Assert.Equal("373067005", view.InterpreterNeededCode);
-        Assert.True(view.LanguageKnown);
-        Assert.Equal("en", view.LanguageCode);
+        Assert.Equal("248152002", view.SexIdentified.Code);
+        Assert.Equal("http://snomed.info/sct", view.SexIdentified.System);
+        Assert.Equal("Navajo Nation (AZ/NM/UT)", view.TribalAffiliation?.Display);
+        Assert.Equal("373067005", view.InterpreterNeeded.Code);
+        Assert.NotNull(view.Language);
+        Assert.Equal("en", view.Language!.Code);
         Assert.Equal("123-45-6789", view.Ssn);
 
         var fhirPatient = FhirPatientMapper.ToFhirPatient(view);
@@ -102,7 +105,7 @@ public class PatientFhirTests(PatientDataContainerFixture fixture)
         var view = await repository.GetByUuidAsync(patient.Uuid, CancellationToken.None);
 
         Assert.NotNull(view);
-        Assert.Null(view!.EthnicityOmbCode);
+        Assert.Null(view!.EthnicityOmb);
         Assert.Equal("Declined To Specify", view.EthnicityText);
     }
 
@@ -120,8 +123,7 @@ public class PatientFhirTests(PatientDataContainerFixture fixture)
         var view = await repository.GetByUuidAsync(patient.Uuid, CancellationToken.None);
         var fhirPatient = FhirPatientMapper.ToFhirPatient(view!);
 
-        Assert.NotNull(fhirPatient.DeceasedDateTime);
-        Assert.Null(fhirPatient.DeceasedBoolean);
+        Assert.IsType<Hl7.Fhir.Model.FhirDateTime>(fhirPatient.Deceased);
     }
 
     [Fact]
@@ -129,7 +131,7 @@ public class PatientFhirTests(PatientDataContainerFixture fixture)
     {
         var context = fixture.CreateDbContext();
         var uniqueLastName = $"Searchable{Guid.NewGuid():N}";
-        var registration = new PatientRegistration("Findme", uniqueLastName, "Female", new DateOnly(1990, 5, 5), null, null);
+        var registration = PatientRegistration.Create("Findme", uniqueLastName, "Female", new DateOnly(1990, 5, 5), null, null);
         var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context))
             .ExecuteAsync(registration, registeredBy: 1, DateTime.UtcNow, CancellationToken.None);
 

@@ -1,4 +1,4 @@
-using System.Net.Mail;
+using OpenEmrNext.PatientManagement.Domain.ValueObjects;
 
 namespace OpenEmrNext.PatientManagement.Domain;
 
@@ -73,47 +73,18 @@ public sealed class Patient
     }
 
     /// <summary>
-    /// Validates <paramref name="registration"/> against the same required/optional rules OpenEMR's own
-    /// <c>PatientValidator::DATABASE_INSERT_CONTEXT</c> enforces (docs/m4-domain-notes.md) and, if valid,
-    /// returns a new <see cref="Patient"/> with <see cref="Uuid"/>/<see cref="Pid"/>/<see cref="Pubpid"/>
-    /// already assigned. <see cref="Id"/> stays <c>0</c> until the database assigns it on insert.
+    /// Returns a new <see cref="Patient"/> from an already-valid <paramref name="registration"/>
+    /// (<see cref="PatientRegistration.Create"/> is where those rules actually live now -- this method
+    /// trusts its input rather than re-checking it), with <see cref="Uuid"/>/<see cref="Pid"/>/
+    /// <see cref="Pubpid"/> already assigned. <see cref="Id"/> stays <c>0</c> until the database
+    /// assigns it on insert.
     /// </summary>
-    /// <exception cref="PatientValidationException">One or more fields fail validation.</exception>
+    /// <exception cref="PatientValidationException"><paramref name="registeredBy"/> cannot identify a user.</exception>
     public static Patient Register(PatientRegistration registration, long registeredBy, DateTime registeredAtUtc)
     {
-        var errors = new List<string>();
-
-        if (registration.FirstName.Length is < 1 or > 255)
-            errors.Add("First name must be between 1 and 255 characters.");
-
-        if (registration.LastName.Length is < 2 or > 255)
-            errors.Add("Last name must be between 2 and 255 characters.");
-
-        if (registration.Sex.Length is < 4 or > 30)
-            errors.Add("Gender must be between 4 and 30 characters.");
-
-        if (registration.Email is { Length: > 0 } email && !IsValidEmail(email))
-            errors.Add("Email is not a valid email.");
-
-        if (registration.TrustedEmail is { Length: > 0 } trustedEmail && !IsValidEmail(trustedEmail))
-            errors.Add("Trusted Email is not a valid email.");
-
-        if (errors.Count > 0)
-            throw new PatientValidationException(errors);
+        if (registeredBy <= 0)
+            throw new PatientValidationException(["RegisteredBy must identify the registering user."]);
 
         return new Patient(registration, registeredBy, registeredAtUtc);
-    }
-
-    private static bool IsValidEmail(string email)
-    {
-        try
-        {
-            _ = new MailAddress(email);
-            return true;
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
     }
 }

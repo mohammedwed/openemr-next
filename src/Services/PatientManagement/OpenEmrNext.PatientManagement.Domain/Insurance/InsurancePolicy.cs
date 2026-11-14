@@ -1,3 +1,5 @@
+using OpenEmrNext.PatientManagement.Domain.Insurance.ValueObjects;
+
 namespace OpenEmrNext.PatientManagement.Domain.Insurance;
 
 /// <summary>
@@ -18,7 +20,7 @@ public sealed class InsurancePolicy
     public long Id { get; private set; }
     public Guid Uuid { get; }
     public long Pid { get; }
-    public InsuranceLevel Level { get; }
+    public InsuranceLevel Level { get; private set; }
     public long CompanyId { get; }
     public string PolicyNumber { get; } = null!;
     public string? GroupNumber { get; }
@@ -39,6 +41,24 @@ public sealed class InsurancePolicy
         StartDate = startDate;
         EndDate = endDate;
         Uuid = Guid.NewGuid();
+    }
+
+    /// <summary>Rebuilds an already-persisted policy with its real <paramref name="id"/>/<paramref name="uuid"/>
+    /// -- <see cref="Reconstitute"/> is the only caller, not application code.</summary>
+    private InsurancePolicy(
+        long id, Guid uuid, long pid, InsuranceLevel level, long companyId, string policyNumber,
+        string? groupNumber, string? planName, DateOnly startDate, DateOnly? endDate)
+    {
+        Id = id;
+        Uuid = uuid;
+        Pid = pid;
+        Level = level;
+        CompanyId = companyId;
+        PolicyNumber = policyNumber;
+        GroupNumber = groupNumber;
+        PlanName = planName;
+        StartDate = startDate;
+        EndDate = endDate;
     }
 
     /// <exception cref="InsurancePolicyValidationException">One or more fields fail validation.</exception>
@@ -79,4 +99,19 @@ public sealed class InsurancePolicy
 
         Id = id;
     }
+
+    /// <summary>Rebuilds a policy that already exists in <c>insurance_data</c>, for loading a patient's
+    /// whole <see cref="InsuranceCoverage"/> cluster back out of persistence -- skips the validation
+    /// <see cref="Add"/> runs, since a row that's already in the database passed it once already.
+    /// <c>internal</c>: only <see cref="EfInsurancePolicyRepository"/> (same assembly via
+    /// <c>InternalsVisibleTo</c>) calls this, never application code.</summary>
+    internal static InsurancePolicy Reconstitute(
+        long id, Guid uuid, long pid, InsuranceLevel level, long companyId, string policyNumber,
+        string? groupNumber, string? planName, DateOnly startDate, DateOnly? endDate) =>
+        new(id, uuid, pid, level, companyId, policyNumber, groupNumber, planName, startDate, endDate);
+
+    /// <summary>Moves this policy to a different level -- the one mutation <see cref="InsuranceCoverage.Swap"/>
+    /// needs, scoped <c>internal</c> so nothing outside the Insurance cluster can change a policy's
+    /// level once it exists.</summary>
+    internal void ChangeLevel(InsuranceLevel newLevel) => Level = newLevel;
 }

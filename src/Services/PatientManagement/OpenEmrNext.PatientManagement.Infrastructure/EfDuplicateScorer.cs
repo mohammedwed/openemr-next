@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OpenEmrNext.PatientManagement.Application.Ports;
 using OpenEmrNext.PatientManagement.Domain;
+using OpenEmrNext.PatientManagement.Domain.Rules;
 
 namespace OpenEmrNext.PatientManagement.Infrastructure;
 

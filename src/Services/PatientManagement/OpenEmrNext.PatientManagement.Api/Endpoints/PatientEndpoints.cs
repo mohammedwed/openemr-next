@@ -2,6 +2,7 @@ using OpenEmrNext.PatientManagement.Api.Contracts.Requests;
 using OpenEmrNext.PatientManagement.Api.Contracts.Responses;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Domain;
+using OpenEmrNext.PatientManagement.Domain.ValueObjects;
 
 namespace OpenEmrNext.PatientManagement.Api.Endpoints;
 
@@ -28,7 +29,7 @@ public static class PatientEndpoints
         try
         {
             patient = await useCase.ExecuteAsync(
-                new PatientRegistration(
+                PatientRegistration.Create(
                     request.FirstName, request.LastName, request.Sex, request.DateOfBirth,
                     request.Email, request.TrustedEmail),
                 request.RegisteredBy,

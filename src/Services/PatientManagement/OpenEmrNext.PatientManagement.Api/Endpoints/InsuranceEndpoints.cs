@@ -2,6 +2,9 @@ using OpenEmrNext.PatientManagement.Api.Contracts.Requests;
 using OpenEmrNext.PatientManagement.Api.Contracts.Responses;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Domain.Insurance;
+using OpenEmrNext.PatientManagement.Domain.Insurance.ValueObjects;
+using OpenEmrNext.PatientManagement.Domain.Insurance.Rules;
+using OpenEmrNext.PatientManagement.Domain.Insurance.ReadModels;
 
 namespace OpenEmrNext.PatientManagement.Api.Endpoints;
 

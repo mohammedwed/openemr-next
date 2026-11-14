@@ -1,19 +1,24 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
+using Hl7.Fhir.Model;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
-using OpenEmrNext.PatientManagement.Api.Contracts.Fhir;
 using OpenEmrNext.PatientManagement.Api.Contracts.Requests;
 using OpenEmrNext.PatientManagement.Api.Contracts.Responses;
+using OpenEmrNext.PatientManagement.Api.Endpoints;
 using Xunit;
+using Task = System.Threading.Tasks.Task;
 
 namespace OpenEmrNext.PatientManagement.IntegrationTests;
 
-/// <summary>Exercises the real HTTP pipeline for the FHIR Patient endpoints, the same way
-/// <see cref="InsuranceEndpointTests"/> does for insurance.</summary>
+/// <summary>Exercises the real HTTP pipeline for the FHIR Patient endpoints -- real FHIR R4 JSON in
+/// and out, through Firely's generated <see cref="Patient"/> model and <see cref="FhirJson"/>, the
+/// same way <see cref="InsuranceEndpointTests"/> does for insurance's own contracts.</summary>
 [Collection("PatientDataContainer")]
 public class FhirPatientEndpointTests(PatientDataContainerFixture fixture) : IAsyncLifetime
 {
+    private const string FhirJsonContentType = "application/fhir+json";
     private WebApplicationFactory<Program>? _factory;
     private HttpClient? _client;
     private readonly DirectoryInfo _repositoryRoot = Directory.CreateTempSubdirectory("fhir-patient-endpoint-tests-");
@@ -49,6 +54,9 @@ public class FhirPatientEndpointTests(PatientDataContainerFixture fixture) : IAs
         return (await response.Content.ReadFromJsonAsync<PatientRegisteredResponse>())!;
     }
 
+    private static StringContent FhirBody(Resource resource) =>
+        new(FhirJson.Serialize(resource), Encoding.UTF8, FhirJsonContentType);
+
     [Fact]
     public async Task GET_a_registered_patient_returns_a_fhir_patient_resource()
     {
@@ -57,12 +65,11 @@ public class FhirPatientEndpointTests(PatientDataContainerFixture fixture) : IAs
         var response = await _client!.GetAsync($"/fhir/Patient/{registered.Uuid}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var patient = await response.Content.ReadFromJsonAsync<FhirPatient>();
-        Assert.NotNull(patient);
-        Assert.Equal("Patient", patient!.ResourceType);
+        Assert.Equal(FhirJsonContentType, response.Content.Headers.ContentType?.MediaType);
+        var patient = FhirJson.Parse<Patient>(await response.Content.ReadAsStringAsync());
         Assert.Equal(registered.Uuid.ToString(), patient.Id);
-        Assert.Equal("male", patient.Gender);
-        Assert.Contains(patient.Extension, e => e.Url.EndsWith("us-core-birthsex") && e.ValueCode == "M");
+        Assert.Equal(AdministrativeGender.Male, patient.Gender);
+        Assert.Contains(patient.Extension, e => e.Url.EndsWith("us-core-birthsex") && (e.Value as Code)?.Value == "M");
     }
 
     [Fact]
@@ -82,9 +89,7 @@ public class FhirPatientEndpointTests(PatientDataContainerFixture fixture) : IAs
         var response = await _client!.GetAsync($"/fhir/Patient?family={lastName}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var bundle = await response.Content.ReadFromJsonAsync<FhirBundle>();
-        Assert.NotNull(bundle);
-        Assert.Equal("Bundle", bundle!.ResourceType);
+        var bundle = FhirJson.Parse<Bundle>(await response.Content.ReadAsStringAsync());
         Assert.Equal(1, bundle.Total);
         Assert.Equal(registered.Uuid.ToString(), bundle.Entry[0].Resource.Id);
     }
@@ -92,33 +97,61 @@ public class FhirPatientEndpointTests(PatientDataContainerFixture fixture) : IAs
     [Fact]
     public async Task POST_a_fhir_patient_creates_a_real_patient_and_returns_201()
     {
-        var request = new CreateFhirPatientRequest(
-            Name: [new FhirHumanName("official", $"Created{Guid.NewGuid():N}", ["Fhir"], [], [])],
-            Telecom: [new FhirContactPoint("email", "fhir-create@example.com", "home")],
-            Gender: "female",
-            BirthDate: "1988-08-08");
+        var request = new Patient();
+        request.Name.Add(new HumanName { Use = HumanName.NameUse.Official, Family = $"Created{Guid.NewGuid():N}", Given = ["Fhir"] });
+        request.Telecom.Add(new ContactPoint(ContactPoint.ContactPointSystem.Email, ContactPoint.ContactPointUse.Home, "fhir-create@example.com"));
+        request.Gender = AdministrativeGender.Female;
+        request.BirthDate = "1988-08-08";
 
-        var response = await _client!.PostAsJsonAsync("/fhir/Patient?registeredBy=1", request);
+        var response = await _client!.PostAsync("/fhir/Patient?registeredBy=1", FhirBody(request));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var patient = await response.Content.ReadFromJsonAsync<FhirPatient>();
-        Assert.NotNull(patient);
-        Assert.Equal("female", patient!.Gender);
-        Assert.Equal("Fhir", patient.Name[0].Given[0]);
+        var patient = FhirJson.Parse<Patient>(await response.Content.ReadAsStringAsync());
+        Assert.Equal(AdministrativeGender.Female, patient.Gender);
+        Assert.Equal("Fhir", patient.Name[0].Given.First());
         Assert.Equal("1988-08-08", patient.BirthDate);
     }
 
     [Fact]
     public async Task POST_a_fhir_patient_with_no_last_name_returns_400()
     {
-        var request = new CreateFhirPatientRequest(
-            Name: [new FhirHumanName("official", "", ["NoLastName"], [], [])],
-            Telecom: [],
-            Gender: "unknown",
-            BirthDate: "1988-08-08");
+        var request = new Patient();
+        request.Name.Add(new HumanName { Use = HumanName.NameUse.Official, Given = ["NoLastName"] });
+        request.Gender = AdministrativeGender.Unknown;
+        request.BirthDate = "1988-08-08";
 
-        var response = await _client!.PostAsJsonAsync("/fhir/Patient?registeredBy=1", request);
+        var response = await _client!.PostAsync("/fhir/Patient?registeredBy=1", FhirBody(request));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task POST_validate_rejects_a_patient_missing_a_required_identifier()
+    {
+        var request = new Patient { Active = true };
+        request.Name.Add(new HumanName { Use = HumanName.NameUse.Official, Family = "Doe", Given = ["Jane"] });
+        request.Gender = AdministrativeGender.Female;
+
+        var response = await _client!.PostAsync("/fhir/Patient/$validate", FhirBody(request));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var outcome = FhirJson.Parse<OperationOutcome>(await response.Content.ReadAsStringAsync());
+        Assert.Contains(outcome.Issue, i => i.Severity == OperationOutcome.IssueSeverity.Error
+            && (i.Details?.Text ?? "").Contains("identifier"));
+    }
+
+    [Fact]
+    public async Task POST_validate_accepts_a_patient_satisfying_us_core()
+    {
+        var request = new Patient { Active = true };
+        request.Name.Add(new HumanName { Use = HumanName.NameUse.Official, Family = "Doe", Given = ["Jane"] });
+        request.Gender = AdministrativeGender.Female;
+        request.Identifier.Add(new Identifier { System = "http://hl7.org/fhir/sid/us-ssn", Value = "123-45-6789" });
+
+        var response = await _client!.PostAsync("/fhir/Patient/$validate", FhirBody(request));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var outcome = FhirJson.Parse<OperationOutcome>(await response.Content.ReadAsStringAsync());
+        Assert.DoesNotContain(outcome.Issue, i => i.Severity is OperationOutcome.IssueSeverity.Error or OperationOutcome.IssueSeverity.Fatal);
     }
 }

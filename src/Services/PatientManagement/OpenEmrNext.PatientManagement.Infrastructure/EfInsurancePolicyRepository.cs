@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using OpenEmrNext.PatientManagement.Application.Ports;
 using OpenEmrNext.PatientManagement.Domain.Insurance;
+using OpenEmrNext.PatientManagement.Domain.Insurance.ValueObjects;
+using OpenEmrNext.PatientManagement.Domain.Insurance.Rules;
+using OpenEmrNext.PatientManagement.Domain.Insurance.ReadModels;
 
 namespace OpenEmrNext.PatientManagement.Infrastructure;
 
@@ -62,62 +65,77 @@ public sealed class EfInsurancePolicyRepository(PatientManagementDbContext db) :
             r.DateEnd ?? ""))];
     }
 
-    public async Task SwapAsync(long pid, InsuranceLevel targetLevel, Guid policyUuid, CancellationToken ct)
+    public async Task<IReadOnlyList<InsurancePolicy>> GetPoliciesAsync(long pid, CancellationToken ct)
     {
-        var targetType = targetLevel.ToWireValue();
-        var sourceUuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(policyUuid);
+        var rows = await db.Database.SqlQueryRaw<RawTypedRow>(
+            """
+            SELECT id AS Id, uuid AS Uuid, type AS Type, provider AS Provider,
+                   policy_number AS PolicyNumber, group_number AS GroupNumber, plan_name AS PlanName,
+                   date AS Date, date_end AS DateEnd
+            FROM insurance_data
+            WHERE pid = {0}
+            """, pid).ToListAsync(ct);
+
+        return [.. rows.Select(r => InsurancePolicy.Reconstitute(
+            r.Id, Rfc4122GuidConverter.FromRfc4122Bytes(r.Uuid), pid,
+            InsuranceLevelExtensions.TryParse(r.Type) ?? throw new InvalidOperationException($"Unknown insurance level '{r.Type}' on policy {r.Id}."),
+            long.TryParse(r.Provider, out var companyId) ? companyId : 0,
+            r.PolicyNumber ?? "", r.GroupNumber, r.PlanName,
+            DateOnly.FromDateTime(r.Date), r.DateEnd is { } end ? DateOnly.FromDateTime(end) : null))];
+    }
+
+    public async Task PersistSwapAsync(InsuranceSwapResult result, CancellationToken ct)
+    {
+        var source = result.Source;
+        var target = result.DisplacedOccupant;
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         try
         {
-            // Both rows' current state, read up front -- everything below only ever writes, using
-            // these captured values, never re-reading mid-swap (legacy's own shape: it loads both
-            // full rows once, then issues writes from the in-memory copies).
-            var source = await db.Database.SqlQueryRaw<RawOccupant>(
-                "SELECT uuid AS Uuid, type AS Type, date AS Date FROM insurance_data WHERE uuid = {0}",
-                sourceUuidBytes).SingleOrDefaultAsync(ct)
-                ?? throw new KeyNotFoundException($"No insurance policy with uuid {policyUuid}.");
-
-            // The row (if any) currently occupying the target level -- it trades places with the
-            // source policy. "ORDER BY (date IS NULL) ASC, date DESC" matches legacy exactly: a real
-            // start date outranks a blank one for "which row currently holds this level" purposes too.
-            var target = await db.Database.SqlQueryRaw<RawOccupant>(
-                """
-                SELECT uuid AS Uuid, type AS Type, date AS Date
-                FROM insurance_data
-                WHERE pid = {0} AND type = {1}
-                ORDER BY (date IS NULL) ASC, date DESC
-                LIMIT 1
-                """, pid, targetType).FirstOrDefaultAsync(ct);
-
             if (target is not null)
             {
-                // Same date as the source -> the (pid, type, date) unique constraint would collide
-                // the instant the source's type changes to targetType, before target's own type
-                // changes away from it. Legacy's own workaround: park target on a date so far out it
-                // will never collide with anything real, swap both rows' types in that state, then
-                // restore target's real date -- all inside this one transaction, so a failure
-                // anywhere rolls every bit of it back.
-                var collides = target.Date == source.Date;
-                var targetDateDuringSwap = collides ? DateTime.Parse("9999-12-31") : target.Date;
+                // Same start date as the source -> the (pid, type, date) unique constraint would
+                // collide the instant the source's type changes to the target's old type, before the
+                // target's own type changes away from it. Legacy's own workaround: park the target on
+                // a date so far out it will never collide with anything real, write both rows' new
+                // types in that state, then restore the target's real date -- all inside this one
+                // transaction, so a failure anywhere rolls every bit of it back. A pure persistence
+                // detail: the swap decision itself (InsuranceCoverage.Swap) neither knows nor cares
+                // about this constraint.
+                var collides = target.StartDate == source.StartDate;
+                var targetDateDuringSwap = collides
+                    ? new DateOnly(9999, 12, 31).ToString("yyyy-MM-dd")
+                    : target.StartDate.ToString("yyyy-MM-dd");
 
                 await db.Database.ExecuteSqlInterpolatedAsync(
-                    $"UPDATE insurance_data SET type = {source.Type}, date = {targetDateDuringSwap} WHERE uuid = {target.Uuid}", ct);
+                    $"""
+                    UPDATE insurance_data SET type = {target.Level.ToWireValue()}, date = {targetDateDuringSwap}
+                    WHERE uuid = {Rfc4122GuidConverter.ToRfc4122Bytes(target.Uuid)}
+                    """, ct);
 
                 await db.Database.ExecuteSqlInterpolatedAsync(
-                    $"UPDATE insurance_data SET type = {targetType} WHERE uuid = {sourceUuidBytes}", ct);
+                    $"""
+                    UPDATE insurance_data SET type = {source.Level.ToWireValue()}
+                    WHERE uuid = {Rfc4122GuidConverter.ToRfc4122Bytes(source.Uuid)}
+                    """, ct);
 
                 if (collides)
                 {
                     await db.Database.ExecuteSqlInterpolatedAsync(
-                        $"UPDATE insurance_data SET date = {target.Date} WHERE uuid = {target.Uuid}", ct);
+                        $"""
+                        UPDATE insurance_data SET date = {target.StartDate.ToString("yyyy-MM-dd")}
+                        WHERE uuid = {Rfc4122GuidConverter.ToRfc4122Bytes(target.Uuid)}
+                        """, ct);
                 }
             }
             else
             {
                 // The target level was empty -- nothing to trade places with, just move the source.
                 await db.Database.ExecuteSqlInterpolatedAsync(
-                    $"UPDATE insurance_data SET type = {targetType} WHERE uuid = {sourceUuidBytes}", ct);
+                    $"""
+                    UPDATE insurance_data SET type = {source.Level.ToWireValue()}
+                    WHERE uuid = {Rfc4122GuidConverter.ToRfc4122Bytes(source.Uuid)}
+                    """, ct);
             }
 
             await transaction.CommitAsync(ct);
@@ -139,10 +157,16 @@ public sealed class EfInsurancePolicyRepository(PatientManagementDbContext db) :
         public string? DateEnd { get; set; }
     }
 
-    private sealed class RawOccupant
+    private sealed class RawTypedRow
     {
+        public long Id { get; set; }
         public byte[] Uuid { get; set; } = [];
-        public string Type { get; set; } = "";
-        public DateTime? Date { get; set; }
+        public string? Type { get; set; }
+        public string? Provider { get; set; }
+        public string? PolicyNumber { get; set; }
+        public string? GroupNumber { get; set; }
+        public string? PlanName { get; set; }
+        public DateTime Date { get; set; }
+        public DateTime? DateEnd { get; set; }
     }
 }

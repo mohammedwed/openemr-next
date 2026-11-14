@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Domain.Insurance;
+using OpenEmrNext.PatientManagement.Domain.Insurance.ValueObjects;
+using OpenEmrNext.PatientManagement.Domain.Insurance.Rules;
+using OpenEmrNext.PatientManagement.Domain.Insurance.ReadModels;
 using OpenEmrNext.PatientManagement.Infrastructure;
 using Xunit;
 

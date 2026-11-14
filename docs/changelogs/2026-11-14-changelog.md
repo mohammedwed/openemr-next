@@ -101,3 +101,41 @@ now. M4 is done except patient merge, which stays deferred until M5+ exist.
   download, the status-flag round trip, the FHIR read/search mapping against real `list_options` seed
   data (including the ethnicity-decline and deceased-date edge cases), and the FHIR create endpoint —
   all against a real Testcontainers MariaDB.
+
+## Added — Firely .NET FHIR SDK adoption (ADR 0052)
+
+- The hand-rolled `Patient` resource shape above is replaced by the real `Hl7.Fhir.Model.Patient` from
+  Firely's SDK (`Hl7.Fhir.R4` 5.11.1, chosen after confirming hands-on that the newer 6.x generation and
+  its validator can't be mixed — see ADR 0052 and `m4-domain-notes.md` for the version maze).
+- **`POST /fhir/Patient/$validate`**, backed by real US Core 8.0.0 conformance checking
+  (`Hl7.Fhir.Validation.Legacy.R4`) against two FHIR packages vendored under `FhirProfiles/` and
+  extracted in-process at startup — offline, no runtime dependency on a package registry.
+- Two real bugs found and fixed during the rewrite: gender-identity/tribal-affiliation extensions were
+  using `valueCoding` instead of the `valueCodeableConcept` legacy's own PHP actually uses, and an
+  explicit `"UNK"` gender-identity value was incorrectly treated as absent.
+
+## Added — domain layer structural hardening
+
+- Every Domain subdomain now sorts into `ValueObjects/`, `Rules/`, and `ReadModels/` folders (mirrored in
+  the unit-test project), replacing a flat layout with no structural signal for each type's DDD role.
+- `ResolvedCode` and `PatientRegistration` moved to validate-on-construction (private constructor + a
+  `Create()` factory); `Patient.Register()` gained a missing `registeredBy` check.
+- New `InvariantEnforcementTests` architecture test: reflection-based, fails if any aggregate or value
+  object ever gains a public constructor or a publicly-settable property — the actual guard behind the
+  validate-on-construction pattern, not just a convention.
+
+## Added — InsuranceCoverage, the first multi-entity aggregate cluster (ADR 0053)
+
+- `InsuranceCoverage` now owns the insurance swap decision legacy's `InsuranceService::swapInsurance()`
+  performs (which policy ends up at which level, including the displaced occupant), plus a cluster-wide
+  invariant (no two policies at the same level and start date) — the first Domain invariant in this
+  service that spans more than one entity.
+- `IInsurancePolicyRepository.SwapAsync` is replaced by `GetPoliciesAsync`/`PersistSwapAsync`, so the
+  swap decision is unit-tested (`InsuranceCoverageTests`) without a database; the sentinel-date
+  `(pid, type, date)` collision workaround stays in `EfInsurancePolicyRepository`, where it belongs as a
+  pure persistence detail. `SwapInsuranceUseCase.ExecuteAsync`'s own signature is unchanged, so
+  `InsuranceEndpoints` and its existing integration tests needed no changes.
+- Prompted by a self-critical review of the Domain layer that scored DDD design well but flagged every
+  aggregate as single-entity until now — recorded in full, along with the dimensions still open
+  (read-model placement, FHIR vocabulary leaking into Domain, an unbounded `byte[]` on
+  `AdvanceDirectiveDocument`), in `m4-domain-notes.md`'s architecture self-assessment section.
