@@ -173,6 +173,88 @@ the fourth and final slice of the full-legacy-parity plan.
   `$everything`, and `$match` are out of scope (the first per the plan; the rest because legacy doesn't
   implement them either).
 
+## Firely .NET SDK: a real FHIR model and validator, grounded empirically not from docs (ADR 0052)
+
+The hand-rolled `Patient` resource shape above was replaced with the real `Hl7.Fhir.Model.Patient` from
+Firely's SDK, plus `$validate` against real US Core 8.0.0 conformance. See ADR 0052 for the decision;
+these are the implementation findings underneath it.
+
+- **The SDK has two incompatible generations, and documentation alone did not reveal that.** `Hl7.Fhir.R4`
+  6.x splits into `Hl7.Fhir.Base`/`Hl7.Fhir.Conformance`/`Hl7.Fhir.R4`; 5.x is self-contained. The simple,
+  documented validator (`Hl7.Fhir.Validation.Legacy.R4`) only works against 5.x — confirmed by actually
+  running it against 6.x and getting `TypeLoadException: IBaseElementNavigator<T> not found`, not by
+  reading a compatibility matrix. `Firely.Fhir.Packages` (live package-registry resolution) is 6.x-only
+  and produces `CS0433` duplicate-type errors (`HumanName` defined twice) the instant it's referenced
+  alongside `Hl7.Fhir.R4 5.11.1` in the same project — the two generations cannot coexist at all.
+- **Live package resolution was abandoned for local `.tgz` extraction.** Rather than fetching
+  `hl7.fhir.us.core` from `packages.fhir.org` at runtime (what `Firely.Fhir.Packages` is for, but
+  version-incompatible here), the two needed packages are vendored under `FhirProfiles/` and extracted
+  in-process at startup via `System.Formats.Tar.TarFile` + `GZipStream` into a `CommonDirectorySource` —
+  no extra NuGet dependency, fully offline, deterministic across environments.
+- **`FhirPackageSource`'s actual namespace was found by reflection, not by guessing from the package
+  name.** It lives in `Firely.Fhir.Packages`, not `Hl7.Fhir.Specification.Source` as the initial research
+  suggested — resolved with a small throwaway program dumping the assembly's actual exported types.
+- **Record `with`-expressions and validation don't mix unless every property is read-only.** Confirmed
+  hands-on (a throwaway sandbox project, not just reasoning about C# semantics): a record property with
+  only `{ get; }` makes `instance with { Prop = x }` a compile error (`CS0200`); `with { }` (an untouched
+  copy) still compiles. This is the actual mechanism (not just a convention) behind
+  `InvariantEnforcementTests` below.
+
+## Domain layer structural hardening: ValueObjects/Rules/ReadModels, and an architecture test for it
+
+Prompted by an explicit request to audit the whole Domain layer for missing validation and unclear
+structure, independent of any single feature slice.
+
+- **Every DDD role now has its own folder, per subdomain**: `ValueObjects/`, `Rules/` (static pure-function
+  classes like `EffectiveInsuranceRule`, `PatientGenderMapping`, `DuplicateScore`), and `ReadModels/`
+  (`PatientFhirView`, `InsurancePolicyRow`, `EffectiveInsurancePolicy`, `AdvanceDirectiveDocumentSummary`),
+  mirrored in the test project. Previously these sat flat alongside the aggregates with no structural
+  signal for which role each type played.
+- **`ResolvedCode` (a new value object for FHIR's `system`/`code`/`display` triples) and
+  `PatientRegistration` both moved to validate-on-construction**: private constructor + a `Create()`
+  factory that collects every error before throwing, rather than trusting a caller to have already
+  checked. `PatientRegistration`'s validation used to live inline in `Patient.Register()` — moved out so
+  the value object enforces its own invariant regardless of caller.
+- **`Patient.Register()` gained a `registeredBy` check** (must be a positive id) — found during the same
+  audit: every other required field was validated, this one wasn't.
+- **`InvariantEnforcementTests`** (new architecture test): reflection-based, asserts that `Patient`,
+  `InsurancePolicy`, `AdvanceDirectiveDocument`, `PatientRegistration`, and `ResolvedCode` have no public
+  constructor and no publicly-settable property. This is what actually keeps the validate-on-construction
+  pattern from regressing — a future change that quietly adds a public setter "to make testing easier"
+  fails this test instead of silently reopening the gap the `with`-expression finding above describes.
+
+## InsuranceCoverage: the first multi-entity aggregate cluster (ADR 0053)
+
+A self-review of the Domain layer (see below) scored DDD design well but flagged that every aggregate
+until now was single-entity — no invariant had ever been enforced *across* a cluster of child entities.
+Legacy's own `InsuranceService::swapInsurance()` — moving one policy to a level, trading places with
+whatever already occupies it — is a genuine two-entity operation, not an invented example. ADR 0053
+records the full decision; in short: `InsuranceCoverage` now owns the swap decision and a cluster-wide
+uniqueness invariant (no two policies at the same level and start date), `InsurancePolicy.Level` became
+mutable through a narrowly `internal` `ChangeLevel`, and the old single-method `SwapAsync` port was split
+into `GetPoliciesAsync`/`PersistSwapAsync` so the decision logic is unit-testable without a database.
+
+## Architecture self-assessment: dimensions still tracked, not yet addressed
+
+Recorded 2026-11-14, when asked to rate the Domain layer out of 10 on clean architecture, documentation,
+security/invariant-enforcement, DDD, and SOLID. The single-entity-aggregate gap this surfaced is now
+resolved (`InsuranceCoverage`, ADR 0053) and documentation debt for that whole session is closed by this
+entry and ADRs 0052/0053. What's still open, for whoever picks this up next:
+
+- **Clean Architecture (was 8/10):** `PatientFhirView`/`ResolvedCode` encode FHIR wire vocabulary
+  (`System`/`Code`/`Display`, `ombCategory`) directly in Domain, rather than Domain speaking only its own
+  language and having Api/Infrastructure translate fully at the boundary. A stricter read would push that
+  translation outward.
+- **Security/invariant enforcement (was 7/10):** `AdvanceDirectiveDocument` holds a raw `byte[] Content`
+  with no size-bound invariant — nothing stops constructing one with an arbitrarily large payload in
+  memory. Minor, but real.
+- **DDD (was 8/10):** read models (`InsurancePolicyRow`, `PatientFhirView`) sit in the same project as the
+  aggregates with no sharper boundary than a folder; a stricter CQRS-style split would separate them more
+  forcefully. (The single-entity-aggregate half of this score is now resolved — see above.)
+- **SOLID (was 8/10):** the enums' `switch`-based extension methods (`InsuranceLevel`, `AdvanceDirectiveType`,
+  etc.) need touching every time a new value is added — a normal, acceptable trade-off for enums, not a
+  violation, but flagged as the honest Open/Closed weak point rather than silently called clean.
+
 ## Scope note
 
 This is vocabulary and rules, not a formal bounded-context diagram or conceptual class model. Per the

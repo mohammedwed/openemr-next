@@ -7,12 +7,23 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Hl7.Fhir.R4" Version="5.11.1" />
+    <PackageReference Include="Hl7.Fhir.Validation.Legacy.R4" Version="5.11.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.18.3" />
     <PackageReference Include="Microting.EntityFrameworkCore.MySql" Version="10.0.3" />
     <!-- Pins past the transitive MySqlConnector 2.5.0's known moderate vulnerability (GHSA-473q-m89c-ghf8),
          matching AuthFacade's own pin for the same reason. -->
     <PackageReference Include="MySqlConnector" Version="2.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The real hl7.fhir.r4.core and hl7.fhir.us.core@8.0.0 FHIR packages (NPM-style .tgz, from
+         packages.fhir.org), extracted at runtime by FhirProfileValidator into a cache directory the
+         first time $validate is called. Needed because neither Firely's own package-resolution
+         library nor live network calls to a package registry are reliable choices for a server's own
+         FHIR validator: see docs/m4-domain-notes.md's FHIR SDK section. -->
+    <Content Include="FhirProfiles\**\*.tgz" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

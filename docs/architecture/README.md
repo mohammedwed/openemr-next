@@ -57,3 +57,5 @@ old one's status is updated to point to it.
 | [0049](0049-patient-management-writes-into-the-legacy-database.md) | Patient Management writes into OpenEMR's own database, not a new one | Accepted | 2026-11-13 |
 | [0050](0050-m4-testing-and-database-access.md) | M4 uses Testcontainers, and a least-privilege database user of its own | Accepted | 2026-11-13 |
 | [0051](0051-m4-scope-expands-to-full-legacy-parity-minus-portal.md) | M4 scope expands to full legacy patient parity, minus the portal | Accepted | 2026-11-13 |
+| [0052](0052-firely-net-fhir-sdk-replaces-hand-rolled-fhir-mapping.md) | The Firely .NET SDK replaces the hand-rolled FHIR Patient mapping, and adds US Core validation | Accepted | 2026-11-14 |
+| [0053](0053-insurancecoverage-aggregate-cluster-for-the-swap-operation.md) | InsuranceCoverage is a multi-entity aggregate cluster, owning the swap decision | Accepted | 2026-11-14 |

@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives.ValueObjects;
 
 namespace OpenEmrNext.PatientManagement.Domain.AdvanceDirectives;
 

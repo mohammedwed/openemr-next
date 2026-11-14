@@ -1,5 +1,7 @@
 using OpenEmrNext.PatientManagement.Application.Ports;
 using OpenEmrNext.PatientManagement.Domain.Fhir;
+using OpenEmrNext.PatientManagement.Domain.Fhir.ReadModels;
+using OpenEmrNext.PatientManagement.Domain.Fhir.Rules;
 
 namespace OpenEmrNext.PatientManagement.Application;
 

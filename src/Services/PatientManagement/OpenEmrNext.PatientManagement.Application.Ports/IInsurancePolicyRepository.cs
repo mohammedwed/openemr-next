@@ -1,4 +1,7 @@
 using OpenEmrNext.PatientManagement.Domain.Insurance;
+using OpenEmrNext.PatientManagement.Domain.Insurance.ValueObjects;
+using OpenEmrNext.PatientManagement.Domain.Insurance.Rules;
+using OpenEmrNext.PatientManagement.Domain.Insurance.ReadModels;
 
 namespace OpenEmrNext.PatientManagement.Application.Ports;
 
@@ -15,11 +18,23 @@ public interface IInsurancePolicyRepository
     Task<IReadOnlyList<InsurancePolicyRow>> GetRowsAsync(long pid, CancellationToken ct);
 
     /// <summary>
-    /// Swaps which level <paramref name="policyUuid"/> occupies: it moves to
-    /// <paramref name="targetLevel"/>, and whatever policy currently occupies that level (if any)
-    /// takes the moved policy's old level instead. Matches legacy OpenEMR's own
+    /// The same patient's policies as real reconstituted <see cref="InsurancePolicy"/> entities, for
+    /// loading an <see cref="InsuranceCoverage"/> cluster -- unlike <see cref="GetRowsAsync"/>, this
+    /// requires every row to have a real, parseable <see cref="DateOnly"/> (a pre-existing row with a
+    /// legacy zero/partial date can't become a strict-typed entity), which is fine for the swap
+    /// operation this exists for: both the policy being moved and whatever already occupies the
+    /// target level are rows this service itself created, through <see cref="InsurancePolicy.Add"/>,
+    /// which never allows a bad date through in the first place.
+    /// </summary>
+    Task<IReadOnlyList<InsurancePolicy>> GetPoliciesAsync(long pid, CancellationToken ct);
+
+    /// <summary>
+    /// Persists an <see cref="InsuranceCoverage.Swap"/> decision: the moved policy's new level, and
+    /// the displaced occupant's (if any). Still where the <c>9999-12-31</c> sentinel-date workaround
+    /// for the <c>(pid, type, date)</c> unique constraint lives -- that's a database detail, not
+    /// something the swap decision itself needs to know about. Matches legacy OpenEMR's own
     /// <c>InsuranceService::swapInsurance()</c>, including its atomicity -- unlike patient merge,
     /// this one already is transactional in legacy, and stays that way here.
     /// </summary>
-    Task SwapAsync(long pid, InsuranceLevel targetLevel, Guid policyUuid, CancellationToken ct);
+    Task PersistSwapAsync(InsuranceSwapResult result, CancellationToken ct);
 }

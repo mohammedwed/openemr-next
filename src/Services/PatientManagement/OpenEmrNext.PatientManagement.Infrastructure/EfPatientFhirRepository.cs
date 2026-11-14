@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using OpenEmrNext.PatientManagement.Application.Ports;
 using OpenEmrNext.PatientManagement.Domain.Fhir;
+using OpenEmrNext.PatientManagement.Domain.Fhir.ReadModels;
+using OpenEmrNext.PatientManagement.Domain.Fhir.Rules;
+using OpenEmrNext.PatientManagement.Domain.Fhir.ValueObjects;
 
 namespace OpenEmrNext.PatientManagement.Infrastructure;
 
@@ -125,17 +128,15 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
 
     private async Task<PatientFhirView> BuildViewAsync(RawPatientRow row, CancellationToken ct)
     {
-        var (gender, birthSexCode) = Domain.Fhir.PatientGenderMapping.Resolve(row.Sex);
+        var (gender, birthSexCode) = PatientGenderMapping.Resolve(row.Sex);
 
-        var (raceSystem, raceCode, raceDisplay) = await ResolveRaceAsync(row.Race, ct);
-        var (ethSystem, ethCode, ethDisplay, ethText) = await ResolveEthnicityAsync(row.Ethnicity, ct);
-        var (sexIdSystem, sexIdCode, sexIdDisplay) = await ResolveCodedListAsync(
-            "administrative_sex", row.SexIdentified, DataAbsentReasonSystem, ct);
-        var (hasGenderIdentity, giSystem, giCode, giDisplay) = await ResolveGenderIdentityAsync(row.GenderIdentity, ct);
-        var (tribalSystem, tribalCode, tribalDisplay) = await ResolveTribalAffiliationAsync(row.TribalAffiliations, ct);
-        var (interpSystem, interpCode, interpDisplay) = await ResolveCodedListAsync(
-            "yes_no_unknown", row.InterpreterNeeded, DataAbsentReasonSystem, ct);
-        var (langKnown, langCode, langDisplay) = await ResolveLanguageAsync(row.Language, ct);
+        var race = await ResolveRaceAsync(row.Race, ct);
+        var (ethnicityOmb, ethnicityText) = await ResolveEthnicityAsync(row.Ethnicity, ct);
+        var sexIdentified = await ResolveCodedListAsync("administrative_sex", row.SexIdentified, DataAbsentReasonSystem, ct);
+        var genderIdentity = await ResolveGenderIdentityAsync(row.GenderIdentity, ct);
+        var tribalAffiliation = await ResolveTribalAffiliationAsync(row.TribalAffiliations, ct);
+        var interpreterNeeded = await ResolveCodedListAsync("yes_no_unknown", row.InterpreterNeeded, DataAbsentReasonSystem, ct);
+        var language = await ResolveLanguageAsync(row.Language, ct);
 
         return new PatientFhirView(
             Rfc4122GuidConverter.FromRfc4122Bytes(row.Uuid), row.LastUpdated,
@@ -143,110 +144,105 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
             row.Street, row.StreetLine2, row.City, row.State, row.PostalCode, row.CountryCode,
             row.PhoneHome, row.PhoneBiz, row.PhoneCell, row.Email, row.EmailDirect,
             TryParseDate(row.DateOfBirth), gender, birthSexCode,
-            raceSystem, raceCode, raceDisplay,
-            ethSystem, ethCode, ethDisplay, ethText,
+            race, ethnicityOmb, ethnicityText,
             row.Ssn, row.PublicPatientId,
-            langKnown, langCode, langDisplay,
+            language,
             row.ProviderUuid is { Length: 16 } pu ? Rfc4122GuidConverter.FromRfc4122Bytes(pu) : null,
-            hasGenderIdentity, giSystem, giCode, giDisplay,
-            sexIdSystem, sexIdCode, sexIdDisplay,
-            tribalSystem, tribalCode, tribalDisplay,
-            interpSystem, interpCode, interpDisplay,
+            genderIdentity, sexIdentified, tribalAffiliation, interpreterNeeded,
             row.DeceasedDate);
     }
 
     /// <summary>Ports <c>parseOpenEMRRaceRecord()</c>: unlike ethnicity, race always resolves to
     /// something -- "Unknown" when blank, "Asked but no answer" for a decline, the real OMB code
     /// otherwise.</summary>
-    private async Task<(string System, string Code, string Display)> ResolveRaceAsync(string? race, CancellationToken ct)
+    private async Task<ResolvedCode> ResolveRaceAsync(string? race, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(race))
-            return (NullFlavorSystem, "UNK", "Unknown");
+            return ResolvedCode.Create(NullFlavorSystem, "UNK", "Unknown");
 
         if (race is "decline_to_specify" or "declne_to_specfy")
-            return (NullFlavorSystem, "ASKU", "Asked but no answer");
+            return ResolvedCode.Create(NullFlavorSystem, "ASKU", "Asked but no answer");
 
         var option = await LookupListOptionAsync("race", race, ct);
         return option is null
-            ? (NullFlavorSystem, "UNK", "Unknown")
-            : (RaceEthnicitySystem, option.Notes ?? "UNK", option.Title ?? "Unknown");
+            ? ResolvedCode.Create(NullFlavorSystem, "UNK", "Unknown")
+            : ResolvedCode.Create(RaceEthnicitySystem, option.Notes ?? "UNK", option.Title ?? "Unknown");
     }
 
     /// <summary>Ports <c>parseOpenEMREthnicityRecord()</c>: unlike race, a blank ethnicity gets no
-    /// extension at all (<c>EthnicitySystem</c> null signals "omit"); a decline gets text only, no
+    /// extension at all (a <c>null</c> ombCategory signals "omit"); a decline gets text only, no
     /// ombCategory coding.</summary>
-    private async Task<(string? System, string? Code, string? Display, string Text)> ResolveEthnicityAsync(
-        string? ethnicity, CancellationToken ct)
+    private async Task<(ResolvedCode? OmbCategory, string Text)> ResolveEthnicityAsync(string? ethnicity, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(ethnicity))
-            return (null, null, null, "");
+            return (null, "");
 
         var option = await LookupListOptionAsync("ethnicity", ethnicity, ct);
         if (option is null)
-            return (null, null, null, "");
+            return (null, "");
 
         var text = option.Title ?? "";
         if (ethnicity is "decline_to_specify" or "declne_to_specfy")
-            return (null, null, null, text);
+            return (null, text);
 
-        return (EthnicitySystem, option.Notes ?? "UNK", text, text);
+        return (ResolvedCode.Create(EthnicitySystem, option.Notes ?? "UNK", text), text);
     }
 
-    private async Task<(bool Known, string System, string Code, string Display)> ResolveGenderIdentityAsync(
-        string? genderIdentity, CancellationToken ct)
+    /// <summary>A <c>null</c> result means the gender-identity extension is omitted entirely (legacy's
+    /// own <c>if (!empty($dataRecord['gender_identity']))</c> guard) -- a literal stored value of
+    /// <c>"UNK"</c> is still non-empty, so it resolves to a real (if unknown-coded) value instead.</summary>
+    private async Task<ResolvedCode?> ResolveGenderIdentityAsync(string? genderIdentity, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(genderIdentity))
-            return (false, NullFlavorSystem, "UNK", "Unknown");
+            return null;
 
         if (genderIdentity == "asked-declined")
-            return (true, DataAbsentReasonSystem, "asked-declined", "Asked But Declined");
+            return ResolvedCode.Create(DataAbsentReasonSystem, "asked-declined", "Asked But Declined");
         if (genderIdentity == "OTH")
-            return (true, NullFlavorSystem, "OTH", "Other");
+            return ResolvedCode.Create(NullFlavorSystem, "OTH", "Other");
         if (genderIdentity == "UNK")
-            return (true, NullFlavorSystem, "UNK", "Unknown");
+            return ResolvedCode.Create(NullFlavorSystem, "UNK", "Unknown");
 
         var option = await LookupListOptionAsync("gender", genderIdentity, ct);
         if (option is null)
-            return (false, NullFlavorSystem, "UNK", "Unknown");
+            return ResolvedCode.Create(NullFlavorSystem, "UNK", "Unknown");
 
         var (system, code) = SplitCode(option.Codes);
-        return (true, system, code, option.Title ?? "Unknown");
+        return ResolvedCode.Create(system, code, option.Title ?? "Unknown");
     }
 
-    private async Task<(string? System, string? Code, string? Display)> ResolveTribalAffiliationAsync(
-        string? tribalAffiliations, CancellationToken ct)
+    private async Task<ResolvedCode?> ResolveTribalAffiliationAsync(string? tribalAffiliations, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(tribalAffiliations))
-            return (null, null, null);
+            return null;
 
         var option = await LookupListOptionAsync("tribal_affiliations", tribalAffiliations, ct);
-        return option is null ? (null, null, null) : (TribalAffiliationSystem, option.OptionId, option.Title);
+        return option is null ? null : ResolvedCode.Create(TribalAffiliationSystem, option.OptionId ?? "", option.Title);
     }
 
-    private async Task<(bool Known, string? Code, string? Display)> ResolveLanguageAsync(string? language, CancellationToken ct)
+    private async Task<ResolvedCode?> ResolveLanguageAsync(string? language, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(language))
-            return (false, null, null);
+            return null;
 
         var option = await LookupListOptionAsync("language", language, ct);
-        return option is null ? (false, null, null) : (true, option.Notes, option.Title);
+        return option is null || option.Notes is null ? null : ResolvedCode.Create(LanguageBcp47System, option.Notes, option.Title);
     }
 
     /// <summary>Shared shape for administrative-sex/interpreter-needed: both resolve via
     /// <c>list_options.codes</c> (<c>SYSTEM:CODE</c>), defaulting to a data-absent-reason "unknown"
     /// when blank or not found.</summary>
-    private async Task<(string System, string Code, string Display)> ResolveCodedListAsync(
-        string listId, string? optionId, string defaultSystem, CancellationToken ct)
+    private async Task<ResolvedCode> ResolveCodedListAsync(string listId, string? optionId, string defaultSystem, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(optionId))
-            return (defaultSystem, DataAbsentCode, "Unknown");
+            return ResolvedCode.Create(defaultSystem, DataAbsentCode, "Unknown");
 
         var option = await LookupListOptionAsync(listId, optionId, ct);
         if (option is null)
-            return (defaultSystem, DataAbsentCode, "Unknown");
+            return ResolvedCode.Create(defaultSystem, DataAbsentCode, "Unknown");
 
         var (system, code) = SplitCode(option.Codes);
-        return (system, code, option.Title ?? "Unknown");
+        return ResolvedCode.Create(system, code, option.Title ?? "Unknown");
     }
 
     /// <summary>Ports <c>CodeTypesService::parseCode()</c> + the two code types actually seeded for

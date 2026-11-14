@@ -1,4 +1,6 @@
 using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives;
+using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives.ValueObjects;
+using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives.ReadModels;
 
 namespace OpenEmrNext.PatientManagement.Application.Ports;
 

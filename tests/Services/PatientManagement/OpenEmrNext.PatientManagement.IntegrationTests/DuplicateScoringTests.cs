@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Domain;
+using OpenEmrNext.PatientManagement.Domain.Rules;
+using OpenEmrNext.PatientManagement.Domain.ValueObjects;
 using OpenEmrNext.PatientManagement.Infrastructure;
 using Xunit;
 
@@ -25,7 +27,7 @@ public class DuplicateScoringTests(PatientDataContainerFixture fixture)
     private static async Task<Patient> Register(
         PatientManagementDbContext context, string firstName, string lastName, string sex, DateOnly dob, string? email = null)
     {
-        var registration = new PatientRegistration(firstName, lastName, sex, dob, email, null);
+        var registration = PatientRegistration.Create(firstName, lastName, sex, dob, email, null);
         return await new RegisterPatientUseCase(new EfPatientRegistry(context))
             .ExecuteAsync(registration, registeredBy: 1, Now, CancellationToken.None);
     }

@@ -1,4 +1,7 @@
 using OpenEmrNext.PatientManagement.Domain.Insurance;
+using OpenEmrNext.PatientManagement.Domain.Insurance.ValueObjects;
+using OpenEmrNext.PatientManagement.Domain.Insurance.Rules;
+using OpenEmrNext.PatientManagement.Domain.Insurance.ReadModels;
 
 namespace OpenEmrNext.PatientManagement.UnitTests.Domain.Insurance;
 
@@ -53,5 +56,31 @@ public class InsurancePolicyTests
         policy.AssignGeneratedIdentity(10);
 
         Assert.Throws<InvalidOperationException>(() => policy.AssignGeneratedIdentity(11));
+    }
+
+    [Fact]
+    public void Reconstitute_restores_the_real_id_and_uuid_without_revalidating()
+    {
+        var uuid = Guid.NewGuid();
+
+        var policy = InsurancePolicy.Reconstitute(
+            id: 10, uuid, pid: 1, InsuranceLevel.Secondary, companyId: 42,
+            policyNumber: "POL123", groupNumber: null, planName: null, StartDate, endDate: null);
+
+        Assert.Equal(10, policy.Id);
+        Assert.Equal(uuid, policy.Uuid);
+        Assert.Equal(InsuranceLevel.Secondary, policy.Level);
+    }
+
+    [Fact]
+    public void ChangeLevel_moves_the_policy_to_a_different_level()
+    {
+        var policy = InsurancePolicy.Reconstitute(
+            id: 10, Guid.NewGuid(), pid: 1, InsuranceLevel.Primary, companyId: 42,
+            policyNumber: "POL123", groupNumber: null, planName: null, StartDate, endDate: null);
+
+        policy.ChangeLevel(InsuranceLevel.Tertiary);
+
+        Assert.Equal(InsuranceLevel.Tertiary, policy.Level);
     }
 }

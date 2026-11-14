@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using OpenEmrNext.PatientManagement.Application.Ports;
 using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives;
+using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives.ValueObjects;
+using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives.ReadModels;
 
 namespace OpenEmrNext.PatientManagement.Infrastructure;
 

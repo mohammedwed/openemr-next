@@ -2,6 +2,8 @@ using OpenEmrNext.PatientManagement.Api.Contracts.Requests;
 using OpenEmrNext.PatientManagement.Api.Contracts.Responses;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives;
+using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives.ValueObjects;
+using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives.ReadModels;
 
 namespace OpenEmrNext.PatientManagement.Api.Endpoints;
 

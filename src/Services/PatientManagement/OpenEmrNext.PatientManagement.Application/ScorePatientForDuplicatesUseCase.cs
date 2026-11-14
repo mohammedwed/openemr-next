@@ -1,5 +1,7 @@
 using OpenEmrNext.PatientManagement.Application.Ports;
 using OpenEmrNext.PatientManagement.Domain;
+using OpenEmrNext.PatientManagement.Domain.Rules;
+using OpenEmrNext.PatientManagement.Domain.ValueObjects;
 
 namespace OpenEmrNext.PatientManagement.Application;
 

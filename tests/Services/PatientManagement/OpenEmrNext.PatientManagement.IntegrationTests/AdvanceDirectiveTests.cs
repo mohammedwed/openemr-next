@@ -1,7 +1,10 @@
 using System.Text;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Domain;
+using OpenEmrNext.PatientManagement.Domain.ValueObjects;
 using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives;
+using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives.ValueObjects;
+using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives.ReadModels;
 using OpenEmrNext.PatientManagement.Infrastructure;
 using Xunit;
 
@@ -29,7 +32,7 @@ public class AdvanceDirectiveTests(PatientDataContainerFixture fixture) : IDispo
     /// registered patient, the same way <c>DuplicateScoringTests</c> does.</summary>
     private static async Task<long> RegisterPatient(PatientManagementDbContext context)
     {
-        var registration = new PatientRegistration(
+        var registration = PatientRegistration.Create(
             "Test", $"Patient{Guid.NewGuid():N}", $"TestSex{Guid.NewGuid():N}"[..30], new DateOnly(2000, 1, 1), null, null);
         var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context))
             .ExecuteAsync(registration, registeredBy: 1, DateTime.UtcNow, CancellationToken.None);

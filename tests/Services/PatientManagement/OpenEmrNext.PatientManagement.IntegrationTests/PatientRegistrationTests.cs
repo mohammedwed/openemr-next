@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Domain;
+using OpenEmrNext.PatientManagement.Domain.ValueObjects;
 using OpenEmrNext.PatientManagement.Infrastructure;
 using Xunit;
 
@@ -21,7 +22,7 @@ public class PatientRegistrationTests(PatientDataContainerFixture fixture)
     [Fact]
     public async Task Registering_a_patient_commits_the_patient_row_and_its_outbox_row_together()
     {
-        var registration = new PatientRegistration("Ada", "Lovelace", "Female", new DateOnly(1990, 1, 1));
+        var registration = PatientRegistration.Create("Ada", "Lovelace", "Female", new DateOnly(1990, 1, 1));
 
         await using var context = fixture.CreateDbContext();
         var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context))
@@ -52,10 +53,10 @@ public class PatientRegistrationTests(PatientDataContainerFixture fixture)
         var patientCountBefore = await context.Patients.CountAsync();
         var outboxCountBefore = await context.OutboxMessages.CountAsync();
 
-        var badRegistration = new PatientRegistration("Ada", "A", "F", new DateOnly(1990, 1, 1));
-        var useCase = new RegisterPatientUseCase(new EfPatientRegistry(context));
-        await Assert.ThrowsAsync<PatientValidationException>(
-            () => useCase.ExecuteAsync(badRegistration, 1, Now, CancellationToken.None));
+        // Validation now lives on PatientRegistration.Create itself (not Patient.Register), so an
+        // invalid registration never gets far enough to reach the use case at all.
+        Assert.Throws<PatientValidationException>(
+            () => PatientRegistration.Create("Ada", "A", "F", new DateOnly(1990, 1, 1)));
 
         Assert.Equal(patientCountBefore, await context.Patients.CountAsync());
         Assert.Equal(outboxCountBefore, await context.OutboxMessages.CountAsync());
@@ -64,7 +65,7 @@ public class PatientRegistrationTests(PatientDataContainerFixture fixture)
     [Fact]
     public async Task Uuid_round_trips_through_the_database_in_rfc4122_byte_order()
     {
-        var registration = new PatientRegistration("Grace", "Hopper", "Female", new DateOnly(1985, 5, 5));
+        var registration = PatientRegistration.Create("Grace", "Hopper", "Female", new DateOnly(1985, 5, 5));
 
         await using var context = fixture.CreateDbContext();
         var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context))

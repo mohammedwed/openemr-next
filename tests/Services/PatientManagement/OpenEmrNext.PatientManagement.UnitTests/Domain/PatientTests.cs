@@ -1,4 +1,5 @@
 using OpenEmrNext.PatientManagement.Domain;
+using OpenEmrNext.PatientManagement.Domain.ValueObjects;
 
 namespace OpenEmrNext.PatientManagement.UnitTests.Domain;
 
@@ -14,7 +15,7 @@ public class PatientTests
         DateOnly? dob = null,
         string? email = null,
         string? trustedEmail = null) =>
-        new(firstName, lastName, sex, dob ?? SomeDob, email, trustedEmail);
+        PatientRegistration.Create(firstName, lastName, sex, dob ?? SomeDob, email, trustedEmail);
 
     [Fact]
     public void Register_with_valid_fields_succeeds()
@@ -49,35 +50,6 @@ public class PatientTests
         Assert.NotEqual(first.Pid, second.Pid);
     }
 
-    [Theory]
-    [InlineData("")]
-    public void Register_rejects_an_empty_first_name(string firstName)
-    {
-        var ex = Assert.Throws<PatientValidationException>(
-            () => Patient.Register(ValidRegistration(firstName: firstName), 1, Now));
-        Assert.Contains(ex.Errors, e => e.Contains("First name"));
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("A")]
-    public void Register_rejects_a_last_name_under_two_characters(string lastName)
-    {
-        var ex = Assert.Throws<PatientValidationException>(
-            () => Patient.Register(ValidRegistration(lastName: lastName), 1, Now));
-        Assert.Contains(ex.Errors, e => e.Contains("Last name"));
-    }
-
-    [Theory]
-    [InlineData("M")]
-    [InlineData("F")]
-    public void Register_rejects_a_gender_under_four_characters(string sex)
-    {
-        var ex = Assert.Throws<PatientValidationException>(
-            () => Patient.Register(ValidRegistration(sex: sex), 1, Now));
-        Assert.Contains(ex.Errors, e => e.Contains("Gender"));
-    }
-
     [Fact]
     public void Register_accepts_no_email_at_all()
     {
@@ -87,31 +59,12 @@ public class PatientTests
     }
 
     [Theory]
-    [InlineData("not-an-email")]
-    [InlineData("missing-domain@")]
-    public void Register_rejects_a_malformed_email(string email)
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Register_rejects_a_registeredBy_that_cannot_identify_a_user(long registeredBy)
     {
         var ex = Assert.Throws<PatientValidationException>(
-            () => Patient.Register(ValidRegistration(email: email), 1, Now));
-        Assert.Contains(ex.Errors, e => e.Contains("Email"));
+            () => Patient.Register(ValidRegistration(), registeredBy, Now));
+        Assert.Contains(ex.Errors, e => e.Contains("RegisteredBy"));
     }
-
-    [Theory]
-    [InlineData("not-an-email")]
-    public void Register_rejects_a_malformed_trusted_email(string trustedEmail)
-    {
-        var ex = Assert.Throws<PatientValidationException>(
-            () => Patient.Register(ValidRegistration(trustedEmail: trustedEmail), 1, Now));
-        Assert.Contains(ex.Errors, e => e.Contains("Trusted Email"));
-    }
-
-    [Fact]
-    public void Register_reports_every_failing_field_at_once()
-    {
-        var ex = Assert.Throws<PatientValidationException>(
-            () => Patient.Register(ValidRegistration(firstName: "", lastName: "A", sex: "M"), 1, Now));
-
-        Assert.Equal(3, ex.Errors.Count);
-    }
-
 }
