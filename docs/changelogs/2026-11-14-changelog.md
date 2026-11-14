@@ -140,6 +140,17 @@ now. M4 is done except patient merge, which stays deferred until M5+ exist.
   (read-model placement, FHIR vocabulary leaking into Domain, an unbounded `byte[]` on
   `AdvanceDirectiveDocument`), in `m4-domain-notes.md`'s architecture self-assessment section.
 
+## Fixed — CI pipeline broken since PR #56
+
+- `.github/workflows/ci.yml`'s "Create .env for docker compose" step never set
+  `PATIENT_MANAGEMENT_DB_PASSWORD`, which `docker-compose.yml`'s `seed-patient-management-db` service
+  requires with no default (`${PATIENT_MANAGEMENT_DB_PASSWORD:?Set PATIENT_MANAGEMENT_DB_PASSWORD in
+  .env}`). Compose interpolates every service's variables up front, so even `docker compose up -d mysql
+  --wait` (a step that never touches that service) failed outright. Missed when ADR 0049/0050 added
+  Patient Management's own least-privilege database user — every CI run on `main` has failed the same
+  way since PR #56 (2026-11-13). Fixed by setting it alongside the other per-service secrets, following
+  the exact same `secrets.X || 'ci-...'` fallback pattern `AUTHFACADE_DB_PASSWORD` already uses.
+
 ## Fixed — the remaining architecture self-assessment items
 
 Closes out every item the 2026-11-14 self-assessment flagged, in the order addressed.

@@ -40,6 +40,7 @@ jobs:
           AUTHFACADE_CLIENT_SECRET: ${{ secrets.AUTHFACADE_CLIENT_SECRET || 'ci-client-secret' }}
           AUTHFACADE_CLIENT_ID: ${{ vars.AUTHFACADE_CLIENT_ID || 'authfacade' }}
           AUTHFACADE_DB_PASSWORD: ${{ secrets.AUTHFACADE_DB_PASSWORD || 'ci-authfacade-db-password' }}
+          PATIENT_MANAGEMENT_DB_PASSWORD: ${{ secrets.PATIENT_MANAGEMENT_DB_PASSWORD || 'ci-patient-management-db-password' }}
         run: |
           cp .env.example .env
           source scripts/lib/env.sh
@@ -49,6 +50,7 @@ jobs:
           env_set AUTHFACADE_CLIENT_SECRET "$AUTHFACADE_CLIENT_SECRET"
           env_set AUTHFACADE_CLIENT_ID "$AUTHFACADE_CLIENT_ID"
           env_set AUTHFACADE_DB_PASSWORD "$AUTHFACADE_DB_PASSWORD"
+          env_set PATIENT_MANAGEMENT_DB_PASSWORD "$PATIENT_MANAGEMENT_DB_PASSWORD"
           env_set STACK_READY_TIMEOUT_MINUTES 3
           # Print variable names only, never values.
           cut -d= -f1 .env
