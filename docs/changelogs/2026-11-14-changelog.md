@@ -238,3 +238,25 @@ repository exists to provide has no clean EF-native equivalent, and the legacy-s
 - New unit tests (`LocalDiskAdvanceDirectiveFileStoreTests`, 6 cases) need no database at all.
 - Full solution: 121 unit (up from 115), 46 integration (unchanged), 17 architecture (unchanged) tests
   all pass; build stays clean (0 errors, same 5 pre-existing warnings).
+
+## Added — a sixth review dimension: Resilience and failing fast
+
+- Two findings logged: no `EnableRetryOnFailure()` on the database connection, and no global
+  exception-handling middleware anywhere in PatientManagement's Api (confirmed a repo-wide gap, not
+  specific to this service — `AuthFacade`/`Gateway` don't have one either).
+- Confirmed, not assumed, as a genuine existing strength: startup configuration fails fast correctly
+  via `[Required]` + `.ValidateOnStart()` on both options classes.
+
+## Fixed — no transient-fault retry on the database connection (ADR 0055)
+
+- `EnableRetryOnFailure()` is now on for `PatientManagementDbContext`'s MySQL connection.
+- All three explicit transactions (`EfInsurancePolicyRepository.AddAsync`/`PersistSwapAsync`,
+  `EfAdvanceDirectiveRepository.AddDocumentAsync`) now run through
+  `Database.CreateExecutionStrategy().ExecuteAsync(...)`, required for EF's retry to work with a
+  user-initiated transaction at all.
+- `AddAsync`/`AddDocumentAsync` moved `AssignGeneratedIdentity` outside the retried delegate (returning
+  the generated id instead, assigned exactly once after a successful commit) — otherwise a retried
+  attempt would call it twice on the same aggregate and throw.
+- The global exception-handling gap remains tracked, not fixed — a response-shaping concern, not a
+  correctness/availability one, so it stayed lower priority than the retry fix.
+- Verified against a real Testcontainers MariaDB: all 46 integration tests still pass.

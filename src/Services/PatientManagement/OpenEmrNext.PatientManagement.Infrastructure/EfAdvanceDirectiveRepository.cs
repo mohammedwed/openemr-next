@@ -39,41 +39,53 @@ public sealed class EfAdvanceDirectiveRepository(PatientManagementDbContext db, 
             var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(document.Uuid);
             var driveUuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(document.DriveUuid);
 
-            // Same DatabaseFacadeExtensions.GetLastInsertIdAsync connection-pinning concern as
-            // EfInsurancePolicyRepository.AddAsync -- here it also has to pin across the id-generation
-            // statement below, which depends on it too.
-            await using var transaction = await db.Database.BeginTransactionAsync(ct);
-
-            // documents.id is NOT an AUTO_INCREMENT column in legacy -- it's allocated from a single
-            // global counter (the `sequences` table, one row, shared by many legacy tables) via
-            // QueryUtils::generateId() / ADOdb's GenID(). We have to draw from that exact same counter,
-            // not our own, so a ever-still-running legacy writer never collides with an id we hand out.
-            await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE sequences SET id = LAST_INSERT_ID(id + 1)", ct);
-            var id = await db.Database.GetLastInsertIdAsync(ct);
-            document.AssignGeneratedIdentity(id);
-
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                INSERT INTO documents
-                    (id, uuid, type, size, date, url, mimetype, owner, revision, foreign_id, docdate, hash,
-                     name, drive_uuid, storagemethod, path_depth, encounter_id)
-                VALUES
-                    ({id}, {uuidBytes}, 'file_url', {document.Size}, NOW(), {url}, {document.MimeType},
-                     {document.OwnerId}, NOW(), {document.Pid}, {document.EffectiveDate?.ToString("yyyy-MM-dd")}, {document.Sha3Hash},
-                     {document.Name}, {driveUuidBytes}, 0, 1, 0)
-                """, ct);
-
-            var categoryId = await db.Database.SqlQueryRaw<long>(
-                "SELECT id AS Value FROM categories WHERE name = {0}", AdvanceDirectiveCategoryName)
-                .SingleOrDefaultAsync(ct);
-
-            if (categoryId != 0)
+            // The whole unit of work runs through an execution strategy, not a bare
+            // BeginTransactionAsync/CommitAsync, because the DbContext has EnableRetryOnFailure on --
+            // a user-initiated transaction has to be replayable wholesale for that to work.
+            // AssignGeneratedIdentity stays outside the delegate and runs exactly once, after a
+            // successful commit: it throws if called twice, and a retried attempt re-executes the
+            // whole delegate (including a fresh id from the sequences counter) from scratch.
+            var strategy = db.Database.CreateExecutionStrategy();
+            var id = await strategy.ExecuteAsync(async () =>
             {
-                await db.Database.ExecuteSqlInterpolatedAsync(
-                    $"REPLACE INTO categories_to_documents (category_id, document_id) VALUES ({categoryId}, {id})", ct);
-            }
+                // A transaction pins the connection for both statements below -- see
+                // DatabaseFacadeExtensions.GetLastInsertIdAsync for why that's required.
+                await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
-            await transaction.CommitAsync(ct);
+                // documents.id is NOT an AUTO_INCREMENT column in legacy -- it's allocated from a
+                // single global counter (the `sequences` table, one row, shared by many legacy tables)
+                // via QueryUtils::generateId() / ADOdb's GenID(). We have to draw from that exact same
+                // counter, not our own, so a ever-still-running legacy writer never collides with an
+                // id we hand out.
+                await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE sequences SET id = LAST_INSERT_ID(id + 1)", ct);
+                var generatedId = await db.Database.GetLastInsertIdAsync(ct);
+
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                    INSERT INTO documents
+                        (id, uuid, type, size, date, url, mimetype, owner, revision, foreign_id, docdate, hash,
+                         name, drive_uuid, storagemethod, path_depth, encounter_id)
+                    VALUES
+                        ({generatedId}, {uuidBytes}, 'file_url', {document.Size}, NOW(), {url}, {document.MimeType},
+                         {document.OwnerId}, NOW(), {document.Pid}, {document.EffectiveDate?.ToString("yyyy-MM-dd")}, {document.Sha3Hash},
+                         {document.Name}, {driveUuidBytes}, 0, 1, 0)
+                    """, ct);
+
+                var categoryId = await db.Database.SqlQueryRaw<long>(
+                    "SELECT id AS Value FROM categories WHERE name = {0}", AdvanceDirectiveCategoryName)
+                    .SingleOrDefaultAsync(ct);
+
+                if (categoryId != 0)
+                {
+                    await db.Database.ExecuteSqlInterpolatedAsync(
+                        $"REPLACE INTO categories_to_documents (category_id, document_id) VALUES ({categoryId}, {generatedId})", ct);
+                }
+
+                await transaction.CommitAsync(ct);
+                return generatedId;
+            });
+
+            document.AssignGeneratedIdentity(id);
         }
         catch
         {

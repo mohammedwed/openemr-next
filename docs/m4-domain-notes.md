@@ -371,6 +371,44 @@ the MySQL driver throws before it would ever run), and the legacy-specific SQL (
   constructor, not settable by a caller. `DeleteAsync` itself (the new, reusable piece) is covered by
   direct unit tests (`LocalDiskAdvanceDirectiveFileStoreTests`) that don't need a database at all.
 
+## A new review dimension: Resilience and failing fast
+
+Added 2026-11-14 alongside the five already in use (Clean Architecture, Documentation, Security, DDD,
+SOLID). Resilience only really applies where I/O happens (`Infrastructure`, and startup configuration
+in `Composition`/`Api`) -- `Domain` has none by design (`LayerDependencyTests`), so for `Domain` this
+dimension only ever measures "failing fast," not resilience. Two real findings; one fixed, one tracked:
+
+- **Fixed -- no transient-fault retry on the database connection (ADR 0055).**
+  `PatientManagementApiExtensions.AddPatientManagementHttpDependencies` called
+  `options.UseMySql(connectionString, ...)` with no `EnableRetryOnFailure()` -- a brief network blip to
+  MariaDB failed every in-flight request outright, no automatic recovery. For comparison: AuthFacade has
+  a dedicated `Resilience/` folder (`OpenEmrCircuitBreakers`, `CircuitBreakerPipeline`, built on Polly)
+  guarding its own external dependency (OpenEMR's HTTP API); PatientManagement's external dependency --
+  the database -- had no equivalent. **Not a one-line fix**: this project's three explicit transactions
+  (`EfInsurancePolicyRepository.AddAsync`/`PersistSwapAsync`, `EfAdvanceDirectiveRepository.AddDocumentAsync`)
+  all needed wrapping in `Database.CreateExecutionStrategy().ExecuteAsync(...)` -- turning on
+  `EnableRetryOnFailure()` without that throws `InvalidOperationException` the first time a retry
+  actually fires, not at startup. `AddAsync` and `AddDocumentAsync` also needed
+  `AssignGeneratedIdentity` moved outside the retried delegate, returning the generated id instead and
+  assigning it exactly once after a successful commit -- otherwise a retried attempt (which
+  re-generates a fresh id from scratch) would call it twice on the same aggregate and throw.
+  `PersistSwapAsync` needed only the wrapping, since it mutates no external object as a side effect of
+  running. Verified against a real Testcontainers MariaDB: all 46 integration tests pass, including
+  every transactional path -- a wrong wrapping would have thrown immediately on any transaction use,
+  not only during an actual retry, so this is real confirmation, not just "it compiled."
+- **Tracked, not fixed -- no global exception-handling middleware anywhere in PatientManagement's Api.** Confirmed this is a
+  repo-wide gap, not specific to this service -- `AuthFacade` and `Gateway` don't have
+  `UseExceptionHandler`/`ProblemDetails` either. Every endpoint catches its own known validation
+  exceptions inline, consistently -- but anything unanticipated (a transient DB error, a real bug)
+  produces ASP.NET's bare default 500, not the `ProblemDetails`-shaped response every other error path
+  in this API already returns.
+
+**Already a genuine strength, confirmed not assumed**: startup configuration fails fast correctly --
+`[Required]` DataAnnotations plus `.ValidateOnStart()` on both `PatientManagementDbOptions` and
+`AdvanceDirectiveStorageOptions` (`CompositionServiceCollectionExtensions`) throw
+`OptionsValidationException` at startup, the same pattern already seen crashing a sibling service's
+startup in a CI log earlier this session -- not a silent empty-string default reaching production.
+
 ## Scope note
 
 This is vocabulary and rules, not a formal bounded-context diagram or conceptual class model. Per the

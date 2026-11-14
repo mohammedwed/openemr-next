@@ -24,7 +24,15 @@ public static class PatientManagementApiExtensions
                 ";Password=" + db.Password + ";";
             // Matches the real mariadb:12.3.3 image this stack runs (.env.example's MARIADB_IMAGE),
             // same pin AuthFacade's own DbContext already uses.
-            options.UseMySql(connectionString, new MariaDbServerVersion(new Version(12, 3, 3)));
+            //
+            // EnableRetryOnFailure means every explicit transaction in this layer (EfInsurancePolicyRepository.
+            // AddAsync/PersistSwapAsync, EfAdvanceDirectiveRepository.AddDocumentAsync) must run inside
+            // Database.CreateExecutionStrategy().ExecuteAsync(...), not just BeginTransactionAsync/
+            // CommitAsync directly -- EF throws InvalidOperationException the first time a retry actually
+            // fires otherwise, since a user-initiated transaction can't be silently replayed by the
+            // strategy on its own. Every one of those methods already does this.
+            options.UseMySql(connectionString, new MariaDbServerVersion(new Version(12, 3, 3)),
+                mySqlOptions => mySqlOptions.EnableRetryOnFailure());
         });
 
         // The only place the port (Application.Ports.IPatientRegistry) is wired to its real adapter

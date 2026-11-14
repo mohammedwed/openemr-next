@@ -60,3 +60,4 @@ old one's status is updated to point to it.
 | [0052](0052-firely-net-fhir-sdk-replaces-hand-rolled-fhir-mapping.md) | The Firely .NET SDK replaces the hand-rolled FHIR Patient mapping, and adds US Core validation | Accepted | 2026-11-14 |
 | [0053](0053-insurancecoverage-aggregate-cluster-for-the-swap-operation.md) | InsuranceCoverage is a multi-entity aggregate cluster, owning the swap decision | Accepted | 2026-11-14 |
 | [0054](0054-domain-readmodels-is-a-separate-project.md) | Domain's read models move into their own project, Domain.ReadModels | Accepted | 2026-11-14 |
+| [0055](0055-patient-management-retries-transient-database-failures.md) | Patient Management's database connection retries transient failures | Accepted | 2026-11-14 |
