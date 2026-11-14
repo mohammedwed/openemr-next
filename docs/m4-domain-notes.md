@@ -306,6 +306,21 @@ duplicate-policy rejection, and tolerance of an unrelated pre-existing zero-date
   `OpenEmrNext.PatientManagement.Domain.Fhir` and `...Fhir.Rules`, neither used) — leftover from the
   bulk `using`-injection during the ValueObjects/Rules/ReadModels reorg, never cleaned up. `Domain.Fhir`
   itself has had zero types in it since the read-model extraction (ADR 0054).
+- **`DuplicateScoringTests` is flaky via a SOUNDEX collision across tests, not just this test
+  file's own assumption.** Found when PR #64's first CI run failed
+  `A_new_patient_with_no_one_to_compare_against_scores_zero` (expected score `0`, got `2`) on a run
+  that touched nothing in duplicate-scoring code at all; a re-run of the same commit passed clean,
+  confirming it's pre-existing flakiness, not a regression. Root cause: the test's own comment claims
+  "every field here (sex included) is unique to this test," but the "Solo" patient's last name is
+  `Patient{Guid.NewGuid():N}` — MySQL's `SOUNDEX()` only encodes a short prefix of the string, so two
+  different tests' GUID-suffixed last names that both start with `"Patient"` collapse to the *same*
+  soundex code and score 2 points against each other, even though the full strings are unique. Given
+  `DuplicateScoringTests`' own fixture doc comment ("the database is shared across every test in this
+  collection, not reset between them"), this can trigger whenever another concurrently-run test's
+  last name happens to share enough of a soundex-equivalent prefix -- not deterministic, so it won't
+  reproduce on every run. Not fixed here (out of scope for the Application-layer PR that surfaced it);
+  the real fix is almost certainly giving each test's "unique" demographic fields a prefix that doesn't
+  collide under `SOUNDEX()`, e.g. randomizing the leading letters too, not just appending a GUID suffix.
 
 ## Scope note
 
