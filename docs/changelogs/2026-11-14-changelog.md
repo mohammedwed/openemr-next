@@ -139,3 +139,26 @@ now. M4 is done except patient merge, which stays deferred until M5+ exist.
   aggregate as single-entity until now — recorded in full, along with the dimensions still open
   (read-model placement, FHIR vocabulary leaking into Domain, an unbounded `byte[]` on
   `AdvanceDirectiveDocument`), in `m4-domain-notes.md`'s architecture self-assessment section.
+
+## Fixed — the remaining architecture self-assessment items
+
+Closes out every item the 2026-11-14 self-assessment flagged, in the order addressed.
+
+- **Security**: `AdvanceDirectiveDocument.Upload` now enforces `MaxContentBytes` (30 MiB, matching
+  legacy's own production `upload_max_filesize`/`post_max_size`, `docker/release/php.ini`) — nothing
+  could previously stop constructing a document with an arbitrarily large in-memory payload.
+- **Clean Architecture**: `ResolvedCode`'s fields renamed `System`/`Code`/`Display` →
+  `CodeSystem`/`CodeValue`/`DisplayText`, and `PatientFhirView.EthnicityOmb` → `EthnicityCategory` —
+  Domain no longer echoes FHIR's own wire vocabulary (`Coding.system/code/display`, the `ombCategory`
+  extension field) by name. `FhirPatientMapper.ToCoding` (Api layer) is now the one place those
+  Domain-native names become an actual FHIR `Coding`.
+- **DDD — read-model boundary**: every read model, plus `EffectiveInsuranceRule` (the one rule that
+  operates purely on read models), moved into a new project, `OpenEmrNext.PatientManagement.Domain.ReadModels`
+  (ADR 0054) — a real, compiler-enforced boundary instead of a folder. Namespaces are unchanged; five
+  `.csproj` files and the solution file gained a new project reference each, nothing else needed to
+  change.
+- **SOLID — Open/Closed**: reviewed and deliberately left as-is. The enums' `switch`-based extension
+  methods are small, legacy-grounded, effectively closed sets; a more "open" pattern would add real
+  indirection to remove a theoretical violation that never bites in practice.
+- Full solution build stays clean (0 errors, same 5 pre-existing nullable warnings) after all four
+  changes.

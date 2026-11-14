@@ -9,9 +9,9 @@ public class ResolvedCodeTests
     {
         var code = ResolvedCode.Create("http://snomed.info/sct", "248152002", "Male");
 
-        Assert.Equal("http://snomed.info/sct", code.System);
-        Assert.Equal("248152002", code.Code);
-        Assert.Equal("Male", code.Display);
+        Assert.Equal("http://snomed.info/sct", code.CodeSystem);
+        Assert.Equal("248152002", code.CodeValue);
+        Assert.Equal("Male", code.DisplayText);
     }
 
     [Fact]
@@ -19,7 +19,7 @@ public class ResolvedCodeTests
     {
         var code = ResolvedCode.Create("http://snomed.info/sct", "248152002", null);
 
-        Assert.Null(code.Display);
+        Assert.Null(code.DisplayText);
     }
 
     [Theory]

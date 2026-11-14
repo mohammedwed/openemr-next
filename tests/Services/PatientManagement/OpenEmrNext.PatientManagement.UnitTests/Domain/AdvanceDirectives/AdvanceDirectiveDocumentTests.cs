@@ -54,6 +54,25 @@ public class AdvanceDirectiveDocumentTests
             () => AdvanceDirectiveDocument.Upload(1, AdvanceDirectiveType.LivingWill, "consent.pdf", "application/pdf", [], null, 7));
 
     [Fact]
+    public void Upload_rejects_content_over_the_max_size()
+    {
+        var oversized = new byte[AdvanceDirectiveDocument.MaxContentBytes + 1];
+
+        Assert.Throws<AdvanceDirectiveDocumentValidationException>(
+            () => AdvanceDirectiveDocument.Upload(1, AdvanceDirectiveType.LivingWill, "consent.pdf", "application/pdf", oversized, null, 7));
+    }
+
+    [Fact]
+    public void Upload_accepts_content_at_exactly_the_max_size()
+    {
+        var atLimit = new byte[AdvanceDirectiveDocument.MaxContentBytes];
+
+        var document = AdvanceDirectiveDocument.Upload(1, AdvanceDirectiveType.LivingWill, "consent.pdf", "application/pdf", atLimit, null, 7);
+
+        Assert.Equal(AdvanceDirectiveDocument.MaxContentBytes, document.Size);
+    }
+
+    [Fact]
     public void AssignGeneratedIdentity_cannot_run_twice()
     {
         var document = AdvanceDirectiveDocument.Upload(1, AdvanceDirectiveType.LivingWill, "consent.pdf", "application/pdf", Content, null, 7);

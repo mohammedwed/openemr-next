@@ -234,26 +234,34 @@ uniqueness invariant (no two policies at the same level and start date), `Insura
 mutable through a narrowly `internal` `ChangeLevel`, and the old single-method `SwapAsync` port was split
 into `GetPoliciesAsync`/`PersistSwapAsync` so the decision logic is unit-testable without a database.
 
-## Architecture self-assessment: dimensions still tracked, not yet addressed
+## Architecture self-assessment: all four tracked dimensions closed out
 
 Recorded 2026-11-14, when asked to rate the Domain layer out of 10 on clean architecture, documentation,
-security/invariant-enforcement, DDD, and SOLID. The single-entity-aggregate gap this surfaced is now
-resolved (`InsuranceCoverage`, ADR 0053) and documentation debt for that whole session is closed by this
-entry and ADRs 0052/0053. What's still open, for whoever picks this up next:
+security/invariant-enforcement, DDD, and SOLID. All five items the rating flagged are now resolved or
+deliberately accepted, in the order addressed:
 
-- **Clean Architecture (was 8/10):** `PatientFhirView`/`ResolvedCode` encode FHIR wire vocabulary
-  (`System`/`Code`/`Display`, `ombCategory`) directly in Domain, rather than Domain speaking only its own
-  language and having Api/Infrastructure translate fully at the boundary. A stricter read would push that
-  translation outward.
-- **Security/invariant enforcement (was 7/10):** `AdvanceDirectiveDocument` holds a raw `byte[] Content`
-  with no size-bound invariant — nothing stops constructing one with an arbitrarily large payload in
-  memory. Minor, but real.
-- **DDD (was 8/10):** read models (`InsurancePolicyRow`, `PatientFhirView`) sit in the same project as the
-  aggregates with no sharper boundary than a folder; a stricter CQRS-style split would separate them more
-  forcefully. (The single-entity-aggregate half of this score is now resolved — see above.)
-- **SOLID (was 8/10):** the enums' `switch`-based extension methods (`InsuranceLevel`, `AdvanceDirectiveType`,
-  etc.) need touching every time a new value is added — a normal, acceptable trade-off for enums, not a
-  violation, but flagged as the honest Open/Closed weak point rather than silently called clean.
+- **Security/invariant enforcement (was 7/10) — resolved.** `AdvanceDirectiveDocument.Upload` now
+  enforces `MaxContentBytes` (30 MiB, matching legacy's own production `upload_max_filesize`/
+  `post_max_size`, `docker/release/php.ini`) — nothing can construct a document with an arbitrarily
+  large payload in memory anymore.
+- **Clean Architecture (was 8/10) — resolved.** `ResolvedCode`'s fields were renamed
+  `System`/`Code`/`Display` → `CodeSystem`/`CodeValue`/`DisplayText`, and `PatientFhirView.EthnicityOmb`
+  → `EthnicityCategory` — Domain no longer echoes FHIR's own wire vocabulary (`Coding.system/code/display`,
+  the `ombCategory` extension field) by name. `FhirPatientMapper.ToCoding` (Api layer) is now the one
+  place those Domain-native names become an actual FHIR `Coding`.
+- **DDD — read-model boundary (was 8/10) — resolved.** Every read model, plus `EffectiveInsuranceRule`
+  (the one Domain rule that operates purely on read models), moved into a new project,
+  `OpenEmrNext.PatientManagement.Domain.ReadModels` (ADR 0054) — a real, compiler-enforced boundary, not
+  just a folder. Namespaces are unchanged; only the physical project moved. (The single-entity-aggregate
+  half of the original DDD score was already resolved by `InsuranceCoverage`, ADR 0053.)
+- **SOLID — Open/Closed (was 8/10) — reviewed, left as-is.** The enums' `switch`-based extension methods
+  (`InsuranceLevel`, `AdvanceDirectiveType`, etc.) still need touching for every new value. Considered and
+  deliberately not refactored: these are small, legacy-grounded, effectively closed sets (OpenEMR's own
+  schema fixes them at 3 values each), and any more "open" pattern (a registry, a class hierarchy) would
+  add real indirection to remove a theoretical violation that never actually bites in practice. Confirmed
+  with the user rather than silently left alone or silently "fixed" for its own sake.
+- **Documentation — resolved** for the whole segment this rating covered, across this entry and ADRs
+  0052/0053/0054.
 
 ## Scope note
 

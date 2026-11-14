@@ -59,3 +59,4 @@ old one's status is updated to point to it.
 | [0051](0051-m4-scope-expands-to-full-legacy-parity-minus-portal.md) | M4 scope expands to full legacy patient parity, minus the portal | Accepted | 2026-11-13 |
 | [0052](0052-firely-net-fhir-sdk-replaces-hand-rolled-fhir-mapping.md) | The Firely .NET SDK replaces the hand-rolled FHIR Patient mapping, and adds US Core validation | Accepted | 2026-11-14 |
 | [0053](0053-insurancecoverage-aggregate-cluster-for-the-swap-operation.md) | InsuranceCoverage is a multi-entity aggregate cluster, owning the swap decision | Accepted | 2026-11-14 |
+| [0054](0054-domain-readmodels-is-a-separate-project.md) | Domain's read models move into their own project, Domain.ReadModels | Accepted | 2026-11-14 |

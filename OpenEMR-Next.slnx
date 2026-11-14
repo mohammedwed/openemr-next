@@ -15,6 +15,7 @@
   </Folder>
   <Folder Name="/src/Services/PatientManagement/">
     <Project Path="src/Services/PatientManagement/OpenEmrNext.PatientManagement.Domain/OpenEmrNext.PatientManagement.Domain.csproj" />
+    <Project Path="src/Services/PatientManagement/OpenEmrNext.PatientManagement.Domain.ReadModels/OpenEmrNext.PatientManagement.Domain.ReadModels.csproj" />
     <Project Path="src/Services/PatientManagement/OpenEmrNext.PatientManagement.Application/OpenEmrNext.PatientManagement.Application.csproj" />
     <Project Path="src/Services/PatientManagement/OpenEmrNext.PatientManagement.Application.Ports/OpenEmrNext.PatientManagement.Application.Ports.csproj" />
     <Project Path="src/Services/PatientManagement/OpenEmrNext.PatientManagement.Infrastructure/OpenEmrNext.PatientManagement.Infrastructure.csproj" />

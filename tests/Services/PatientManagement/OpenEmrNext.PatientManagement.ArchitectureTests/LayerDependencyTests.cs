@@ -3,6 +3,7 @@ using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Application.Ports;
 using OpenEmrNext.PatientManagement.Composition;
 using OpenEmrNext.PatientManagement.Domain;
+using OpenEmrNext.PatientManagement.Domain.Fhir.ReadModels;
 using OpenEmrNext.PatientManagement.Infrastructure;
 
 namespace OpenEmrNext.PatientManagement.ArchitectureTests;
@@ -16,20 +17,24 @@ namespace OpenEmrNext.PatientManagement.ArchitectureTests;
 /// </summary>
 /// <remarks>
 /// Rules enforced: dependencies point inward only. <c>Domain</c> references nothing of ours.
-/// <c>Application.Ports</c> references only <c>Domain</c>. <c>Application</c> references
-/// <c>Domain</c> and <c>Ports</c>, never <c>Infrastructure</c> directly -- it only ever sees the
-/// port. <c>Infrastructure</c> implements the ports but never references <c>Application</c>.
-/// <c>Composition</c> references neither the API nor ASP.NET Core.
+/// <c>Domain.ReadModels</c> (ADR 0054) references only <c>Domain</c> -- the write-side aggregates
+/// never reference the read side back. <c>Application.Ports</c> references only <c>Domain</c> and
+/// <c>Domain.ReadModels</c>. <c>Application</c> references those plus <c>Ports</c>, never
+/// <c>Infrastructure</c> directly -- it only ever sees the port. <c>Infrastructure</c> implements the
+/// ports but never references <c>Application</c>. <c>Composition</c> references neither the API nor
+/// ASP.NET Core.
 /// </remarks>
 public class LayerDependencyTests
 {
     private const string DomainName = "OpenEmrNext.PatientManagement.Domain";
+    private const string ReadModelsName = "OpenEmrNext.PatientManagement.Domain.ReadModels";
     private const string PortsName = "OpenEmrNext.PatientManagement.Application.Ports";
     private const string ApplicationName = "OpenEmrNext.PatientManagement.Application";
     private const string InfrastructureName = "OpenEmrNext.PatientManagement.Infrastructure";
     private const string ApiName = "OpenEmrNext.PatientManagement.Api";
 
     private static readonly Assembly Domain = typeof(Patient).Assembly;
+    private static readonly Assembly ReadModels = typeof(PatientFhirView).Assembly;
     private static readonly Assembly Ports = typeof(IPatientRegistry).Assembly;
     private static readonly Assembly Application = typeof(RegisterPatientUseCase).Assembly;
     private static readonly Assembly Infrastructure = typeof(EfPatientRegistry).Assembly;
@@ -50,10 +55,21 @@ public class LayerDependencyTests
     }
 
     [Fact]
-    public void Ports_references_only_domain()
+    public void ReadModels_references_only_domain()
+    {
+        var forbidden = References(ReadModels)
+            .Where(name => name.StartsWith("OpenEmrNext.PatientManagement", StringComparison.Ordinal) && name != DomainName)
+            .ToList();
+
+        Assert.Empty(forbidden);
+    }
+
+    [Fact]
+    public void Ports_references_only_domain_and_read_models()
     {
         var forbidden = References(Ports)
-            .Where(name => name.StartsWith("OpenEmrNext.PatientManagement", StringComparison.Ordinal) && name != DomainName)
+            .Where(name => name.StartsWith("OpenEmrNext.PatientManagement", StringComparison.Ordinal)
+                && name != DomainName && name != ReadModelsName)
             .ToList();
 
         Assert.Empty(forbidden);
