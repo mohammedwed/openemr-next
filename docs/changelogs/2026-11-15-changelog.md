@@ -229,3 +229,37 @@ PatientManagement's full suite (57/121/17) still pass unchanged, since none of t
 - Verified visually against the real running stack (Chrome, with a hard reload to rule out caching):
   `/patients`' heading and button, and `Home.razor`'s heading, now render fully visible below the app
   bar on every page.
+
+## Changed — WebApp's chrome flattens toward the plain Blazor template's look (ADR 0062)
+
+- Even after the app-bar fix above, the UI still read as heavier/more "branded" than a plain
+  `dotnet new blazor` scaffold. Asked what specifically felt that way, the answer covered all three
+  axes: visual weight (shadows/elevation), nav structure (a persistent sidebar), and color (a solid
+  saturated purple app bar).
+- **Dropped the persistent `MudDrawer` sidebar** for a flat inline top nav (`NavLink`s inside the app
+  bar itself), styled with the active route in purple text + underline and everything else muted gray.
+  Breadcrumbs moved below the app bar into `MudMainContent`.
+- **Neutralized the app bar's color**: `OpenEmrNextTheme` now sets `AppbarBackground`/`AppbarText`
+  explicitly (white / dark text in light mode) instead of letting MudBlazor's default paint the whole
+  bar with `Primary` — purple now shows up only as an accent (active nav, primary buttons), not as a
+  solid block.
+- **Reduced elevation/shadow use**: app bar and nav now `Elevation="0"` with a hairline border instead
+  of a shadow; cards/tables that were `Elevation="2"` are now `1`; alerts switched from filled to
+  `Variant="Outlined"` + `Dense`; the patient detail page's two feature sections moved from one shadowed
+  `MudExpansionPanels` to two separate flat `MudPaper` panels.
+- **Found and fixed two real bugs while making this change, neither caught by the build**:
+  1. Blazor's CSS-isolation scope attribute is never added to `NavLink`'s own rendered `<a>` — a first
+     attempt at scoped `MainLayout.razor.css` nav styles silently matched nothing (confirmed via the
+     live DOM: no `b-xxxxxxxx` attribute on the anchor at all). Fixed by moving the nav styles into the
+     existing global `wwwroot/css/app.css` instead.
+  2. `Color="Color.Secondary"` on `MudText` was being used to mean "muted gray text," but it actually
+     maps to the theme's teal accent, not the muted `TextSecondary` palette token — so several
+     supporting lines (the patient detail page's DOB/Pid line, sign-in labels, empty-state captions)
+     rendered in loud teal instead of quiet gray, undermining the very goal the change was meant to
+     serve. Fixed by switching those to `Class="mud-text-secondary"`, confirmed against the installed
+     package's own compiled CSS. The one legitimate accent use (the insurance "Swap" button) was left
+     unchanged.
+- Verified visually against the real running stack (Chrome, hard reload): active nav link renders in
+  purple with an underline, inactive links in muted gray, "Encounters" visibly dimmed as disabled; the
+  app bar is flat and white; the patient detail page's DOB/Pid line and other supporting text render in
+  muted gray, not teal.

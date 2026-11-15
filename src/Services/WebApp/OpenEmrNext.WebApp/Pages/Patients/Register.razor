@@ -11,39 +11,41 @@
 <PageTitle>Register patient</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="pa-0">
-    <MudText Typo="Typo.h4" Class="mb-4">Register patient</MudText>
+    <MudText Typo="Typo.h5" Class="mb-6">Register patient</MudText>
 
     @switch (_state)
     {
         case State.Loading:
-            <MudProgressCircular Indeterminate="true" />
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
             break;
 
         case State.SignedOut:
-            <MudAlert Severity="Severity.Warning">
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
                 You need to be signed in to register a patient.
-                <MudButton Variant="Variant.Text" Href="@LoginUrl">Log in with OpenEMR</MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Warning" Href="@LoginUrl">Log in with OpenEMR</MudButton>
             </MudAlert>
             break;
 
         case State.Ready:
-            <MudPaper Elevation="2" Class="pa-6">
+            <MudPaper Elevation="1" Class="pa-6">
                 <MudForm @ref="_form" Model="_model">
                     @if (_errorMessage is { } message)
                     {
-                        <MudAlert Severity="Severity.Error" Class="mb-4">@message</MudAlert>
+                        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">@message</MudAlert>
                     }
-                    <MudStack Spacing="3">
-                        <MudTextField @bind-Value="_model.FirstName" Label="First name" Required="true" />
-                        <MudTextField @bind-Value="_model.LastName" Label="Last name" Required="true" />
-                        <MudTextField @bind-Value="_model.Sex" Label="Sex" Required="true"
+                    <MudStack Spacing="4">
+                        <MudTextField @bind-Value="_model.FirstName" Label="First name" Required="true" Variant="Variant.Outlined" />
+                        <MudTextField @bind-Value="_model.LastName" Label="Last name" Required="true" Variant="Variant.Outlined" />
+                        <MudTextField @bind-Value="_model.Sex" Label="Sex" Required="true" Variant="Variant.Outlined"
                             HelperText="Free text, matching OpenEMR's own sex column" />
                         <MudDatePicker @bind-Date="_model.DateOfBirth" Label="Date of birth" Required="true" />
-                        <MudTextField @bind-Value="_model.Email" Label="Email (optional)" />
-                        <MudTextField @bind-Value="_model.TrustedEmail" Label="Trusted email (optional)" />
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_submitting">
-                            Register
-                        </MudButton>
+                        <MudTextField @bind-Value="_model.Email" Label="Email (optional)" Variant="Variant.Outlined" />
+                        <MudTextField @bind-Value="_model.TrustedEmail" Label="Trusted email (optional)" Variant="Variant.Outlined" />
+                        <div>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_submitting">
+                                Register
+                            </MudButton>
+                        </div>
                     </MudStack>
                 </MudForm>
             </MudPaper>

@@ -9,42 +9,44 @@
 <PageTitle>Patients</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Medium" Class="pa-0">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-        <MudText Typo="Typo.h4">Patients</MudText>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/patients/register">Register patient</MudButton>
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
+        <MudText Typo="Typo.h5">Patients</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/patients/register" Size="Size.Medium">
+            Register patient
+        </MudButton>
     </MudStack>
 
     @switch (_state)
     {
         case State.Loading:
-            <MudProgressCircular Indeterminate="true" />
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
             break;
 
         case State.SignedOut:
-            <MudAlert Severity="Severity.Warning">
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
                 You need to be signed in to see patients.
-                <MudButton Variant="Variant.Text" Href="@LoginUrl">Log in with OpenEMR</MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Warning" Href="@LoginUrl">Log in with OpenEMR</MudButton>
             </MudAlert>
             break;
 
         case State.Error:
-            <MudAlert Severity="Severity.Error">Could not load patients. Please try again.</MudAlert>
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">Could not load patients. Please try again.</MudAlert>
             break;
 
         case State.Loaded:
             <MudTextField T="string" @bind-Value="_searchTerm" Label="Search by name" Class="mb-4"
                 Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" OnAdornmentClick="SearchAsync"
-                OnKeyDown="OnSearchKeyDownAsync" Immediate="true" />
+                OnKeyDown="OnSearchKeyDownAsync" Immediate="true" Variant="Variant.Outlined" />
 
             @if (_patients.Count == 0)
             {
-                <MudAlert Severity="Severity.Info">
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
                     @(string.IsNullOrWhiteSpace(_searchTerm) ? "No patients registered yet." : $"No patients match \"{_searchTerm}\".")
                 </MudAlert>
             }
             else
             {
-                <MudTable Items="_patients" Hover="true">
+                <MudTable Items="_patients" Hover="true" Elevation="1" Dense="true">
                     <HeaderContent>
                         <MudTh>First name</MudTh>
                         <MudTh>Last name</MudTh>
@@ -53,12 +55,13 @@
                         <MudTh></MudTh>
                     </HeaderContent>
                     <RowTemplate Context="patient">
-                        <MudTd>@patient.FirstName</MudTd>
-                        <MudTd>@patient.LastName</MudTd>
-                        <MudTd>@(patient.DateOfBirth?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
-                        <MudTd>@(patient.Email ?? "—")</MudTd>
+                        <MudTd DataLabel="First name">@patient.FirstName</MudTd>
+                        <MudTd DataLabel="Last name">@patient.LastName</MudTd>
+                        <MudTd DataLabel="Date of birth">@(patient.DateOfBirth?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
+                        <MudTd DataLabel="Email">@(patient.Email ?? "—")</MudTd>
                         <MudTd>
-                            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@($"/patients/{patient.Uuid}")">View</MudButton>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                Href="@($"/patients/{patient.Uuid}")">View</MudButton>
                         </MudTd>
                     </RowTemplate>
                 </MudTable>

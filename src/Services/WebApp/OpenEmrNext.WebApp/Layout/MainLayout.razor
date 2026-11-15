@@ -4,10 +4,20 @@
 @inject NavigationManager Navigation
 
 <MudLayout>
-    <MudAppBar Elevation="1">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@(() => _drawerOpen = !_drawerOpen)" />
-        <MudText Typo="Typo.h6" Class="ml-2">OpenEMR Next</MudText>
-        <MudBreadcrumbs Items="_breadcrumbs" Class="ml-6 pa-0" />
+    @* Elevation 0 + a hairline border, not a shadow: a flat, light app bar reads closer to the plain
+       Blazor template's chrome than a shadowed, solid-brand-color bar did. *@
+    <MudAppBar Elevation="0" Class="op-appbar">
+        <MudText Typo="Typo.h6" Class="op-brand">OpenEMR Next</MudText>
+        <MudSpacer />
+        @* A flat inline nav, not a persistent MudDrawer sidebar: with only two enabled routes, an
+           always-visible side rail added chrome weight without adding navigability. *@
+        <nav class="op-nav">
+            <NavLink href="" Match="NavLinkMatch.All" class="op-nav-link">Dashboard</NavLink>
+            <NavLink href="patients" class="op-nav-link">Patients</NavLink>
+            <MudTooltip Text="Coming soon">
+                <span class="op-nav-link op-nav-link--disabled">Encounters</span>
+            </MudTooltip>
+        </nav>
         <MudSpacer />
         @if (_userLabel is { } userLabel)
         {
@@ -18,28 +28,18 @@
             </MudMenu>
         }
     </MudAppBar>
-    <MudDrawer @bind-Open="_drawerOpen" Elevation="1" Variant="DrawerVariant.Persistent">
-        <MudNavMenu>
-            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
-            <MudNavLink Href="/patients" Icon="@Icons.Material.Filled.People">Patients</MudNavLink>
-            <MudNavLink Disabled="true" Icon="@Icons.Material.Filled.EventNote">
-                Encounters
-                <MudText Typo="Typo.caption" Class="ml-2">Coming soon</MudText>
-            </MudNavLink>
-        </MudNavMenu>
-    </MudDrawer>
     @* px-4/pb-4, not pa-4: pa-4's padding: 16px !important overrides MudMainContent's own
        padding-top: calc(var(--mud-appbar-height) - ...) -- the rule that clears the fixed app bar.
        With pa-4, every page's top content (headers, primary buttons) rendered ~40px too high,
        hidden underneath the app bar -- confirmed by inspecting the actual computed styles and
        CSS rules in a running browser, not guessed. Leaving padding-top alone lets that rule apply. *@
     <MudMainContent Class="px-4 pb-4">
+        <MudBreadcrumbs Items="_breadcrumbs" Class="op-breadcrumbs px-0" />
         @Body
     </MudMainContent>
 </MudLayout>
 
 @code {
-    private bool _drawerOpen = true;
     private string? _userLabel;
     private List<BreadcrumbItem> _breadcrumbs = [];
 

@@ -1,38 +1,53 @@
-﻿@page "/"
+@page "/"
 @inject IAuthFacadeClient AuthFacade
 @inject NavigationManager Navigation
 
 <PageTitle>Dashboard</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="pa-0">
-    <MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
+    <MudText Typo="Typo.h5" Class="mb-6">Dashboard</MudText>
 
     @switch (_state)
     {
         case State.Loading:
-            <MudProgressCircular Indeterminate="true" />
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
             break;
 
         case State.SignedIn:
-            <MudPaper Elevation="2" Class="pa-6 d-flex flex-column ga-4">
-                <MudText Typo="Typo.h6">Signed in as @_name</MudText>
-                <MudText Typo="Typo.body2" Class="mb-4">Subject: @_subject</MudText>
-                <MudAlert Severity="Severity.Info">
-                    Patient and encounter data isn't built yet (ROADMAP M4/M5) — this page proves the
-                    sign-in round trip end to end, through the generated AuthFacadeClient.
-                </MudAlert>
-                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Href="/logout" Class="align-self-start">Log out</MudButton>
+            <MudPaper Elevation="1" Class="pa-6">
+                <MudStack Spacing="4">
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Class="mud-text-secondary">Signed in as</MudText>
+                        <MudText Typo="Typo.h6">@_name</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@_subject</MudText>
+                    </div>
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                        Patient and encounter data isn't built yet (ROADMAP M4/M5) — this page proves the
+                        sign-in round trip end to end, through the generated AuthFacadeClient.
+                    </MudAlert>
+                    <div>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/logout" Size="Size.Small">
+                            Log out
+                        </MudButton>
+                    </div>
+                </MudStack>
             </MudPaper>
             break;
 
         case State.SignedOut:
-            <MudPaper Elevation="2" Class="pa-6 d-flex flex-column align-start ga-4">
-                @if (ErrorMessage is { } message)
-                {
-                    <MudAlert Severity="Severity.Error" role="alert" Class="w-100">@message</MudAlert>
-                }
-                <MudText>Sign in with your existing OpenEMR account.</MudText>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@LoginUrl">Log in with OpenEMR</MudButton>
+            <MudPaper Elevation="1" Class="pa-6">
+                <MudStack Spacing="4">
+                    @if (ErrorMessage is { } message)
+                    {
+                        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" role="alert">@message</MudAlert>
+                    }
+                    <MudText Class="mud-text-secondary">Sign in with your existing OpenEMR account.</MudText>
+                    <div>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@LoginUrl">
+                            Log in with OpenEMR
+                        </MudButton>
+                    </div>
+                </MudStack>
             </MudPaper>
             break;
     }
