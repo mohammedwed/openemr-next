@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OpenEmrNext.PatientManagement.Api.Authentication;
+using OpenEmrNext.PatientManagement.Api.OpenApi;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Application.Ports;
 using OpenEmrNext.PatientManagement.Infrastructure;
@@ -76,7 +77,7 @@ public static class PatientManagementApiExtensions
         // Firely's own Validator/resolvers are meant to be built once and reused, not once per request.
         builder.Services.AddSingleton<Endpoints.FhirProfileValidator>();
 
-        builder.Services.AddOpenApi();
+        builder.Services.AddOpenApi(options => options.ConfigurePatientManagement());
 
         // Every endpoint catches its own known Domain validation exceptions and maps them to a clean
         // ValidationProblem/NotFound response -- but anything unanticipated (a bug, a DB error that
