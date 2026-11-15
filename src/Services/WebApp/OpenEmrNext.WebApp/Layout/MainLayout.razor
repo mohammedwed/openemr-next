@@ -28,7 +28,12 @@
             </MudNavLink>
         </MudNavMenu>
     </MudDrawer>
-    <MudMainContent Class="pa-4">
+    @* px-4/pb-4, not pa-4: pa-4's padding: 16px !important overrides MudMainContent's own
+       padding-top: calc(var(--mud-appbar-height) - ...) -- the rule that clears the fixed app bar.
+       With pa-4, every page's top content (headers, primary buttons) rendered ~40px too high,
+       hidden underneath the app bar -- confirmed by inspecting the actual computed styles and
+       CSS rules in a running browser, not guessed. Leaving padding-top alone lets that rule apply. *@
+    <MudMainContent Class="px-4 pb-4">
         @Body
     </MudMainContent>
 </MudLayout>

@@ -212,3 +212,20 @@ PatientManagement's full suite (57/121/17) still pass unchanged, since none of t
 - Verified visually against the real running stack (Chrome): the menu opens and shows "Signed in as
   &lt;subject&gt;" / "Log out", the drawer toggles correctly and the main content reclaims the freed
   space, and breadcrumbs show correctly on `/patients/register` ("Patients / Register").
+
+## Fixed — every page's top content was rendering hidden behind the app bar
+
+- **Found while investigating a UI complaint**: `MudMainContent`'s `Class="pa-4"` sets
+  `padding: 16px !important`, which overrides MudBlazor's own built-in `padding-top: calc(var(--mud-
+  appbar-height) - ...)` rule -- the one that clears the fixed 64px app bar. With `pa-4`, every page's
+  top ~40px of content rendered underneath the app bar, invisible, while the rest of the page below it
+  rendered normally -- explaining why `/patients`' own "Patients" heading and "Register patient"
+  button, and `Home.razor`'s "Dashboard" heading, never actually appeared, despite existing correctly
+  in the DOM the whole time (confirmed via the actual computed styles and matched CSS rules in a
+  running browser, not guessed). This bug predates every round of frontend work this session -- it was
+  already present in `MainLayout.razor`'s very first version, not something introduced recently.
+- Fixed by changing `MudMainContent`'s class to `px-4 pb-4` (horizontal and bottom padding only),
+  leaving `padding-top` untouched so MudBlazor's own appbar-clearing rule applies.
+- Verified visually against the real running stack (Chrome, with a hard reload to rule out caching):
+  `/patients`' heading and button, and `Home.razor`'s heading, now render fully visible below the app
+  bar on every page.
