@@ -323,6 +323,109 @@ review dimensions**:
   the real fix is almost certainly giving each test's "unique" demographic fields a prefix that doesn't
   collide under `SOUNDEX()`, e.g. randomizing the leading letters too, not just appending a GUID suffix.
 
+## Api self-assessment: three findings, all fixed
+
+Recorded 2026-11-15, the same grounded pass over all 19 files in `Api` (endpoints, contracts,
+`FhirJson`, `FhirProfileValidator`, `Program.cs`, composition). Resilience & failing fast scored
+strongly here by construction (ADRs 0055/0056 live in this project); DDD and Clean Architecture were
+already solid (every endpoint delegates to Application/Domain, never hand-rolls validation). Three
+real findings, all fixed:
+
+- **Documentation -- an inconsistently-applied caveat.** `RegisterPatientRequest.RegisteredBy`
+  documented "caller-supplied for now, not verified against any authenticated session -- an
+  already-accepted gap inherited from ADR 0048" -- but the identical pattern on
+  `UploadAdvanceDirectiveDocumentRequest.OwnerId`, `SetAdvanceDirectiveStatusRequest.AuthenticatorUserId`,
+  and `FhirPatientEndpoints.CreatePatient`'s `registeredBy` query parameter carried no such note. Fixed
+  by adding the same caveat to all three. This is **not a new security finding** -- the lack of
+  authentication itself is ADR 0048's own explicit, named deferral (no token exists to validate until
+  the gateway routes a second service through it) -- only the missing documentation was new.
+- **SOLID -- duplicated registration orchestration.** `PatientEndpoints.RegisterPatient` and
+  `FhirPatientEndpoints.CreatePatient` each independently called
+  `PatientRegistration.Create(...)` then `RegisterPatientUseCase.ExecuteAsync(...)` -- identical
+  construct-then-register sequence duplicated across two Api files for two different input shapes (raw
+  HTTP fields vs. FHIR-resource-extracted fields). Fixed by adding a convenience overload to
+  `RegisterPatientUseCase.ExecuteAsync` that accepts the raw primitive fields and constructs the
+  registration internally -- additive, not a breaking change to the existing
+  `PatientRegistration`-accepting overload several integration tests already use directly to test
+  registration persistence given an already-valid registration. Each endpoint still shapes its own
+  error response for `PatientValidationException` (REST `ValidationProblem` vs. FHIR
+  `OperationOutcome`) -- only the construction call itself stopped being duplicated.
+- **Security (defense-in-depth) -- a predictable, unversioned temp-cache path.**
+  `FhirProfileValidator.ExtractIfNeeded` extracted into a fixed `Path.GetTempPath()` subdirectory,
+  gated only by a marker file's *existence*, not the source `.tgz`'s content -- a staleness risk if
+  `/tmp` ever persisted across a redeploy with updated profile packages, and (low real-world severity
+  given this runs in an isolated container) a theoretical plant-a-fake-marker risk on a
+  non-containerized, multi-tenant host. Fixed by making the cache content-addressed: the destination
+  subdirectory and the marker file's own content are both keyed on the source `.tgz`'s SHA-256 hash, so
+  a changed package version naturally invalidates the old cache entry instead of silently reusing it,
+  and skipping extraction now requires matching that exact hash, not just a marker file's presence.
+- Also found and fixed, while already in `FhirPatientEndpoints.cs`: 2 more dead `using` statements
+  (`OpenEmrNext.PatientManagement.Domain.Fhir` and `...Fhir.Rules`) that the earlier
+  Application/Application.Ports SOLID cleanup round missed in this one file.
+
+## Api follow-up: request validation and a cleanup pass
+
+Recorded 2026-11-15, after the three findings above. Two more rounds of work on `Api`, both
+user-initiated rather than found during the six-dimension pass itself:
+
+- **DataAnnotations added to every Request DTO.** All 5 `Contracts/Requests` types
+  (`RegisterPatientRequest`, `AddInsurancePolicyRequest`, `SwapInsuranceRequest`,
+  `SetAdvanceDirectiveStatusRequest`, `UploadAdvanceDirectiveDocumentRequest`) now carry
+  `[Required]`/`[StringLength]`/`[Range]`/`[EmailAddress]` attributes, enforced by
+  `builder.Services.AddValidation()` (`PatientManagementApiExtensions.cs`) -- ASP.NET Core 10's
+  built-in minimal-API validation, wired globally via `Microsoft.AspNetCore.Routing`'s
+  `ValidationEndpointFilterFactory`, not a hand-written filter. Every `ErrorMessage` matches the
+  corresponding Domain factory's own exact wording wherever an equivalent Domain rule exists (e.g.
+  `PatientRegistration`'s "First name must be between 1 and 255 characters."), so a caller sees
+  identical text whichever layer actually caught the problem; a handful of fields with no Domain
+  counterpart (`AuthenticatorUserId`, and the string-encoded enums `Level`/`Status`/`Type`/
+  `TargetLevel`) got new, purpose-written messages instead. This is restating Domain's validation
+  earlier, not replacing it -- the Domain factories remain the actual source of truth and still run
+  on every request regardless of what the attributes catch first. The one genuine prior gap this
+  closes: `AuthenticatorUserId` had no validation anywhere before this (neither
+  `SetAdvanceDirectiveStatusUseCase` nor `IAdvanceDirectiveRepository` checked it), now
+  `[Range(1, long.MaxValue)]`. Covered by a new integration test,
+  `PUT_status_with_a_non_positive_authenticator_id_returns_400`.
+- **Code-cleanliness pass.** A new `ValidationProblems` helper
+  (`Endpoints/ValidationProblems.cs`) centralizes the `Results.ValidationProblem(new
+  Dictionary<string, string[]> { ["errors"] = ... })` construction that was duplicated 8 times
+  across `PatientEndpoints`, `InsuranceEndpoints`, and `AdvanceDirectiveEndpoints` -- `Single(...)`
+  for one error, `Many(...)` for a list. `FhirPatientMapper`'s own private `UsCoreProfile` constant
+  (an independent second copy of the same profile URL already defined as
+  `FhirProfileValidator.UsCorePatientProfile`) was removed in favor of the existing one. 4 more dead
+  `using` statements removed (`Domain.Insurance.Rules`, `Domain.Insurance.ReadModels` in
+  `InsuranceEndpoints.cs`; `Domain.AdvanceDirectives.ReadModels` in `AdvanceDirectiveEndpoints.cs`;
+  a bare `Domain` in `FhirPatientEndpoints.cs`, verified safe to remove without reintroducing the
+  `Patient`/`FhirPatient` ambiguity an earlier fix deliberately avoided) -- found by removing each
+  suspected one and doing a full rebuild, not by static inspection alone.
+
+Build-verified only; the integration test suite has not been run against either round yet.
+
+## Hardcoded-values audit (PatientManagement)
+
+Recorded 2026-11-15. Swept all six `PatientManagement` projects (`Domain`, `Application`,
+`Application.Ports`, `Infrastructure`, `Composition`, `Api`) for literals that should arguably be
+configuration instead. Everything found was already either a bound, overridable options default
+(`PatientManagementDbOptions.Port = 3306`; `AdvanceDirectiveStorageOptions.RepositoryRoot` resolved
+from config, not hardcoded, in `LocalDiskAdvanceDirectiveFileStore`) or a legacy-grounded Domain
+invariant with its source already cited in a comment (`AdvanceDirectiveDocument.MaxContentBytes` ==
+`php.ini`'s 30M; `DuplicateScore.DisplayThreshold`/`HighlightThreshold` == the legacy scoring
+formula's own 12/17; the `255`/`30`-ish string-length bounds across `PatientRegistration` and
+`InsurancePolicy` == legacy's own column widths; the `9999-12-31` open-ended-policy sentinel; the
+FHIR/LOINC/RFC spec URIs in `FhirPatientMapper`/`EfPatientFhirRepository`/`Rfc4122GuidConverter`) --
+none of these are new findings.
+
+One real finding: `new MariaDbServerVersion(new Version(12, 3, 3))` is hardcoded identically in
+**three** places repo-wide -- `PatientManagementApiExtensions.cs` (production), the test fixture
+`PatientDataContainerFixture.cs`, and (out of this audit's scope, but the same literal)
+AuthFacade's own `OpenIddictClientServiceCollectionExtensions.cs`. `PatientManagementApiExtensions.cs`'s
+own comment already acknowledges this as deliberate ("same pin AuthFacade's own DbContext already
+uses"), so it's a known, repo-wide convention, not an oversight -- but the two `PatientManagement`
+copies (prod + test) aren't sharing a single source of truth within this service. Left as-is pending
+a decision: either leave it (each of the two copies is small and already commented), or deduplicate
+the two `PatientManagement` copies behind one shared `internal const` (not touching AuthFacade, which
+is a separate deployable service entitled to pin its own MariaDB client version independently).
+
 ## Scope note
 
 This is vocabulary and rules, not a formal bounded-context diagram or conceptual class model. Per the

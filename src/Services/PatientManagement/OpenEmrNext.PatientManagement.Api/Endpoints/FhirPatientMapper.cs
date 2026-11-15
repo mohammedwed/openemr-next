@@ -17,7 +17,6 @@ namespace OpenEmrNext.PatientManagement.Api.Endpoints;
 /// </summary>
 public static class FhirPatientMapper
 {
-    private const string UsCoreProfile = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient";
     private const string DataAbsentReasonSystem = "http://terminology.hl7.org/CodeSystem/data-absent-reason";
 
     public static Patient ToFhirPatient(PatientFhirView view)
@@ -31,7 +30,7 @@ public static class FhirPatientMapper
             {
                 VersionId = "1",
                 LastUpdated = view.LastUpdated,
-                Profile = [UsCoreProfile]
+                Profile = [FhirProfileValidator.UsCorePatientProfile]
             },
             Active = true,
             Gender = view.Gender switch

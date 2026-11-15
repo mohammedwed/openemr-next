@@ -12,6 +12,24 @@ namespace OpenEmrNext.PatientManagement.Application;
 /// </summary>
 public sealed class RegisterPatientUseCase(IPatientRegistry registry)
 {
+    /// <summary>
+    /// Builds the <see cref="PatientRegistration"/> from raw facts first, then registers it -- the one
+    /// place that sequence lives. Both <c>PatientEndpoints.RegisterPatient</c> and
+    /// <c>FhirPatientEndpoints.CreatePatient</c> used to construct the registration themselves before
+    /// calling <see cref="ExecuteAsync(PatientRegistration,long,DateTime,CancellationToken)"/>
+    /// directly -- duplicated, identical orchestration across two Api files for two different input
+    /// shapes (raw HTTP fields vs. FHIR-resource-extracted fields). Each endpoint still shapes its own
+    /// error response for <see cref="PatientValidationException"/> (REST <c>ValidationProblem</c> vs.
+    /// FHIR <c>OperationOutcome</c>) -- only the construct-then-register sequence moved here.
+    /// </summary>
+    /// <exception cref="PatientValidationException">One or more fields fail validation. Nothing is persisted.</exception>
+    public Task<Patient> ExecuteAsync(
+        string firstName, string lastName, string sex, DateOnly dateOfBirth, string? email, string? trustedEmail,
+        long registeredBy, DateTime registeredAtUtc, CancellationToken ct) =>
+        ExecuteAsync(
+            PatientRegistration.Create(firstName, lastName, sex, dateOfBirth, email, trustedEmail),
+            registeredBy, registeredAtUtc, ct);
+
     /// <exception cref="PatientValidationException">One or more fields fail validation. Nothing is persisted.</exception>
     public async Task<Patient> ExecuteAsync(
         PatientRegistration registration, long registeredBy, DateTime registeredAtUtc, CancellationToken ct)

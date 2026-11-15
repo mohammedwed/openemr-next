@@ -29,16 +29,13 @@ public static class PatientEndpoints
         try
         {
             patient = await useCase.ExecuteAsync(
-                PatientRegistration.Create(
-                    request.FirstName, request.LastName, request.Sex, request.DateOfBirth,
-                    request.Email, request.TrustedEmail),
-                request.RegisteredBy,
-                DateTime.UtcNow,
-                ct);
+                request.FirstName, request.LastName, request.Sex, request.DateOfBirth,
+                request.Email, request.TrustedEmail,
+                request.RegisteredBy, DateTime.UtcNow, ct);
         }
         catch (PatientValidationException ex)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]> { ["errors"] = [.. ex.Errors] });
+            return ValidationProblems.Many(ex.Errors);
         }
 
         // Matches legacy OpenEMR's own behavior: scored synchronously right after insert, cached for

@@ -1,10 +1,7 @@
 using Hl7.Fhir.Model;
 using OpenEmrNext.PatientManagement.Application;
-using OpenEmrNext.PatientManagement.Domain;
 using OpenEmrNext.PatientManagement.Domain.ValueObjects;
-using OpenEmrNext.PatientManagement.Domain.Fhir;
 using OpenEmrNext.PatientManagement.Domain.Fhir.ReadModels;
-using OpenEmrNext.PatientManagement.Domain.Fhir.Rules;
 using FhirPatient = Hl7.Fhir.Model.Patient;
 
 namespace OpenEmrNext.PatientManagement.Api.Endpoints;
@@ -113,6 +110,10 @@ public static class FhirPatientEndpoints
         return FhirContent(bundle);
     }
 
+    /// <param name="registeredBy">The id of the user creating this patient, as a query parameter
+    /// (<c>?registeredBy=</c>) -- caller-supplied for now, not verified against any authenticated
+    /// session, the same already-accepted ADR 0048 gap <c>RegisterPatientRequest.RegisteredBy</c>
+    /// documents for the plain registration path.</param>
     private static async Task<IResult> CreatePatient(
         HttpRequest request, long registeredBy,
         RegisterPatientUseCase registerUseCase, ScorePatientForDuplicatesUseCase scoreUseCase,
@@ -154,7 +155,7 @@ public static class FhirPatientEndpoints
         try
         {
             registered = await registerUseCase.ExecuteAsync(
-                PatientRegistration.Create(firstName, lastName, gender, dateOfBirth, email, trustedEmail),
+                firstName, lastName, gender, dateOfBirth, email, trustedEmail,
                 registeredBy, DateTime.UtcNow, ct);
         }
         catch (PatientValidationException ex)
