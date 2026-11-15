@@ -110,3 +110,32 @@
 .op-breadcrumbs {
     margin-bottom: 1rem;
 }
+
+/* op-nav--desktop/--mobile: the same three routes, rendered twice, with only one visible at a time via
+   media query -- not MudHidden, which decides via a JS viewport observer and so can't apply its rule
+   until after a JS-interop round trip (a flash of the wrong one on first paint). 599.98px matches
+   MudBlazor's own xs/sm boundary (600px), kept one hundredth under it to avoid the boundary pixel
+   matching both a max-width and a min-width query at once. */
+.op-nav--mobile {
+    display: none;
+}
+
+@media (max-width: 599.98px) {
+    .op-nav--desktop {
+        display: none;
+    }
+
+    .op-nav--mobile {
+        display: inline-block;
+    }
+}
+
+/* Matches MudIconButton's own default (Size.Medium) rendered footprint -- measured directly via
+   getBoundingClientRect() on the app bar's own hamburger button in a running instance (48x48px), not
+   guessed from the compiled CSS rules alone (font-size 1.5rem + 12px padding on each side nets 48px,
+   but that arithmetic assumes the icon glyph's visual box exactly equals its font-size, which isn't
+   guaranteed) -- so the user-menu button never visibly resizes when it replaces this placeholder. */
+.op-user-slot-placeholder {
+    width: 48px;
+    height: 48px;
+}

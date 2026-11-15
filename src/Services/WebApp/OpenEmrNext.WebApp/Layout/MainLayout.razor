@@ -10,18 +10,40 @@
         <MudText Typo="Typo.h6" Class="op-brand">OpenEMR Next</MudText>
         <MudSpacer />
         @* A flat inline nav, not a persistent MudDrawer sidebar: with only two enabled routes, an
-           always-visible side rail added chrome weight without adding navigability. *@
-        <nav class="op-nav">
+           always-visible side rail added chrome weight without adding navigability (ADR 0062). That
+           decision was about route *count*, not viewport width -- below the sm breakpoint this same
+           three-item row has nowhere to go, so op-nav--desktop/--mobile below switch between it and a
+           menu on a plain CSS media query (app.css), not MudHidden's JS viewport observer: the latter
+           only knows the real size after a JS-interop round trip, so the wrong one would flash on
+           first paint every time. *@
+        <nav class="op-nav op-nav--desktop">
             <NavLink href="" Match="NavLinkMatch.All" class="op-nav-link">Dashboard</NavLink>
             <NavLink href="patients" class="op-nav-link">Patients</NavLink>
-            <MudTooltip Text="Coming soon">
-                <span class="op-nav-link op-nav-link--disabled">Encounters</span>
+            @* ShowOnClick covers touch (no hover state to reveal it otherwise); tabindex+role+aria-disabled
+               make it reachable and announced for keyboard/screen-reader users, who previously had no way
+               to discover a tooltip that only ever bound to mouseenter. *@
+            <MudTooltip Text="Coming soon" ShowOnClick="true">
+                <span class="op-nav-link op-nav-link--disabled" tabindex="0" role="link" aria-disabled="true">Encounters</span>
             </MudTooltip>
         </nav>
+        <MudMenu Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" AriaLabel="Open navigation menu"
+            Class="op-nav--mobile">
+            <MudMenuItem Href="">Dashboard</MudMenuItem>
+            <MudMenuItem Href="patients">Patients</MudMenuItem>
+            <MudMenuItem Disabled="true">Encounters (coming soon)</MudMenuItem>
+        </MudMenu>
         <MudSpacer />
-        @if (_userLabel is { } userLabel)
+        @* A fixed-size placeholder while sign-in status is still loading, not nothing: without it, the
+           menu button pops into existence after the GetCurrentUserAsync round trip resolves, visibly
+           shifting the app bar's contents. Signed-out stays genuinely empty afterward -- there's never
+           a menu to reserve space for in that case. *@
+        @if (_loadingUser)
         {
-            <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit">
+            <div class="op-user-slot-placeholder" aria-hidden="true"></div>
+        }
+        else if (_userLabel is { } userLabel)
+        {
+            <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" AriaLabel="Open user menu">
                 <MudMenuItem Disabled="true">Signed in as @userLabel</MudMenuItem>
                 <MudDivider />
                 <MudMenuItem Href="/logout">Log out</MudMenuItem>
@@ -47,6 +69,7 @@
 
 @code {
     private string? _userLabel;
+    private bool _loadingUser = true;
     private List<BreadcrumbItem> _breadcrumbs = [];
 
     protected override async Task OnInitializedAsync()
@@ -65,6 +88,10 @@
         catch (ApiException)
         {
             _userLabel = null;
+        }
+        finally
+        {
+            _loadingUser = false;
         }
     }
 

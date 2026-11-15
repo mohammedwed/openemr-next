@@ -277,3 +277,50 @@ PatientManagement's full suite (57/121/17) still pass unchanged, since none of t
 - Verified visually again (Chrome, hard reload): cards now visibly separate from the page canvas,
   top-level pages ("Dashboard", "Patients") no longer show a redundant breadcrumb, nested pages
   ("Patients / Register") still do, and every date field matches the outlined style of its neighbors.
+
+## Fixed — MainLayout's chrome had no mobile-width fallback and two accessibility gaps
+
+- **No responsive fallback for the top nav below the `sm` breakpoint (600px)**: the flat inline nav
+  introduced by ADR 0062 has nowhere to go at phone width — nothing in that ADR considered viewport
+  size, only route count (it explicitly accepted not scaling past "a handful of routes," with "revisit
+  if the route list grows" as the named trigger for *that* tradeoff). This is a different gap, not a
+  reopening of that one. Fixed with `op-nav--desktop`/`op-nav--mobile`: the same three links render
+  twice, swapped by a `max-width: 599.98px` media query in `app.css` — a hamburger `MudMenu` below the
+  breakpoint, the existing inline nav above it. Deliberately plain CSS, not `MudHidden`: `MudHidden`
+  decides via a JS viewport observer, so it can't apply until after a JS-interop round trip, meaning the
+  wrong nav would flash on first paint every time; a media query is correct from first render.
+- **The disabled "Encounters" placeholder was unreachable except by mouse hover**: a non-focusable
+  `<span>` behind a `MudTooltip` that only bound to `mouseenter`. Touch devices have no hover state and
+  keyboard users had no way to tab to it, so both got a dimmed label with zero explanation. Fixed with
+  `tabindex="0"`/`role="link"`/`aria-disabled="true"` on the span (reachable and announced) and
+  `ShowOnClick="true"` on the tooltip (covers touch taps).
+- **Both icon-only `MudMenu` triggers (the new hamburger, and the existing user-account menu) had no
+  accessible name** — screen readers get nothing to announce beyond "button." Added `AriaLabel` to
+  each.
+- **Found while reviewing the fix, not the original finding**: the user-menu slot pops into existence
+  only after `GetCurrentUserAsync()` resolves, visibly shifting the app bar's contents for a signed-in
+  user. Fixed with a `_loadingUser` flag and a fixed-size placeholder (`.op-user-slot-placeholder`)
+  shown only while that call is in flight; a signed-out visitor still sees nothing there afterward, same
+  as before.
+- **Not touched, and not new findings**: the breadcrumb path-segment `switch` and the UUID-fragment
+  `_userLabel` fallback are both already-flagged, intentional stopgaps from the prior author's own
+  comments in this file — left exactly as they were.
+- Verified against a standalone `dotnet run` instance (Chrome): real window resizing has no effect in
+  this sandbox (confirmed — `resize_window` and `window.resizeTo` both left `window.innerWidth`
+  unchanged), so the breakpoint was exercised with a same-origin `<iframe>` sized to 375×700 — each
+  frame's own document evaluates `@media` against its own viewport, so this is a faithful test of the
+  real breakpoint, not a simulation. At 375px: the inline nav disappears, the hamburger appears, opening
+  it lists Dashboard/Patients/"Encounters (coming soon)" correctly, and clicking "Patients" navigates
+  correctly inside the frame. At the outer 1280px window: the inline nav renders as before, Tab reaches
+  "Encounters" and shows its focus ring with the "Coming soon" tooltip visible. The user-menu placeholder
+  size (48×48px) was measured directly via `getBoundingClientRect()` on the real hamburger button rather
+  than assumed from `MudIconButton`'s compiled CSS rules alone, which don't by themselves guarantee the
+  icon glyph's rendered box exactly equals its `font-size`. Full solution builds clean (0 errors, 0
+  warnings).
+- **Follow-up checks, both clean**: (1) Dark mode — `MudThemeProvider.ObserveSystemDarkModeChange`
+  defaults to `true`, so the app already follows the OS/browser preference with no app code involved;
+  verified by temporarily hardcoding `IsDarkMode="true"` on `App.razor`'s `<MudThemeProvider>` (reverted
+  before committing, never shipped) and checking the desktop nav, mobile hamburger menu, and the
+  "Encounters" focus ring/tooltip all render with correct contrast against the dark palette. (2) The
+  narrowest common phone width (320px, e.g. iPhone SE) — the brand text and hamburger fit with ~75px of
+  slack to spare, more than the 48px the account-menu icon would also need once signed in.
