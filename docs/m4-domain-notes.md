@@ -378,7 +378,7 @@ SOLID). Resilience only really applies where I/O happens (`Infrastructure`, and 
 in `Composition`/`Api`) -- `Domain` has none by design (`LayerDependencyTests`), so for `Domain` this
 dimension only ever measures "failing fast," not resilience. Two real findings; one fixed, one tracked:
 
-- **Fixed -- no transient-fault retry on the database connection (ADR 0055).**
+- **Fixed -- no transient-fault retry on the database connection (ADR 0056).**
   `PatientManagementApiExtensions.AddPatientManagementHttpDependencies` called
   `options.UseMySql(connectionString, ...)` with no `EnableRetryOnFailure()` -- a brief network blip to
   MariaDB failed every in-flight request outright, no automatic recovery. For comparison: AuthFacade has
@@ -400,7 +400,7 @@ dimension only ever measures "failing fast," not resilience. Two real findings; 
   this was a repo-wide gap, not specific to this service -- `AuthFacade` and `Gateway` still don't have
   `UseExceptionHandler`/`ProblemDetails` either, only this service does now. Every endpoint already
   caught its own known validation exceptions inline, consistently; anything unanticipated (a transient
-  DB error that exhausted ADR 0055's retries, a real bug) previously fell through to ASP.NET's bare
+  DB error that exhausted ADR 0056's retries, a real bug) previously fell through to ASP.NET's bare
   default 500. Fixed with the minimal built-in pattern -- `builder.Services.AddProblemDetails()`
   (`PatientManagementApiExtensions`) plus `app.UseExceptionHandler()` (`Program.cs`), no custom
   `IExceptionHandler` needed: ASP.NET Core's own exception middleware already logs the exception at
@@ -420,7 +420,7 @@ startup in a CI log earlier this session -- not a silent empty-string default re
 
 Recorded 2026-11-15, the same grounded pass over all 19 files in `Api` (endpoints, contracts,
 `FhirJson`, `FhirProfileValidator`, `Program.cs`, composition). Resilience & failing fast scored
-strongly here by construction (ADRs 0055/0056 live in this project); DDD and Clean Architecture were
+strongly here by construction (ADRs 0056/0057 live in this project); DDD and Clean Architecture were
 already solid (every endpoint delegates to Application/Domain, never hand-rolls validation). Three
 real findings, all fixed:
 

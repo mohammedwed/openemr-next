@@ -1,4 +1,4 @@
-# 0055. Patient Management's database connection retries transient failures
+# 0056. Patient Management's database connection retries transient failures
 
 - **Status:** Accepted
 - **Date:** 2026-11-14
@@ -56,7 +56,7 @@ transient failure occurs in production.
   against a stable database).
 - Global exception-handling middleware (`UseExceptionHandler`/`ProblemDetails`) was a separate finding
   from the same review, deprioritized below this one at the time -- fixed immediately after, in
-  [0056](0056-patient-management-adds-global-exception-handling-middleware.md).
+  [0057](0057-patient-management-adds-global-exception-handling-middleware.md).
 
 ## Alternatives considered
 

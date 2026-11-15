@@ -247,7 +247,7 @@ repository exists to provide has no clean EF-native equivalent, and the legacy-s
 - Confirmed, not assumed, as a genuine existing strength: startup configuration fails fast correctly
   via `[Required]` + `.ValidateOnStart()` on both options classes.
 
-## Fixed — no transient-fault retry on the database connection (ADR 0055)
+## Fixed — no transient-fault retry on the database connection (ADR 0056)
 
 - `EnableRetryOnFailure()` is now on for `PatientManagementDbContext`'s MySQL connection.
 - All three explicit transactions (`EfInsurancePolicyRepository.AddAsync`/`PersistSwapAsync`,

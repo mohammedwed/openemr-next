@@ -1,21 +1,21 @@
-# 0056. Patient Management adds global exception-handling middleware
+# 0057. Patient Management adds global exception-handling middleware
 
 - **Status:** Accepted
 - **Date:** 2026-11-14
-- **Builds on:** `docs/m4-domain-notes.md`'s Resilience and failing fast dimension, [0055](0055-patient-management-retries-transient-database-failures.md)
+- **Builds on:** `docs/m4-domain-notes.md`'s Resilience and failing fast dimension, [0056](0056-patient-management-retries-transient-database-failures.md)
 
 ## Context
 
-The same Resilience and failing fast review that led to ADR 0055 found a second gap: no global
+The same Resilience and failing fast review that led to ADR 0056 found a second gap: no global
 exception-handling middleware anywhere in `OpenEmrNext.PatientManagement.Api`. Every endpoint already
 catches its own known Domain validation exceptions inline and maps them to a clean
 `Results.ValidationProblem`/`Results.NotFound` response -- but anything unanticipated (a transient
-database error that exhausts ADR 0055's retries, a real bug) fell through to ASP.NET Core's bare
+database error that exhausts ADR 0056's retries, a real bug) fell through to ASP.NET Core's bare
 default 500, with no structured body, unlike every other error path in this API.
 
 Confirmed, not assumed, that this was a repo-wide gap, not specific to this service: neither
 `AuthFacade` nor `Gateway` have `UseExceptionHandler`/`ProblemDetails` configured either. Deprioritized
-below the ADR 0055 retry fix at the time (a response-shaping concern, not a correctness/availability
+below the ADR 0056 retry fix at the time (a response-shaping concern, not a correctness/availability
 one), then picked up immediately after.
 
 ## Decision
@@ -60,5 +60,5 @@ middleware only ever sees what wasn't already caught closer to where it happened
   create two places that could drift apart. The global handler's job here is narrower and clearer:
   catch what nothing else anticipated, not re-implement what already works.
 - **Leave it as tracked debt, same as it was initially.** Rejected once picked back up: unlike ADR
-  0055's retry fix, this change carries no transactional-correctness risk to weigh against -- it's two
+  0056's retry fix, this change carries no transactional-correctness risk to weigh against -- it's two
   lines, verified by a real test, with no plausible way to make an already-failing request worse.
