@@ -96,6 +96,16 @@ Infrastructure, and now Api). Three findings, all fixed.
   maximum rather than publish it.
 - Covered by a new `OpenApiDocumentTests`, verified against the real generated document.
 
+## Added — a typed PatientManagement client via NSwag (ADR 0059)
+
+- New `OpenEmrNext.PatientManagement.Client` project, same shape as `OpenEmrNext.AuthFacade.Client`
+  (ADR 0031): an `OpenApiReference` against a committed snapshot, no `ProjectReference` to the Api
+  project.
+- New `scripts/dev/generate-patientmanagement-openapi.sh` regenerates the snapshot by running the
+  real Api briefly with placeholder config. Unlike AuthFacade's script, it polls `/openapi/v1.json`
+  itself for readiness — this Api has no `/health` endpoint.
+- Added to `OpenEMR-Next.slnx`. Nothing consumes the generated client yet.
+
 ## Tests
 
 Full solution builds clean (0 errors, same 5 pre-existing unrelated nullable warnings). Full

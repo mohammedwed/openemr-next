@@ -21,6 +21,7 @@
     <Project Path="src/Services/PatientManagement/OpenEmrNext.PatientManagement.Infrastructure/OpenEmrNext.PatientManagement.Infrastructure.csproj" />
     <Project Path="src/Services/PatientManagement/OpenEmrNext.PatientManagement.Composition/OpenEmrNext.PatientManagement.Composition.csproj" />
     <Project Path="src/Services/PatientManagement/OpenEmrNext.PatientManagement.Api/OpenEmrNext.PatientManagement.Api.csproj" />
+    <Project Path="src/Services/PatientManagement/OpenEmrNext.PatientManagement.Client/OpenEmrNext.PatientManagement.Client.csproj" />
   </Folder>
   <Folder Name="/src/Services/LoginUi/">
     <Project Path="src/Services/LoginUi/OpenEmrNext.LoginUi/OpenEmrNext.LoginUi.csproj" />
