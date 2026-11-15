@@ -33,7 +33,7 @@ public static class FhirPatientEndpoints
 
     public static IEndpointRouteBuilder MapFhirPatientEndpoints(this IEndpointRouteBuilder app)
     {
-        var fhir = app.MapGroup("/fhir");
+        var fhir = app.MapGroup("/fhir").RequireAuthorization();
 
         fhir.MapGet("/Patient/{uuid:guid}", GetPatient)
             .WithName("FhirGetPatient")

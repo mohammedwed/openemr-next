@@ -62,7 +62,24 @@ Infrastructure, and now Api). Three findings, all fixed.
   service's scope). Already acknowledged in-code as a deliberate repo-wide pin, not an oversight --
   not fixed here pending a decision on whether to deduplicate the two `PatientManagement` copies.
 
+## Added — shared-secret gate on PatientManagement.Api (ADR 0055)
+
+- Every endpoint now requires the `X-Internal-Gateway-Secret` header to match a configured secret
+  (`InternalGatewayOptions.Secret`), enforced by a new `InternalGatewayAuthenticationHandler` (modeled
+  on the deleted `OpenEmrBearerHandler`, ADR 0035) wired via `.RequireAuthorization()` on both route
+  groups. A request without it, or with the wrong value, gets 401.
+- This closes the "anyone can call this service" half of the gap ADR 0048 named. The other half --
+  `RegisteredBy`/`OwnerId`/`AuthenticatorUserId` still being caller-supplied, not resolved from a real
+  authenticated identity -- is unchanged and not fixed here. Doing that requires resolving OpenEMR's
+  UUID `sub` claim to a numeric `users.id`, which nothing in this codebase does today; ADR 0055 tracks
+  this explicitly as a follow-up rather than leaving it undocumented.
+- All four HTTP-pipeline integration test fixtures (`PatientEndpointTests`, `FhirPatientEndpointTests`,
+  `InsuranceEndpointTests`, `AdvanceDirectiveEndpointTests`) now configure a test secret and attach it
+  to every request. New `GatewaySecretAuthenticationTests` proves the gate itself: no header or the
+  wrong header both return 401.
+
 ## Tests
 
 Full solution builds clean (0 errors, same 5 pre-existing unrelated nullable warnings). The
-integration test suite has not been run against the DataAnnotations or cleanup changes yet.
+integration test suite is about to be run against all of this round's changes (DataAnnotations,
+the ValidationProblems/UsCoreProfile cleanup, and the new gateway-secret gate).

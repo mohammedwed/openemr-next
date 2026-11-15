@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using OpenEmrNext.PatientManagement.Api.Authentication;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Application.Ports;
 using OpenEmrNext.PatientManagement.Infrastructure;
@@ -67,6 +69,14 @@ public static class PatientManagementApiExtensions
         builder.Services.AddSingleton<Endpoints.FhirProfileValidator>();
 
         builder.Services.AddOpenApi();
+
+        // Gates every endpoint shut to anyone without the configured shared secret (see
+        // InternalGatewayOptions/InternalGatewayAuthenticationHandler) -- it does not resolve or verify
+        // which end user is behind the call, only that the caller is a trusted internal one.
+        builder.Services.AddAuthentication(InternalGatewayAuthenticationHandler.SchemeName)
+            .AddScheme<AuthenticationSchemeOptions, InternalGatewayAuthenticationHandler>(
+                InternalGatewayAuthenticationHandler.SchemeName, null);
+        builder.Services.AddAuthorization();
 
         // Enforces the [Required]/[Range]/[StringLength]/[EmailAddress] attributes on every record in
         // Contracts/Requests -- these fail the same checks the Domain factories (PatientRegistration.Create,

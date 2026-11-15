@@ -426,6 +426,27 @@ a decision: either leave it (each of the two copies is small and already comment
 the two `PatientManagement` copies behind one shared `internal const` (not touching AuthFacade, which
 is a separate deployable service entitled to pin its own MariaDB client version independently).
 
+## PatientManagement.Api now requires a shared internal-gateway secret
+
+Recorded 2026-11-15 (ADR 0055). PatientManagement.Api had no authentication or authorization at all --
+every endpoint trusted caller-supplied identity fields unconditionally. The original goal was to close
+this properly: gate the service *and* forward the real authenticated user's identity. Research found the
+second half isn't buildable yet -- AuthFacade's session only carries OpenEMR's UUID `sub` claim, with no
+claim or lookup anywhere in this codebase that resolves it to the numeric `users.id` that
+`RegisteredBy`/`OwnerId`/`AuthenticatorUserId` actually need (they map onto real legacy integer FK
+columns -- `patient_data.created_by`, `documents.owner`,
+`patient_data.advance_directive_user_authenticator` -- confirmed by reading
+`PatientManagementDbContext`/`EfAdvanceDirectiveRepository`, neither of which overrides the column type).
+
+Scaled back to the grounded part: every endpoint now requires a shared secret
+(`X-Internal-Gateway-Secret`, `InternalGatewayOptions.Secret`), checked by a new
+`InternalGatewayAuthenticationHandler` modeled on the deleted `OpenEmrBearerHandler` (ADR 0035) --
+constant-time comparison, same `NoResult()`-vs-`Fail()` shape. `RegisteredBy`/`OwnerId`/
+`AuthenticatorUserId` are still caller-supplied exactly as before; that gap is unchanged, not fixed, and
+is now explicitly tracked (ADR 0055) rather than silently left as-is. No caller attaches this header yet
+-- PatientManagement isn't wired into docker-compose or the Gateway's routes at all; per ADR 0030, the
+Gateway is the intended future owner of that wiring, not a direct AuthFacade cluster.
+
 ## Scope note
 
 This is vocabulary and rules, not a formal bounded-context diagram or conceptual class model. Per the

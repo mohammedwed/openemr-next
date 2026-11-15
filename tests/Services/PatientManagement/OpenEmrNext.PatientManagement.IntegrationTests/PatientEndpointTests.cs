@@ -31,9 +31,11 @@ public class PatientEndpointTests(PatientDataContainerFixture fixture) : IAsyncL
                 new("PatientManagementDb:Database", fixture.Database),
                 new("PatientManagementDb:User", fixture.User),
                 new("PatientManagementDb:Password", fixture.DbPassword),
-                new("AdvanceDirectiveStorage:RepositoryRoot", Path.GetTempPath())
+                new("AdvanceDirectiveStorage:RepositoryRoot", Path.GetTempPath()),
+                new("InternalGateway:Secret", "test-secret")
             ])));
         _client = _factory.CreateClient();
+        _client.DefaultRequestHeaders.Add("X-Internal-Gateway-Secret", "test-secret");
         return Task.CompletedTask;
     }
 
