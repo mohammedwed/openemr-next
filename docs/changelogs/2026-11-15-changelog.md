@@ -197,3 +197,18 @@ PatientManagement's full suite (57/121/17) still pass unchanged, since none of t
 - Verified visually against the real running stack (Chrome): the app bar, active nav highlight, and
   "Add policy"/"Swap" buttons now show the brand purple/teal distinctly, and both expansion panels
   (Insurance, Advance directives) now have the same visible elevation as every other card in the app.
+
+## Added — main layout adjustments
+
+- **A user menu in the app bar**: shows who's signed in and a "Log out" link, where previously only
+  `Home.razor` had any logout affordance at all. Falls back to a shortened subject id when `Name` is
+  empty (OpenEMR's tokens in this stack carry no name claim -- the same known gap `Home.razor`'s own
+  display already has, not a new one).
+- **A collapsible drawer**: a hamburger toggle in the app bar now opens/closes the nav drawer
+  (`@bind-Open`), where it was previously always persistently open with no way to reclaim the space.
+- **Breadcrumbs reflecting the current page**: `MudBreadcrumbs`, driven by a plain path-segment match
+  against `NavigationManager`'s current URI (re-evaluated on `LocationChanged`) -- not a per-page
+  cascading value, since this app has few enough routes that the extra plumbing isn't worth it yet.
+- Verified visually against the real running stack (Chrome): the menu opens and shows "Signed in as
+  &lt;subject&gt;" / "Log out", the drawer toggles correctly and the main content reclaims the freed
+  space, and breadcrumbs show correctly on `/patients/register` ("Patients / Register").
