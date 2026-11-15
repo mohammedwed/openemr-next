@@ -9,7 +9,7 @@ public static class PatientManagementEndpoints
     /// <returns>The same builder, for chaining.</returns>
     public static IEndpointRouteBuilder MapPatientManagementEndpoints(this IEndpointRouteBuilder app)
     {
-        var v1 = app.MapGroup("/api/v1");
+        var v1 = app.MapGroup("/api/v1").RequireAuthorization();
         v1.MapPatientEndpoints();
         v1.MapInsuranceEndpoints();
         v1.MapAdvanceDirectiveEndpoints();

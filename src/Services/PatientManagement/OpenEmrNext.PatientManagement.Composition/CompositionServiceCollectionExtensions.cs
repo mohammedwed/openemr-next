@@ -25,6 +25,11 @@ public static class CompositionServiceCollectionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddOptions<InternalGatewayOptions>()
+            .Bind(configuration.GetSection(InternalGatewayOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         return services;
     }
 }

@@ -1,5 +1,6 @@
 using System.Formats.Tar;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Specification.Source;
@@ -60,23 +61,34 @@ public sealed class FhirProfileValidator
         });
     }
 
-    /// <summary>Idempotent: a marker file next to the extracted <c>package/</c> folder means a
-    /// previous run already did this, so a long-running service only pays the extraction cost once
-    /// per cache directory, not once per <see cref="Build"/> call.</summary>
+    /// <summary>
+    /// Idempotent and content-addressed: the extracted <c>package/</c> folder lives under a
+    /// subdirectory named for the source <c>.tgz</c>'s own SHA-256 hash, not a fixed name, so a
+    /// long-running service only pays the extraction cost once per distinct package content, not once
+    /// per <see cref="Build"/> call -- and a stale cache from a previously-deployed, different version
+    /// of the <c>.tgz</c> (if <see cref="Path.GetTempPath"/> ever persisted across a redeploy) can never
+    /// be silently reused, since a changed source file hashes to a different directory entirely.
+    /// Content-addressing also closes a narrower defense-in-depth gap a fixed, predictable path would
+    /// leave open: nothing could plant a fake <c>.extracted</c> marker to make this skip extraction and
+    /// trust substituted content, since doing so would require guessing this exact file's SHA-256 hash.
+    /// </summary>
     private static string ExtractIfNeeded(string tgzPath, string destinationDirectory)
     {
-        var markerFile = Path.Combine(destinationDirectory, ".extracted");
-        if (File.Exists(markerFile))
-            return destinationDirectory;
+        var contentHash = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(tgzPath)));
+        var versionedDirectory = Path.Combine(destinationDirectory, contentHash);
+        var markerFile = Path.Combine(versionedDirectory, ".extracted");
 
-        Directory.CreateDirectory(destinationDirectory);
+        if (File.Exists(markerFile) && File.ReadAllText(markerFile) == contentHash)
+            return versionedDirectory;
+
+        Directory.CreateDirectory(versionedDirectory);
         using (var fileStream = File.OpenRead(tgzPath))
         using (var gzip = new GZipStream(fileStream, CompressionMode.Decompress))
         {
-            TarFile.ExtractToDirectory(gzip, destinationDirectory, overwriteFiles: true);
+            TarFile.ExtractToDirectory(gzip, versionedDirectory, overwriteFiles: true);
         }
-        File.WriteAllText(markerFile, DateTime.UtcNow.ToString("O"));
+        File.WriteAllText(markerFile, contentHash);
 
-        return destinationDirectory;
+        return versionedDirectory;
     }
 }
