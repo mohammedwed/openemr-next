@@ -32,9 +32,15 @@
             break;
 
         case State.Loaded:
+            <MudTextField T="string" @bind-Value="_searchTerm" Label="Search by name" Class="mb-4"
+                Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" OnAdornmentClick="SearchAsync"
+                OnKeyDown="OnSearchKeyDownAsync" Immediate="true" />
+
             @if (_patients.Count == 0)
             {
-                <MudAlert Severity="Severity.Info">No patients registered yet.</MudAlert>
+                <MudAlert Severity="Severity.Info">
+                    @(string.IsNullOrWhiteSpace(_searchTerm) ? "No patients registered yet." : $"No patients match \"{_searchTerm}\".")
+                </MudAlert>
             }
             else
             {
@@ -66,6 +72,7 @@
 
     private State _state = State.Loading;
     private List<PatientSummaryResponse> _patients = [];
+    private string? _searchTerm;
 
     private string LoginUrl => $"/oidc/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
 
@@ -95,6 +102,27 @@
         catch (PatientManagementApiException)
         {
             _state = State.Error;
+        }
+    }
+
+    private async Task SearchAsync()
+    {
+        try
+        {
+            var patients = await PatientManagement.GetPatientsAsync(string.IsNullOrWhiteSpace(_searchTerm) ? null! : _searchTerm);
+            _patients = [.. patients];
+        }
+        catch (PatientManagementApiException)
+        {
+            _state = State.Error;
+        }
+    }
+
+    private async Task OnSearchKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchAsync();
         }
     }
 }
