@@ -63,3 +63,4 @@ old one's status is updated to point to it.
 | [0055](0055-patientmanagement-api-gated-by-a-shared-secret-identity-forwarding-deferred.md) | PatientManagement.Api is gated by a shared secret; forwarding the real caller's identity is deferred | Accepted | 2026-11-15 |
 | [0056](0056-patient-management-retries-transient-database-failures.md) | Patient Management's database connection retries transient failures | Accepted | 2026-11-14 |
 | [0057](0057-patient-management-adds-global-exception-handling-middleware.md) | Patient Management adds global exception-handling middleware | Accepted | 2026-11-14 |
+| [0058](0058-patientmanagement-openapi-declares-the-gateway-secret-and-reflects-validation-attributes.md) | PatientManagement's OpenAPI document declares the gateway secret and reflects validation attributes | Accepted | 2026-11-15 |

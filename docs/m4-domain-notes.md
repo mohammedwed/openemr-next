@@ -540,6 +540,35 @@ is now explicitly tracked (ADR 0055) rather than silently left as-is. No caller 
 -- PatientManagement isn't wired into docker-compose or the Gateway's routes at all; per ADR 0030, the
 Gateway is the intended future owner of that wiring, not a direct AuthFacade cluster.
 
+## PatientManagement's OpenAPI document: two real gaps, fixed (ADR 0058)
+
+Recorded 2026-11-15. `AddOpenApi()`/Scalar were already wired, but nobody had checked the actual
+generated document (`/openapi/v1.json`) against reality. Fetching it directly (running the app with
+placeholder config) surfaced two real gaps, both fixed:
+
+- **No security scheme at all.** Every operation showed `security: null` despite ADR 0055's gate
+  requiring the shared secret on every endpoint -- Scalar's "Try it" UI had no way to know to send it.
+  Fixed with `PatientManagementOpenApi.ConfigurePatientManagement()`, mirroring AuthFacade's own
+  `AuthFacadeOpenApi` pattern exactly: a document transformer declares `X-Internal-Gateway-Secret` as
+  an `apiKey`/header scheme, an operation transformer adds it wherever `IAuthorizeData` is present --
+  every operation here, unlike AuthFacade where only `/me` needs it.
+- **DataAnnotations never reached the schema.** `RegisterPatientRequest`'s generated schema had no
+  `minLength`/`maxLength`/`format`/`minimum` despite real `[StringLength]`/`[Range]`/`[EmailAddress]`
+  attributes genuinely enforced at runtime by `AddValidation()`. Root cause, confirmed by reflection:
+  these DTOs are positional records, so the attributes live on the primary constructor's *parameter*,
+  not the auto-generated property `JsonPropertyInfo.AttributeProvider` reflects --
+  `JsonPropertyInfo.AssociatedParameter.AttributeProvider` is where they actually are. Fixed with a new
+  `ValidationAttributesSchemaTransformer` that checks both.
+- **Found along the way**: writing `[Range(1, long.MaxValue)]`'s `Maximum` straight through produced
+  `9.223372036854776E+18` in the real document, not `9223372036854775807`. `RangeAttribute` has no
+  `(long, long)` constructor, only `(int, int)`/`(double, double)`, so the bound is already a lossy
+  double inside the attribute itself before any OpenAPI code sees it -- confirmed by reflecting the
+  attribute directly, not assumed. Since every `[Range]` here is a "must be positive" idiom, not a real
+  upper bound, the fix omits a known-wrong maximum rather than publish one.
+- Covered by a new `OpenApiDocumentTests` against the real generated document: the scheme's shape,
+  that literally every operation requires it, and that the schema carries the right constraints (and no
+  `maximum` key at all for the `long.MaxValue` sentinel case).
+
 ## Scope note
 
 This is vocabulary and rules, not a formal bounded-context diagram or conceptual class model. Per the

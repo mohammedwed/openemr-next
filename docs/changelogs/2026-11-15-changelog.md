@@ -78,8 +78,26 @@ Infrastructure, and now Api). Three findings, all fixed.
   to every request. New `GatewaySecretAuthenticationTests` proves the gate itself: no header or the
   wrong header both return 401.
 
+## Fixed — PatientManagement's OpenAPI document (ADR 0058)
+
+- The document declared no security scheme at all, despite every endpoint now requiring the
+  gateway secret (ADR 0055). Fixed with `PatientManagementOpenApi.ConfigurePatientManagement()`
+  (mirrors AuthFacade's own `AuthFacadeOpenApi`): declares `X-Internal-Gateway-Secret` as an
+  `apiKey`/header scheme and requires it on every operation.
+- DataAnnotations never reached the generated schema (`RegisterPatientRequest` showed no
+  `minLength`/`maxLength`/`format`/`minimum` despite real attributes). Root cause: these are
+  positional records, so the attributes live on the constructor parameter, not the property
+  `JsonPropertyInfo.AttributeProvider` reflects. Fixed with a new
+  `ValidationAttributesSchemaTransformer` that also checks `AssociatedParameter.AttributeProvider`.
+- Found and fixed along the way: `[Range(1, long.MaxValue)]`'s `Maximum` was writing as a
+  precision-losing `9.223372036854776E+18`, not the real `9223372036854775807` — `RangeAttribute`
+  has no `(long, long)` constructor, so the bound is already a lossy double inside the attribute
+  itself. Since every `[Range]` here is a "must be positive" idiom, the fix omits the wrong
+  maximum rather than publish it.
+- Covered by a new `OpenApiDocumentTests`, verified against the real generated document.
+
 ## Tests
 
-Full solution builds clean (0 errors, same 5 pre-existing unrelated nullable warnings). The
-integration test suite is about to be run against all of this round's changes (DataAnnotations,
-the ValidationProblems/UsCoreProfile cleanup, and the new gateway-secret gate).
+Full solution builds clean (0 errors, same 5 pre-existing unrelated nullable warnings). Full
+PatientManagement suite run and passing: 54 integration tests (including the new gateway-secret
+and OpenAPI-document tests), 121 unit tests, 17 architecture tests.
