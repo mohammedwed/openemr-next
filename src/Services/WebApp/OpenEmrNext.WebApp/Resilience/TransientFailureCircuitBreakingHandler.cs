@@ -4,17 +4,19 @@ using Polly.CircuitBreaker;
 namespace OpenEmrNext.WebApp.Resilience;
 
 /// <summary>
-/// Guards WebApp's calls to AuthFacade (through the generated <c>AuthFacadeClient</c>) with a circuit
-/// breaker, mirroring AuthFacade.Api's own breakers that guard its calls to OpenEMR (ADR 0041) -- this is
-/// the one remaining hop neither of those cover. Once AuthFacade has failed enough times, further calls
+/// Guards one of WebApp's dependencies (AuthFacade, via the generated <c>AuthFacadeClient</c>, or
+/// PatientManagement, via <c>PatientManagementClient</c>) with a circuit breaker, mirroring
+/// AuthFacade.Api's own breakers that guard its calls to OpenEMR (ADR 0041). Each dependency gets its
+/// own <c>HttpClient</c> and its own instance of this handler, so a down PatientManagement trips only
+/// its own breaker, never AuthFacade's. Once a dependency has failed enough times, further calls to it
 /// fail immediately with a synthetic 503 instead of each one waiting out its own timeout against a
-/// dependency already known to be down. A 4xx from AuthFacade (for example a 401 from an expired session)
-/// is never a failure here, same as ADR 0041's own breakers -- only a connection problem, a timeout, or a
-/// 5xx/408 says anything about whether AuthFacade itself is up. One fixed threshold set, not a configurable
-/// <c>CircuitBreakerOptions</c> like AuthFacade.Api's: WebApp has no configuration/options-binding
-/// infrastructure today, and there is exactly one dependency to guard here, not three independent ones.
+/// dependency already known to be down. A 4xx response (for example a 401 from an expired session) is
+/// never a failure here, same as ADR 0041's own breakers -- only a connection problem, a timeout, or a
+/// 5xx/408 says anything about whether the dependency itself is up. One fixed threshold set, not a
+/// configurable <c>CircuitBreakerOptions</c> like AuthFacade.Api's: WebApp has no configuration/
+/// options-binding infrastructure today.
 /// </summary>
-internal sealed class AuthFacadeCircuitBreakingHandler : DelegatingHandler
+internal sealed class TransientFailureCircuitBreakingHandler : DelegatingHandler
 {
     private readonly ResiliencePipeline<HttpResponseMessage> _pipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
         .AddCircuitBreaker(new CircuitBreakerStrategyOptions<HttpResponseMessage>
@@ -40,8 +42,9 @@ internal sealed class AuthFacadeCircuitBreakingHandler : DelegatingHandler
         }
         catch (BrokenCircuitException)
         {
-            // No request was sent to AuthFacade. The generated client surfaces this the same way it
-            // surfaces a real 503 from AuthFacade -- an ApiException callers already have to handle.
+            // No request was sent to the dependency. The generated client surfaces this the same way
+            // it surfaces a real 503 from the dependency itself -- an ApiException callers already
+            // have to handle.
             return new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable);
         }
     }

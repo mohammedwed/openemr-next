@@ -121,7 +121,7 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
 
     private const string BaseSelect =
         """
-        SELECT patient_data.uuid AS Uuid, patient_data.date AS LastUpdated,
+        SELECT patient_data.uuid AS Uuid, patient_data.pid AS Pid, patient_data.date AS LastUpdated,
                title AS Title, fname AS FirstName, mname AS MiddleName, lname AS LastName, suffix AS Suffix,
                street AS Street, street_line_2 AS StreetLine2, city AS City, state AS State,
                postal_code AS PostalCode, country_code AS CountryCode,
@@ -150,7 +150,7 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
         var language = ResolveLanguage(row.Language, listOptions);
 
         return new PatientFhirView(
-            Rfc4122GuidConverter.FromRfc4122Bytes(row.Uuid), row.LastUpdated,
+            Rfc4122GuidConverter.FromRfc4122Bytes(row.Uuid), row.Pid, row.LastUpdated,
             row.Title, row.FirstName ?? "", row.MiddleName, row.LastName ?? "", row.Suffix,
             row.Street, row.StreetLine2, row.City, row.State, row.PostalCode, row.CountryCode,
             row.PhoneHome, row.PhoneBiz, row.PhoneCell, row.Email, row.EmailDirect,
@@ -308,6 +308,7 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
     private sealed class RawPatientRow
     {
         public byte[] Uuid { get; set; } = [];
+        public long Pid { get; set; }
         public DateTime LastUpdated { get; set; }
         public string? Title { get; set; }
         public string? FirstName { get; set; }

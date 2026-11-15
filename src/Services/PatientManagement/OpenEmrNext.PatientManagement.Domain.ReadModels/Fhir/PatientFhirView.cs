@@ -24,6 +24,7 @@ namespace OpenEmrNext.PatientManagement.Domain.Fhir.ReadModels;
 /// </remarks>
 public sealed record PatientFhirView(
     Guid Uuid,
+    long Pid,
     DateTime LastUpdated,
     string? Title,
     string FirstName,

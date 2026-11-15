@@ -1,0 +1,139 @@
+@page "/patients/register"
+@using System.ComponentModel.DataAnnotations
+@using OpenEmrNext.PatientManagement.Client
+@using AuthFacadeApiException = OpenEmrNext.AuthFacade.Client.ApiException
+@using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
+@inject IAuthFacadeClient AuthFacade
+@inject IPatientManagementClient PatientManagement
+@inject NavigationManager Navigation
+
+<PageTitle>Register patient</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="pa-0">
+    <MudText Typo="Typo.h4" Class="mb-4">Register patient</MudText>
+
+    @switch (_state)
+    {
+        case State.Loading:
+            <MudProgressCircular Indeterminate="true" />
+            break;
+
+        case State.SignedOut:
+            <MudAlert Severity="Severity.Warning">
+                You need to be signed in to register a patient.
+                <MudButton Variant="Variant.Text" Href="@LoginUrl">Log in with OpenEMR</MudButton>
+            </MudAlert>
+            break;
+
+        case State.Ready:
+            <MudPaper Elevation="2" Class="pa-6">
+                <MudForm @ref="_form" Model="_model">
+                    @if (_errorMessage is { } message)
+                    {
+                        <MudAlert Severity="Severity.Error" Class="mb-4">@message</MudAlert>
+                    }
+                    <MudStack Spacing="3">
+                        <MudTextField @bind-Value="_model.FirstName" Label="First name" Required="true" />
+                        <MudTextField @bind-Value="_model.LastName" Label="Last name" Required="true" />
+                        <MudTextField @bind-Value="_model.Sex" Label="Sex" Required="true"
+                            HelperText="Free text, matching OpenEMR's own sex column" />
+                        <MudDatePicker @bind-Date="_model.DateOfBirth" Label="Date of birth" Required="true" />
+                        <MudTextField @bind-Value="_model.Email" Label="Email (optional)" />
+                        <MudTextField @bind-Value="_model.TrustedEmail" Label="Trusted email (optional)" />
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_submitting">
+                            Register
+                        </MudButton>
+                    </MudStack>
+                </MudForm>
+            </MudPaper>
+            break;
+    }
+</MudContainer>
+
+@code {
+    private enum State { Loading, SignedOut, Ready }
+
+    /// <summary>
+    /// The id of the user performing the registration. No real numeric id exists to supply here --
+    /// AuthFacade's session only carries OpenEMR's UUID <c>sub</c> claim, and there's no lookup from
+    /// that to a numeric <c>users.id</c> (ADR 0055's tracked gap). A fixed placeholder, same framing
+    /// the backend itself already uses for this exact gap, not a new decision made here.
+    /// </summary>
+    private const long PlaceholderRegisteredById = 1;
+
+    private State _state = State.Loading;
+    private MudForm? _form;
+    private readonly FormModel _model = new();
+    private bool _submitting;
+    private string? _errorMessage;
+
+    private string LoginUrl => $"/oidc/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await AuthFacade.GetCurrentUserAsync();
+            _state = State.Ready;
+        }
+        catch (AuthFacadeApiException)
+        {
+            _state = State.SignedOut;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        await _form!.ValidateAsync();
+        if (!_form.IsValid || _model.DateOfBirth is null)
+        {
+            return;
+        }
+
+        _submitting = true;
+        _errorMessage = null;
+        try
+        {
+            var request = new RegisterPatientRequest
+            {
+                FirstName = _model.FirstName,
+                LastName = _model.LastName,
+                Sex = _model.Sex,
+                DateOfBirth = new DateTimeOffset(_model.DateOfBirth.Value),
+                Email = string.IsNullOrWhiteSpace(_model.Email) ? null : _model.Email,
+                TrustedEmail = string.IsNullOrWhiteSpace(_model.TrustedEmail) ? null : _model.TrustedEmail,
+                RegisteredBy = PlaceholderRegisteredById
+            };
+            await PatientManagement.RegisterPatientAsync(request);
+            Navigation.NavigateTo("/patients");
+        }
+        catch (PatientManagementApiException)
+        {
+            _errorMessage = "Something went wrong registering this patient. Please check the details and try again.";
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private sealed class FormModel
+    {
+        [Required, MinLength(1), MaxLength(255)]
+        public string FirstName { get; set; } = "";
+
+        [Required, MinLength(2), MaxLength(255)]
+        public string LastName { get; set; } = "";
+
+        [Required, MinLength(4), MaxLength(30)]
+        public string Sex { get; set; } = "";
+
+        public DateTime? DateOfBirth { get; set; }
+
+        [EmailAddress]
+        public string? Email { get; set; }
+
+        [EmailAddress]
+        public string? TrustedEmail { get; set; }
+    }
+}

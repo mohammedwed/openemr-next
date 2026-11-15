@@ -64,6 +64,23 @@ public class GatewayStackTests
         Assert.NotEqual("text/html", contentType);
     }
 
+    [Theory]
+    [InlineData("/api/v1/patients")]
+    [InlineData("/fhir/Patient")]
+    public async Task PatientManagement_route_prefixes_are_routed_to_PatientManagement_not_WebApp(string path)
+    {
+        var response = await Http.GetAsync(GatewayStackConfig.GatewayHttpsBaseUrl + path);
+
+        // This client never presents X-Internal-Gateway-Secret itself -- the gateway attaches it
+        // server-side (ADR 0055) to every request matching this route, unconditionally, before
+        // forwarding. A 200 here proves the request actually reached PatientManagement (which would
+        // 401 without that header), not WebApp's SPA catch-all, which would answer any unmatched path
+        // with its own 200-HTML page instead.
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var contentType = response.Content.Headers.ContentType?.MediaType;
+        Assert.NotEqual("text/html", contentType);
+    }
+
     [Fact]
     public async Task Everything_else_is_routed_to_WebApp()
     {

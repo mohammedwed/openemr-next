@@ -1,0 +1,100 @@
+@page "/patients"
+@using OpenEmrNext.PatientManagement.Client
+@using AuthFacadeApiException = OpenEmrNext.AuthFacade.Client.ApiException
+@using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
+@inject IAuthFacadeClient AuthFacade
+@inject IPatientManagementClient PatientManagement
+@inject NavigationManager Navigation
+
+<PageTitle>Patients</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="pa-0">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h4">Patients</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/patients/register">Register patient</MudButton>
+    </MudStack>
+
+    @switch (_state)
+    {
+        case State.Loading:
+            <MudProgressCircular Indeterminate="true" />
+            break;
+
+        case State.SignedOut:
+            <MudAlert Severity="Severity.Warning">
+                You need to be signed in to see patients.
+                <MudButton Variant="Variant.Text" Href="@LoginUrl">Log in with OpenEMR</MudButton>
+            </MudAlert>
+            break;
+
+        case State.Error:
+            <MudAlert Severity="Severity.Error">Could not load patients. Please try again.</MudAlert>
+            break;
+
+        case State.Loaded:
+            @if (_patients.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">No patients registered yet.</MudAlert>
+            }
+            else
+            {
+                <MudTable Items="_patients" Hover="true">
+                    <HeaderContent>
+                        <MudTh>First name</MudTh>
+                        <MudTh>Last name</MudTh>
+                        <MudTh>Date of birth</MudTh>
+                        <MudTh>Email</MudTh>
+                        <MudTh></MudTh>
+                    </HeaderContent>
+                    <RowTemplate Context="patient">
+                        <MudTd>@patient.FirstName</MudTd>
+                        <MudTd>@patient.LastName</MudTd>
+                        <MudTd>@(patient.DateOfBirth?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
+                        <MudTd>@(patient.Email ?? "—")</MudTd>
+                        <MudTd>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@($"/patients/{patient.Uuid}")">View</MudButton>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+            break;
+    }
+</MudContainer>
+
+@code {
+    private enum State { Loading, SignedOut, Error, Loaded }
+
+    private State _state = State.Loading;
+    private List<PatientSummaryResponse> _patients = [];
+
+    private string LoginUrl => $"/oidc/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
+
+    /// <summary>
+    /// Checks sign-in the same way <c>Home.razor</c> does. PatientManagement's own gate (ADR 0055) only
+    /// checks that the call came through this gateway, not which user is signed in -- so this page's own
+    /// check is what actually keeps a signed-out visitor from seeing patient data, not the backend.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await AuthFacade.GetCurrentUserAsync();
+        }
+        catch (AuthFacadeApiException)
+        {
+            _state = State.SignedOut;
+            return;
+        }
+
+        try
+        {
+            var patients = await PatientManagement.GetPatientsAsync(null!);
+            _patients = [.. patients];
+            _state = State.Loaded;
+        }
+        catch (PatientManagementApiException)
+        {
+            _state = State.Error;
+        }
+    }
+}

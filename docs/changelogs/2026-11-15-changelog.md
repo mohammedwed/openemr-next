@@ -106,8 +106,59 @@ Infrastructure, and now Api). Three findings, all fixed.
   itself for readiness — this Api has no `/health` endpoint.
 - Added to `OpenEMR-Next.slnx`. Nothing consumes the generated client yet.
 
+## Added — PatientManagement is deployed and reachable through the Gateway (ADR 0060)
+
+- New `src/Services/PatientManagement/Dockerfile` and `.dockerignore`. The missing `.dockerignore`
+  caused a real, confusing build failure (`NETSDK1064`, package "not found" despite a successful
+  restore) — the repo-root one only covers WebApp's build, not a per-service one like this; fixed by
+  adding PatientManagement's own, mirroring AuthFacade's.
+- New `patient-management` docker-compose service (no published host port — only the Gateway may
+  reach it), a new `INTERNAL_GATEWAY_SECRET` shared between it and the `gateway` service
+  (`.env.example`, `new-env.sh`, CI), and `patient-management` added to CI's `docker compose up`
+  service list.
+- Gateway (`Program.cs`): a new `patientmanagement` cluster, two routes
+  (`/api/v1/patients/{**catch-all}`, `/fhir/{**catch-all}`), and a request transform scoped to only
+  that cluster attaching `X-Internal-Gateway-Secret` unconditionally. Two new `GatewayStackTests`
+  prove this against the real running stack.
+- New `GET /api/v1/patients` endpoint, reusing `SearchPatientFhirRecordsUseCase` as-is — no new
+  Domain/persistence work — since the only existing search path returns a FHIR `Bundle` with no
+  typed NSwag model. Covered by a new integration test.
+- WebApp: `IPatientManagementClient` registered alongside `IAuthFacadeClient`, each with its own
+  `HttpClient`/circuit breaker (renamed `AuthFacadeCircuitBreakingHandler` →
+  `TransientFailureCircuitBreakingHandler`). Two new pages (`Pages/Patients/Index.razor`,
+  `Register.razor`), enabling the previously-disabled "Patients" nav link. Resolved a real
+  `ApiException` namespace collision between the two generated clients with explicit `@using`
+  aliases.
+- Verified against the real running `docker compose` stack: `docker compose up` with
+  `patient-management` included, all services healthy, Gateway integration tests passing against it,
+  and a direct `curl` through the gateway (no secret presented by the caller) registering a patient
+  and listing it back.
+
+## Added — WebApp now covers insurance and advance directives (ADR 0061)
+
+- `PatientFhirView`/`PatientSummaryResponse` gain `Pid`; new `GET /api/v1/patients/{uuid}` (reuses
+  `GetPatientFhirRecordUseCase`) — needed because insurance/advance-directive routes are keyed by
+  `pid`, which the patient list never exposed before.
+- New `Pages/Patients/Detail.razor`: Insurance (effective coverage, add policy, swap) and Advance
+  Directives (status, document list/download, upload) sections, both reached from the patient list.
+- **Three real bugs found only by exercising the real deployed stack**, all fixed:
+  - Document download bypasses the generated client (bodyless — NSwag can't type a per-document
+    content-type) in favor of a direct link to the Gateway's relative URL.
+  - `UnauthorizedAccessException` on upload: `sitesvolume`'s `documents` directory is uid-1000-only
+    (mode `700`, matching OpenEMR's own `apache` worker uid). Fixed with `user: "1000:1000"` on the
+    `patient-management` service in `docker-compose.yml`.
+  - `SELECT command denied... 'sequences'` on upload, after the uid fix: the seed script granted only
+    `UPDATE` on `sequences`, which MariaDB doesn't treat as sufficient for a `SET id = LAST_INSERT_ID(id
+    + 1)` expression. Fixed by granting `SELECT, UPDATE`. Also surfaces a real test gap:
+    `PatientDataContainerFixture` never exercises the real least-privilege grant set at all (connects
+    with a fully-privileged user) — tracked as a separate follow-up, not fixed here.
+- Verified end to end against the real running stack for every feature via `curl` through the
+  Gateway: insurance add/swap/effective-coverage, advance-directive status, and document
+  upload/list/download (byte-for-byte correct) all round-trip correctly.
+
 ## Tests
 
-Full solution builds clean (0 errors, same 5 pre-existing unrelated nullable warnings). Full
-PatientManagement suite run and passing: 54 integration tests (including the new gateway-secret
-and OpenAPI-document tests), 121 unit tests, 17 architecture tests.
+Full solution builds clean (0 errors, 0 warnings across every project touched today). Full
+PatientManagement suite passing: 57 integration tests (including the new `Pid`/single-patient-lookup
+tests), 121 unit tests, 17 architecture tests. Gateway's integration suite passing against the real
+stack: 7 tests.

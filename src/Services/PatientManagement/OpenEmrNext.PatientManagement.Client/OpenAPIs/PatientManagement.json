@@ -50,6 +50,82 @@
             "InternalGateway": []
           }
         ]
+      },
+      "get": {
+        "tags": [
+          "Patients"
+        ],
+        "summary": "List patients, optionally filtered by name",
+        "operationId": "GetPatients",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PatientSummaryResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
+    },
+    "/api/v1/patients/{uuid}": {
+      "get": {
+        "tags": [
+          "Patients"
+        ],
+        "summary": "Get a single patient by uuid",
+        "operationId": "GetPatient",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientSummaryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
       }
     },
     "/api/v1/patients/{pid}/insurance": {
@@ -917,6 +993,50 @@
           },
           "pubpid": {
             "type": "string"
+          }
+        }
+      },
+      "PatientSummaryResponse": {
+        "required": [
+          "uuid",
+          "pid",
+          "firstName",
+          "lastName",
+          "dateOfBirth",
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pid": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "dateOfBirth": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
