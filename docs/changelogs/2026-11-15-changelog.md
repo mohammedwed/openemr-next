@@ -184,3 +184,16 @@ stack: 7 tests.
 Verified: full solution still builds with 0 warnings; redeployed `webapp` on the real running stack
 and confirmed `/patients` still serves correctly; Gateway's integration suite (7 tests) and
 PatientManagement's full suite (57/121/17) still pass unchanged, since none of this touched the Api.
+
+## Fixed — WebApp's Material Design was running on bare defaults
+
+- `<MudThemeProvider />` had no `Theme=`, so the app ran MudBlazor's own stock palette rather than a
+  deliberately chosen one. New `Theme/OpenEmrNextTheme.cs` sets Primary to OpenEMR's own brand purple
+  (`#5c2d91` -- the dominant color already baked into `wwwroot/icon-192.png`, confirmed by sampling the
+  icon's actual pixels, not guessed) and a contrasting teal Secondary, with lighter dark-mode variants
+  of each.
+- `Detail.razor`'s `MudExpansionPanels` had no explicit `Elevation`, unlike every other content
+  surface in the app (`Elevation="2"`, matching `MudPaper` elsewhere). Added for consistency.
+- Verified visually against the real running stack (Chrome): the app bar, active nav highlight, and
+  "Add policy"/"Swap" buttons now show the brand purple/teal distinctly, and both expansion panels
+  (Insurance, Advance directives) now have the same visible elevation as every other card in the app.

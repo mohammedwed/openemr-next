@@ -38,7 +38,7 @@
                 Date of birth: @(_patient!.DateOfBirth?.ToString("yyyy-MM-dd") ?? "—") · Pid: @_patient.Pid
             </MudText>
 
-            <MudExpansionPanels Class="mb-4">
+            <MudExpansionPanels Elevation="2" Class="mb-4">
                 <MudExpansionPanel Text="Insurance" Expanded="true">
                     @if (_insuranceError)
                     {
