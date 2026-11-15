@@ -1,10 +1,24 @@
 ﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject IAuthFacadeClient AuthFacade
+@inject NavigationManager Navigation
 
 <MudLayout>
     <MudAppBar Elevation="1">
-        <MudText Typo="Typo.h6">OpenEMR Next</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@(() => _drawerOpen = !_drawerOpen)" />
+        <MudText Typo="Typo.h6" Class="ml-2">OpenEMR Next</MudText>
+        <MudBreadcrumbs Items="_breadcrumbs" Class="ml-6 pa-0" />
+        <MudSpacer />
+        @if (_userLabel is { } userLabel)
+        {
+            <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit">
+                <MudMenuItem Disabled="true">Signed in as @userLabel</MudMenuItem>
+                <MudDivider />
+                <MudMenuItem Href="/logout">Log out</MudMenuItem>
+            </MudMenu>
+        }
     </MudAppBar>
-    <MudDrawer Open="true" Elevation="1" Variant="DrawerVariant.Persistent">
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="1" Variant="DrawerVariant.Persistent">
         <MudNavMenu>
             <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
             <MudNavLink Href="/patients" Icon="@Icons.Material.Filled.People">Patients</MudNavLink>
@@ -14,7 +28,73 @@
             </MudNavLink>
         </MudNavMenu>
     </MudDrawer>
-    <MudMainContent Class="pa-4">
+    @* px-4/pb-4, not pa-4: pa-4's padding: 16px !important overrides MudMainContent's own
+       padding-top: calc(var(--mud-appbar-height) - ...) -- the rule that clears the fixed app bar.
+       With pa-4, every page's top content (headers, primary buttons) rendered ~40px too high,
+       hidden underneath the app bar -- confirmed by inspecting the actual computed styles and
+       CSS rules in a running browser, not guessed. Leaving padding-top alone lets that rule apply. *@
+    <MudMainContent Class="px-4 pb-4">
         @Body
     </MudMainContent>
 </MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+    private string? _userLabel;
+    private List<BreadcrumbItem> _breadcrumbs = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        BuildBreadcrumbs();
+
+        try
+        {
+            var me = await AuthFacade.GetCurrentUserAsync();
+            // OpenEMR's tokens in this stack carry no name claim (docs/m4-domain-notes.md), so Name is
+            // reliably empty for a real user -- the same gap Home.razor's own display already has.
+            // Falling back to a shortened subject (its UUID) keeps the menu meaningful either way.
+            _userLabel = string.IsNullOrEmpty(me.Name) ? me.Subject[..Math.Min(8, me.Subject.Length)] : me.Name;
+        }
+        catch (ApiException)
+        {
+            _userLabel = null;
+        }
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        BuildBreadcrumbs();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// A plain path-segment mapping, not a per-page cascading value: this app has few enough routes
+    /// that a shared source of truth isn't worth the extra plumbing yet. Revisit if the route list
+    /// grows past what a simple switch can read at a glance.
+    /// </summary>
+    private void BuildBreadcrumbs()
+    {
+        var path = new Uri(Navigation.Uri).AbsolutePath.Trim('/');
+        var segments = path.Length == 0 ? [] : path.Split('/');
+
+        _breadcrumbs = segments switch
+        {
+            [] => [new BreadcrumbItem("Dashboard", href: "/")],
+            ["patients"] => [new BreadcrumbItem("Patients", href: null)],
+            ["patients", "register"] =>
+            [
+                new BreadcrumbItem("Patients", href: "/patients"),
+                new BreadcrumbItem("Register", href: null)
+            ],
+            ["patients", _] =>
+            [
+                new BreadcrumbItem("Patients", href: "/patients"),
+                new BreadcrumbItem("Patient", href: null)
+            ],
+            _ => []
+        };
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}
