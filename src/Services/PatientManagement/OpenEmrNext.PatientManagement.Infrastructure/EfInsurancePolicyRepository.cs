@@ -23,27 +23,35 @@ public sealed class EfInsurancePolicyRepository(PatientManagementDbContext db) :
     {
         var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(policy.Uuid);
 
-        // LAST_INSERT_ID() is scoped to the connection session, not the statement -- without an
-        // explicit transaction here, EF Core is free to run the INSERT and the follow-up SELECT on
-        // two different pooled connections, reading back someone else's id or none at all (caught
-        // the hard way: against a real database, not by reasoning about it). A transaction pins the
-        // connection for both statements, the same way SwapAsync below already needs one anyway.
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        // The whole unit of work runs through an execution strategy, not a bare BeginTransactionAsync/
+        // CommitAsync, because the DbContext has EnableRetryOnFailure on -- a user-initiated transaction
+        // has to be replayable wholesale for that to work. AssignGeneratedIdentity stays outside the
+        // delegate and runs exactly once, after a successful commit: it throws if called twice, and a
+        // retried attempt re-executes the whole delegate (including a fresh id) from scratch.
+        var strategy = db.Database.CreateExecutionStrategy();
+        var id = await strategy.ExecuteAsync(async () =>
+        {
+            // A transaction pins the connection for both statements below -- see
+            // DatabaseFacadeExtensions.GetLastInsertIdAsync for why that's required -- the same way
+            // PersistSwapAsync below already needs one anyway.
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            INSERT INTO insurance_data
-                (pid, type, provider, policy_number, group_number, plan_name, date, date_end, uuid)
-            VALUES
-                ({policy.Pid}, {policy.Level.ToWireValue()}, {policy.CompanyId.ToString()}, {policy.PolicyNumber},
-                 {policy.GroupNumber}, {policy.PlanName}, {policy.StartDate.ToString("yyyy-MM-dd")},
-                 {policy.EndDate?.ToString("yyyy-MM-dd")}, {uuidBytes})
-            """, ct);
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO insurance_data
+                    (pid, type, provider, policy_number, group_number, plan_name, date, date_end, uuid)
+                VALUES
+                    ({policy.Pid}, {policy.Level.ToWireValue()}, {policy.CompanyId.ToString()}, {policy.PolicyNumber},
+                     {policy.GroupNumber}, {policy.PlanName}, {policy.StartDate.ToString("yyyy-MM-dd")},
+                     {policy.EndDate?.ToString("yyyy-MM-dd")}, {uuidBytes})
+                """, ct);
 
-        var id = await db.Database.SqlQueryRaw<long>("SELECT LAST_INSERT_ID() AS Value").SingleAsync(ct);
+            var generatedId = await db.Database.GetLastInsertIdAsync(ct);
+            await transaction.CommitAsync(ct);
+            return generatedId;
+        });
+
         policy.AssignGeneratedIdentity(id);
-
-        await transaction.CommitAsync(ct);
     }
 
     public async Task<IReadOnlyList<InsurancePolicyRow>> GetRowsAsync(long pid, CancellationToken ct)
@@ -113,62 +121,71 @@ public sealed class EfInsurancePolicyRepository(PatientManagementDbContext db) :
         var source = result.Source;
         var target = result.DisplacedOccupant;
 
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        try
+        // Same execution-strategy requirement as AddAsync above -- EnableRetryOnFailure needs a
+        // user-initiated transaction wrapped so the whole unit of work can be replayed, not just
+        // begun/committed directly. Unlike AddAsync, nothing here mutates an external aggregate, so a
+        // retried attempt re-running the same UPDATEs is naturally safe -- they just reapply the same
+        // already-decided target values.
+        var strategy = db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            if (target is not null)
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            try
             {
-                // Same start date as the source -> the (pid, type, date) unique constraint would
-                // collide the instant the source's type changes to the target's old type, before the
-                // target's own type changes away from it. Legacy's own workaround: park the target on
-                // a date so far out it will never collide with anything real, write both rows' new
-                // types in that state, then restore the target's real date -- all inside this one
-                // transaction, so a failure anywhere rolls every bit of it back. A pure persistence
-                // detail: the swap decision itself (InsuranceCoverage.Swap) neither knows nor cares
-                // about this constraint.
-                var collides = target.StartDate == source.StartDate;
-                var targetDateDuringSwap = collides
-                    ? new DateOnly(9999, 12, 31).ToString("yyyy-MM-dd")
-                    : target.StartDate.ToString("yyyy-MM-dd");
-
-                await db.Database.ExecuteSqlInterpolatedAsync(
-                    $"""
-                    UPDATE insurance_data SET type = {target.Level.ToWireValue()}, date = {targetDateDuringSwap}
-                    WHERE uuid = {Rfc4122GuidConverter.ToRfc4122Bytes(target.Uuid)}
-                    """, ct);
-
-                await db.Database.ExecuteSqlInterpolatedAsync(
-                    $"""
-                    UPDATE insurance_data SET type = {source.Level.ToWireValue()}
-                    WHERE uuid = {Rfc4122GuidConverter.ToRfc4122Bytes(source.Uuid)}
-                    """, ct);
-
-                if (collides)
+                if (target is not null)
                 {
+                    // Same start date as the source -> the (pid, type, date) unique constraint would
+                    // collide the instant the source's type changes to the target's old type, before
+                    // the target's own type changes away from it. Legacy's own workaround: park the
+                    // target on a date so far out it will never collide with anything real, write both
+                    // rows' new types in that state, then restore the target's real date -- all inside
+                    // this one transaction, so a failure anywhere rolls every bit of it back. A pure
+                    // persistence detail: the swap decision itself (InsuranceCoverage.Swap) neither
+                    // knows nor cares about this constraint.
+                    var collides = target.StartDate == source.StartDate;
+                    var targetDateDuringSwap = collides
+                        ? new DateOnly(9999, 12, 31).ToString("yyyy-MM-dd")
+                        : target.StartDate.ToString("yyyy-MM-dd");
+
                     await db.Database.ExecuteSqlInterpolatedAsync(
                         $"""
-                        UPDATE insurance_data SET date = {target.StartDate.ToString("yyyy-MM-dd")}
+                        UPDATE insurance_data SET type = {target.Level.ToWireValue()}, date = {targetDateDuringSwap}
                         WHERE uuid = {Rfc4122GuidConverter.ToRfc4122Bytes(target.Uuid)}
                         """, ct);
-                }
-            }
-            else
-            {
-                // The target level was empty -- nothing to trade places with, just move the source.
-                await db.Database.ExecuteSqlInterpolatedAsync(
-                    $"""
-                    UPDATE insurance_data SET type = {source.Level.ToWireValue()}
-                    WHERE uuid = {Rfc4122GuidConverter.ToRfc4122Bytes(source.Uuid)}
-                    """, ct);
-            }
 
-            await transaction.CommitAsync(ct);
-        }
-        catch
-        {
-            await transaction.RollbackAsync(ct);
-            throw;
-        }
+                    await db.Database.ExecuteSqlInterpolatedAsync(
+                        $"""
+                        UPDATE insurance_data SET type = {source.Level.ToWireValue()}
+                        WHERE uuid = {Rfc4122GuidConverter.ToRfc4122Bytes(source.Uuid)}
+                        """, ct);
+
+                    if (collides)
+                    {
+                        await db.Database.ExecuteSqlInterpolatedAsync(
+                            $"""
+                            UPDATE insurance_data SET date = {target.StartDate.ToString("yyyy-MM-dd")}
+                            WHERE uuid = {Rfc4122GuidConverter.ToRfc4122Bytes(target.Uuid)}
+                            """, ct);
+                    }
+                }
+                else
+                {
+                    // The target level was empty -- nothing to trade places with, just move the source.
+                    await db.Database.ExecuteSqlInterpolatedAsync(
+                        $"""
+                        UPDATE insurance_data SET type = {source.Level.ToWireValue()}
+                        WHERE uuid = {Rfc4122GuidConverter.ToRfc4122Bytes(source.Uuid)}
+                        """, ct);
+                }
+
+                await transaction.CommitAsync(ct);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
+        });
     }
 
     private sealed class RawInsuranceRow
