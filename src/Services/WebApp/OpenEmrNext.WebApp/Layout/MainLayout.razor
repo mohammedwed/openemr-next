@@ -34,7 +34,13 @@
        hidden underneath the app bar -- confirmed by inspecting the actual computed styles and
        CSS rules in a running browser, not guessed. Leaving padding-top alone lets that rule apply. *@
     <MudMainContent Class="px-4 pb-4">
-        <MudBreadcrumbs Items="_breadcrumbs" Class="op-breadcrumbs px-0" />
+        @* A single-item breadcrumb on a top-level page only repeats what the active nav link and the
+           page's own heading already say -- real wayfinding value starts at two items (an actual
+           trail, e.g. Patients / Register). *@
+        @if (_breadcrumbs.Count > 1)
+        {
+            <MudBreadcrumbs Items="_breadcrumbs" Class="op-breadcrumbs px-0" />
+        }
         @Body
     </MudMainContent>
 </MudLayout>

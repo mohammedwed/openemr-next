@@ -54,6 +54,27 @@ sidebar), and the color (a solid, saturated purple app bar).
    similarly-named classes). The one legitimate use of `Color="Color.Secondary"` -- the insurance
    "Swap" button, deliberately distinct from the primary Add/Save actions -- was left unchanged.
 
+**A follow-up round, after the user still found the result "not elegant" with no further specifics
+given**: rather than ask a fourth round of categorization questions, the page was inspected directly
+(computed styles in a running browser) for concrete, fixable defects instead of guessed at again. Two
+were found:
+
+4. **`PaletteLight.Background` (the page canvas) and `Surface` (`MudPaper`/`MudTable`'s own
+   background) were both pure white** -- confirmed via `getComputedStyle`: `--mud-palette-background`
+   and `--mud-palette-surface` were both `rgba(255,255,255,1)`, and a card's only separation from the
+   page was a barely-visible 1px/12%-opacity shadow. It read as unstyled, not flat-by-design. Fixed by
+   giving `Background` a faint neutral tint (`#f7f7f8`), leaving `Surface` white -- the standard
+   light-canvas/white-card pattern, still with no heavy shadow or saturated color.
+5. **"Dashboard" (or "Patients") appeared three times stacked within ~100px**: once as the active top
+   nav link, once as a single-item breadcrumb directly below it, and once again as the page's own
+   `<h1>`. A breadcrumb with no real trail adds nothing over the nav + heading already there. Fixed by
+   only rendering `MudBreadcrumbs` when there are 2+ items (an actual hierarchy, e.g. "Patients /
+   Register" or "Patients / Patient") -- top-level pages no longer show one at all.
+6. **`MudDatePicker` fields were missing `Variant="Variant.Outlined"`**, rendering with MudBlazor's
+   default underlined style while every `MudTextField`/`MudSelect` on the same form used the outlined
+   variant -- a visible inconsistency within a single form. Fixed by adding the same `Variant` to every
+   `MudDatePicker` across `Register.razor` and `Detail.razor`.
+
 ## Consequences
 
 - The chrome now visually resembles the plain Blazor template's own aesthetic the user compared it

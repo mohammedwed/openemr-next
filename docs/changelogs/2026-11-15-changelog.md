@@ -263,3 +263,17 @@ PatientManagement's full suite (57/121/17) still pass unchanged, since none of t
   purple with an underline, inactive links in muted gray, "Encounters" visibly dimmed as disabled; the
   app bar is flat and white; the patient detail page's DOB/Pid line and other supporting text render in
   muted gray, not teal.
+- **Follow-up round**: still "not elegant" with no further specifics given, so the page was inspected
+  directly instead of asking a fourth round of categorization questions. Two more concrete defects
+  found and fixed:
+  1. The page canvas (`Background`) and card surface (`Surface`) were both pure white — confirmed via
+     `getComputedStyle` — so a card's only separation from the page was a barely-visible shadow. Fixed
+     by giving `Background` a faint neutral tint (`#f7f7f8`), leaving cards white.
+  2. "Dashboard"/"Patients" appeared three times stacked within ~100px (active nav link, a pointless
+     single-item breadcrumb, and the page's own heading). Fixed by only rendering breadcrumbs when
+     there's an actual 2+ item trail (e.g. "Patients / Register").
+  3. `MudDatePicker` fields were missing `Variant="Variant.Outlined"`, rendering underlined while every
+     other field on the same form was outlined. Fixed across `Register.razor` and `Detail.razor`.
+- Verified visually again (Chrome, hard reload): cards now visibly separate from the page canvas,
+  top-level pages ("Dashboard", "Patients") no longer show a redundant breadcrumb, nested pages
+  ("Patients / Register") still do, and every date field matches the outlined style of its neighbors.

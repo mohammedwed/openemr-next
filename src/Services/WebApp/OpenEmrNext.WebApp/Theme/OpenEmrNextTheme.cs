@@ -24,7 +24,11 @@ public static class OpenEmrNextTheme
             Primary = "#5c2d91",
             Secondary = "#00897b",
             AppbarBackground = "#ffffff",
-            AppbarText = "rgba(0,0,0,0.87)"
+            AppbarText = "rgba(0,0,0,0.87)",
+            // A faint tint, not white: Background and Surface (MudPaper/MudTable's own white) were
+            // identical, so a card's only separation from the page was a barely-visible 1px shadow --
+            // confirmed by inspecting the live computed styles. It read as unstyled, not flat-by-design.
+            Background = "#f7f7f8"
         },
         PaletteDark = new PaletteDark
         {

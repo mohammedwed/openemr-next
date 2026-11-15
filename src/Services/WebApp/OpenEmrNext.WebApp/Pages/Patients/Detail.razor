@@ -78,8 +78,8 @@
                                     <MudTextField @bind-Value="_addPolicyModel.PolicyNumber" Label="Policy number" Required="true" Variant="Variant.Outlined" />
                                     <MudTextField @bind-Value="_addPolicyModel.GroupNumber" Label="Group number (optional)" Variant="Variant.Outlined" />
                                     <MudTextField @bind-Value="_addPolicyModel.PlanName" Label="Plan name (optional)" Variant="Variant.Outlined" />
-                                    <MudDatePicker @bind-Date="_addPolicyModel.StartDate" Label="Start date" Required="true" />
-                                    <MudDatePicker @bind-Date="_addPolicyModel.EndDate" Label="End date (optional)" />
+                                    <MudDatePicker @bind-Date="_addPolicyModel.StartDate" Label="Start date" Required="true" Variant="Variant.Outlined" />
+                                    <MudDatePicker @bind-Date="_addPolicyModel.EndDate" Label="End date (optional)" Variant="Variant.Outlined" />
                                     <div>
                                         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddPolicyAsync" Disabled="_addingPolicy">
                                             Add policy
@@ -146,7 +146,7 @@
                                     <MudSelectItem Value="@("no")">No</MudSelectItem>
                                     <MudSelectItem Value="@("unknown")">Unknown</MudSelectItem>
                                 </MudSelect>
-                                <MudDatePicker @bind-Date="_setStatusModel.ReviewedAtUtc" Label="Reviewed on (optional)" />
+                                <MudDatePicker @bind-Date="_setStatusModel.ReviewedAtUtc" Label="Reviewed on (optional)" Variant="Variant.Outlined" />
                                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SetStatusAsync" Disabled="_settingStatus">
                                     Save
                                 </MudButton>
@@ -191,7 +191,7 @@
                                 {
                                     <MudText Typo="Typo.body2" Class="mud-text-secondary">Selected: @fileName</MudText>
                                 }
-                                <MudDatePicker @bind-Date="_uploadEffectiveDate" Label="Effective date (optional)" />
+                                <MudDatePicker @bind-Date="_uploadEffectiveDate" Label="Effective date (optional)" Variant="Variant.Outlined" />
                                 <div>
                                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="UploadDocumentAsync" Disabled="_uploading || _uploadContentBase64 is null">
                                         Upload
