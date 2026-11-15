@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using OpenEmrNext.PatientManagement.Api.Authentication;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Application.Ports;
 using OpenEmrNext.PatientManagement.Infrastructure;
@@ -84,6 +86,20 @@ public static class PatientManagementApiExtensions
         // middleware already logs the exception at Error level and writes a ProblemDetails body for
         // whatever status code is current (500 here) -- no custom IExceptionHandler needed for that.
         builder.Services.AddProblemDetails();
+
+        // Gates every endpoint shut to anyone without the configured shared secret (see
+        // InternalGatewayOptions/InternalGatewayAuthenticationHandler) -- it does not resolve or verify
+        // which end user is behind the call, only that the caller is a trusted internal one.
+        builder.Services.AddAuthentication(InternalGatewayAuthenticationHandler.SchemeName)
+            .AddScheme<AuthenticationSchemeOptions, InternalGatewayAuthenticationHandler>(
+                InternalGatewayAuthenticationHandler.SchemeName, null);
+        builder.Services.AddAuthorization();
+
+        // Enforces the [Required]/[Range]/[StringLength]/[EmailAddress] attributes on every record in
+        // Contracts/Requests -- these fail the same checks the Domain factories (PatientRegistration.Create,
+        // InsurancePolicy.Add, AdvanceDirectiveDocument.Upload) already enforce, just earlier, at the
+        // model-binding boundary; the Domain factories remain the actual source of truth, not this.
+        builder.Services.AddValidation();
 
         return builder;
     }

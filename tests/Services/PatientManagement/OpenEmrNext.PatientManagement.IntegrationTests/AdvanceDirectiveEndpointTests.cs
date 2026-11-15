@@ -27,9 +27,11 @@ public class AdvanceDirectiveEndpointTests(PatientDataContainerFixture fixture) 
                 new("PatientManagementDb:Database", fixture.Database),
                 new("PatientManagementDb:User", fixture.User),
                 new("PatientManagementDb:Password", fixture.DbPassword),
-                new("AdvanceDirectiveStorage:RepositoryRoot", _repositoryRoot.FullName)
+                new("AdvanceDirectiveStorage:RepositoryRoot", _repositoryRoot.FullName),
+                new("InternalGateway:Secret", "test-secret")
             ])));
         _client = _factory.CreateClient();
+        _client.DefaultRequestHeaders.Add("X-Internal-Gateway-Secret", "test-secret");
         return Task.CompletedTask;
     }
 
@@ -139,6 +141,21 @@ public class AdvanceDirectiveEndpointTests(PatientDataContainerFixture fixture) 
     {
         var pid = NextPid();
         var request = new SetAdvanceDirectiveStatusRequest("maybe", null, null);
+
+        var response = await _client!.PutAsJsonAsync($"/api/v1/patients/{pid}/advance-directives/status", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PUT_status_with_a_non_positive_authenticator_id_returns_400()
+    {
+        // Nothing in Domain or Application validates AuthenticatorUserId at all (legacy defines no
+        // rule linking it to Status) -- this request's own [Range] attribute is the only thing that
+        // can catch a non-positive value, so a 400 here proves AddValidation() is actually enforcing
+        // it, not just compiling.
+        var pid = NextPid();
+        var request = new SetAdvanceDirectiveStatusRequest("yes", null, -1);
 
         var response = await _client!.PutAsJsonAsync($"/api/v1/patients/{pid}/advance-directives/status", request);
 

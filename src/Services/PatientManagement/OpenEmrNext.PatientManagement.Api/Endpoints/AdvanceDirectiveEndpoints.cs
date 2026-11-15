@@ -3,7 +3,6 @@ using OpenEmrNext.PatientManagement.Api.Contracts.Responses;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives;
 using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives.ValueObjects;
-using OpenEmrNext.PatientManagement.Domain.AdvanceDirectives.ReadModels;
 
 namespace OpenEmrNext.PatientManagement.Api.Endpoints;
 
@@ -53,12 +52,7 @@ public static class AdvanceDirectiveEndpoints
     {
         var type = AdvanceDirectiveTypeExtensions.TryParse(request.Type);
         if (type is null)
-        {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["errors"] = ["Type must be \"living_will\", \"durable_power_attorney\", or \"dnr_order\"."]
-            });
-        }
+            return ValidationProblems.Single("Type must be \"living_will\", \"durable_power_attorney\", or \"dnr_order\".");
 
         byte[] content;
         try
@@ -67,10 +61,7 @@ public static class AdvanceDirectiveEndpoints
         }
         catch (FormatException)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["errors"] = ["ContentBase64 must be valid base64."]
-            });
+            return ValidationProblems.Single("ContentBase64 must be valid base64.");
         }
 
         AdvanceDirectiveDocument document;
@@ -81,7 +72,7 @@ public static class AdvanceDirectiveEndpoints
         }
         catch (AdvanceDirectiveDocumentValidationException ex)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]> { ["errors"] = [.. ex.Errors] });
+            return ValidationProblems.Many(ex.Errors);
         }
 
         return Results.Created(
@@ -117,12 +108,7 @@ public static class AdvanceDirectiveEndpoints
     {
         var status = AdvanceDirectiveCompletionStatusExtensions.TryParseWireValue(request.Status);
         if (status is null)
-        {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["errors"] = ["Status must be \"yes\", \"no\", or \"unknown\"."]
-            });
-        }
+            return ValidationProblems.Single("Status must be \"yes\", \"no\", or \"unknown\".");
 
         await useCase.ExecuteAsync(pid, status.Value, request.ReviewedAtUtc, request.AuthenticatorUserId, ct);
         return Results.NoContent();

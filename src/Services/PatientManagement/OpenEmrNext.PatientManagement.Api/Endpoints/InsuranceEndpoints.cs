@@ -3,8 +3,6 @@ using OpenEmrNext.PatientManagement.Api.Contracts.Responses;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Domain.Insurance;
 using OpenEmrNext.PatientManagement.Domain.Insurance.ValueObjects;
-using OpenEmrNext.PatientManagement.Domain.Insurance.Rules;
-using OpenEmrNext.PatientManagement.Domain.Insurance.ReadModels;
 
 namespace OpenEmrNext.PatientManagement.Api.Endpoints;
 
@@ -42,12 +40,7 @@ public static class InsuranceEndpoints
     {
         var level = InsuranceLevelExtensions.TryParse(request.Level);
         if (level is null)
-        {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["errors"] = ["Level must be \"primary\", \"secondary\", or \"tertiary\"."]
-            });
-        }
+            return ValidationProblems.Single("Level must be \"primary\", \"secondary\", or \"tertiary\".");
 
         InsurancePolicy policy;
         try
@@ -58,7 +51,7 @@ public static class InsuranceEndpoints
         }
         catch (InsurancePolicyValidationException ex)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]> { ["errors"] = [.. ex.Errors] });
+            return ValidationProblems.Many(ex.Errors);
         }
 
         return Results.Created(
@@ -84,12 +77,7 @@ public static class InsuranceEndpoints
     {
         var level = InsuranceLevelExtensions.TryParse(request.TargetLevel);
         if (level is null)
-        {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["errors"] = ["TargetLevel must be \"primary\", \"secondary\", or \"tertiary\"."]
-            });
-        }
+            return ValidationProblems.Single("TargetLevel must be \"primary\", \"secondary\", or \"tertiary\".");
 
         try
         {

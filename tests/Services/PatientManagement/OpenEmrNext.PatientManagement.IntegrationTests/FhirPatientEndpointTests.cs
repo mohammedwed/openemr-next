@@ -33,9 +33,11 @@ public class FhirPatientEndpointTests(PatientDataContainerFixture fixture) : IAs
                 new("PatientManagementDb:Database", fixture.Database),
                 new("PatientManagementDb:User", fixture.User),
                 new("PatientManagementDb:Password", fixture.DbPassword),
-                new("AdvanceDirectiveStorage:RepositoryRoot", _repositoryRoot.FullName)
+                new("AdvanceDirectiveStorage:RepositoryRoot", _repositoryRoot.FullName),
+                new("InternalGateway:Secret", "test-secret")
             ])));
         _client = _factory.CreateClient();
+        _client.DefaultRequestHeaders.Add("X-Internal-Gateway-Secret", "test-secret");
         return Task.CompletedTask;
     }
 

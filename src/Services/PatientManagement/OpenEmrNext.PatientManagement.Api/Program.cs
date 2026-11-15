@@ -9,6 +9,9 @@ var app = builder.Build();
 // PatientManagementApiExtensions for why this alone (no custom IExceptionHandler) is enough.
 app.UseExceptionHandler();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapPatientManagementEndpoints();
 
 // The OpenAPI document and Scalar UI are for development only, matching AuthFacade's own convention.
