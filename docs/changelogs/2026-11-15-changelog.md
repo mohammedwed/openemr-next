@@ -162,3 +162,38 @@ Full solution builds clean (0 errors, 0 warnings across every project touched to
 PatientManagement suite passing: 57 integration tests (including the new `Pid`/single-patient-lookup
 tests), 121 unit tests, 17 architecture tests. Gateway's integration suite passing against the real
 stack: 7 tests.
+
+## Added — WebApp UI/UX quick wins
+
+- **Toast feedback**: `MudSnackbarProvider`/`MudDialogProvider` added to `App.razor` (outside the
+  `Router`, so a toast survives the navigation a successful action often triggers). Every
+  insurance/advance-directive action (add policy, swap, set status, upload) and patient registration
+  now shows a success snackbar — previously the only feedback was the list silently refreshing.
+- **Confirmation before an irreversible action**: swapping an insurance policy's level now asks first
+  (`IDialogService.ShowMessageBoxAsync`) — the one action here that displaces whatever already
+  occupies the target level, unlike adding a policy or setting a status.
+- **Real validation messages, not a flat "something went wrong"**: a new
+  `Shared/PatientManagementErrorFormatter.cs` reads the typed `ApiException<HttpValidationProblemDetails>`
+  the generated client already throws for a 400 and surfaces the actual message(s) the Api returned,
+  falling back to a generic message only for anything else (a 500, a network failure). Wired into
+  every catch block across `Register.razor`/`Detail.razor`.
+- **A working search box on the patient list**: the backend's `?name=` filter was already there with
+  no way to reach it from the UI. `Index.razor` gets a search field (button or Enter-triggered, no
+  debounce needed for a quick win) that re-queries `GetPatientsAsync` with the typed term.
+
+Verified: full solution still builds with 0 warnings; redeployed `webapp` on the real running stack
+and confirmed `/patients` still serves correctly; Gateway's integration suite (7 tests) and
+PatientManagement's full suite (57/121/17) still pass unchanged, since none of this touched the Api.
+
+## Fixed — WebApp's Material Design was running on bare defaults
+
+- `<MudThemeProvider />` had no `Theme=`, so the app ran MudBlazor's own stock palette rather than a
+  deliberately chosen one. New `Theme/OpenEmrNextTheme.cs` sets Primary to OpenEMR's own brand purple
+  (`#5c2d91` -- the dominant color already baked into `wwwroot/icon-192.png`, confirmed by sampling the
+  icon's actual pixels, not guessed) and a contrasting teal Secondary, with lighter dark-mode variants
+  of each.
+- `Detail.razor`'s `MudExpansionPanels` had no explicit `Elevation`, unlike every other content
+  surface in the app (`Elevation="2"`, matching `MudPaper` elsewhere). Added for consistency.
+- Verified visually against the real running stack (Chrome): the app bar, active nav highlight, and
+  "Add policy"/"Swap" buttons now show the brand purple/teal distinctly, and both expansion panels
+  (Insurance, Advance directives) now have the same visible elevation as every other card in the app.

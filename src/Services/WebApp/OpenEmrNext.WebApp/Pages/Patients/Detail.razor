@@ -5,6 +5,8 @@
 @inject IAuthFacadeClient AuthFacade
 @inject IPatientManagementClient PatientManagement
 @inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Patient</PageTitle>
 
@@ -36,7 +38,7 @@
                 Date of birth: @(_patient!.DateOfBirth?.ToString("yyyy-MM-dd") ?? "—") · Pid: @_patient.Pid
             </MudText>
 
-            <MudExpansionPanels Class="mb-4">
+            <MudExpansionPanels Elevation="2" Class="mb-4">
                 <MudExpansionPanel Text="Insurance" Expanded="true">
                     @if (_insuranceError)
                     {
@@ -318,11 +320,13 @@
                 EndDate = _addPolicyModel.EndDate is { } end ? new DateTimeOffset(end) : null
             };
             await PatientManagement.AddInsurancePolicyAsync(_patient!.Pid, request);
+            Snackbar.Add("Insurance policy added.", Severity.Success);
             await LoadInsuranceAsync();
         }
-        catch (PatientManagementApiException)
+        catch (PatientManagementApiException ex)
         {
-            _addPolicyError = "Could not add this policy. Please check the details and try again.";
+            _addPolicyError = PatientManagementErrorFormatter.Describe(
+                ex, "Could not add this policy. Please check the details and try again.");
         }
         finally
         {
@@ -337,17 +341,30 @@
             return;
         }
 
+        // Swapping changes which policy is in force at each of the two levels involved -- worth a
+        // confirmation, unlike adding a policy or setting a status, neither of which displaces
+        // something else that was already there.
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Swap insurance level",
+            $"Swap this policy to {_swapTargetLevel}? Whatever currently occupies {_swapTargetLevel} will take this policy's place.",
+            yesText: "Swap", cancelText: "Cancel");
+        if (confirmed != true)
+        {
+            return;
+        }
+
         _swapping = true;
         _swapError = null;
         try
         {
             var request = new SwapInsuranceRequest { TargetLevel = _swapTargetLevel, PolicyUuid = _swapPolicyUuid.Value };
             await PatientManagement.SwapInsuranceAsync(_patient!.Pid, request);
+            Snackbar.Add("Insurance levels swapped.", Severity.Success);
             await LoadInsuranceAsync();
         }
-        catch (PatientManagementApiException)
+        catch (PatientManagementApiException ex)
         {
-            _swapError = "Could not swap this policy. Please try again.";
+            _swapError = PatientManagementErrorFormatter.Describe(ex, "Could not swap this policy. Please try again.");
         }
         finally
         {
@@ -368,11 +385,12 @@
                 AuthenticatorUserId = PlaceholderUserId
             };
             await PatientManagement.SetAdvanceDirectiveStatusAsync(_patient!.Pid, request);
+            Snackbar.Add("Advance directive status saved.", Severity.Success);
             await LoadAdvanceDirectivesAsync();
         }
-        catch (PatientManagementApiException)
+        catch (PatientManagementApiException ex)
         {
-            _statusError = "Could not save this status. Please try again.";
+            _statusError = PatientManagementErrorFormatter.Describe(ex, "Could not save this status. Please try again.");
         }
         finally
         {
@@ -417,14 +435,15 @@
                 OwnerId = PlaceholderUserId
             };
             await PatientManagement.UploadAdvanceDirectiveDocumentAsync(_patient!.Pid, request);
+            Snackbar.Add("Document uploaded.", Severity.Success);
             await LoadAdvanceDirectivesAsync();
             _uploadContentBase64 = null;
             _uploadFileName = null;
             _uploadMimeType = null;
         }
-        catch (PatientManagementApiException)
+        catch (PatientManagementApiException ex)
         {
-            _uploadError = "Could not upload this document. Please try again.";
+            _uploadError = PatientManagementErrorFormatter.Describe(ex, "Could not upload this document. Please try again.");
         }
         finally
         {

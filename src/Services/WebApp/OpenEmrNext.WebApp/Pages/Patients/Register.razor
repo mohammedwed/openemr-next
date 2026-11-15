@@ -6,6 +6,7 @@
 @inject IAuthFacadeClient AuthFacade
 @inject IPatientManagementClient PatientManagement
 @inject NavigationManager Navigation
+@inject ISnackbar Snackbar
 
 <PageTitle>Register patient</PageTitle>
 
@@ -105,11 +106,13 @@
                 RegisteredBy = PlaceholderRegisteredById
             };
             await PatientManagement.RegisterPatientAsync(request);
+            Snackbar.Add($"Registered {_model.FirstName} {_model.LastName}.", Severity.Success);
             Navigation.NavigateTo("/patients");
         }
-        catch (PatientManagementApiException)
+        catch (PatientManagementApiException ex)
         {
-            _errorMessage = "Something went wrong registering this patient. Please check the details and try again.";
+            _errorMessage = PatientManagementErrorFormatter.Describe(
+                ex, "Something went wrong registering this patient. Please check the details and try again.");
         }
         finally
         {

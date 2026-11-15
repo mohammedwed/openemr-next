@@ -1,5 +1,8 @@
-﻿<MudThemeProvider />
+﻿@using OpenEmrNext.WebApp.Theme
+<MudThemeProvider Theme="OpenEmrNextTheme.Theme" />
 <MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
 
 <Router AppAssembly="@typeof(App).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
