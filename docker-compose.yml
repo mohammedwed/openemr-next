@@ -162,6 +162,13 @@ services:
       context: src/Services/PatientManagement
       dockerfile: Dockerfile
     restart: unless-stopped
+    # Runs as OpenEMR's own apache UID (1000), not the image's default $APP_UID: sitesvolume's
+    # documents/ directory is mode 700, owned by that exact UID (confirmed by inspecting it directly --
+    # OpenEMR's httpd workers run as `apache`, uid 1000, and the directory has no group/other access at
+    # all), so no other UID can read or write it regardless of group membership. This doesn't loosen
+    # the volume's own permissions -- it makes this container assume the UID that already legitimately
+    # owns it, the same file ownership OpenEMR's own writes already use.
+    user: "1000:1000"
     depends_on:
       mysql:
         condition: service_healthy

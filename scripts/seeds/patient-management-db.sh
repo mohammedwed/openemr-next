@@ -57,9 +57,13 @@ GRANT SELECT ON \`${DB_NAME}\`.categories TO '${PATIENT_MANAGEMENT_DB_USER}'@'%'
 -- DELETE+INSERT on a duplicate key, so both privileges are needed even though this service never
 -- issues a bare DELETE itself.
 GRANT SELECT, INSERT, DELETE ON \`${DB_NAME}\`.categories_to_documents TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
--- The single shared id-generation counter (legacy's own QueryUtils::generateId()) -- UPDATE alone
--- covers "SET id = LAST_INSERT_ID(id + 1)", since it reads the row being updated, not a separate one.
-GRANT UPDATE ON \`${DB_NAME}\`.sequences TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
+-- The single shared id-generation counter (legacy's own QueryUtils::generateId()) -- "SET id =
+-- LAST_INSERT_ID(id + 1)" needs SELECT too, not just UPDATE: MariaDB requires read privilege on any
+-- column referenced on the right-hand side of a SET expression, even one from the row being updated.
+-- Confirmed the hard way: UPDATE-only produced "SELECT command denied... for column 'id'" against the
+-- real seeded user, a gap the Testcontainers integration tests never catch (that fixture connects
+-- with a more permissive user, not this exact least-privilege grant set).
+GRANT SELECT, UPDATE ON \`${DB_NAME}\`.sequences TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 -- FHIR Patient API: read-only lookups for generalPractitioner (users.uuid) and every coded extension
 -- (list_options) -- this service never writes to either.
 GRANT SELECT ON \`${DB_NAME}\`.users TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';

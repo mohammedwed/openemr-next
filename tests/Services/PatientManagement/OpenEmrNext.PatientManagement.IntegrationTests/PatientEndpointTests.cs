@@ -93,7 +93,32 @@ public class PatientEndpointTests(PatientDataContainerFixture fixture) : IAsyncL
         Assert.NotNull(patients);
         var match = Assert.Single(patients!);
         Assert.Equal(registered!.Uuid, match.Uuid);
+        Assert.Equal(registered.Pid, match.Pid);
         Assert.Equal(firstName, match.FirstName);
         Assert.Equal("Johnson", match.LastName);
+    }
+
+    [Fact]
+    public async Task GET_patient_by_uuid_returns_the_patient_including_its_pid()
+    {
+        var registerRequest = new RegisterPatientRequest("Katherine", "Johnson", "Female", new DateOnly(1918, 8, 26), null, null, RegisteredBy: 1);
+        var registerResponse = await _client!.PostAsJsonAsync("/api/v1/patients", registerRequest);
+        var registered = await registerResponse.Content.ReadFromJsonAsync<PatientRegisteredResponse>();
+
+        var response = await _client.GetAsync($"/api/v1/patients/{registered!.Uuid}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var patient = await response.Content.ReadFromJsonAsync<PatientSummaryResponse>();
+        Assert.NotNull(patient);
+        Assert.Equal(registered.Uuid, patient!.Uuid);
+        Assert.Equal(registered.Pid, patient.Pid);
+    }
+
+    [Fact]
+    public async Task GET_patient_by_an_unknown_uuid_returns_404()
+    {
+        var response = await _client!.GetAsync($"/api/v1/patients/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }

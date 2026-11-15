@@ -622,6 +622,37 @@ disambiguation shape already used for the `Patient`/`FhirPatient` collision else
 `RegisteredBy` uses a fixed placeholder id in the form, the same gap ADR 0055 already named, not a new
 decision made here.
 
+## WebApp's frontend extends to insurance and advance directives (ADR 0061)
+
+Recorded 2026-11-15. Every PatientManagement.Api feature except patient merge (M5+-blocked) and the
+FHIR API (no legacy UI equivalent -- it's an interop surface, same as legacy's own) now has a working
+WebApp page: `Pages/Patients/Detail.razor` adds Insurance (effective coverage, add policy, swap) and
+Advance Directives (status, document list/download, upload) sections.
+
+Needed `Pid` added to `PatientFhirView`/`PatientSummaryResponse` first (insurance/advance-directive
+routes are keyed by `pid`, not `uuid` -- nothing exposed it before now; it's already a column in the
+same query that selects `uuid`, not new logic) and a new `GET /api/v1/patients/{uuid}` endpoint
+(reuses `GetPatientFhirRecordUseCase` as-is) so the detail page can resolve a patient's `pid`.
+
+**Three real bugs found only by exercising the actual deployed stack, not by any unit/integration
+test**:
+- The download endpoint's generated client method is bodyless (NSwag can't type a per-document-
+  variable content-type) -- the UI links directly to the relative Gateway URL instead, which is the
+  right shape for a file download anyway.
+- Document upload threw `UnauthorizedAccessException`: `sitesvolume`'s `documents` directory is mode
+  `700`, owned by uid 1000 (OpenEMR's own `apache` worker uid), and PatientManagement's container ran
+  as a different uid with zero access. Fixed with `user: "1000:1000"` in `docker-compose.yml`.
+- Document upload then failed a second way: the real least-privilege DB user lacked `SELECT` on
+  `sequences` for the id-generation `UPDATE`, because `UPDATE` alone does not grant read access to a
+  column referenced in a `SET` expression, contrary to what the seed script's own comment claimed.
+  **This is also a real test-coverage gap**: `PatientDataContainerFixture` never creates or connects
+  as a restricted user at all, so the real grant set has never been exercised by any automated test --
+  worth fixing separately, not folded into this round.
+
+Verified end to end against the real stack for every feature: register/reuse a patient, add an
+insurance policy, swap its level, set advance-directive status, upload a document, list it, and
+download its exact original bytes back -- all through the real Gateway.
+
 ## Scope note
 
 This is vocabulary and rules, not a formal bounded-context diagram or conceptual class model. Per the

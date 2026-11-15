@@ -44,12 +44,16 @@
                         <MudTh>Last name</MudTh>
                         <MudTh>Date of birth</MudTh>
                         <MudTh>Email</MudTh>
+                        <MudTh></MudTh>
                     </HeaderContent>
                     <RowTemplate Context="patient">
                         <MudTd>@patient.FirstName</MudTd>
                         <MudTd>@patient.LastName</MudTd>
                         <MudTd>@(patient.DateOfBirth?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
                         <MudTd>@(patient.Email ?? "—")</MudTd>
+                        <MudTd>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@($"/patients/{patient.Uuid}")">View</MudButton>
+                        </MudTd>
                     </RowTemplate>
                 </MudTable>
             }

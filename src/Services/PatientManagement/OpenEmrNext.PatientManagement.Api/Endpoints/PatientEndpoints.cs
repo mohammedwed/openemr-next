@@ -25,6 +25,13 @@ public static class PatientEndpoints
             .WithSummary("List patients, optionally filtered by name")
             .Produces<IReadOnlyList<PatientSummaryResponse>>();
 
+        app.MapGet("/patients/{uuid:guid}", GetPatient)
+            .WithName("GetPatient")
+            .WithTags("Patients")
+            .WithSummary("Get a single patient by uuid")
+            .Produces<PatientSummaryResponse>()
+            .Produces(StatusCodes.Status404NotFound);
+
         return app;
     }
 
@@ -65,8 +72,21 @@ public static class PatientEndpoints
     {
         var views = await useCase.ExecuteAsync(new PatientFhirSearchCriteria(Name: name), ct);
 
-        return Results.Ok(views
-            .Select(v => new PatientSummaryResponse(v.Uuid, v.FirstName, v.LastName, v.DateOfBirth, v.Email))
-            .ToList());
+        return Results.Ok(views.Select(ToSummary).ToList());
     }
+
+    /// <summary>
+    /// A plain single-patient lookup by uuid -- reuses the same read this service's own FHIR API
+    /// already does (<see cref="GetPatientFhirRecordUseCase"/>) for <c>GET /fhir/Patient/{uuid}</c>,
+    /// just projected to the same smaller shape <see cref="GetPatients"/> uses. No new Domain or
+    /// persistence logic.
+    /// </summary>
+    private static async Task<IResult> GetPatient(Guid uuid, GetPatientFhirRecordUseCase useCase, CancellationToken ct)
+    {
+        var view = await useCase.ExecuteAsync(uuid, ct);
+        return view is null ? Results.NotFound() : Results.Ok(ToSummary(view));
+    }
+
+    private static PatientSummaryResponse ToSummary(PatientFhirView v) =>
+        new(v.Uuid, v.Pid, v.FirstName, v.LastName, v.DateOfBirth, v.Email);
 }
