@@ -106,8 +106,38 @@ Infrastructure, and now Api). Three findings, all fixed.
   itself for readiness — this Api has no `/health` endpoint.
 - Added to `OpenEMR-Next.slnx`. Nothing consumes the generated client yet.
 
+## Added — PatientManagement is deployed and reachable through the Gateway (ADR 0060)
+
+- New `src/Services/PatientManagement/Dockerfile` and `.dockerignore`. The missing `.dockerignore`
+  caused a real, confusing build failure (`NETSDK1064`, package "not found" despite a successful
+  restore) — the repo-root one only covers WebApp's build, not a per-service one like this; fixed by
+  adding PatientManagement's own, mirroring AuthFacade's.
+- New `patient-management` docker-compose service (no published host port — only the Gateway may
+  reach it), a new `INTERNAL_GATEWAY_SECRET` shared between it and the `gateway` service
+  (`.env.example`, `new-env.sh`, CI), and `patient-management` added to CI's `docker compose up`
+  service list.
+- Gateway (`Program.cs`): a new `patientmanagement` cluster, two routes
+  (`/api/v1/patients/{**catch-all}`, `/fhir/{**catch-all}`), and a request transform scoped to only
+  that cluster attaching `X-Internal-Gateway-Secret` unconditionally. Two new `GatewayStackTests`
+  prove this against the real running stack.
+- New `GET /api/v1/patients` endpoint, reusing `SearchPatientFhirRecordsUseCase` as-is — no new
+  Domain/persistence work — since the only existing search path returns a FHIR `Bundle` with no
+  typed NSwag model. Covered by a new integration test.
+- WebApp: `IPatientManagementClient` registered alongside `IAuthFacadeClient`, each with its own
+  `HttpClient`/circuit breaker (renamed `AuthFacadeCircuitBreakingHandler` →
+  `TransientFailureCircuitBreakingHandler`). Two new pages (`Pages/Patients/Index.razor`,
+  `Register.razor`), enabling the previously-disabled "Patients" nav link. Resolved a real
+  `ApiException` namespace collision between the two generated clients with explicit `@using`
+  aliases.
+- Verified against the real running `docker compose` stack: `docker compose up` with
+  `patient-management` included, all services healthy, Gateway integration tests passing against it,
+  and a direct `curl` through the gateway (no secret presented by the caller) registering a patient
+  and listing it back.
+
 ## Tests
 
-Full solution builds clean (0 errors, same 5 pre-existing unrelated nullable warnings). Full
-PatientManagement suite run and passing: 54 integration tests (including the new gateway-secret
-and OpenAPI-document tests), 121 unit tests, 17 architecture tests.
+Full solution builds clean (0 errors, 0 warnings across every project touched today). Full
+PatientManagement suite passing: 55 integration tests (including the new list-endpoint and
+gateway-secret/OpenAPI-document tests), 121 unit tests, 17 architecture tests. Gateway's own
+integration suite passing against the real stack: 7 tests (including the 2 new PatientManagement
+routing cases).

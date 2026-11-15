@@ -1,17 +1,25 @@
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Transforms;
 
-// The single external origin a browser talks to (ADR 0033): WebApp (the dashboard) and AuthFacade need to
-// share one origin for the AuthFacadeSession cookie to work on the dashboard's own fetch calls, without
-// CORS or loosening SameSite. This gateway is that origin -- it routes AuthFacade's own known path
-// prefixes to it and everything else to WebApp's static files, and otherwise does nothing: no auth
-// decisions, no token handling, consistent with AuthFacade keeping those (ADR 0029/0030).
+// The single external origin a browser talks to (ADR 0033): WebApp (the dashboard), AuthFacade, and
+// PatientManagement need to share one origin -- AuthFacade for the AuthFacadeSession cookie to work on
+// the dashboard's own fetch calls (without CORS or loosening SameSite), PatientManagement because it
+// trusts no caller that isn't this gateway (ADR 0055). This gateway is that origin -- it routes each
+// service's own known path prefixes to it and everything else to WebApp's static files. It still makes
+// no auth decisions for AuthFacade's own routes (ADR 0029/0030); for PatientManagement's, the one thing
+// it does is attach the shared secret server-side (see the "patientmanagement" case in AddTransforms
+// below) -- not a real per-user authorization decision, just the one ADR 0055 already scoped to this
+// gateway.
 var builder = WebApplication.CreateBuilder(args);
 
 var authFacadeBaseUrl = builder.Configuration["AuthFacade:BaseUrl"]
     ?? throw new InvalidOperationException("AuthFacade:BaseUrl is required.");
 var webAppBaseUrl = builder.Configuration["WebApp:BaseUrl"]
     ?? throw new InvalidOperationException("WebApp:BaseUrl is required.");
+var patientManagementBaseUrl = builder.Configuration["PatientManagement:BaseUrl"]
+    ?? throw new InvalidOperationException("PatientManagement:BaseUrl is required.");
+var internalGatewaySecret = builder.Configuration["InternalGateway:Secret"]
+    ?? throw new InvalidOperationException("InternalGateway:Secret is required.");
 
 // Every path AuthFacade itself maps outside /api/v1 (UserEndpoints, OpenIddictClientEndpoints,
 // LogoutEndpoints, SessionEndpoints, OpenEmrBffProxyEndpoints, SystemEndpoints) plus /api/v1 itself. More specific than WebApp's own
@@ -31,6 +39,13 @@ string[] authFacadeRoutePatterns =
     "/scalar/{**catch-all}"
 ];
 
+// PatientManagement's own path prefixes: /api/v1/patients (registration, insurance, advance
+// directives -- PatientEndpoints/InsuranceEndpoints/AdvanceDirectiveEndpoints all map under the same
+// /api/v1/patients group) and /fhir (the FHIR Patient API, a top-level group of its own). Both more
+// specific than AuthFacade's bare /api/{**catch-all} above, so the same route-precedence reasoning
+// already stated for that one applies here too.
+string[] patientManagementRoutePatterns = ["/api/v1/patients/{**catch-all}", "/fhir/{**catch-all}"];
+
 var routes = authFacadeRoutePatterns
     .Select((pattern, index) => new RouteConfig
     {
@@ -46,6 +61,12 @@ var routes = authFacadeRoutePatterns
         // itself (looked up by the state query parameter, independent of Host) was found correctly.
         Transforms = [new Dictionary<string, string> { ["RequestHeaderOriginalHost"] = "true" }]
     })
+    .Concat(patientManagementRoutePatterns.Select((pattern, index) => new RouteConfig
+    {
+        RouteId = $"patientmanagement-{index}",
+        ClusterId = "patientmanagement",
+        Match = new RouteMatch { Path = pattern }
+    }))
     .Append(new RouteConfig
     {
         RouteId = "webapp",
@@ -60,6 +81,11 @@ ClusterConfig[] clusters =
     {
         ClusterId = "authfacade",
         Destinations = new Dictionary<string, DestinationConfig> { ["authfacade"] = new() { Address = authFacadeBaseUrl } }
+    },
+    new ClusterConfig
+    {
+        ClusterId = "patientmanagement",
+        Destinations = new Dictionary<string, DestinationConfig> { ["patientmanagement"] = new() { Address = patientManagementBaseUrl } }
     },
     new ClusterConfig
     {
@@ -86,6 +112,20 @@ builder.Services.AddReverseProxy()
     {
         transformContext.AddXForwardedFor().AddXForwardedProto();
         transformContext.AddResponseHeader("Strict-Transport-Security", "max-age=2592000", append: false, ResponseCondition.Always);
+
+        // Scoped to only the patientmanagement cluster, not applied globally like the transforms
+        // above: the secret must never reach AuthFacade or WebApp's destinations, only the one
+        // service ADR 0055 requires it for. Unconditional -- this gateway makes no per-user auth
+        // decision here, only the one ADR 0055 already scoped to it (see the top-of-file comment).
+        if (transformContext.Cluster?.ClusterId == "patientmanagement")
+        {
+            transformContext.AddRequestTransform(requestTransformContext =>
+            {
+                requestTransformContext.ProxyRequest.Headers.Remove("X-Internal-Gateway-Secret");
+                requestTransformContext.ProxyRequest.Headers.Add("X-Internal-Gateway-Secret", internalGatewaySecret);
+                return ValueTask.CompletedTask;
+            });
+        }
     });
 
 // HttpsRedirection:HttpsPort is the externally-published HTTPS port (GATEWAY_HTTPS_PORT), not Kestrel's

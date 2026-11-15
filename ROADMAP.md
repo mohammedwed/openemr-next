@@ -218,10 +218,19 @@ doc's anti-pattern #2).
 - Gateway integration test coverage: 5 black-box tests covering routing, TLS redirect, and HSTS
   (previously zero, unlike AuthFacade's unit/architecture/integration projects).
 
-**Remaining — both blocked on M4/M5 existing, nothing to build yet:**
+**Done:**
 
-- Routes to the new services (Patient Management, Clinical Care)
-- AuthFacade's BFF proxy gaining a cluster pointed at this gateway (ADR 0030)
+- Route to Patient Management (`/api/v1/patients/{**catch-all}`, `/fhir/{**catch-all}`), with a
+  request transform attaching the shared `X-Internal-Gateway-Secret` server-side (ADR 0055, ADR 0060)
+  — not a per-user auth decision, the one thing ADR 0055 already scoped to this gateway. Verified
+  against the real running stack, including 2 new `GatewayStackTests`.
+
+**Remaining — blocked on M5 existing, nothing to build yet:**
+
+- Route to Clinical Care, once that service exists
+- AuthFacade's BFF proxy gaining a cluster pointed at this gateway (ADR 0030) — a different mechanism
+  (browser calls that need the real OpenEMR token forwarded through AuthFacade's own proxy) than the
+  direct Patient Management route above, still unbuilt
 
 Gateway token validation itself stays deferred per ADR 0048 until one of its two named triggers occurs —
 not tracked as remaining M3 work, since there is nothing to build against yet.
@@ -254,8 +263,12 @@ is no concurrent-writer race to design around.
 - Unit and integration tests, via Testcontainers rather than the black-box-against-the-running-stack
   pattern AuthFacade/Gateway use (ADR 0050 — a deliberate departure, not an oversight)
 
-**Exit criteria:** A patient is registered through the gateway. The event is
-published exactly once. Tests pass.
+**Exit criteria:** A patient is registered through the gateway. **Met** — PatientManagement is deployed
+(Dockerfile, docker-compose service) and reachable through the Gateway (ADR 0060); verified against the
+real stack by registering a patient through `https://localhost:7131` with no caller-presented
+credential, the Gateway attaching the internal secret server-side. A first WebApp frontend slice
+(registration + list pages, `OpenEmrNext.PatientManagement.Client`) exercises the same path. The event
+is published exactly once. Tests pass.
 
 ### M5: Clinical Care service (not started)
 

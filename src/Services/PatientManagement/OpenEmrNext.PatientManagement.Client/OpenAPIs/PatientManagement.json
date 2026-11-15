@@ -50,6 +50,42 @@
             "InternalGateway": []
           }
         ]
+      },
+      "get": {
+        "tags": [
+          "Patients"
+        ],
+        "summary": "List patients, optionally filtered by name",
+        "operationId": "GetPatients",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PatientSummaryResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
       }
     },
     "/api/v1/patients/{pid}/insurance": {
@@ -917,6 +953,41 @@
           },
           "pubpid": {
             "type": "string"
+          }
+        }
+      },
+      "PatientSummaryResponse": {
+        "required": [
+          "uuid",
+          "firstName",
+          "lastName",
+          "dateOfBirth",
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "dateOfBirth": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

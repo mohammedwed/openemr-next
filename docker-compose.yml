@@ -153,6 +153,36 @@ services:
       - ./scripts/seeds/patient-management-db.sh:/seed/patient-management-db.sh:ro
     entrypoint: ["bash", "/seed/patient-management-db.sh"]
 
+  # ---- Patient Management (.NET) ----
+  # No published host port: unlike AuthFacade, this service is never reached directly, only through the
+  # gateway's own route (ADR 0030, ADR 0055), which is the only caller that knows
+  # INTERNAL_GATEWAY_SECRET. Publishing a host port here would let that gate be bypassed entirely.
+  patient-management:
+    build:
+      context: src/Services/PatientManagement
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      seed-patient-management-db:
+        condition: service_completed_successfully
+    volumes:
+      # The same sitesvolume OpenEMR itself writes advance-directive documents under (ADR 0049's
+      # anti-corruption-adapter reasoning): legacy's own documents/{pid}/{uuid} layout, read and written
+      # by both OpenEMR's PHP and this service so neither corrupts the other's view of the same files.
+      - sitesvolume:/sites
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${PATIENT_MANAGEMENT_ENVIRONMENT:-Production}
+      PatientManagementDb__Host: mysql
+      PatientManagementDb__Database: ${DB_NAME:-openemr}
+      PatientManagementDb__User: ${PATIENT_MANAGEMENT_DB_USER:-patient_management}
+      PatientManagementDb__Password: ${PATIENT_MANAGEMENT_DB_PASSWORD:?Set PATIENT_MANAGEMENT_DB_PASSWORD in .env}
+      AdvanceDirectiveStorage__RepositoryRoot: /sites/default/documents
+      # Shared with the gateway service below (ADR 0055) -- the gateway attaches this as
+      # X-Internal-Gateway-Secret; this service refuses any request missing it.
+      InternalGateway__Secret: ${INTERNAL_GATEWAY_SECRET:?Set INTERNAL_GATEWAY_SECRET in .env}
+
   # ---- AuthFacade (.NET) ----
   auth-facade:
     build:
@@ -230,8 +260,10 @@ services:
     restart: unless-stopped
 
   # ---- Gateway (YARP) ----
-  # The single external origin a browser talks to for the dashboard (ADR 0033): routes AuthFacade's own
-  # path prefixes to it and everything else to WebApp's static files. Makes no auth decisions of its own.
+  # The single external origin a browser talks to for the dashboard (ADR 0033): routes AuthFacade's and
+  # PatientManagement's own path prefixes to each (ADR 0030, ADR 0055), and everything else to WebApp's
+  # static files. Makes no auth decisions for AuthFacade's own routes; for PatientManagement's, it
+  # attaches the shared InternalGateway secret server-side -- the browser never holds it.
   # Terminates TLS with the self-signed dev cert from scripts/setup/new-dev-cert.sh (ADR 0039): the plain
   # HTTP port stays open only to redirect to HTTPS, never to serve a response itself.
   gateway:
@@ -241,6 +273,7 @@ services:
     restart: unless-stopped
     depends_on:
       - auth-facade
+      - patient-management
       - webapp
     ports:
       - "${HOST_BIND_ADDRESS:-127.0.0.1}:${GATEWAY_HTTP_PORT:-7130}:8080"
@@ -258,6 +291,11 @@ services:
       HttpsRedirection__HttpsPort: ${GATEWAY_HTTPS_PORT:-7131}
       AuthFacade__BaseUrl: "http://auth-facade:8080"
       WebApp__BaseUrl: "http://webapp:8080"
+      PatientManagement__BaseUrl: "http://patient-management:8080"
+      # Shared with the patient-management service above (ADR 0055) -- attached server-side as
+      # X-Internal-Gateway-Secret on every request this gateway forwards there; never sent to the
+      # browser.
+      InternalGateway__Secret: ${INTERNAL_GATEWAY_SECRET:?Set INTERNAL_GATEWAY_SECRET in .env}
 
   # ---- Login UI (Blazor) ----
   # A static page: one "Log in with OpenEMR" link to AuthFacade's /oidc/login (ADR 0026). It holds no

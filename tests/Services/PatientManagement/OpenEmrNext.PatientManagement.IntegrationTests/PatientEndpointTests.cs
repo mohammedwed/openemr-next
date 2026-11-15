@@ -74,4 +74,26 @@ public class PatientEndpointTests(PatientDataContainerFixture fixture) : IAsyncL
         Assert.NotNull(problem);
         Assert.True(problem!.ContainsKey("errors"));
     }
+
+    [Fact]
+    public async Task GET_patients_filtered_by_name_returns_the_registered_patient()
+    {
+        // GUID-suffixed first name: the database is shared across every test in this collection, not
+        // reset between them (same reasoning DuplicateScoringTests' own fixture doc comment states),
+        // so a plain "Katherine" would also match rows other tests in this file register.
+        var firstName = $"Unique{Guid.NewGuid():N}";
+        var registerRequest = new RegisterPatientRequest(firstName, "Johnson", "Female", new DateOnly(1918, 8, 26), null, null, RegisteredBy: 1);
+        var registerResponse = await _client!.PostAsJsonAsync("/api/v1/patients", registerRequest);
+        var registered = await registerResponse.Content.ReadFromJsonAsync<PatientRegisteredResponse>();
+
+        var response = await _client.GetAsync($"/api/v1/patients?name={firstName}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var patients = await response.Content.ReadFromJsonAsync<List<PatientSummaryResponse>>();
+        Assert.NotNull(patients);
+        var match = Assert.Single(patients!);
+        Assert.Equal(registered!.Uuid, match.Uuid);
+        Assert.Equal(firstName, match.FirstName);
+        Assert.Equal("Johnson", match.LastName);
+    }
 }

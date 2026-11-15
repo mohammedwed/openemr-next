@@ -585,6 +585,43 @@ correct -- the gateway-secret scheme and the DataAnnotations-derived `minLength`
 constraints all flow straight into the generated `PatientManagementClient`'s request/response types.
 Nothing consumes this client yet; that's a separate, later decision.
 
+## PatientManagement is deployed and reachable through the Gateway; a first WebApp frontend slice (ADR 0060)
+
+Recorded 2026-11-15. ROADMAP M3's "routes to the new services... blocked on M4/M5 existing" item had
+its trigger fire: M4 exists now. Closing it meant standing up the whole path PatientManagement never
+had: a Dockerfile, a docker-compose service, and a Gateway route.
+
+**Found along the way**: PatientManagement's own `.dockerignore` was missing. The repo-root one only
+covers builds whose Compose context is the repository root (WebApp); a per-service build like this one
+needs its own, the same way AuthFacade already has one. Without it, `COPY . ./` silently overwrote the
+container's freshly-restored `obj/`/`bin/` folders with the host's own (pointing at
+`/root/.nuget/packages`-shaped paths that don't exist in the container), producing a confusing
+`NETSDK1064 "package was not found"` on `dotnet publish --no-restore` despite `dotnet restore` and
+`project.assets.json` both genuinely having the package -- confirmed by direct inspection inside the
+build, not guessed.
+
+The Gateway gets a new `patientmanagement` cluster and two routes (`/api/v1/patients/{**catch-all}`,
+`/fhir/{**catch-all}`), with a request transform scoped to only that cluster attaching
+`X-Internal-Gateway-Secret` unconditionally -- the one thing ADR 0055 already named as this gateway's
+job, not a new per-user authorization decision. Verified against the real running `docker compose`
+stack (not just reasoning about YARP config): two new `GatewayStackTests` prove a caller presenting no
+secret of its own still reaches PatientManagement for real, and a direct `curl` through the gateway
+registered a patient and listed it back -- the same round trip the new WebApp pages drive.
+
+A new `GET /api/v1/patients` endpoint reuses `SearchPatientFhirRecordsUseCase` as-is (no new Domain or
+persistence work) to give a plain list, since the only existing search path (`GET /fhir/Patient`)
+returns a FHIR `Bundle` NSwag can't generate a typed model for.
+
+WebApp gets `IPatientManagementClient` alongside `IAuthFacadeClient`, each with its own `HttpClient`
+and independent circuit-breaker instance (renamed `AuthFacadeCircuitBreakingHandler` →
+`TransientFailureCircuitBreakingHandler`, since it's now genuinely shared logic, not AuthFacade-
+specific), and two new pages (`Pages/Patients/Index.razor`, `Register.razor`) enabling the
+previously-disabled "Patients" nav link. Both generated clients define their own `ApiException` class
+-- a real collision once a page calls both -- resolved with explicit `@using` aliases, the same
+disambiguation shape already used for the `Patient`/`FhirPatient` collision elsewhere in this codebase.
+`RegisteredBy` uses a fixed placeholder id in the form, the same gap ADR 0055 already named, not a new
+decision made here.
+
 ## Scope note
 
 This is vocabulary and rules, not a formal bounded-context diagram or conceptual class model. Per the

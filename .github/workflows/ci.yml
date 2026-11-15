@@ -41,6 +41,7 @@ jobs:
           AUTHFACADE_CLIENT_ID: ${{ vars.AUTHFACADE_CLIENT_ID || 'authfacade' }}
           AUTHFACADE_DB_PASSWORD: ${{ secrets.AUTHFACADE_DB_PASSWORD || 'ci-authfacade-db-password' }}
           PATIENT_MANAGEMENT_DB_PASSWORD: ${{ secrets.PATIENT_MANAGEMENT_DB_PASSWORD || 'ci-patient-management-db-password' }}
+          INTERNAL_GATEWAY_SECRET: ${{ secrets.INTERNAL_GATEWAY_SECRET || 'ci-internal-gateway-secret' }}
         run: |
           cp .env.example .env
           source scripts/lib/env.sh
@@ -51,6 +52,7 @@ jobs:
           env_set AUTHFACADE_CLIENT_ID "$AUTHFACADE_CLIENT_ID"
           env_set AUTHFACADE_DB_PASSWORD "$AUTHFACADE_DB_PASSWORD"
           env_set PATIENT_MANAGEMENT_DB_PASSWORD "$PATIENT_MANAGEMENT_DB_PASSWORD"
+          env_set INTERNAL_GATEWAY_SECRET "$INTERNAL_GATEWAY_SECRET"
           env_set STACK_READY_TIMEOUT_MINUTES 3
           # Print variable names only, never values.
           cut -d= -f1 .env
@@ -98,7 +100,7 @@ jobs:
         run: bash scripts/setup/new-dev-cert.sh
 
       - name: Start stack
-        run: docker compose up -d --build --wait --wait-timeout 1200 openemr auth-facade webapp gateway phpmyadmin
+        run: docker compose up -d --build --wait --wait-timeout 1200 openemr auth-facade patient-management webapp gateway phpmyadmin
 
       - name: Probe endpoints
         if: always()

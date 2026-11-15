@@ -2,6 +2,7 @@ using OpenEmrNext.PatientManagement.Api.Contracts.Requests;
 using OpenEmrNext.PatientManagement.Api.Contracts.Responses;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Domain;
+using OpenEmrNext.PatientManagement.Domain.Fhir.ReadModels;
 using OpenEmrNext.PatientManagement.Domain.ValueObjects;
 
 namespace OpenEmrNext.PatientManagement.Api.Endpoints;
@@ -17,6 +18,12 @@ public static class PatientEndpoints
             .WithSummary("Register a new patient")
             .Produces<PatientRegisteredResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem();
+
+        app.MapGet("/patients", GetPatients)
+            .WithName("GetPatients")
+            .WithTags("Patients")
+            .WithSummary("List patients, optionally filtered by name")
+            .Produces<IReadOnlyList<PatientSummaryResponse>>();
 
         return app;
     }
@@ -46,5 +53,20 @@ public static class PatientEndpoints
         return Results.Created(
             $"/api/v1/patients/{patient.Uuid}",
             new PatientRegisteredResponse(patient.Uuid, patient.Pid, patient.Pubpid));
+    }
+
+    /// <summary>
+    /// A plain list, for a caller that doesn't want a FHIR Bundle -- reuses the same search this
+    /// service's own FHIR API already does (<see cref="SearchPatientFhirRecordsUseCase"/>), just
+    /// projected to a smaller shape. No new Domain or persistence logic.
+    /// </summary>
+    private static async Task<IResult> GetPatients(
+        string? name, SearchPatientFhirRecordsUseCase useCase, CancellationToken ct)
+    {
+        var views = await useCase.ExecuteAsync(new PatientFhirSearchCriteria(Name: name), ct);
+
+        return Results.Ok(views
+            .Select(v => new PatientSummaryResponse(v.Uuid, v.FirstName, v.LastName, v.DateOfBirth, v.Email))
+            .ToList());
     }
 }
