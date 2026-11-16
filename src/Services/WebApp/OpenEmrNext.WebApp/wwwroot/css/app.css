@@ -89,6 +89,12 @@
     margin-top: 1rem;
 }
 
+/* Dashboard cards: stretch to the row height so cards side by side in a MudGrid line up. */
+.dash-card {
+    height: 100%;
+    box-sizing: border-box;
+}
+
 /* The same flat, hairline-border treatment the app bar already uses (ADR 0062's color/elevation
    decisions), applied to the drawer ADR 0063 restored: a vertical border reads as the rail's own edge
    the same way the app bar's horizontal one does, rather than reaching for Elevation="1"'s shadow. */

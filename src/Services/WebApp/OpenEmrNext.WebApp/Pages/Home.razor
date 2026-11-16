@@ -5,43 +5,182 @@
 
 <PageTitle>Dashboard</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Small" Class="pa-0">
-    <MudText Typo="Typo.h5" Class="mb-6">Dashboard</MudText>
-
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-0">
     @switch (_state)
     {
         case State.Loading:
-            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" role="status" aria-label="Loading dashboard" />
             break;
 
         case State.SignedIn:
-            <MudPaper Elevation="1" Class="pa-6">
-                <MudStack Spacing="4">
-                    <div>
-                        <MudText Typo="Typo.subtitle2" Class="mud-text-secondary">Signed in as</MudText>
-                        <MudText Typo="Typo.h6">@_name</MudText>
-                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@_subject</MudText>
-                    </div>
-                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
-                        Patient and encounter data isn't built yet (ROADMAP M4/M5) — this page proves the
-                        sign-in round trip end to end, through the generated AuthFacadeClient.
-                    </MudAlert>
-                    <div>
-                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/logout" Size="Size.Small">
-                            Log out
-                        </MudButton>
-                    </div>
-                </MudStack>
-            </MudPaper>
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Class="mb-4">
+                <div>
+                    <MudText Typo="Typo.h4" HtmlTag="h1">Dashboard</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                        Signed in as <strong>@_name</strong> (@_subject)
+                    </MudText>
+                </div>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/logout" Size="Size.Small">
+                    Log out
+                </MudButton>
+            </MudStack>
+
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-6">
+                Sample data for layout review. None of the figures below come from patient records yet (ROADMAP M4/M5).
+            </MudAlert>
+
+            @* KPI row: four headline numbers, each with its change against the previous period. *@
+            <MudGrid Spacing="3" Class="mb-2">
+                @foreach (var kpi in _kpis)
+                {
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Elevation="0" Outlined="true" Class="pa-4 rounded-lg dash-card">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
+                                <MudText Typo="Typo.body2" Class="mud-text-secondary">@kpi.Label</MudText>
+                                <MudIcon Icon="@kpi.Icon" Color="Color.Primary" Size="Size.Small" />
+                            </MudStack>
+                            <MudText Typo="Typo.h4" Class="mt-2">@kpi.Value</MudText>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mt-1">
+                                <MudIcon Icon="@kpi.TrendIcon" Color="@kpi.TrendColor" Size="Size.Small" />
+                                <MudText Typo="Typo.caption" Color="@kpi.TrendColor">
+                                    @kpi.Change
+                                    <span class="mud-text-secondary">@kpi.ComparedTo</span>
+                                </MudText>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                }
+            </MudGrid>
+
+            @* Charts row: a wide trend chart beside a status breakdown. *@
+            <MudGrid Spacing="3" Class="mb-2">
+                <MudItem xs="12" md="8">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-4 rounded-lg dash-card" role="region" aria-labelledby="chart-registrations-title">
+                        <MudText id="chart-registrations-title" Typo="Typo.h6">New patients</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary mb-2">Last six months</MudText>
+                        <MudChart T="double" ChartType="ChartType.Line"
+                                  ChartSeries="@_registrationSeries"
+                                  ChartLabels="@_months"
+                                  Width="100%"
+                                  Height="260px"
+                                  ChartOptions="@_lineOptions"
+                                  />
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-4 rounded-lg dash-card" role="region" aria-labelledby="chart-status-title">
+                        <MudText id="chart-status-title" Typo="Typo.h6">Today's appointments</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary mb-2">By status, 36 total</MudText>
+                        <MudStack AlignItems="AlignItems.Center" Class="mt-2">
+                            <MudChart T="double" ChartType="ChartType.Donut"
+                                      ChartSeries="@_statusSeries"
+                                  ChartLabels="@_statusLabels"
+                                      Width="200px"
+                                      Height="200px"
+                                      ChartOptions="@_donutOptions"
+                                      />
+                        </MudStack>
+                        <MudStack Spacing="1" Class="mt-3">
+                            @* foreach, not for: Razor's child lambdas run after a for loop's index has moved on,
+                               which threw IndexOutOfRangeException here. foreach gives each row its own values. *@
+                            @foreach (var (label, count) in _statusLabels.Zip(_statusCounts))
+                            {
+                                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.body2">@label</MudText>
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">@count</MudText>
+                                </MudStack>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            @* Table and activity row. *@
+            <MudGrid Spacing="3" Class="mb-2">
+                <MudItem xs="12" md="8">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-4 rounded-lg dash-card" role="region" aria-labelledby="table-upcoming-title">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                            <MudText id="table-upcoming-title" Typo="Typo.h6">Upcoming appointments</MudText>
+                        </MudStack>
+                        <MudTable Items="@_appointments" Dense="true" Hover="true" Striped="true" Elevation="0" T="Appointment">
+                            <HeaderContent>
+                                <MudTh>Time</MudTh>
+                                <MudTh>Patient</MudTh>
+                                <MudTh>Provider</MudTh>
+                                <MudTh>Visit type</MudTh>
+                                <MudTh>Status</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Time">@context.Time</MudTd>
+                                <MudTd DataLabel="Patient">@context.Patient</MudTd>
+                                <MudTd DataLabel="Provider">@context.Provider</MudTd>
+                                <MudTd DataLabel="Visit type">@context.VisitType</MudTd>
+                                <MudTd DataLabel="Status">
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@context.StatusColor">@context.Status</MudChip>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-4 rounded-lg dash-card" role="region" aria-labelledby="activity-title">
+                        <MudText id="activity-title" Typo="Typo.h6" Class="mb-2">Recent activity</MudText>
+                        <MudList T="string" Dense="true" ReadOnly="true">
+                            @foreach (var item in _activity)
+                            {
+                                <MudListItem T="string" Icon="@item.Icon" IconColor="@item.Color">
+                                    <MudText Typo="Typo.body2">@item.Text</MudText>
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">@item.When</MudText>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            @* Weekday bar chart and a pending-work panel. *@
+            <MudGrid Spacing="3">
+                <MudItem xs="12" md="8">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-4 rounded-lg dash-card" role="region" aria-labelledby="chart-visits-title">
+                        <MudText id="chart-visits-title" Typo="Typo.h6">Visits by weekday</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary mb-2">Average over the last four weeks</MudText>
+                        <MudChart T="double" ChartType="ChartType.Bar"
+                                  ChartSeries="@_visitSeries"
+                                  ChartLabels="@_weekdays"
+                                  Width="100%"
+                                  Height="240px"
+                                  ChartOptions="@_barOptions"
+                                  />
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-4 rounded-lg dash-card" role="region" aria-labelledby="pending-title">
+                        <MudText id="pending-title" Typo="Typo.h6" Class="mb-3">Pending work</MudText>
+                        <MudStack Spacing="3">
+                            @foreach (var task in _pending)
+                            {
+                                <div>
+                                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                        <MudText Typo="Typo.body2">@task.Label</MudText>
+                                        <MudText Typo="Typo.body2" Class="mud-text-secondary">@task.Done of @task.Total</MudText>
+                                    </MudStack>
+                                    <MudProgressLinear Value="@(task.Done * 100.0 / task.Total)" Color="@task.Color" Rounded="true" Class="mt-1" Size="Size.Small" />
+                                </div>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
             break;
 
         case State.SignedOut:
-            <MudPaper Elevation="1" Class="pa-6">
+            <MudPaper Elevation="1" Class="pa-6" Style="max-width: 560px;">
                 <MudStack Spacing="4">
                     @if (ErrorMessage is { } message)
                     {
                         <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" role="alert">@message</MudAlert>
                     }
+                    <MudText Typo="Typo.h5" HtmlTag="h1">Dashboard</MudText>
                     <MudText Class="mud-text-secondary">Sign in with your existing OpenEMR account.</MudText>
                     <div>
                         <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@LoginUrl">
@@ -60,6 +199,75 @@
     private State _state = State.Loading;
     private string? _name;
     private string? _subject;
+
+    private sealed record Kpi(string Label, string Value, string Icon, string Change, bool Up, string ComparedTo)
+    {
+        public string TrendIcon => Up ? Icons.Material.Filled.TrendingUp : Icons.Material.Filled.TrendingDown;
+        public Color TrendColor => Up ? Color.Success : Color.Error;
+    }
+
+    private sealed record Appointment(string Time, string Patient, string Provider, string VisitType, string Status, Color StatusColor);
+
+    private sealed record Activity(string Text, string When, string Icon, Color Color);
+
+    private sealed record PendingTask(string Label, int Done, int Total, Color Color);
+
+    // Mock data for layout review only. Replace with real queries when the patient and encounter
+    // APIs exist (ROADMAP M4/M5); the component structure should not need to change.
+    private readonly List<Kpi> _kpis =
+    [
+        new("Patients", "1,248", Icons.Material.Filled.People, "+3.2%", true, "vs. last month"),
+        new("Appointments today", "36", Icons.Material.Filled.EventAvailable, "+4", true, "vs. same day last week"),
+        new("Open advance directives", "7", Icons.Material.Filled.Gavel, "−2", false, "vs. last month"),
+        new("Documents awaiting review", "12", Icons.Material.Filled.Description, "+5", false, "since yesterday")
+    ];
+
+    private readonly string[] _months = ["Jun", "Jul", "Aug", "Sep", "Oct", "Nov"];
+    private readonly List<ChartSeries<double>> _registrationSeries =
+    [
+        new() { Name = "New patients", Data = new ChartData<double>(new double[] { 42, 55, 48, 61, 58, 67 }) }
+    ];
+
+    private readonly string[] _statusLabels = ["Completed", "Checked in", "Scheduled", "Cancelled"];
+    private static readonly double[] _statusCounts = [14, 6, 13, 3];
+    private readonly List<ChartSeries<double>> _statusSeries =
+    [
+        new() { Name = "Appointments", Data = new ChartData<double>(_statusCounts) }
+    ];
+
+    private readonly string[] _weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+    private readonly List<ChartSeries<double>> _visitSeries =
+    [
+        new() { Name = "Average visits", Data = new ChartData<double>(new double[] { 38, 44, 41, 47, 29 }) }
+    ];
+
+    private readonly List<Appointment> _appointments =
+    [
+        new("09:00", "Amara Okafor", "Dr. Lindqvist", "Annual check-up", "Checked in", Color.Info),
+        new("09:30", "Diego Ramírez", "Dr. Lindqvist", "Follow-up", "Scheduled", Color.Default),
+        new("10:15", "Priya Nair", "Dr. Haddad", "Blood pressure review", "Scheduled", Color.Default),
+        new("11:00", "Samuel Mensah", "Dr. Haddad", "Vaccination", "Cancelled", Color.Error),
+        new("13:30", "Hannah Schmidt", "Dr. Osei", "New patient intake", "Scheduled", Color.Default)
+    ];
+
+    private readonly List<Activity> _activity =
+    [
+        new("Registered patient Lena Park", "12 min ago", Icons.Material.Filled.PersonAdd, Color.Primary),
+        new("Advance directive signed by Joao Silva", "1 hour ago", Icons.Material.Filled.Gavel, Color.Success),
+        new("Insurance policy updated for Mei Tanaka", "2 hours ago", Icons.Material.Filled.Shield, Color.Info),
+        new("Lab document uploaded for Omar Haddad", "Yesterday", Icons.Material.Filled.UploadFile, Color.Secondary)
+    ];
+
+    private readonly List<PendingTask> _pending =
+    [
+        new("Documents to review", 8, 12, Color.Primary),
+        new("Advance directives to sign", 3, 7, Color.Secondary),
+        new("Insurance verifications", 19, 24, Color.Info)
+    ];
+
+    private readonly ChartOptions _lineOptions = new();
+    private readonly ChartOptions _donutOptions = new();
+    private readonly ChartOptions _barOptions = new();
 
     /// <summary>
     /// The error code AuthFacade's <c>/callback</c> appends when login did not complete (ADR 0026) --

@@ -1,5 +1,18 @@
 # Changelog 2026-11-16
 
+## Added — dashboard with sample content
+
+- **Dashboard** (`Pages/Home.razor`) populated for layout review: four KPI cards, a new-patients line chart,
+  a today's-appointments donut with a count legend, an upcoming-appointments table, recent activity,
+  a visits-by-weekday bar chart, and pending-work progress bars. All figures are sample data, labeled as such
+  on the page; no patient data is read.
+- The page is widened to `MaxWidth.Large`. Sign-in is unchanged.
+- **Fixed during review:** the legend rows threw `IndexOutOfRangeException` (a `for` loop captured by Razor's
+  child lambdas). Switched to `foreach` over the zipped labels and counts.
+- **Charts:** MudBlazor 9 API (`ChartSeries<double>`, `ChartLabels`), with the donut on `ChartSeries`.
+- Verified in Chrome at 1568px desktop width against the local stack: no console errors after the fix.
+  Phone width was not verified (the window resize did not change the viewport).
+
 ## Fixed — patient view on phone width
 
 - **Section actions wrap** onto their own line when the card is narrow (`op-section-header` and
