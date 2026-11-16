@@ -5,6 +5,7 @@ using OpenEmrNext.AuthFacade.Client;
 using OpenEmrNext.PatientManagement.Client;
 using OpenEmrNext.WebApp;
 using OpenEmrNext.WebApp.Resilience;
+using OpenEmrNext.WebApp.Theme;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -31,5 +32,6 @@ builder.Services.AddScoped<IPatientManagementClient>(_ => new PatientManagementC
     }));
 
 builder.Services.AddMudServices();
+builder.Services.AddScoped<ThemeService>();
 
 await builder.Build().RunAsync();

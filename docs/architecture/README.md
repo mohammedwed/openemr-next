@@ -67,3 +67,4 @@ old one's status is updated to point to it.
 | [0059](0059-nswag-generates-a-typed-patientmanagement-client.md) | NSwag generates a typed PatientManagement client from a committed OpenAPI snapshot | Accepted | 2026-11-15 |
 | [0060](0060-patientmanagement-is-deployed-and-reachable-through-the-gateway.md) | PatientManagement is deployed and reachable through the Gateway; WebApp gets a first frontend slice | Accepted | 2026-11-15 |
 | [0061](0061-webapp-covers-insurance-and-advance-directives.md) | WebApp's frontend extends to insurance and advance directives | Accepted | 2026-11-15 |
+| [0062](0062-webapp-chrome-flattens-toward-the-plain-blazor-template.md) | WebApp's chrome flattens toward the plain Blazor template's look | Accepted | 2026-11-15 |

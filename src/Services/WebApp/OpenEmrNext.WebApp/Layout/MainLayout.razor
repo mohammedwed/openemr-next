@@ -1,31 +1,97 @@
-﻿@inherits LayoutComponentBase
-@implements IDisposable
+﻿@using OpenEmrNext.WebApp.Theme
+@inherits LayoutComponentBase
+@implements IAsyncDisposable
 @inject IAuthFacadeClient AuthFacade
 @inject NavigationManager Navigation
+@inject ThemeService ThemeService
+@inject IBrowserViewportService BrowserViewportService
 
 <MudLayout>
-    <MudAppBar Elevation="1">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@(() => _drawerOpen = !_drawerOpen)" />
-        <MudText Typo="Typo.h6" Class="ml-2">OpenEMR Next</MudText>
-        <MudBreadcrumbs Items="_breadcrumbs" Class="ml-6 pa-0" />
+    @* Elevation 0 + a hairline border, not a shadow: a flat, light app bar reads closer to the plain
+       Blazor template's chrome than a shadowed, solid-brand-color bar did. *@
+    <MudAppBar Elevation="0" Class="op-appbar">
+        @* Restores the drawer ADR 0062 dropped, per ADR 0063 -- that decision's explicit, named trigger
+           ("the route list grows materially") never fired, but the user asked to bring it back anyway
+           after being shown the tradeoff, so this is a deliberate reversal, not a quiet one. Matches the
+           original pre-0062 toggle's position (app bar start) and icon-morph behavior the later mobile-
+           dropdown version had added, now reflecting the drawer's own open state instead.
+           op-drawer-toggle hides this at/above the drawer's own Breakpoint.Md (app.css): the drawer
+           shouldn't be dismissable on desktop/tablet, where it's the primary nav surface, only below it
+           where there isn't room for both it and the page content at once (OnViewportChanged below is
+           the other half of that: a safety net forcing it back open if the window grows past the
+           breakpoint after being closed on mobile, since DrawerVariant.Responsive -- confirmed directly,
+           not assumed -- does still honor Open="false" above its own breakpoint rather than ignoring it). *@
+        <MudIconButton Icon="@(_drawerOpen ? Icons.Material.Filled.Close : Icons.Material.Filled.Menu)" Color="Color.Inherit"
+            Edge="Edge.Start" Class="op-drawer-toggle" aria-label="@(_drawerOpen ? "Close navigation drawer" : "Open navigation drawer")"
+            OnClick="@(() => _drawerOpen = !_drawerOpen)" />
+        <MudText Typo="Typo.h6" Class="op-brand">OpenEMR Next</MudText>
         <MudSpacer />
-        @if (_userLabel is { } userLabel)
+        @* Follows the OS/browser preference until the user picks explicitly (ThemeService.LoadAsync /
+           App.razor), same icon-reflects-current-state convention as the drawer toggle above. Grouped
+           with the account control, not the drawer toggle -- this is a per-viewer preference, not part
+           of the nav structure. *@
+        <MudIconButton Icon="@(ThemeService.IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+            Color="Color.Inherit" aria-label="@(ThemeService.IsDarkMode ? "Switch to light mode" : "Switch to dark mode")"
+            OnClick="@(() => ThemeService.SetDarkModeAsync(!ThemeService.IsDarkMode))" />
+        @* A fixed-size placeholder while sign-in status is still loading, not nothing: without it, the
+           menu button pops into existence after the GetCurrentUserAsync round trip resolves, visibly
+           shifting the app bar's contents. Signed-out stays genuinely empty afterward -- there's never
+           a menu to reserve space for in that case. *@
+        @switch (_userState)
         {
-            <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit">
-                <MudMenuItem Disabled="true">Signed in as @userLabel</MudMenuItem>
-                <MudDivider />
-                <MudMenuItem Href="/logout">Log out</MudMenuItem>
-            </MudMenu>
+            case UserState.Loading:
+                <div class="op-user-slot-placeholder" aria-hidden="true"></div>
+                break;
+            case UserState.SignedIn:
+                <MudMenu Class="op-user-menu" PopoverClass="op-menu-popover">
+                    @* An initials avatar, not the generic AccountCircle icon every signed-in user showed
+                       before: this chrome only ever displays the current viewer's own identity, never a
+                       roster of other users to tell apart, so a single fixed brand color is enough --
+                       no per-user hash-to-color scheme to keep every avatar visually distinct.
+                       OnClick="context.ToggleAsync" is required, not optional: MudMenu's own XML doc
+                       comment says so directly ("When using ActivatorContent, click ... activators
+                       should call the provided MenuContext") -- confirmed the hard way, by spending a
+                       long debugging pass chasing phantom coordinate-space and caching theories before
+                       finding the real cause was simply never having wired this at all. The built-in
+                       Icon=/Label= activator wires its own click handler automatically; a custom
+                       ActivatorContent does not. *@
+                    <ActivatorContent Context="menuContext">
+                        <MudAvatar Color="Color.Primary" Class="op-user-avatar" @onclick="menuContext.ToggleAsync">@GetInitials(_userLabel)</MudAvatar>
+                    </ActivatorContent>
+                    <ChildContent>
+                        @* A plain label block, not a Disabled MudMenuItem: that rendered this exactly like a
+                           greyed-out, broken button rather than a header, since MudMenuItem's disabled style
+                           exists for an action that can't be taken right now, not for a non-interactive line
+                           of text that was never an action to begin with. *@
+                        <div class="op-menu-header">
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">Signed in as</MudText>
+                            <MudText Typo="Typo.body2" Class="op-menu-header-name">@_userLabel</MudText>
+                        </div>
+                        <MudDivider Class="my-1" />
+                        <MudMenuItem Href="/logout" Icon="@Icons.Material.Filled.Logout">Log out</MudMenuItem>
+                    </ChildContent>
+                </MudMenu>
+                break;
+            case UserState.SignedOut:
+                break;
         }
     </MudAppBar>
-    <MudDrawer @bind-Open="_drawerOpen" Elevation="1" Variant="DrawerVariant.Persistent">
+    @* Elevation 0 + the app bar's own hairline-border treatment, not the pre-0062 drawer's Elevation=1:
+       ADR 0063 restores the drawer itself but keeps 0062's flat/neutral color and elevation decisions,
+       which were never in question. Breakpoint.Md (960px, the library's own default), not the 600px the
+       removed hamburger dropdown used for its own breakpoint -- a persistent side rail competing with
+       page content for width warrants a wider point to collapse at than a top nav row did. *@
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="0" Class="op-drawer" Variant="DrawerVariant.Responsive" Breakpoint="Breakpoint.Md">
         <MudNavMenu>
-            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
-            <MudNavLink Href="/patients" Icon="@Icons.Material.Filled.People">Patients</MudNavLink>
-            <MudNavLink Disabled="true" Icon="@Icons.Material.Filled.EventNote">
-                Encounters
-                <MudText Typo="Typo.caption" Class="ml-2">Coming soon</MudText>
-            </MudNavLink>
+            @foreach (var item in _navItems)
+            {
+                <MudNavLink Href="@item.Href" Match="@(item.ExactMatch ? NavLinkMatch.All : NavLinkMatch.Prefix)" Icon="@item.Icon">@item.Label</MudNavLink>
+            }
+            @* MudNavLink's own Disabled state already handles the focusable/announced-as-disabled
+               concerns the flat nav's hand-rolled tabindex/role/aria-disabled trio existed to work
+               around -- that trio went away with the flat nav itself; a first-party disabled nav-link
+               component already covers it. The "Soon" badge added after ADR 0062 shipped is kept. *@
+            <MudNavLink Disabled="true" Icon="@Icons.Material.Filled.EventNote">Encounters<span class="op-soon-badge">Soon</span></MudNavLink>
         </MudNavMenu>
     </MudDrawer>
     @* px-4/pb-4, not pa-4: pa-4's padding: 16px !important overrides MudMainContent's own
@@ -34,12 +100,70 @@
        hidden underneath the app bar -- confirmed by inspecting the actual computed styles and
        CSS rules in a running browser, not guessed. Leaving padding-top alone lets that rule apply. *@
     <MudMainContent Class="px-4 pb-4">
-        @Body
+        @* A plain div with its own margin-top, not a pt-* utility class on MudMainContent itself:
+           those compile with !important (confirmed the hard way, the exact bug the comment above this
+           one documents), so one would replace MudMainContent's own calc()-based padding-top outright
+           rather than add to it. At any real-world width (>=600px, confirmed against MudBlazor's own
+           compiled CSS: that's the breakpoint where its padding-top becomes exactly
+           var(--mud-appbar-height), no more), that padding-top clears the bar's exact height and no
+           further -- zero built-in buffer beyond the bare minimum needed not to render underneath it.
+           Reported as the page's first heading/button reading as flush against the bar across both
+           themes (not a color-contrast illusion in one of them, confirmed by checking both) -- this is
+           that literal zero-buffer gap, not a guessed-at fix. *@
+        <div class="op-page-content">
+            @* A single-item breadcrumb on a top-level page only repeats what the active nav link and the
+               page's own heading already say -- real wayfinding value starts at two items (an actual
+               trail, e.g. Patients / Register). *@
+            @if (_breadcrumbs.Count > 1)
+            {
+                <MudBreadcrumbs Items="_breadcrumbs" Class="op-breadcrumbs px-0" />
+            }
+            @Body
+        </div>
     </MudMainContent>
 </MudLayout>
 
 @code {
+    // Single source for the drawer's two real routes, rendered into MudNavLinks via MudNavMenu below.
+    // The disabled "Encounters" placeholder stays hand-written instead -- see the comment above its
+    // own MudNavLink.
+    private static readonly (string Label, string Href, bool ExactMatch, string Icon)[] _navItems =
+    [
+        ("Dashboard", "", true, Icons.Material.Filled.Dashboard),
+        ("Patients", "patients", false, Icons.Material.Filled.People)
+    ];
+
+    // Open by default; OnViewportChanged below forces it back true if a mobile close left it false and
+    // the window then grows past the drawer's own breakpoint (op-drawer-toggle, hidden there, means the
+    // user has no way to do that themselves at that width -- this only catches the resize case, a full
+    // reload already starts from this same default). Also drives the toggle button's hamburger<->close
+    // icon via @bind-Open.
     private bool _drawerOpen = true;
+
+    private readonly Guid _viewportObserverId = Guid.NewGuid();
+
+    // Two words (a real name, once OpenEMR's tokens carry one -- docs/m4-domain-notes.md) take one
+    // letter each; a single token (today's UUID-fragment fallback) takes its first two characters
+    // instead of just one, so the avatar is never a single letter wide.
+    private static string GetInitials(string? label)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            return "?";
+        }
+
+        var words = label.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return words.Length >= 2
+            ? $"{words[0][0]}{words[1][0]}".ToUpperInvariant()
+            : label[..Math.Min(2, label.Length)].ToUpperInvariant();
+    }
+
+    private enum UserState { Loading, SignedIn, SignedOut }
+
+    // Mirrors the Loading/SignedIn/SignedOut shape Home.razor and Patients/Index.razor already use for
+    // the same GetCurrentUserAsync check, rather than a separate bool-plus-nullable-string encoding of
+    // the same three states.
+    private UserState _userState = UserState.Loading;
     private string? _userLabel;
     private List<BreadcrumbItem> _breadcrumbs = [];
 
@@ -55,10 +179,11 @@
             // reliably empty for a real user -- the same gap Home.razor's own display already has.
             // Falling back to a shortened subject (its UUID) keeps the menu meaningful either way.
             _userLabel = string.IsNullOrEmpty(me.Name) ? me.Subject[..Math.Min(8, me.Subject.Length)] : me.Name;
+            _userState = UserState.SignedIn;
         }
         catch (ApiException)
         {
-            _userLabel = null;
+            _userState = UserState.SignedOut;
         }
     }
 
@@ -66,6 +191,29 @@
     {
         BuildBreadcrumbs();
         StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await BrowserViewportService.SubscribeAsync(_viewportObserverId, OnViewportChanged, fireImmediately: true);
+        }
+    }
+
+    // The safety net described above op-drawer-toggle's own comment: re-opens the drawer the moment the
+    // window is Md-or-wider, regardless of whatever it was before. Breakpoint.Md/Lg/Xl/Xxl, not a
+    // "GreaterOrEqual" check against Md -- BrowserViewportEventArgs.Breakpoint reports the exact current
+    // bucket (Xs/Sm/Md/Lg/Xl/Xxl), not an "and up" alias, so the comparison has to name each one at or
+    // above the drawer's own Breakpoint.Md to mean the same threshold.
+    private void OnViewportChanged(BrowserViewportEventArgs args)
+    {
+        var isAtOrAboveDrawerBreakpoint = args.Breakpoint is Breakpoint.Md or Breakpoint.Lg or Breakpoint.Xl or Breakpoint.Xxl;
+        if (isAtOrAboveDrawerBreakpoint && !_drawerOpen)
+        {
+            _drawerOpen = true;
+            InvokeAsync(StateHasChanged);
+        }
     }
 
     /// <summary>
@@ -96,5 +244,9 @@
         };
     }
 
-    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+    public async ValueTask DisposeAsync()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        await BrowserViewportService.UnsubscribeAsync(_viewportObserverId);
+    }
 }

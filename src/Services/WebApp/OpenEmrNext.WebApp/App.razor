@@ -1,12 +1,52 @@
 ﻿@using OpenEmrNext.WebApp.Theme
-<MudThemeProvider Theme="OpenEmrNextTheme.Theme" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
+@inject ThemeService ThemeService
+@implements IDisposable
 
-<Router AppAssembly="@typeof(App).Assembly" NotFoundPage="typeof(Pages.NotFound)">
-    <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
-        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
-    </Found>
-</Router>
+@* Gated on _ready, not rendered immediately with defaults: MudThemeProvider's ObserveSystemDarkModeChange
+   needs to already be correct (false once a stored preference exists) on its very first render -- toggling
+   it after that first render isn't a case the component is documented to handle, so this avoids relying on
+   that instead of guaranteeing it never happens. The brief blank frame while LoadAsync's localStorage round
+   trip resolves is the tradeoff for that guarantee. *@
+@if (_ready)
+{
+    @* Split IsDarkMode/IsDarkModeChanged, not @bind-IsDarkMode: binding would blindly reassign
+       ThemeService.IsDarkMode on every change MudThemeProvider raises, including system-preference
+       changes after the user has already made an explicit choice -- OnSystemDarkModeChanged below only
+       accepts those while no explicit preference exists yet. *@
+    <MudThemeProvider Theme="OpenEmrNextTheme.Theme" IsDarkMode="ThemeService.IsDarkMode"
+        IsDarkModeChanged="OnSystemDarkModeChanged"
+        ObserveSystemDarkModeChange="@(!ThemeService.HasExplicitPreference.GetValueOrDefault())" />
+    <MudPopoverProvider />
+    <MudDialogProvider />
+    <MudSnackbarProvider />
+
+    <Router AppAssembly="@typeof(App).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+        <Found Context="routeData">
+            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+    </Router>
+}
+
+@code {
+    private bool _ready;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ThemeService.LoadAsync();
+        _ready = true;
+        ThemeService.Changed += OnThemeChanged;
+    }
+
+    private void OnSystemDarkModeChanged(bool isDarkMode)
+    {
+        if (!ThemeService.HasExplicitPreference.GetValueOrDefault())
+        {
+            ThemeService.SetFromSystemPreference(isDarkMode);
+        }
+    }
+
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => ThemeService.Changed -= OnThemeChanged;
+}

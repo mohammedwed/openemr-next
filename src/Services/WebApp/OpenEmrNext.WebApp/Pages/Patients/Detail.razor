@@ -14,180 +14,194 @@
     @switch (_state)
     {
         case State.Loading:
-            <MudProgressCircular Indeterminate="true" />
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
             break;
 
         case State.SignedOut:
-            <MudAlert Severity="Severity.Warning">
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
                 You need to be signed in to see this patient.
-                <MudButton Variant="Variant.Text" Href="@LoginUrl">Log in with OpenEMR</MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Warning" Href="@LoginUrl">Log in with OpenEMR</MudButton>
             </MudAlert>
             break;
 
         case State.NotFound:
-            <MudAlert Severity="Severity.Warning">No patient with that id was found.</MudAlert>
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">No patient with that id was found.</MudAlert>
             break;
 
         case State.Error:
-            <MudAlert Severity="Severity.Error">Could not load this patient. Please try again.</MudAlert>
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">Could not load this patient. Please try again.</MudAlert>
             break;
 
         case State.Ready:
-            <MudText Typo="Typo.h4" Class="mb-1">@_patient!.FirstName @_patient.LastName</MudText>
-            <MudText Typo="Typo.body2" Class="mb-4">
+            <MudText Typo="Typo.h5" GutterBottom="true">@_patient!.FirstName @_patient.LastName</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-6">
                 Date of birth: @(_patient!.DateOfBirth?.ToString("yyyy-MM-dd") ?? "—") · Pid: @_patient.Pid
             </MudText>
 
-            <MudExpansionPanels Elevation="2" Class="mb-4">
-                <MudExpansionPanel Text="Insurance" Expanded="true">
-                    @if (_insuranceError)
-                    {
-                        <MudAlert Severity="Severity.Error" Class="mb-3">Could not load insurance.</MudAlert>
-                    }
-                    <MudTable Items="_effectiveInsurance" Hover="true" Class="mb-4">
-                        <HeaderContent>
-                            <MudTh>Level</MudTh>
-                            <MudTh>Company id</MudTh>
-                            <MudTh>Start</MudTh>
-                            <MudTh>End</MudTh>
-                        </HeaderContent>
-                        <RowTemplate Context="policy">
-                            <MudTd>@policy.Level</MudTd>
-                            <MudTd>@policy.CompanyId</MudTd>
-                            <MudTd>@(policy.Start?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
-                            <MudTd>@(policy.End?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
-                        </RowTemplate>
-                        <NoRecordsContent>No effective insurance today.</NoRecordsContent>
-                    </MudTable>
+            <MudStack Spacing="4">
+                <MudPaper Elevation="1">
+                    <MudExpansionPanels Elevation="0">
+                        <MudExpansionPanel Text="Insurance" Expanded="true">
+                            @if (_insuranceError)
+                            {
+                                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">Could not load insurance.</MudAlert>
+                            }
+                            <MudTable Items="_effectiveInsurance" Hover="true" Elevation="0" Dense="true" Class="mb-4">
+                                <HeaderContent>
+                                    <MudTh>Level</MudTh>
+                                    <MudTh>Company id</MudTh>
+                                    <MudTh>Start</MudTh>
+                                    <MudTh>End</MudTh>
+                                </HeaderContent>
+                                <RowTemplate Context="policy">
+                                    <MudTd DataLabel="Level">@policy.Level</MudTd>
+                                    <MudTd DataLabel="Company id">@policy.CompanyId</MudTd>
+                                    <MudTd DataLabel="Start">@(policy.Start?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
+                                    <MudTd DataLabel="End">@(policy.End?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
+                                </RowTemplate>
+                                <NoRecordsContent>No effective insurance today.</NoRecordsContent>
+                            </MudTable>
 
-                    <MudText Typo="Typo.subtitle1" Class="mb-2">Add a policy</MudText>
-                    @if (_addPolicyError is { } addPolicyError)
-                    {
-                        <MudAlert Severity="Severity.Error" Class="mb-3">@addPolicyError</MudAlert>
-                    }
-                    <MudForm @ref="_addPolicyForm" Model="_addPolicyModel">
-                        <MudStack Spacing="3">
-                            <MudSelect T="string" @bind-Value="_addPolicyModel.Level" Label="Level" Required="true">
-                                <MudSelectItem Value="@("primary")">Primary</MudSelectItem>
-                                <MudSelectItem Value="@("secondary")">Secondary</MudSelectItem>
-                                <MudSelectItem Value="@("tertiary")">Tertiary</MudSelectItem>
-                            </MudSelect>
-                            <MudNumericField @bind-Value="_addPolicyModel.CompanyId" Label="Company id" Required="true" Min="1" />
-                            <MudTextField @bind-Value="_addPolicyModel.PolicyNumber" Label="Policy number" Required="true" />
-                            <MudTextField @bind-Value="_addPolicyModel.GroupNumber" Label="Group number (optional)" />
-                            <MudTextField @bind-Value="_addPolicyModel.PlanName" Label="Plan name (optional)" />
-                            <MudDatePicker @bind-Date="_addPolicyModel.StartDate" Label="Start date" Required="true" />
-                            <MudDatePicker @bind-Date="_addPolicyModel.EndDate" Label="End date (optional)" />
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddPolicyAsync" Disabled="_addingPolicy">
-                                Add policy
-                            </MudButton>
-                        </MudStack>
-                    </MudForm>
+                            <MudText Typo="Typo.subtitle2" Class="mb-3">Add a policy</MudText>
+                            @if (_addPolicyError is { } addPolicyError)
+                            {
+                                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-3">@addPolicyError</MudAlert>
+                            }
+                            <MudForm @ref="_addPolicyForm" Model="_addPolicyModel">
+                                <MudStack Spacing="4">
+                                    <MudSelect T="string" @bind-Value="_addPolicyModel.Level" Label="Level" Required="true" Variant="Variant.Outlined">
+                                        <MudSelectItem Value="@("primary")">Primary</MudSelectItem>
+                                        <MudSelectItem Value="@("secondary")">Secondary</MudSelectItem>
+                                        <MudSelectItem Value="@("tertiary")">Tertiary</MudSelectItem>
+                                    </MudSelect>
+                                    <MudNumericField @bind-Value="_addPolicyModel.CompanyId" Label="Company id" Required="true" Min="1" Variant="Variant.Outlined" />
+                                    <MudTextField @bind-Value="_addPolicyModel.PolicyNumber" Label="Policy number" Required="true" Variant="Variant.Outlined" />
+                                    <MudTextField @bind-Value="_addPolicyModel.GroupNumber" Label="Group number (optional)" Variant="Variant.Outlined" />
+                                    <MudTextField @bind-Value="_addPolicyModel.PlanName" Label="Plan name (optional)" Variant="Variant.Outlined" />
+                                    <MudDatePicker @bind-Date="_addPolicyModel.StartDate" Label="Start date" Required="true" Variant="Variant.Outlined" />
+                                    <MudDatePicker @bind-Date="_addPolicyModel.EndDate" Label="End date (optional)" Variant="Variant.Outlined" />
+                                    <div>
+                                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddPolicyAsync" Disabled="_addingPolicy">
+                                            Add policy
+                                        </MudButton>
+                                    </div>
+                                </MudStack>
+                            </MudForm>
 
-                    <MudDivider Class="my-4" />
+                            <MudDivider Class="my-6" />
 
-                    <MudText Typo="Typo.subtitle1" Class="mb-2">Swap a policy's level</MudText>
-                    @if (_swapError is { } swapError)
-                    {
-                        <MudAlert Severity="Severity.Error" Class="mb-3">@swapError</MudAlert>
-                    }
-                    @if (_effectiveInsurance.Any(p => p.Uuid is not null))
-                    {
-                        <MudStack Spacing="3">
-                            <MudSelect T="Guid?" @bind-Value="_swapPolicyUuid" Label="Policy">
-                                @foreach (var policy in _effectiveInsurance.Where(p => p.Uuid is not null))
+                            <MudText Typo="Typo.subtitle2" Class="mb-3">Swap a policy's level</MudText>
+                            @if (_swapError is { } swapError)
+                            {
+                                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-3">@swapError</MudAlert>
+                            }
+                            @if (_effectiveInsurance.Any(p => p.Uuid is not null))
+                            {
+                                <MudStack Spacing="4">
+                                    <MudSelect T="Guid?" @bind-Value="_swapPolicyUuid" Label="Policy" Variant="Variant.Outlined">
+                                        @foreach (var policy in _effectiveInsurance.Where(p => p.Uuid is not null))
+                                        {
+                                            <MudSelectItem Value="@policy.Uuid">@policy.Level (company @policy.CompanyId)</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                    <MudSelect T="string" @bind-Value="_swapTargetLevel" Label="Target level" Variant="Variant.Outlined">
+                                        <MudSelectItem Value="@("primary")">Primary</MudSelectItem>
+                                        <MudSelectItem Value="@("secondary")">Secondary</MudSelectItem>
+                                        <MudSelectItem Value="@("tertiary")">Tertiary</MudSelectItem>
+                                    </MudSelect>
+                                    <div>
+                                        <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="SwapPolicyAsync" Disabled="_swapping">
+                                            Swap
+                                        </MudButton>
+                                    </div>
+                                </MudStack>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2" Class="mud-text-secondary">No policies to swap yet.</MudText>
+                            }
+                        </MudExpansionPanel>
+                    </MudExpansionPanels>
+                </MudPaper>
+
+                <MudPaper Elevation="1">
+                    <MudExpansionPanels Elevation="0">
+                        <MudExpansionPanel Text="Advance directives" Expanded="true">
+                            @if (_advanceDirectiveError)
+                            {
+                                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">Could not load advance directives.</MudAlert>
+                            }
+
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Status</MudText>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+                                @(_status?.Status ?? "unknown") · reviewed @(_status?.ReviewedAtUtc?.ToString("yyyy-MM-dd") ?? "—")
+                            </MudText>
+                            @if (_statusError is { } statusError)
+                            {
+                                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-3">@statusError</MudAlert>
+                            }
+                            <MudStack Row="true" Spacing="3" AlignItems="AlignItems.End" Class="mb-6">
+                                <MudSelect T="string" @bind-Value="_setStatusModel.Status" Label="Set status" Variant="Variant.Outlined">
+                                    <MudSelectItem Value="@("yes")">Yes</MudSelectItem>
+                                    <MudSelectItem Value="@("no")">No</MudSelectItem>
+                                    <MudSelectItem Value="@("unknown")">Unknown</MudSelectItem>
+                                </MudSelect>
+                                <MudDatePicker @bind-Date="_setStatusModel.ReviewedAtUtc" Label="Reviewed on (optional)" Variant="Variant.Outlined" />
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SetStatusAsync" Disabled="_settingStatus">
+                                    Save
+                                </MudButton>
+                            </MudStack>
+
+                            <MudDivider Class="my-6" />
+
+                            <MudText Typo="Typo.subtitle2" Class="mb-3">Documents</MudText>
+                            <MudTable Items="_documents" Hover="true" Elevation="0" Dense="true" Class="mb-4">
+                                <HeaderContent>
+                                    <MudTh>Type</MudTh>
+                                    <MudTh>Name</MudTh>
+                                    <MudTh>Size</MudTh>
+                                    <MudTh>Effective date</MudTh>
+                                    <MudTh></MudTh>
+                                </HeaderContent>
+                                <RowTemplate Context="document">
+                                    <MudTd DataLabel="Type">@document.Type</MudTd>
+                                    <MudTd DataLabel="Name">@document.Name</MudTd>
+                                    <MudTd DataLabel="Size">@document.Size bytes</MudTd>
+                                    <MudTd DataLabel="Effective date">@(document.EffectiveDate?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
+                                    <MudTd>
+                                        <MudLink Href="@DocumentContentUrl(document)" Target="_blank">Download</MudLink>
+                                    </MudTd>
+                                </RowTemplate>
+                                <NoRecordsContent>No documents uploaded yet.</NoRecordsContent>
+                            </MudTable>
+
+                            <MudText Typo="Typo.subtitle2" Class="mb-3">Upload a document</MudText>
+                            @if (_uploadError is { } uploadError)
+                            {
+                                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-3">@uploadError</MudAlert>
+                            }
+                            <MudStack Spacing="4">
+                                <MudSelect T="string" @bind-Value="_uploadType" Label="Type" Required="true" Variant="Variant.Outlined">
+                                    <MudSelectItem Value="@("living_will")">Living will</MudSelectItem>
+                                    <MudSelectItem Value="@("durable_power_attorney")">Durable power of attorney</MudSelectItem>
+                                    <MudSelectItem Value="@("dnr_order")">DNR order</MudSelectItem>
+                                </MudSelect>
+                                <InputFile OnChange="OnFileSelectedAsync" />
+                                @if (_uploadFileName is { } fileName)
                                 {
-                                    <MudSelectItem Value="@policy.Uuid">@policy.Level (company @policy.CompanyId)</MudSelectItem>
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Selected: @fileName</MudText>
                                 }
-                            </MudSelect>
-                            <MudSelect T="string" @bind-Value="_swapTargetLevel" Label="Target level">
-                                <MudSelectItem Value="@("primary")">Primary</MudSelectItem>
-                                <MudSelectItem Value="@("secondary")">Secondary</MudSelectItem>
-                                <MudSelectItem Value="@("tertiary")">Tertiary</MudSelectItem>
-                            </MudSelect>
-                            <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="SwapPolicyAsync" Disabled="_swapping">
-                                Swap
-                            </MudButton>
-                        </MudStack>
-                    }
-                    else
-                    {
-                        <MudText Typo="Typo.body2">No policies to swap yet.</MudText>
-                    }
-                </MudExpansionPanel>
-
-                <MudExpansionPanel Text="Advance directives" Expanded="true">
-                    @if (_advanceDirectiveError)
-                    {
-                        <MudAlert Severity="Severity.Error" Class="mb-3">Could not load advance directives.</MudAlert>
-                    }
-
-                    <MudText Typo="Typo.subtitle1" Class="mb-2">Status</MudText>
-                    <MudText Typo="Typo.body2" Class="mb-3">
-                        @(_status?.Status ?? "unknown") · reviewed @(_status?.ReviewedAtUtc?.ToString("yyyy-MM-dd") ?? "—")
-                    </MudText>
-                    @if (_statusError is { } statusError)
-                    {
-                        <MudAlert Severity="Severity.Error" Class="mb-3">@statusError</MudAlert>
-                    }
-                    <MudStack Row="true" Spacing="3" AlignItems="AlignItems.End" Class="mb-4">
-                        <MudSelect T="string" @bind-Value="_setStatusModel.Status" Label="Set status">
-                            <MudSelectItem Value="@("yes")">Yes</MudSelectItem>
-                            <MudSelectItem Value="@("no")">No</MudSelectItem>
-                            <MudSelectItem Value="@("unknown")">Unknown</MudSelectItem>
-                        </MudSelect>
-                        <MudDatePicker @bind-Date="_setStatusModel.ReviewedAtUtc" Label="Reviewed on (optional)" />
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SetStatusAsync" Disabled="_settingStatus">
-                            Save
-                        </MudButton>
-                    </MudStack>
-
-                    <MudDivider Class="my-4" />
-
-                    <MudText Typo="Typo.subtitle1" Class="mb-2">Documents</MudText>
-                    <MudTable Items="_documents" Hover="true" Class="mb-4">
-                        <HeaderContent>
-                            <MudTh>Type</MudTh>
-                            <MudTh>Name</MudTh>
-                            <MudTh>Size</MudTh>
-                            <MudTh>Effective date</MudTh>
-                            <MudTh></MudTh>
-                        </HeaderContent>
-                        <RowTemplate Context="document">
-                            <MudTd>@document.Type</MudTd>
-                            <MudTd>@document.Name</MudTd>
-                            <MudTd>@document.Size bytes</MudTd>
-                            <MudTd>@(document.EffectiveDate?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
-                            <MudTd>
-                                <MudLink Href="@DocumentContentUrl(document)" Target="_blank">Download</MudLink>
-                            </MudTd>
-                        </RowTemplate>
-                        <NoRecordsContent>No documents uploaded yet.</NoRecordsContent>
-                    </MudTable>
-
-                    <MudText Typo="Typo.subtitle1" Class="mb-2">Upload a document</MudText>
-                    @if (_uploadError is { } uploadError)
-                    {
-                        <MudAlert Severity="Severity.Error" Class="mb-3">@uploadError</MudAlert>
-                    }
-                    <MudStack Spacing="3">
-                        <MudSelect T="string" @bind-Value="_uploadType" Label="Type" Required="true">
-                            <MudSelectItem Value="@("living_will")">Living will</MudSelectItem>
-                            <MudSelectItem Value="@("durable_power_attorney")">Durable power of attorney</MudSelectItem>
-                            <MudSelectItem Value="@("dnr_order")">DNR order</MudSelectItem>
-                        </MudSelect>
-                        <InputFile OnChange="OnFileSelectedAsync" />
-                        @if (_uploadFileName is { } fileName)
-                        {
-                            <MudText Typo="Typo.body2">Selected: @fileName</MudText>
-                        }
-                        <MudDatePicker @bind-Date="_uploadEffectiveDate" Label="Effective date (optional)" />
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="UploadDocumentAsync" Disabled="_uploading || _uploadContentBase64 is null">
-                            Upload
-                        </MudButton>
-                    </MudStack>
-                </MudExpansionPanel>
-            </MudExpansionPanels>
+                                <MudDatePicker @bind-Date="_uploadEffectiveDate" Label="Effective date (optional)" Variant="Variant.Outlined" />
+                                <div>
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="UploadDocumentAsync" Disabled="_uploading || _uploadContentBase64 is null">
+                                        Upload
+                                    </MudButton>
+                                </div>
+                            </MudStack>
+                        </MudExpansionPanel>
+                    </MudExpansionPanels>
+                </MudPaper>
+            </MudStack>
             break;
     }
 </MudContainer>
