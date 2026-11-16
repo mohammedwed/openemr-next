@@ -82,6 +82,22 @@ public class GatewayStackTests
     }
 
     [Fact]
+    public async Task ClinicalCare_route_prefix_is_routed_to_ClinicalCare_with_its_own_secret_attached()
+    {
+        // An empty body is deliberately invalid. Reaching request validation (400) proves three things at once:
+        // the request left the gateway for ClinicalCare, not WebApp's SPA catch-all (which would answer with
+        // HTML); the gateway attached ClinicalCare's own secret server-side, since this client never presents
+        // one and ClinicalCare would answer 401 without it (ADR 0055, ADR 0064); and the route is not
+        // PatientManagement's, which owns /api/v1/patients/ and not this prefix.
+        using var content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
+
+        var response = await Http.PostAsync(GatewayStackConfig.GatewayHttpsBaseUrl + "/api/v1/encounters", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.NotEqual("text/html", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task Everything_else_is_routed_to_WebApp()
     {
         var response = await Http.GetAsync(GatewayStackConfig.GatewayHttpsBaseUrl + "/some-dashboard-route");

@@ -20,6 +20,12 @@ var patientManagementBaseUrl = builder.Configuration["PatientManagement:BaseUrl"
     ?? throw new InvalidOperationException("PatientManagement:BaseUrl is required.");
 var internalGatewaySecret = builder.Configuration["InternalGateway:Secret"]
     ?? throw new InvalidOperationException("InternalGateway:Secret is required.");
+var clinicalCareBaseUrl = builder.Configuration["ClinicalCare:BaseUrl"]
+    ?? throw new InvalidOperationException("ClinicalCare:BaseUrl is required.");
+// Its own secret, not PatientManagement's (API-16, ADR 0064): attached only on requests forwarded to the
+// clinicalcare cluster, so neither backend can present itself to the other as this gateway.
+var clinicalCareSecret = builder.Configuration["ClinicalCare:Secret"]
+    ?? throw new InvalidOperationException("ClinicalCare:Secret is required.");
 
 // Every path AuthFacade itself maps outside /api/v1 (UserEndpoints, OpenIddictClientEndpoints,
 // LogoutEndpoints, SessionEndpoints, OpenEmrBffProxyEndpoints, SystemEndpoints) plus /api/v1 itself. More specific than WebApp's own
@@ -46,6 +52,12 @@ string[] authFacadeRoutePatterns =
 // already stated for that one applies here too.
 string[] patientManagementRoutePatterns = ["/api/v1/patients/{**catch-all}", "/fhir/{**catch-all}"];
 
+// ClinicalCare's own path prefix: /api/v1/encounters. A flat prefix of its own rather than
+// /api/v1/patients/{uuid}/encounters, because everything under /api/v1/patients/ already belongs to
+// PatientManagement and one prefix must belong to one service (ADR 0064). More specific than AuthFacade's
+// bare /api/{**catch-all}, so the same route-precedence reasoning applies.
+string[] clinicalCareRoutePatterns = ["/api/v1/encounters/{**catch-all}"];
+
 var routes = authFacadeRoutePatterns
     .Select((pattern, index) => new RouteConfig
     {
@@ -67,6 +79,12 @@ var routes = authFacadeRoutePatterns
         ClusterId = "patientmanagement",
         Match = new RouteMatch { Path = pattern }
     }))
+    .Concat(clinicalCareRoutePatterns.Select((pattern, index) => new RouteConfig
+    {
+        RouteId = $"clinicalcare-{index}",
+        ClusterId = "clinicalcare",
+        Match = new RouteMatch { Path = pattern }
+    }))
     .Append(new RouteConfig
     {
         RouteId = "webapp",
@@ -86,6 +104,11 @@ ClusterConfig[] clusters =
     {
         ClusterId = "patientmanagement",
         Destinations = new Dictionary<string, DestinationConfig> { ["patientmanagement"] = new() { Address = patientManagementBaseUrl } }
+    },
+    new ClusterConfig
+    {
+        ClusterId = "clinicalcare",
+        Destinations = new Dictionary<string, DestinationConfig> { ["clinicalcare"] = new() { Address = clinicalCareBaseUrl } }
     },
     new ClusterConfig
     {
@@ -123,6 +146,18 @@ builder.Services.AddReverseProxy()
             {
                 requestTransformContext.ProxyRequest.Headers.Remove("X-Internal-Gateway-Secret");
                 requestTransformContext.ProxyRequest.Headers.Add("X-Internal-Gateway-Secret", internalGatewaySecret);
+                return ValueTask.CompletedTask;
+            });
+        }
+
+        // The same pattern, with ClinicalCare's own secret (API-16). The header is deleted before it is set,
+        // so a caller can never smuggle in a value of its own.
+        if (transformContext.Cluster?.ClusterId == "clinicalcare")
+        {
+            transformContext.AddRequestTransform(requestTransformContext =>
+            {
+                requestTransformContext.ProxyRequest.Headers.Remove("X-Internal-Gateway-Secret");
+                requestTransformContext.ProxyRequest.Headers.Add("X-Internal-Gateway-Secret", clinicalCareSecret);
                 return ValueTask.CompletedTask;
             });
         }

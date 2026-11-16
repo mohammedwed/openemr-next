@@ -185,10 +185,64 @@ services:
       PatientManagementDb__Database: ${DB_NAME:-openemr}
       PatientManagementDb__User: ${PATIENT_MANAGEMENT_DB_USER:-patient_management}
       PatientManagementDb__Password: ${PATIENT_MANAGEMENT_DB_PASSWORD:?Set PATIENT_MANAGEMENT_DB_PASSWORD in .env}
+      # The outbox relay (ADR 0066): pushes PatientRegistered to clinical-care over the internal network. It presents
+      # its own secret (CLINICAL_CARE_EVENTS_SECRET), which opens /internal/events and nothing else; the gateway's
+      # secret does not, and this one does not open the public API.
+      EventRelay__Enabled: "true"
+      EventRelay__BaseUrl: "http://clinical-care:8080"
+      EventRelay__Secret: ${CLINICAL_CARE_EVENTS_SECRET:?Set CLINICAL_CARE_EVENTS_SECRET in .env}
       AdvanceDirectiveStorage__RepositoryRoot: /sites/default/documents
       # Shared with the gateway service below (ADR 0055) -- the gateway attaches this as
       # X-Internal-Gateway-Secret; this service refuses any request missing it.
       InternalGateway__Secret: ${INTERNAL_GATEWAY_SECRET:?Set INTERNAL_GATEWAY_SECRET in .env}
+
+  # ---- One-shot: creates the clinical_care_outbox table and a least-privilege user ----
+  # Same pattern as seed-patient-management-db (ADR 0050, ADR 0064): the new user is scoped to the exact
+  # tables and columns Clinical Care reads and writes inside OpenEMR's own database -- never OpenEMR's broader
+  # app user, never a grant on the whole database. Depends on openemr itself, since form_encounter and the
+  # other legacy tables only exist once OpenEMR's own installer has created them. The same script runs
+  # unchanged in the integration-test container, so the grants are tested.
+  seed-clinical-care-db:
+    image: ${MARIADB_IMAGE}
+    restart: "no"
+    depends_on:
+      openemr:
+        condition: service_healthy
+    environment:
+      MYSQL_PWD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
+      DB_NAME: ${DB_NAME:-openemr}
+      CLINICAL_CARE_DB_USER: ${CLINICAL_CARE_DB_USER:-clinical_care}
+      CLINICAL_CARE_DB_PASSWORD: ${CLINICAL_CARE_DB_PASSWORD:?Set CLINICAL_CARE_DB_PASSWORD in .env}
+    volumes:
+      - ./scripts/seeds/clinical-care-db.sh:/seed/clinical-care-db.sh:ro
+    entrypoint: ["bash", "/seed/clinical-care-db.sh"]
+
+  # ---- Clinical Care (.NET) ----
+  # No published host port: like patient-management, never reached directly, only through the gateway's own
+  # route (ADR 0055, ADR 0064), the only caller that knows CLINICAL_CARE_GATEWAY_SECRET. Publishing a host port
+  # here would let that gate be bypassed entirely. Runs as the image's default non-root user: unlike
+  # patient-management it touches no files, only the database, so it needs no sitesvolume and no UID override.
+  clinical-care:
+    build:
+      context: src/Services/ClinicalCare
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      seed-clinical-care-db:
+        condition: service_completed_successfully
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${CLINICAL_CARE_ENVIRONMENT:-Production}
+      ClinicalCareDb__Host: mysql
+      ClinicalCareDb__Database: ${DB_NAME:-openemr}
+      ClinicalCareDb__User: ${CLINICAL_CARE_DB_USER:-clinical_care}
+      ClinicalCareDb__Password: ${CLINICAL_CARE_DB_PASSWORD:?Set CLINICAL_CARE_DB_PASSWORD in .env}
+      # Its own secret, not patient-management's (API-16): the gateway attaches this one only on requests it
+      # forwards here, so a compromised service cannot present itself to the other as the gateway.
+      InternalGateway__Secret: ${CLINICAL_CARE_GATEWAY_SECRET:?Set CLINICAL_CARE_GATEWAY_SECRET in .env}
+      # Opens /internal/events for the PatientManagement relay (ADR 0066) and nothing else. Never reaches the browser.
+      InternalEvents__Secret: ${CLINICAL_CARE_EVENTS_SECRET:?Set CLINICAL_CARE_EVENTS_SECRET in .env}
 
   # ---- AuthFacade (.NET) ----
   auth-facade:
@@ -281,6 +335,7 @@ services:
     depends_on:
       - auth-facade
       - patient-management
+      - clinical-care
       - webapp
     ports:
       - "${HOST_BIND_ADDRESS:-127.0.0.1}:${GATEWAY_HTTP_PORT:-7130}:8080"
@@ -299,10 +354,13 @@ services:
       AuthFacade__BaseUrl: "http://auth-facade:8080"
       WebApp__BaseUrl: "http://webapp:8080"
       PatientManagement__BaseUrl: "http://patient-management:8080"
+      ClinicalCare__BaseUrl: "http://clinical-care:8080"
       # Shared with the patient-management service above (ADR 0055) -- attached server-side as
       # X-Internal-Gateway-Secret on every request this gateway forwards there; never sent to the
       # browser.
       InternalGateway__Secret: ${INTERNAL_GATEWAY_SECRET:?Set INTERNAL_GATEWAY_SECRET in .env}
+      # Attached only on requests forwarded to clinical-care (ADR 0064); never sent to any other service.
+      ClinicalCare__Secret: ${CLINICAL_CARE_GATEWAY_SECRET:?Set CLINICAL_CARE_GATEWAY_SECRET in .env}
 
   # ---- Login UI (Blazor) ----
   # A static page: one "Log in with OpenEMR" link to AuthFacade's /oidc/login (ADR 0026). It holds no
