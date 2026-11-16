@@ -1,5 +1,21 @@
 # Changelog 2026-11-16
 
+## Changed — patient identifier and patient view (webapp and PatientManagement API)
+
+- **API: `PatientSummaryResponse` now includes `PublicPatientId`** (OpenEMR's `pubpid`, the identifier
+  its own screens show), mapped from the existing `PatientFhirView.PublicPatientId`. Added as a trailing
+  nullable record parameter, so no existing construction site changed. Regenerated
+  `OpenAPIs/PatientManagement.json` with `scripts/dev/generate-patientmanagement-openapi.sh`; the diff is
+  only the new property. This is not an MRN: the service does not model one.
+- **Patient list** shows the public ID. Sorting stays on the internal `Pid`, so numeric IDs sort as
+  numbers ("9" before "10").
+- **Patient view header** shows "Patient ID: [public ID]" instead of the internal `Pid`. The `Pid` is still
+  used for every API call on the page.
+- **Route change without reload.** Moving from one patient to another within the page used to keep the
+  previous patient's data, because the page loaded only on first render. It now reloads on each route change,
+  clears the previous patient's state, and drops any response that arrives for a patient the user has left.
+- **Tabs.** Insurance and advance directives are tabs (`MudTabs`) instead of two stacked expansion panels.
+
 ## Changed — patient view (`Pages/Patients/Detail.razor`)
 
 - **Retry on load failure.** The error state had no way to recover. "Try again" reloads the patient;

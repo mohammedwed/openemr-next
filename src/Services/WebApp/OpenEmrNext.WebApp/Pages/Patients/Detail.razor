@@ -38,13 +38,13 @@
         case State.Ready:
             <MudText Typo="Typo.h5" GutterBottom="true">@_patient!.FirstName @_patient.LastName</MudText>
             <MudText Typo="Typo.body2" Class="mud-text-secondary mb-6">
-                Date of birth: @(_patient!.DateOfBirth?.ToString("yyyy-MM-dd") ?? "—") · Pid: @_patient.Pid
+                Patient ID: @(_patient!.PublicPatientId ?? _patient.Pid.ToString()) · Date of birth: @(_patient.DateOfBirth?.ToString("yyyy-MM-dd") ?? "—")
             </MudText>
 
-            <MudStack Spacing="4">
-                <MudPaper Elevation="1">
-                    <MudExpansionPanels Elevation="0">
-                        <MudExpansionPanel Text="Insurance" Expanded="true">
+            @* Tabs, not one long page: insurance and advance directives are separate jobs, and a tab keeps
+               the other one out of the way. MudTabs supplies the tablist semantics. *@
+            <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+                <MudTabPanel Text="Insurance">
                             @if (_insuranceError)
                             {
                                 <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">Could not load insurance.</MudAlert>
@@ -123,13 +123,9 @@
                             {
                                 <MudText Typo="Typo.body2" Class="mud-text-secondary">No policies to swap yet.</MudText>
                             }
-                        </MudExpansionPanel>
-                    </MudExpansionPanels>
-                </MudPaper>
+                </MudTabPanel>
 
-                <MudPaper Elevation="1">
-                    <MudExpansionPanels Elevation="0">
-                        <MudExpansionPanel Text="Advance directives" Expanded="true">
+                <MudTabPanel Text="Advance directives">
                             @if (_advanceDirectiveError)
                             {
                                 <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">Could not load advance directives.</MudAlert>
@@ -203,10 +199,8 @@
                                     </MudButton>
                                 </div>
                             </MudStack>
-                        </MudExpansionPanel>
-                    </MudExpansionPanels>
-                </MudPaper>
-            </MudStack>
+                </MudTabPanel>
+            </MudTabs>
             break;
     }
 </MudContainer>
@@ -276,15 +270,32 @@
     private string DocumentContentUrl(AdvanceDirectiveDocumentResponse document) =>
         $"/api/v1/patients/{_patient!.Pid}/advance-directives/documents/{document.Uuid}/content";
 
-    protected override Task OnInitializedAsync() => LoadPatientAsync();
+    private Guid? _loadedUuid;
 
     /// <summary>
-    /// Loads the patient, then their insurance and advance directives. Runs on first render and from
+    /// Blazor reuses this page instance when only the route parameter changes (one patient to another),
+    /// so loading only on first render would keep showing the previous patient's data.
+    /// </summary>
+    protected override Task OnParametersSetAsync()
+    {
+        if (_loadedUuid == Uuid)
+        {
+            return Task.CompletedTask;
+        }
+
+        _loadedUuid = Uuid;
+        return LoadPatientAsync();
+    }
+
+    /// <summary>
+    /// Loads the patient, then their insurance and advance directives. Runs on each new patient and from
     /// the "Try again" button. Only the patient itself gates the page: a failed insurance or directive
     /// load shows its own message in its own section.
     /// </summary>
     private async Task LoadPatientAsync()
     {
+        var requested = Uuid;
+        ResetPatientState();
         _state = State.Loading;
 
         if (await AuthFacade.TryGetCurrentUserAsync() is null)
@@ -295,7 +306,13 @@
 
         try
         {
-            _patient = await PatientManagement.GetPatientAsync(Uuid);
+            var patient = await PatientManagement.GetPatientAsync(requested);
+            if (requested != Uuid)
+            {
+                return; // navigated to another patient while this was in flight
+            }
+
+            _patient = patient;
         }
         catch (PatientManagementApiException ex) when (ex.StatusCode == 404)
         {
@@ -314,35 +331,72 @@
         }
 
         _state = State.Ready;
-        await Task.WhenAll(LoadInsuranceAsync(), LoadAdvanceDirectivesAsync());
+        var pid = _patient!.Pid;
+        await Task.WhenAll(LoadInsuranceAsync(pid), LoadAdvanceDirectivesAsync(pid));
     }
 
-    private async Task LoadInsuranceAsync()
+    /// <summary>
+    /// Clears everything that belongs to the previous patient, so none of it can show under the new one.
+    /// </summary>
+    private void ResetPatientState()
+    {
+        _patient = null;
+        _effectiveInsurance = [];
+        _insuranceError = false;
+        _status = null;
+        _documents = [];
+        _advanceDirectiveError = false;
+        _addPolicyError = null;
+        _swapPolicyUuid = null;
+        _swapError = null;
+        _statusError = null;
+        _uploadError = null;
+        _uploadFileName = null;
+        _uploadMimeType = null;
+        _uploadContentBase64 = null;
+    }
+
+    // Each load takes the patient's Pid and writes its result only if that patient is still the one shown,
+    // so a slow response for a patient the user has already left cannot land under the next one.
+    private async Task LoadInsuranceAsync(long pid)
     {
         try
         {
-            var policies = await PatientManagement.GetEffectiveInsuranceAsync(_patient!.Pid, null);
-            _effectiveInsurance = [.. policies];
-            _insuranceError = false;
+            var policies = await PatientManagement.GetEffectiveInsuranceAsync(pid, null);
+            if (_patient?.Pid == pid)
+            {
+                _effectiveInsurance = [.. policies];
+                _insuranceError = false;
+            }
         }
         catch (PatientManagementApiException)
         {
-            _insuranceError = true;
+            if (_patient?.Pid == pid)
+            {
+                _insuranceError = true;
+            }
         }
     }
 
-    private async Task LoadAdvanceDirectivesAsync()
+    private async Task LoadAdvanceDirectivesAsync(long pid)
     {
         try
         {
-            _status = await PatientManagement.GetAdvanceDirectiveStatusAsync(_patient!.Pid);
-            var documents = await PatientManagement.GetAdvanceDirectiveDocumentsAsync(_patient.Pid);
-            _documents = [.. documents];
-            _advanceDirectiveError = false;
+            var status = await PatientManagement.GetAdvanceDirectiveStatusAsync(pid);
+            var documents = await PatientManagement.GetAdvanceDirectiveDocumentsAsync(pid);
+            if (_patient?.Pid == pid)
+            {
+                _status = status;
+                _documents = [.. documents];
+                _advanceDirectiveError = false;
+            }
         }
         catch (PatientManagementApiException)
         {
-            _advanceDirectiveError = true;
+            if (_patient?.Pid == pid)
+            {
+                _advanceDirectiveError = true;
+            }
         }
     }
 
@@ -370,7 +424,7 @@
             };
             await PatientManagement.AddInsurancePolicyAsync(_patient!.Pid, request);
             Snackbar.Add("Insurance policy added.", Severity.Success);
-            await LoadInsuranceAsync();
+            await LoadInsuranceAsync(_patient!.Pid);
         }
         catch (PatientManagementApiException ex)
         {
@@ -409,7 +463,7 @@
             var request = new SwapInsuranceRequest { TargetLevel = _swapTargetLevel, PolicyUuid = _swapPolicyUuid.Value };
             await PatientManagement.SwapInsuranceAsync(_patient!.Pid, request);
             Snackbar.Add("Insurance levels swapped.", Severity.Success);
-            await LoadInsuranceAsync();
+            await LoadInsuranceAsync(_patient!.Pid);
         }
         catch (PatientManagementApiException ex)
         {
@@ -435,7 +489,7 @@
             };
             await PatientManagement.SetAdvanceDirectiveStatusAsync(_patient!.Pid, request);
             Snackbar.Add("Advance directive status saved.", Severity.Success);
-            await LoadAdvanceDirectivesAsync();
+            await LoadAdvanceDirectivesAsync(_patient!.Pid);
         }
         catch (PatientManagementApiException ex)
         {
@@ -485,7 +539,7 @@
             };
             await PatientManagement.UploadAdvanceDirectiveDocumentAsync(_patient!.Pid, request);
             Snackbar.Add("Document uploaded.", Severity.Success);
-            await LoadAdvanceDirectivesAsync();
+            await LoadAdvanceDirectivesAsync(_patient!.Pid);
             _uploadContentBase64 = null;
             _uploadFileName = null;
             _uploadMimeType = null;
