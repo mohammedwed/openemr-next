@@ -2,7 +2,8 @@
    summary and actions, and three states. Loading shows a spinner. A failed first load shows an error with
    "Try again". A failed refresh keeps the last data on screen with a warning. *@
 <MudPaper Outlined="true" Class="@($"pa-5 {Class}".Trim())">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-5">
+    @* Title and actions wrap onto separate lines when the card is narrow, so the buttons never squeeze the title. *@
+    <div class="op-section-header mb-5">
         <div>
             <MudText Typo="Typo.h6">@Title</MudText>
             @if (Summary is not null)
@@ -12,9 +13,9 @@
         </div>
         @if (HasData && Actions is not null)
         {
-            <div>@Actions</div>
+            <div class="op-section-actions">@Actions</div>
         }
-    </MudStack>
+    </div>
 
     @if (!HasData && Error)
     {

@@ -137,6 +137,26 @@ a:focus-visible {
     outline-offset: 2px;
 }
 
+/* Section header on the patient view: the title and its actions share a row when there is room, and
+   the actions drop to the next line when there is not. Buttons never break their own label across lines. */
+.op-section-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px 16px;
+}
+
+.op-section-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.op-section-actions .mud-button-root {
+    white-space: nowrap;
+}
+
 /* Label/value pairs on the patient overview. A description list, so screen readers announce each pair. */
 .op-details {
     display: grid;

@@ -1,5 +1,13 @@
 # Changelog 2026-11-16
 
+## Fixed — patient view on phone width
+
+- **Section actions wrap** onto their own line when the card is narrow (`op-section-header` and
+  `op-section-actions` in `app.css`), so "Swap levels" no longer splits across two lines.
+- **Tabs show scroll arrows always** (`AlwaysShowScrollButtons`), so a second tab cannot be hidden off the edge.
+  The arrows also show on desktop, faintly. Accepted as a small trade-off.
+- Verified in a 390px frame (no sideways scroll; actions on one line below the title; arrows visible) and on desktop.
+
 ## Verified — patient frontend polish round
 
 - **Phone width:** checked by loading the page in a 390px frame (the window resize tool does not change the viewport

@@ -52,7 +52,8 @@
                 </dl>
             </MudPaper>
 
-            <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
+            @* Scroll arrows always show, so a second tab cannot be hidden off the edge of a narrow screen. *@
+            <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" AlwaysShowScrollButtons="true">
                 <MudTabPanel Text="@WithCount("Insurance", _policies?.Count)">
                     <PatientInsurancePanel @key="patient.Pid" Pid="patient.Pid"
                         Policies="_policies" Error="_policiesError"

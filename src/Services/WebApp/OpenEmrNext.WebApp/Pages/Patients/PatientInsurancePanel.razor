@@ -11,14 +11,12 @@
     StaleMessage="Could not refresh insurance. The list below may be out of date."
     LoadingLabel="Loading insurance">
     <Actions>
-        <MudStack Row="true" Spacing="2">
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="OpenSwapAsync" Disabled="!CanSwap">
-                Swap levels
-            </MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenAddPolicyAsync">
-                Add policy
-            </MudButton>
-        </MudStack>
+        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="OpenSwapAsync" Disabled="!CanSwap">
+            Swap levels
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenAddPolicyAsync">
+            Add policy
+        </MudButton>
     </Actions>
     <ChildContent>
         @if (!CanSwap)
