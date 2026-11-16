@@ -64,10 +64,10 @@
         content: var(--blazor-load-percentage-text, "Loading");
     }
 
-/* MainLayout's top nav. Global, not a MainLayout.razor.css scoped file: Blazor's CSS isolation scope
-   attribute is never added to NavLink's own rendered <a> (confirmed by inspecting the live DOM -- it
-   carries no b-xxxxxxxx attribute at all), so a scoped selector like .op-nav-link[b-xxxxxxxx] can
-   never match it and every rule below would silently no-op. */
+/* MainLayout's app bar. Global, not a MainLayout.razor.css scoped file: Blazor's CSS isolation scope
+   attribute is never added to MudNavLink's own rendered <a> (confirmed by inspecting the live DOM for
+   the plain NavLink this app used before MudNavLink -- it carried no b-xxxxxxxx attribute at all), so a
+   scoped selector targeting it can never match and every rule below would silently no-op. */
 .op-appbar {
     border-bottom: 1px solid var(--mud-palette-lines-default);
 }
@@ -76,57 +76,35 @@
     font-weight: 600;
 }
 
-.op-nav {
-    display: flex;
-    align-items: center;
-    gap: 1.75rem;
-}
-
-.op-nav-link {
-    display: inline-block;
-    padding: 4px 0;
-    color: var(--mud-palette-text-secondary);
-    text-decoration: none;
-    font-size: 0.875rem;
-    font-weight: 500;
-    border-bottom: 2px solid transparent;
-    transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-.op-nav-link:hover {
-    color: var(--mud-palette-text-primary);
-}
-
-.op-nav-link.active {
-    color: var(--mud-palette-primary);
-    border-bottom-color: var(--mud-palette-primary);
-}
-
-.op-nav-link--disabled {
-    color: var(--mud-palette-text-disabled);
-    pointer-events: none;
-}
-
 .op-breadcrumbs {
     margin-bottom: 1rem;
 }
 
-/* op-nav--desktop/--mobile: the same three routes, rendered twice, with only one visible at a time via
-   media query -- not MudHidden, which decides via a JS viewport observer and so can't apply its rule
-   until after a JS-interop round trip (a flash of the wrong one on first paint). 599.98px matches
-   MudBlazor's own xs/sm boundary (600px), kept one hundredth under it to avoid the boundary pixel
-   matching both a max-width and a min-width query at once. */
-.op-nav--mobile {
-    display: none;
+/* The genuine breathing room MudMainContent's own padding-top never included -- that rule (MudBlazor's
+   own compiled CSS, confirmed directly) clears exactly var(--mud-appbar-height) at any real-world width
+   and not a px more, so a page's own first heading/button sat flush against the app bar's bottom edge
+   with nothing but a 1px hairline border between them. 1rem matches the existing px-4/pb-4 spacing scale
+   on MudMainContent itself, not a new unit of measure. */
+.op-page-content {
+    margin-top: 1rem;
 }
 
-@media (max-width: 599.98px) {
-    .op-nav--desktop {
-        display: none;
-    }
+/* The same flat, hairline-border treatment the app bar already uses (ADR 0062's color/elevation
+   decisions), applied to the drawer ADR 0063 restored: a vertical border reads as the rail's own edge
+   the same way the app bar's horizontal one does, rather than reaching for Elevation="1"'s shadow. */
+.op-drawer {
+    border-right: 1px solid var(--mud-palette-lines-default);
+}
 
-    .op-nav--mobile {
-        display: inline-block;
+/* The drawer shouldn't be dismissable at/above its own Breakpoint.Md (960px) -- hiding the toggle there
+   removes the means to close it; MainLayout's OnViewportChanged is the other half, a safety net forcing
+   it back open if a mobile close left it shut and the window then grows past this same threshold.
+   Matches MudDrawer's own Breakpoint.Md exactly, not an approximation -- MudBlazor's own Md boundary is
+   960px, confirmed from the library's XML doc remarks for the Breakpoint enum, the same source already
+   cited for the drawer's own Breakpoint="Breakpoint.Md" above. */
+@media (min-width: 960px) {
+    .op-drawer-toggle {
+        display: none;
     }
 }
 
@@ -138,4 +116,68 @@
 .op-user-slot-placeholder {
     width: 48px;
     height: 48px;
+}
+
+/* MudAvatar's own default (Size.Medium) renders 40x40px -- measured the same way as the placeholder
+   comment above -- visibly smaller than the 48px hamburger it now sits beside on mobile. Sized up to
+   match so the two app bar controls read as the same touch-target weight, not an incidental mismatch;
+   the placeholder above stays 48px unchanged, so this still swaps in without a layout shift. */
+.op-user-avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 1.1rem;
+}
+
+/* The standard "sr-only" clip pattern: present in the accessibility tree's text content (so it can name
+   the avatar button, see the comment above its own usage) but removed from visual and spatial layout --
+   display:none or visibility:hidden would also hide it from screen readers, defeating the point. */
+.op-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* A neutral mid-gray tint at low opacity, not a theme palette var: it needs to read as a quiet, muted
+   badge in both light and dark mode without picking a side (the app's own palette vars are tuned for
+   each theme separately, and no single one of them stays muted-but-visible across both). */
+.op-soon-badge {
+    display: inline-block;
+    margin-inline-start: 6px;
+    padding: 1px 6px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--mud-palette-text-secondary);
+    background-color: rgba(128, 128, 128, 0.18);
+    border-radius: 999px;
+    vertical-align: middle;
+}
+
+/* Matches MudMenuItem's own real padding (8px 12px) -- measured via getComputedStyle() on the actual
+   "Log out" item in a running instance, not assumed: an earlier guess of 4px 16px here was wrong on both
+   axes, and the mismatch (half the vertical padding of every item below it) was a real, visible part of
+   why this menu read as cramped. */
+.op-menu-header {
+    padding: 8px 12px;
+}
+
+.op-menu-header-name {
+    font-weight: 600;
+    word-break: break-word;
+}
+
+/* Both op-user-menu's and op-nav--mobile's popovers (PopoverClass): MudMenu has no min-width of its own,
+   so a short label set like "Dashboard"/"Patients" or "Signed in as"/"Log out" left it hugging content
+   at ~115px wide -- measured via getBoundingClientRect() on the real popover, not guessed. 200px is a
+   deliberate choice, not a measurement: comfortably past every current label's own width with room for a
+   longer real name once one is available, while still well short of the viewport at any width this nav
+   supports. */
+.op-menu-popover {
+    min-width: 200px;
 }
