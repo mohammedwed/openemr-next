@@ -383,3 +383,27 @@ Tracked here so they are not lost. Ordered by how much they matter.
   the canvas, failing AA on the canvas. Set `TextSecondary = #5f5f5f` on the light palette: 6.16:1 on
   cards, 5.5:1 on the canvas. Verified on the live page (caption and secondary text compute to
   `rgb(95,95,95)`). Dark mode is unchanged.
+
+## Added — Patient Management DDD design set (draft)
+
+- New `docs/patient-management/` (README plus eight documents): bounded context, ubiquitous language,
+  context map, domain model (aggregates and 51 numbered rules), workflows and events, data ownership and
+  legacy mapping, gaps and evolution, and 22 Mermaid UML diagrams. Target-design perspective, with every
+  capability and rule marked built, partial, target, or deferred. Status is **Draft**: nothing in it is
+  accepted, and its 22 decisions (doc 07, section 6) are unanswered. No code changed.
+- Findings recorded, not fixed (each is tracked with an id in doc 07):
+  - The patient API is reachable without signing in: the Gateway attaches the shared secret to every
+    request on the patient routes (doc 03, M1). The one critical finding.
+  - Registration runs duplicate scoring after its transaction commits, so a scoring failure returns an
+    error for a patient that was created, and a retry registers them twice (doc 05, F-1).
+  - Patient numbers are random up to 19 digits, which also breaks legacy's `MAX(pid)+1` allocator, and
+    legacy's REST API (`POST /api/patient`) is still enabled in this stack as a second insert path
+    (doc 06, G-2 and G-3).
+  - Nothing audits changes or reads, only `PatientRegistered` is ever written to the outbox, and nothing
+    delivers it (doc 06, G-8; doc 05, F-5 and F-6).
+- Not verified (doc 07, section 7): the Mermaid diagrams were not rendered, and that legacy screens
+  open rows this service created, which tables legacy populates for contacts, and whether legacy writes
+  its audit `log` on patient creation were read from code and schema only.
+- Corrected along the way: related persons. Legacy's `DemographicsRelatedPersonsService` uses a
+  `patient_related_persons` table that no SQL file in the legacy checkout creates; the schema models a
+  related person as `contact` → `person` → `contact_relation`.
