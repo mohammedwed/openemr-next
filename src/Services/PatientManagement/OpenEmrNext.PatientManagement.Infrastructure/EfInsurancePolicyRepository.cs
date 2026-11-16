@@ -47,6 +47,14 @@ public sealed class EfInsurancePolicyRepository(PatientManagementDbContext db) :
                 """, ct);
 
             var generatedId = await db.Database.GetLastInsertIdAsync(ct);
+
+            // Legacy's UuidRegistry::createUuid records every uuid it hands out; so does this (finding F-CC-3).
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO uuid_registry (uuid, table_name, table_id, table_vertical, couchdb, document_drive, mapped, created)
+                VALUES ({uuidBytes}, 'insurance_data', 'id', '', '', 0, 0, NOW())
+                """, ct);
+
             await transaction.CommitAsync(ct);
             return generatedId;
         });
