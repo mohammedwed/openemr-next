@@ -30,6 +30,6 @@ public sealed record CreateEncounterRequest(
     [StringLength(65_535, ErrorMessage = "Reason must be at most 65535 characters.")] string? Reason,
     [Range(0, int.MaxValue, ErrorMessage = "FacilityId cannot be negative.")] int FacilityId,
     [Range(1, 99, ErrorMessage = "PosCode must be between 1 and 99.")] int? PosCode,
-    [Range(1, long.MaxValue, ErrorMessage = "ProviderId must identify the acting provider.")] long ProviderId,
+    [Range(1, int.MaxValue, ErrorMessage = "ProviderId must identify the acting provider.")] long ProviderId,
     DateTime? OnsetDate,
     [StringLength(30, ErrorMessage = "Sensitivity must be at most 30 characters.")] string? Sensitivity);

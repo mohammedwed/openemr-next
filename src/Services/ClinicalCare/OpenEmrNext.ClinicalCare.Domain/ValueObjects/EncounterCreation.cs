@@ -24,6 +24,21 @@ public sealed record EncounterCreation
     /// </summary>
     public const int MaxPosCode = 99;
 
+    /// <summary>
+    /// (new) The earliest encounter or onset date accepted (CC-17). Legacy's <c>datetime</c> columns accept almost anything and a
+    /// year-1 date is stored without complaint, so a typo becomes a clinical record sorted to the bottom of every list.
+    /// </summary>
+    public static readonly DateTime MinDate = new(1900, 1, 1);
+
+    /// <summary>(new) How far past <c>now</c> a date may be (CC-17): a scheduled visit is plausible, year 2999 is a typo.</summary>
+    public static readonly TimeSpan MaxFutureOffset = TimeSpan.FromDays(366);
+
+    /// <summary>
+    /// <c>form_encounter.provider_id</c> is an <c>int(11)</c>: a larger id is a valid <c>long</c> and a value the column cannot
+    /// hold, which was a 500 (review finding R-1). The same bound applies to every provider id in this service.
+    /// </summary>
+    public const long MaxProviderId = int.MaxValue;
+
     public PatientReference Patient { get; }
     public string ClassCode { get; }
     public int CalendarCategoryId { get; }
@@ -87,8 +102,16 @@ public sealed record EncounterCreation
             errors.Add($"Sensitivity must be at most {MaxSensitivityLength} characters.");
 
         // CC-10 (new): legacy stores 0 when nobody is signed in; this service needs an identifiable provider.
-        if (providerId <= 0)
+        // The upper bound is the column's own (review finding R-1).
+        if (providerId is <= 0 or > MaxProviderId)
             errors.Add("ProviderId must identify the acting provider.");
+
+        // CC-17 (new)
+        if (date is { } given && (given < MinDate || given > now + MaxFutureOffset))
+            errors.Add($"Date must be between {MinDate:yyyy-MM-dd} and one year from now.");
+
+        if (onsetDate is { } onset && (onset < MinDate || onset > now + MaxFutureOffset))
+            errors.Add($"Onset date must be between {MinDate:yyyy-MM-dd} and one year from now.");
 
         // CC-8 and CC-13
         string? facilityName = null;

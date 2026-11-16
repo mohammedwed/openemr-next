@@ -102,4 +102,4 @@ The user decided all three on 2026-11-16.
 ## Related decisions
 
 0049, 0050, 0055, 0060; `docs/patient-management/03-context-map.md` (R7, D1, D2, risk M4);
-`docs/clinical-care/01-create-encounter-slice.md`.
+`docs/clinical-care/01-create-encounter-slice.md`; the layered review of slices 1 to 3: `docs/clinical-care/04-layered-review.md`.

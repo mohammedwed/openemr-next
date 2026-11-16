@@ -113,6 +113,7 @@ chosen here (KD-7).
 | CC-12 | `reason` is at most 65,535 characters. | none (the column is a longtext) | **(new)** input bound (SEC-7) | `EncounterCreation.Create` |
 | CC-13 | A place-of-service code is 1 to 99. | `pos_code` is a signed tinyint; CMS codes are two digits | **(new)**: legacy would raise a raw database error above 127 | `EncounterCreation.Create` |
 | CC-14 | `sensitivity` is at most 30 characters. | `form_encounter.sensitivity` is varchar(30) | Parity (the column's own limit) | `EncounterCreation.Create` |
+| CC-17 | An encounter or onset date is between 1900-01-01 and one year ahead of now. | none: legacy's `datetime` columns accept almost anything | **(new)** (review finding R-7) | `EncounterCreation.Create` |
 | CC-15 | A list is one patient's, newest first **by date** (not by encounter number), and bounded: at most 100 per page, default 25. | `EncounterService::getMostRecentEncounterForPatient` (a late-entered old visit has a higher number); legacy lists are unbounded | Order is parity. The bound is **(new)** (API-6) | `PageRequest.Create`, `EfEncounterReader` |
 | CC-16 | A row with no `uuid` is not addressable and is left out of lists. A half-filled legacy row (no date, class, number, or a pid matching no patient) is still read, not an error. | `UuidRegistry::populateAllMissingUuids` backfills missing uuids; DOM-9 | Tolerant read, parity-preserving | `EfEncounterReader` |
 
@@ -256,7 +257,7 @@ ROLLBACK:     Remove the gateway route and the compose service; delete created r
 | 6 API and contract | **Built and tested:** create, get and list; OpenAPI snapshot, NSwag `Client`, and a drift-guard test |
 | 7 Deploy | **Built and run.** The stack was started with the new services; the seed script ran against the real OpenEMR database; the live grants match the design; the gateway route works; the gateway stack tests pass 8/8 |
 | 8 Docs | This document, ADR 0064, ROADMAP, ADR index, changelog |
-| 9 Review (six dimensions) | **Not done** |
+| 9 Review (six dimensions) | **Done 2026-11-17**: [04-layered-review.md](04-layered-review.md). Seven defects found and fixed, seven findings tracked |
 | 10 Register | Findings F-CC-1 to F-CC-11 above |
 
 **Test results (run 2026-11-16):** unit 63/63, architecture 23/23, integration 77/77. The first integration run was 74/76:

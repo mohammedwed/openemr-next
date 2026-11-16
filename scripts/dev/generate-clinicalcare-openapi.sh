@@ -5,8 +5,8 @@
 #
 #   bash scripts/dev/generate-clinicalcare-openapi.sh
 #
-# Why a running instance, not build-time generation: ClinicalCareDbOptions and
-# InternalGatewayOptions are both [Required] and ValidateOnStart(), neither ever committed to a file --
+# Why a running instance, not build-time generation: ClinicalCareDbOptions, InternalGatewayOptions and
+# InternalEventsOptions are all [Required] and ValidateOnStart(), neither ever committed to a file --
 # only injected via .env/Docker (see docker-compose.yml). A build-time generator (Microsoft.Extensions.ApiDescription.Server) runs that
 # same startup validation with no server listening, so it fails the same way a bare `dotnet run` would
 # outside Docker. This script supplies placeholder values for exactly those fields instead of requiring
@@ -43,6 +43,7 @@ export ClinicalCareDb__Database=openapi-codegen-placeholder
 export ClinicalCareDb__User=openapi-codegen-placeholder
 export ClinicalCareDb__Password=openapi-codegen-placeholder
 export InternalGateway__Secret=openapi-codegen-placeholder
+export InternalEvents__Secret=openapi-codegen-placeholder
 
 API_LOG=$(mktemp)
 (cd "$API_PROJECT" && exec dotnet run --no-build --no-launch-profile) >"$API_LOG" 2>&1 &

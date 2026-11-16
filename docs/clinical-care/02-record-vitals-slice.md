@@ -107,14 +107,14 @@ stored unit.
 
 | Measurement | Stored unit | Bound |
 |---|---|---|
-| Weight | lb | `> 0` and `<= 1500` |
-| Height | in | `> 0` and `<= 120` |
+| Weight | lb | `>= 0.1` and `<= 1500` (floor added by the review, R-2) |
+| Height | in | `>= 5` and `<= 120` (floor added by the review, R-2: it keeps the derived BMI inside `decimal(12,6)`) |
 | Temperature | degF | `>= 50` and `<= 120` |
 | Waist, head circumference | in | `> 0` and `<= 200` |
 | Systolic, diastolic | mm[Hg] | whole number, `1` to `400` |
 | Pulse | /min | `1` to `400` |
 | Respiration | /min | `1` to `150` |
-| Oxygen saturation | % | `> 0` and `<= 100` |
+| Oxygen saturation | % | `> 0` and `<= 100`, rounded to 2 places (the column's scale) |
 | Note | text | at most 255 characters (the column) |
 | Temperature method | text | at most 255 characters (the column) |
 
@@ -163,7 +163,7 @@ stored unit.
 | 6 API and contract | **Built and tested:** `POST`, list and get under `/api/v1/encounters/{uuid}/vitals`; OpenAPI snapshot and `Client` regenerated; drift guard passes |
 | 7 Deploy | **No new route or secret** (the existing `/api/v1/encounters/**` gateway route covers it). One new grant (`form_vitals`: `SELECT, INSERT`), applied to the live database by re-running the idempotent seed |
 | 8 Docs | This document, ADR 0065, changelog, ROADMAP |
-| 9 Review | Not done |
+| 9 Review | **Done 2026-11-17**: [04-layered-review.md](04-layered-review.md) |
 | 10 Register | F-CV-1 to F-CV-3 above |
 
 ## 9. End-to-end verification against the running stack (2026-11-16)

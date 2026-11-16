@@ -10,8 +10,11 @@ public sealed record PatientRegisteredMessage(Guid EventId, Guid PatientUuid, lo
 /// Consumes <c>PatientRegistered</c> (slice 3, design set R7): remembers that the patient exists so an encounter can be
 /// created for them without asking another service or reading its tables. Idempotent on the event id (EVT-3).
 /// </summary>
-public sealed class ConsumePatientRegisteredUseCase(IPatientReferenceStore store)
+public sealed class ConsumePatientRegisteredUseCase(IPatientReferenceStore store, TimeProvider clock)
 {
+    /// <summary>The earliest registration time believed (the same floor as encounter dates).</summary>
+    private static readonly DateTime EarliestPlausible = new(1900, 1, 1);
+
     /// <exception cref="EncounterValidationException">The message names no usable patient (empty uuid or non-positive pid).</exception>
     public Task<EventRecordingResult> ExecuteAsync(PatientRegisteredMessage message, CancellationToken ct)
     {
@@ -21,6 +24,12 @@ public sealed class ConsumePatientRegisteredUseCase(IPatientReferenceStore store
         // The same factory every other path uses: one owner of "what is a valid patient reference" (DOM-2).
         var patient = PatientReference.Create(message.PatientUuid, message.PatientPid);
 
-        return store.RecordPatientRegisteredAsync(message.EventId, patient, message.RegisteredAtUtc, ct);
+        // registered_at is informational. A producer's nonsense timestamp must not fail, retry and finally dead-letter an event whose
+        // patient identity is perfectly good (review finding R-5), so an implausible time is recorded as unknown (a tolerant reader).
+        var registeredAt = message.RegisteredAtUtc is { } at && at >= EarliestPlausible && at <= clock.GetUtcNow().UtcDateTime.AddDays(1)
+            ? at
+            : (DateTime?)null;
+
+        return store.RecordPatientRegisteredAsync(message.EventId, patient, registeredAt, ct);
     }
 }

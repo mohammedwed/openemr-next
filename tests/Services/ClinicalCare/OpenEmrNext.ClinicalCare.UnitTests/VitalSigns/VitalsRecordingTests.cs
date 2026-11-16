@@ -212,4 +212,75 @@ public class VitalsRecordingTests
 
         Assert.Equal(2, ex.Errors.Count);
     }
+
+    [Fact]
+    public void R_3_a_number_big_enough_to_overflow_decimal_during_conversion_is_rejected_not_thrown_as_an_overflow()
+    {
+        // 7e28 kg * 2.2046 exceeds decimal.MaxValue (7.9e28): before the fix this was an OverflowException, a 500.
+        var ex = Assert.Throws<VitalsValidationException>(() => Create(new VitalsInput(Weight: Kg(70_000_000_000_000_000_000_000_000_000m))));
+
+        Assert.Contains("Weight must be between 0.1 and 1500 lb.", ex.Errors);
+    }
+
+    [Theory]
+    [InlineData(1_000_001)]
+    [InlineData(-1_000_001)]
+    public void R_3_anything_beyond_the_raw_cap_is_out_of_bounds_in_every_unit(double value)
+    {
+        Assert.Throws<VitalsValidationException>(() => Create(new VitalsInput(Height: Cm((decimal)value))));
+        Assert.Throws<VitalsValidationException>(() => Create(new VitalsInput(Temperature: new Quantity((decimal)value, MeasurementUnit.DegreeCelsius))));
+    }
+
+    [Theory]
+    [InlineData(4.99, false)]
+    [InlineData(5, true)]
+    [InlineData(120, true)]
+    public void R_2_height_has_a_floor_so_the_derived_bmi_always_fits_its_column(double inches, bool ok)
+    {
+        var input = new VitalsInput(Weight: Lb(1500m), Height: In((decimal)inches));
+
+        if (ok)
+            Assert.True(Create(input).Bmi < 999_999m);
+        else
+            Assert.Throws<VitalsValidationException>(() => Create(input));
+    }
+
+    [Fact]
+    public void R_2_the_worst_case_bmi_the_bounds_allow_fits_decimal_12_6()
+    {
+        // The heaviest allowed weight over the shortest allowed height is the largest BMI any accepted input can produce.
+        var worst = Create(new VitalsInput(Weight: Lb(VitalsRecording.MaxWeightPounds), Height: In(VitalsRecording.MinHeightInches)));
+
+        Assert.True(worst.Bmi < 999_999.999999m);
+        Assert.Equal(42_180m, worst.Bmi);   // 1500 / 5 / 5 * 703
+    }
+
+    [Theory]
+    [InlineData(0.09, false)]
+    [InlineData(0.1, true)]
+    public void R_2_weight_has_a_floor(double pounds, bool ok)
+    {
+        var input = new VitalsInput(Weight: Lb((decimal)pounds));
+
+        if (ok)
+            Assert.Equal(0.1m, Create(input).WeightPounds);
+        else
+            Assert.Throws<VitalsValidationException>(() => Create(input));
+    }
+
+    [Theory]
+    [InlineData(3_000_000_000L)]
+    [InlineData(int.MaxValue + 1L)]
+    public void R_1_a_vitals_provider_id_that_does_not_fit_the_users_id_column_is_rejected(long providerId)
+    {
+        Assert.Throws<VitalsValidationException>(() => Create(new VitalsInput(Pulse: 64), providerId));
+    }
+
+    [Fact]
+    public void Oxygen_saturation_is_rounded_to_the_two_places_the_column_stores_so_what_is_returned_is_what_is_held()
+    {
+        Assert.Equal(98.12m, Create(new VitalsInput(OxygenSaturation: 98.123456m)).OxygenSaturation);
+        Assert.Equal(98.13m, Create(new VitalsInput(OxygenSaturation: 98.125m)).OxygenSaturation);   // half away from zero, as the column rounds
+        Assert.Equal(100m, Create(new VitalsInput(OxygenSaturation: 99.996m)).OxygenSaturation);
+    }
 }
