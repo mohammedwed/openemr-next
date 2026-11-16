@@ -35,13 +35,24 @@
 
         case State.Ready:
             var patient = _patient!;
-            <MudText Typo="Typo.h5" GutterBottom="true">@patient.FirstName @patient.LastName</MudText>
-            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-6">
-                Patient ID: @(patient.PublicPatientId ?? patient.Pid.ToString()) · Date of birth: @(patient.DateOfBirth?.ToString("yyyy-MM-dd") ?? "—")
-            </MudText>
+            <MudText Typo="Typo.h5" GutterBottom="true" Class="mb-4">@patient.FirstName @patient.LastName</MudText>
 
-            @* Tabs, not one long page. Each panel is keyed on the patient, so switching patients rebuilds it. *@
+            @* The overview opens first. Insurance and advance directives load only when their tab is opened.
+               Each panel is keyed on the patient, so switching patients rebuilds it. *@
             <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+                <MudTabPanel Text="Overview">
+                    <dl class="op-details">
+                        <dt>Name</dt>
+                        <dd>@patient.FirstName @patient.LastName</dd>
+                        <dt>Patient ID</dt>
+                        <dd>@(patient.PublicPatientId ?? patient.Pid.ToString())</dd>
+                        <dt>Date of birth</dt>
+                        <dd>@(patient.DateOfBirth?.ToString("yyyy-MM-dd") ?? "—")</dd>
+                        <dt>Email</dt>
+                        <dd>@(string.IsNullOrWhiteSpace(patient.Email) ? "—" : patient.Email)</dd>
+                    </dl>
+                </MudTabPanel>
+
                 <MudTabPanel Text="Insurance">
                     <PatientInsurancePanel @key="patient.Pid" Pid="patient.Pid" />
                 </MudTabPanel>

@@ -1,5 +1,16 @@
 # Changelog 2026-11-16
 
+## Changed — patient view opens on an Overview with basic information
+
+- New first tab, **Overview**, is the default. It shows name, patient ID, date of birth, and email as a
+  description list. Insurance and Advance directives are the second and third tabs and load when opened.
+- The header keeps only the name, so the patient ID is no longer shown twice.
+- Blank email values now display as "—" on the overview and on the patient list. Before, an empty string
+  (not null) left the cell empty.
+- Verified in the browser: Overview is the default tab with all four values, and Insurance loads on click.
+- The overview has only the fields the patient summary API returns. Phone, address, and sex would need the
+  API to return them.
+
 ## Changed — patient view is read-only by default; changes happen in dialogs
 
 - Previously every panel showed its records and all of its edit forms at once, so a viewer could not

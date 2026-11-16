@@ -81,7 +81,7 @@
                         <MudTd DataLabel="First name">@patient.FirstName</MudTd>
                         <MudTd DataLabel="Last name">@patient.LastName</MudTd>
                         <MudTd DataLabel="Date of birth">@(patient.DateOfBirth?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
-                        <MudTd DataLabel="Email">@(patient.Email ?? "—")</MudTd>
+                        <MudTd DataLabel="Email">@(string.IsNullOrWhiteSpace(patient.Email) ? "—" : patient.Email)</MudTd>
                         <MudTd>
                             <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
                                 Href="@($"/patients/{patient.Uuid}")"
