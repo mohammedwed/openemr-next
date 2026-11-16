@@ -3,9 +3,9 @@
 @using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
 @inject IPatientManagementClient PatientManagement
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
-@* Advance directives for one patient. Rendered with @key on the patient's Pid, so switching patients starts
-   a fresh panel instead of carrying the previous patient's status, documents, or upload state along. *@
+@* Read-only by default. Recording a status or uploading a document opens its own dialog. *@
 @if (_loading)
 {
     <MudProgressCircular Indeterminate="true" Color="Color.Primary" role="status" aria-label="Loading advance directives" />
@@ -20,30 +20,19 @@ else
         </MudAlert>
     }
 
-    <MudText Typo="Typo.subtitle2" Class="mb-2">Status</MudText>
-    <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
-        @CodeLabels.Of(_status?.Status ?? "unknown") · reviewed @(_status?.ReviewedAtUtc?.ToString("yyyy-MM-dd") ?? "—")
-    </MudText>
-    @if (_statusError is { } statusError)
-    {
-        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-3">@statusError</MudAlert>
-    }
-    <MudStack Row="true" Spacing="3" AlignItems="AlignItems.End" Class="mb-6">
-        <MudSelect T="string" @bind-Value="_setStatusModel.Status" Label="Set status" Variant="Variant.Outlined">
-            <MudSelectItem Value="@("yes")">Yes</MudSelectItem>
-            <MudSelectItem Value="@("no")">No</MudSelectItem>
-            <MudSelectItem Value="@("unknown")">Unknown</MudSelectItem>
-        </MudSelect>
-        <MudDatePicker @bind-Date="_setStatusModel.ReviewedAtUtc" Label="Reviewed on (optional)" Variant="Variant.Outlined" />
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SetStatusAsync" Disabled="_settingStatus">
-            Save
-        </MudButton>
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+        <MudText Typo="Typo.subtitle2">
+            Status: @CodeLabels.Of(_status?.Status ?? "unknown") · reviewed @(_status?.ReviewedAtUtc?.ToString("yyyy-MM-dd") ?? "—")
+        </MudText>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenSetStatusAsync">Set status</MudButton>
     </MudStack>
 
-    <MudDivider Class="my-6" />
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+        <MudText Typo="Typo.subtitle2">Documents</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenUploadAsync">Upload document</MudButton>
+    </MudStack>
 
-    <MudText Typo="Typo.subtitle2" Class="mb-3">Documents</MudText>
-    <MudTable Items="_documents" Hover="true" Elevation="0" Dense="true" Class="mb-4">
+    <MudTable Items="_documents" Hover="true" Elevation="0" Dense="true">
         <HeaderContent>
             <MudTh>Type</MudTh>
             <MudTh>Name</MudTh>
@@ -64,68 +53,22 @@ else
         </RowTemplate>
         <NoRecordsContent>No documents uploaded yet.</NoRecordsContent>
     </MudTable>
-
-    <MudText Typo="Typo.subtitle2" Class="mb-3">Upload a document</MudText>
-    @if (_uploadError is { } uploadError)
-    {
-        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-3">@uploadError</MudAlert>
-    }
-    <MudStack Spacing="4">
-        <MudSelect T="string" @bind-Value="_uploadType" Label="Type" Required="true" Variant="Variant.Outlined">
-            <MudSelectItem Value="@("living_will")">Living will</MudSelectItem>
-            <MudSelectItem Value="@("durable_power_attorney")">Durable power of attorney</MudSelectItem>
-            <MudSelectItem Value="@("dnr_order")">DNR order</MudSelectItem>
-        </MudSelect>
-        <InputFile OnChange="OnFileSelectedAsync" aria-label="Choose a document file to upload" />
-        @if (_uploadFileName is { } fileName)
-        {
-            <MudText Typo="Typo.body2" Class="mud-text-secondary">Selected: @fileName</MudText>
-        }
-        <MudDatePicker @bind-Date="_uploadEffectiveDate" Label="Effective date (optional)" Variant="Variant.Outlined" />
-        <div>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="UploadDocumentAsync" Disabled="_uploading || _uploadContentBase64 is null">
-                Upload
-            </MudButton>
-        </div>
-    </MudStack>
 }
 
 @code {
-    /// <summary>
-    /// The id of the user performing advance-directive actions. Same tracked gap as
-    /// <c>Register.razor</c>'s own <c>PlaceholderRegisteredById</c> (ADR 0055) -- no real numeric id
-    /// exists to supply here yet. The signed-in user only has a string subject, not OpenEMR's numeric id.
-    /// </summary>
-    private const long PlaceholderUserId = 1;
-
-    /// <summary>30 MB, matching <c>AdvanceDirectiveDocument.MaxContentBytes</c> -- the real limit the
-    /// Domain factory itself enforces; <c>InputFile</c>'s own default (512 KB) would reject a real
-    /// document long before that check ever ran.</summary>
-    private const long MaxUploadBytes = 30 * 1024 * 1024;
-
     [Parameter, EditorRequired] public long Pid { get; set; }
 
     private AdvanceDirectiveStatusResponse? _status;
     private List<AdvanceDirectiveDocumentResponse> _documents = [];
     private bool _loading = true;
     private bool _advanceDirectiveError;
-    private readonly SetStatusModel _setStatusModel = new();
-    private bool _settingStatus;
-    private string? _statusError;
-    private string _uploadType = "living_will";
-    private string? _uploadFileName;
-    private string? _uploadMimeType;
-    private string? _uploadContentBase64;
-    private DateTime? _uploadEffectiveDate;
-    private bool _uploading;
-    private string? _uploadError;
 
     private string DocumentContentUrl(AdvanceDirectiveDocumentResponse document) =>
         $"/api/v1/patients/{Pid}/advance-directives/documents/{document.Uuid}/content";
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
-    // Only the first load shows the spinner. Reloads after a save or upload keep the form on screen.
+    // Only the first load shows the spinner. Reloads after a change keep the view on screen.
     private async Task LoadAsync()
     {
         try
@@ -145,83 +88,34 @@ else
         }
     }
 
-    private async Task SetStatusAsync()
+    private async Task OpenSetStatusAsync()
     {
-        _settingStatus = true;
-        _statusError = null;
-        try
+        var parameters = new DialogParameters<SetAdvanceDirectiveStatusDialog>
         {
-            var request = new SetAdvanceDirectiveStatusRequest
-            {
-                Status = _setStatusModel.Status,
-                ReviewedAtUtc = _setStatusModel.ReviewedAtUtc is { } reviewed ? new DateTimeOffset(reviewed) : null,
-                AuthenticatorUserId = PlaceholderUserId
-            };
-            await PatientManagement.SetAdvanceDirectiveStatusAsync(Pid, request);
+            { x => x.Pid, Pid },
+            { x => x.CurrentStatus, _status?.Status ?? "unknown" },
+        };
+        var dialog = await DialogService.ShowAsync<SetAdvanceDirectiveStatusDialog>("Set advance directive status", parameters, DialogOptionsFor());
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
             Snackbar.Add("Advance directive status saved.", Severity.Success);
             await LoadAsync();
         }
-        catch (PatientManagementApiException ex)
-        {
-            _statusError = PatientManagementErrorFormatter.Describe(ex, "Could not save this status. Please try again.");
-        }
-        finally
-        {
-            _settingStatus = false;
-        }
     }
 
-    private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
+    private async Task OpenUploadAsync()
     {
-        var file = e.File;
-        using var stream = file.OpenReadStream(MaxUploadBytes);
-        using var buffer = new MemoryStream();
-        await stream.CopyToAsync(buffer);
-        _uploadContentBase64 = Convert.ToBase64String(buffer.ToArray());
-        _uploadFileName = file.Name;
-        _uploadMimeType = file.ContentType;
-    }
-
-    private async Task UploadDocumentAsync()
-    {
-        if (_uploadContentBase64 is null || _uploadFileName is null)
+        var parameters = new DialogParameters<UploadDocumentDialog> { { x => x.Pid, Pid } };
+        var dialog = await DialogService.ShowAsync<UploadDocumentDialog>("Upload advance directive document", parameters, DialogOptionsFor());
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
         {
-            return;
-        }
-
-        _uploading = true;
-        _uploadError = null;
-        try
-        {
-            var request = new UploadAdvanceDirectiveDocumentRequest
-            {
-                Type = _uploadType,
-                FileName = _uploadFileName,
-                MimeType = _uploadMimeType ?? "application/octet-stream",
-                ContentBase64 = _uploadContentBase64,
-                EffectiveDate = _uploadEffectiveDate is { } effective ? new DateTimeOffset(effective) : null,
-                OwnerId = PlaceholderUserId
-            };
-            await PatientManagement.UploadAdvanceDirectiveDocumentAsync(Pid, request);
             Snackbar.Add("Document uploaded.", Severity.Success);
             await LoadAsync();
-            _uploadContentBase64 = null;
-            _uploadFileName = null;
-            _uploadMimeType = null;
-        }
-        catch (PatientManagementApiException ex)
-        {
-            _uploadError = PatientManagementErrorFormatter.Describe(ex, "Could not upload this document. Please try again.");
-        }
-        finally
-        {
-            _uploading = false;
         }
     }
 
-    private sealed class SetStatusModel
-    {
-        public string Status { get; set; } = "unknown";
-        public DateTime? ReviewedAtUtc { get; set; }
-    }
+    private static DialogOptions DialogOptionsFor() =>
+        new() { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
 }

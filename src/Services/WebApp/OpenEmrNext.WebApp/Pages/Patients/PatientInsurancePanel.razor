@@ -5,8 +5,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-@* Insurance for one patient. Rendered with @key on the patient's Pid, so switching patients starts a
-   fresh panel instead of carrying the previous patient's policies, forms, or errors along. *@
+@* Read-only by default. Every change opens its own dialog, so a view can never be edited by accident. *@
 @if (_loading)
 {
     <MudProgressCircular Indeterminate="true" Color="Color.Primary" role="status" aria-label="Loading insurance" />
@@ -21,7 +20,19 @@ else
         </MudAlert>
     }
 
-    <MudTable Items="_effectiveInsurance" Hover="true" Elevation="0" Dense="true" Class="mb-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+        <MudText Typo="Typo.subtitle2">Effective insurance today</MudText>
+        <MudStack Row="true" Spacing="2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="OpenSwapAsync" Disabled="!_effectiveInsurance.Any(p => p.Uuid is not null)">
+                Swap levels
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenAddPolicyAsync">
+                Add policy
+            </MudButton>
+        </MudStack>
+    </MudStack>
+
+    <MudTable Items="_effectiveInsurance" Hover="true" Elevation="0" Dense="true">
         <HeaderContent>
             <MudTh>Level</MudTh>
             <MudTh>Company id</MudTh>
@@ -36,65 +47,6 @@ else
         </RowTemplate>
         <NoRecordsContent>No effective insurance today.</NoRecordsContent>
     </MudTable>
-
-    <MudText Typo="Typo.subtitle2" Class="mb-3">Add a policy</MudText>
-    @if (_addPolicyError is { } addPolicyError)
-    {
-        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-3">@addPolicyError</MudAlert>
-    }
-    <MudForm @ref="_addPolicyForm" Model="_addPolicyModel">
-        <MudStack Spacing="4">
-            <MudSelect T="string" @bind-Value="_addPolicyModel.Level" Label="Level" Required="true" Variant="Variant.Outlined">
-                <MudSelectItem Value="@("primary")">Primary</MudSelectItem>
-                <MudSelectItem Value="@("secondary")">Secondary</MudSelectItem>
-                <MudSelectItem Value="@("tertiary")">Tertiary</MudSelectItem>
-            </MudSelect>
-            <MudNumericField @bind-Value="_addPolicyModel.CompanyId" Label="Company id" Required="true" Min="1" Variant="Variant.Outlined" />
-            <MudTextField @bind-Value="_addPolicyModel.PolicyNumber" Label="Policy number" Required="true" Variant="Variant.Outlined" />
-            <MudTextField @bind-Value="_addPolicyModel.GroupNumber" Label="Group number (optional)" Variant="Variant.Outlined" />
-            <MudTextField @bind-Value="_addPolicyModel.PlanName" Label="Plan name (optional)" Variant="Variant.Outlined" />
-            <MudDatePicker @bind-Date="_addPolicyModel.StartDate" Label="Start date" Required="true" Variant="Variant.Outlined" />
-            <MudDatePicker @bind-Date="_addPolicyModel.EndDate" Label="End date (optional)" Variant="Variant.Outlined" />
-            <div>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddPolicyAsync" Disabled="_addingPolicy">
-                    Add policy
-                </MudButton>
-            </div>
-        </MudStack>
-    </MudForm>
-
-    <MudDivider Class="my-6" />
-
-    <MudText Typo="Typo.subtitle2" Class="mb-3">Swap a policy's level</MudText>
-    @if (_swapError is { } swapError)
-    {
-        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-3">@swapError</MudAlert>
-    }
-    @if (_effectiveInsurance.Any(p => p.Uuid is not null))
-    {
-        <MudStack Spacing="4">
-            <MudSelect T="Guid?" @bind-Value="_swapPolicyUuid" Label="Policy" Variant="Variant.Outlined">
-                @foreach (var policy in _effectiveInsurance.Where(p => p.Uuid is not null))
-                {
-                    <MudSelectItem Value="@policy.Uuid">@CodeLabels.Of(policy.Level) (company @policy.CompanyId)</MudSelectItem>
-                }
-            </MudSelect>
-            <MudSelect T="string" @bind-Value="_swapTargetLevel" Label="Target level" Variant="Variant.Outlined">
-                <MudSelectItem Value="@("primary")">Primary</MudSelectItem>
-                <MudSelectItem Value="@("secondary")">Secondary</MudSelectItem>
-                <MudSelectItem Value="@("tertiary")">Tertiary</MudSelectItem>
-            </MudSelect>
-            <div>
-                <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="SwapPolicyAsync" Disabled="_swapping">
-                    Swap
-                </MudButton>
-            </div>
-        </MudStack>
-    }
-    else
-    {
-        <MudText Typo="Typo.body2" Class="mud-text-secondary">No policies to swap yet.</MudText>
-    }
 }
 
 @code {
@@ -103,18 +55,10 @@ else
     private List<EffectiveInsuranceResponse> _effectiveInsurance = [];
     private bool _loading = true;
     private bool _insuranceError;
-    private MudForm? _addPolicyForm;
-    private readonly AddPolicyModel _addPolicyModel = new();
-    private bool _addingPolicy;
-    private string? _addPolicyError;
-    private Guid? _swapPolicyUuid;
-    private string _swapTargetLevel = "primary";
-    private bool _swapping;
-    private string? _swapError;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
-    // Only the first load shows the spinner. Reloads after an add or swap keep the form on screen.
+    // Only the first load shows the spinner. Reloads after a change keep the table on screen.
     private async Task LoadAsync()
     {
         try
@@ -133,88 +77,34 @@ else
         }
     }
 
-    private async Task AddPolicyAsync()
+    private async Task OpenAddPolicyAsync()
     {
-        await _addPolicyForm!.ValidateAsync();
-        if (!_addPolicyForm.IsValid || _addPolicyModel.StartDate is null)
+        var parameters = new DialogParameters<AddPolicyDialog> { { x => x.Pid, Pid } };
+        var dialog = await DialogService.ShowAsync<AddPolicyDialog>("Add insurance policy", parameters, DialogOptionsFor());
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
         {
-            return;
-        }
-
-        _addingPolicy = true;
-        _addPolicyError = null;
-        try
-        {
-            var request = new AddInsurancePolicyRequest
-            {
-                Level = _addPolicyModel.Level,
-                CompanyId = _addPolicyModel.CompanyId,
-                PolicyNumber = _addPolicyModel.PolicyNumber,
-                GroupNumber = string.IsNullOrWhiteSpace(_addPolicyModel.GroupNumber) ? null : _addPolicyModel.GroupNumber,
-                PlanName = string.IsNullOrWhiteSpace(_addPolicyModel.PlanName) ? null : _addPolicyModel.PlanName,
-                StartDate = new DateTimeOffset(_addPolicyModel.StartDate.Value),
-                EndDate = _addPolicyModel.EndDate is { } end ? new DateTimeOffset(end) : null
-            };
-            await PatientManagement.AddInsurancePolicyAsync(Pid, request);
             Snackbar.Add("Insurance policy added.", Severity.Success);
             await LoadAsync();
         }
-        catch (PatientManagementApiException ex)
-        {
-            _addPolicyError = PatientManagementErrorFormatter.Describe(
-                ex, "Could not add this policy. Please check the details and try again.");
-        }
-        finally
-        {
-            _addingPolicy = false;
-        }
     }
 
-    private async Task SwapPolicyAsync()
+    private async Task OpenSwapAsync()
     {
-        if (_swapPolicyUuid is null)
+        var parameters = new DialogParameters<SwapPolicyDialog>
         {
-            return;
-        }
-
-        // Swapping changes which policy is in force at each of the two levels involved -- worth a
-        // confirmation, unlike adding a policy, which doesn't displace anything already there.
-        var confirmed = await DialogService.ShowMessageBoxAsync(
-            "Swap insurance level",
-            $"Swap this policy to {_swapTargetLevel}? Whatever currently occupies {_swapTargetLevel} will take this policy's place.",
-            yesText: "Swap", cancelText: "Cancel");
-        if (confirmed != true)
+            { x => x.Pid, Pid },
+            { x => x.Policies, _effectiveInsurance },
+        };
+        var dialog = await DialogService.ShowAsync<SwapPolicyDialog>("Swap insurance levels", parameters, DialogOptionsFor());
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
         {
-            return;
-        }
-
-        _swapping = true;
-        _swapError = null;
-        try
-        {
-            var request = new SwapInsuranceRequest { TargetLevel = _swapTargetLevel, PolicyUuid = _swapPolicyUuid.Value };
-            await PatientManagement.SwapInsuranceAsync(Pid, request);
             Snackbar.Add("Insurance levels swapped.", Severity.Success);
             await LoadAsync();
         }
-        catch (PatientManagementApiException ex)
-        {
-            _swapError = PatientManagementErrorFormatter.Describe(ex, "Could not swap this policy. Please try again.");
-        }
-        finally
-        {
-            _swapping = false;
-        }
     }
 
-    private sealed class AddPolicyModel
-    {
-        public string Level { get; set; } = "primary";
-        public long CompanyId { get; set; }
-        public string PolicyNumber { get; set; } = "";
-        public string? GroupNumber { get; set; }
-        public string? PlanName { get; set; }
-        public DateTime? StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
-    }
+    private static DialogOptions DialogOptionsFor() =>
+        new() { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
 }

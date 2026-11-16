@@ -1,5 +1,20 @@
 # Changelog 2026-11-16
 
+## Changed — patient view is read-only by default; changes happen in dialogs
+
+- Previously every panel showed its records and all of its edit forms at once, so a viewer could not
+  tell whether they were looking or changing something. Both tabs are now read-only lists with action
+  buttons.
+- **Add policy**, **Swap levels**, **Set status**, and **Upload document** each open a dialog that makes
+  one change. A dialog closes only when its save succeeds. On failure it stays open with the typed values.
+- **Swap levels** names the policy being moved and whoever holds the target level before the user
+  confirms, and its button says what it does ("Swap levels").
+- Dialog components: `AddPolicyDialog`, `SwapPolicyDialog`, `SetAdvanceDirectiveStatusDialog`,
+  `UploadDocumentDialog` (all under `Pages/Patients`).
+- Verified in the browser by opening and cancelling each dialog, and confirming that Upload stays disabled
+  until a file is chosen. **Not verified:** a successful submit of any dialog, since that would change the
+  dev database. Submitting still needs a check.
+
 ## Changed — patient view split into panels
 
 - `Pages/Patients/Detail.razor` is now the header, the states, and the tabs. Its two sections moved

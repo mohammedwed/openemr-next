@@ -1,0 +1,92 @@
+@using OpenEmrNext.PatientManagement.Client
+@using OpenEmrNext.WebApp.Shared
+@using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
+@inject IPatientManagementClient PatientManagement
+
+@* Adding a policy is a change, so it lives in its own dialog. It closes only when the save succeeds;
+   on failure it stays open with the typed values intact. *@
+<MudDialog>
+    <DialogContent>
+        @if (_error is { } error)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">@error</MudAlert>
+        }
+        <MudForm @ref="_form" Model="_model">
+            <MudStack Spacing="4">
+                <MudSelect T="string" @bind-Value="_model.Level" Label="Level" Required="true" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("primary")">Primary</MudSelectItem>
+                    <MudSelectItem Value="@("secondary")">Secondary</MudSelectItem>
+                    <MudSelectItem Value="@("tertiary")">Tertiary</MudSelectItem>
+                </MudSelect>
+                <MudNumericField @bind-Value="_model.CompanyId" Label="Company id" Required="true" Min="1" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_model.PolicyNumber" Label="Policy number" Required="true" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_model.GroupNumber" Label="Group number (optional)" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_model.PlanName" Label="Plan name (optional)" Variant="Variant.Outlined" />
+                <MudDatePicker @bind-Date="_model.StartDate" Label="Start date" Required="true" Variant="Variant.Outlined" />
+                <MudDatePicker @bind-Date="_model.EndDate" Label="End date (optional)" Variant="Variant.Outlined" />
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_saving">Add policy</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public long Pid { get; set; }
+
+    private MudForm _form = null!;
+    private readonly Model _model = new();
+    private bool _saving;
+    private string? _error;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid || _model.StartDate is null)
+        {
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            var request = new AddInsurancePolicyRequest
+            {
+                Level = _model.Level,
+                CompanyId = _model.CompanyId,
+                PolicyNumber = _model.PolicyNumber,
+                GroupNumber = string.IsNullOrWhiteSpace(_model.GroupNumber) ? null : _model.GroupNumber,
+                PlanName = string.IsNullOrWhiteSpace(_model.PlanName) ? null : _model.PlanName,
+                StartDate = new DateTimeOffset(_model.StartDate.Value),
+                EndDate = _model.EndDate is { } end ? new DateTimeOffset(end) : null
+            };
+            await PatientManagement.AddInsurancePolicyAsync(Pid, request);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (PatientManagementApiException ex)
+        {
+            _error = PatientManagementErrorFormatter.Describe(ex, "Could not add this policy. Please check the details and try again.");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private sealed class Model
+    {
+        public string Level { get; set; } = "primary";
+        public long CompanyId { get; set; }
+        public string PolicyNumber { get; set; } = "";
+        public string? GroupNumber { get; set; }
+        public string? PlanName { get; set; }
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+    }
+}
