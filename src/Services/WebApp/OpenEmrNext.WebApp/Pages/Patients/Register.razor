@@ -10,7 +10,7 @@
 
 <PageTitle>Register patient</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Small" Class="pa-0">
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-0">
     <MudText Typo="Typo.h4" HtmlTag="h1" Class="mb-6">Register patient</MudText>
 
     @switch (_state)
@@ -40,25 +40,38 @@
                     {
                         <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">@message</MudAlert>
                     }
-                    <MudStack Spacing="4">
-                        <MudTextField @bind-Value="_model.FirstName" Label="First name" Required="true" Variant="Variant.Outlined" />
-                        <MudTextField @bind-Value="_model.LastName" Label="Last name" Required="true" Variant="Variant.Outlined" />
-                        <MudSelect T="string" @bind-Value="_model.Sex" Label="Sex" Required="true" Variant="Variant.Outlined">
-                            @foreach (var option in SexOptions)
-                            {
-                                <MudSelectItem Value="@option">@option</MudSelectItem>
-                            }
-                        </MudSelect>
-                        <MudDatePicker @bind-Date="_model.DateOfBirth" Label="Date of birth" Required="true" Variant="Variant.Outlined"
-                            MaxDate="DateTime.Today" />
-                        <MudTextField @bind-Value="_model.Email" Label="Email (optional)" Variant="Variant.Outlined" InputType="InputType.Email" />
-                        <MudTextField @bind-Value="_model.TrustedEmail" Label="Trusted email (optional)" Variant="Variant.Outlined" InputType="InputType.Email" />
-                        <div>
+                    @* Paired fields share a row on wider screens and stack on phones. *@
+                    <MudGrid Spacing="4">
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_model.FirstName" Label="First name" Required="true" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_model.LastName" Label="Last name" Required="true" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="string" @bind-Value="_model.Sex" Label="Sex" Required="true" Variant="Variant.Outlined">
+                                @foreach (var option in SexOptions)
+                                {
+                                    <MudSelectItem Value="@option">@option</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudDatePicker @bind-Date="_model.DateOfBirth" Label="Date of birth" Required="true" Variant="Variant.Outlined"
+                                MaxDate="DateTime.Today" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_model.Email" Label="Email (optional)" Variant="Variant.Outlined" InputType="InputType.Email" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_model.TrustedEmail" Label="Trusted email (optional)" Variant="Variant.Outlined" InputType="InputType.Email" />
+                        </MudItem>
+                        <MudItem xs="12">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_submitting">
                                 Register
                             </MudButton>
-                        </div>
-                    </MudStack>
+                        </MudItem>
+                    </MudGrid>
                 </MudForm>
             </MudPaper>
             break;

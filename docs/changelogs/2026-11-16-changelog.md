@@ -1,5 +1,13 @@
 # Changelog 2026-11-16
 
+## Changed — register form width and layout
+
+- Container widened from `Small` (600px) to `Large` (1280px), the same width as the patient list and detail pages.
+- First and last name share a row, and sex and date of birth share a row, on screens 600px and wider. They
+  stack on phones. Email fields stay full width.
+- Built and redeployed. **Not yet checked visually in the browser** (the browser tool's permission check
+  was unavailable at the time).
+
 ## Changed — register patient page
 
 - **Sex is a dropdown** (Male, Female, Other, Unknown) instead of free text. The values match the ones the
