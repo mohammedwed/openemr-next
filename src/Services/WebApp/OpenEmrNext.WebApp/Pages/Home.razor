@@ -1,4 +1,5 @@
 @page "/"
+@using OpenEmrNext.WebApp.Shared
 @inject IAuthFacadeClient AuthFacade
 @inject NavigationManager Navigation
 
@@ -87,14 +88,15 @@
     /// </summary>
     protected override async Task OnInitializedAsync()
     {
-        try
+        // Same sign-in rule as the patient pages (TryGetCurrentUserAsync): an API rejection means signed out,
+        // and a network failure still throws, so an outage is not mistaken for a signed-out visitor.
+        if (await AuthFacade.TryGetCurrentUserAsync() is { } me)
         {
-            var me = await AuthFacade.GetCurrentUserAsync();
             _name = me.Name;
             _subject = me.Subject;
             _state = State.SignedIn;
         }
-        catch (ApiException)
+        else
         {
             _state = State.SignedOut;
         }

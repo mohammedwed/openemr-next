@@ -1,0 +1,92 @@
+@using OpenEmrNext.PatientManagement.Client
+@using OpenEmrNext.WebApp.Shared
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+@* Shows the insurance it is given, read-only. Every change opens its own dialog and then asks the parent to
+   reload, so the table and the tab count always come from the same data. *@
+<PatientSectionCard Title="Effective insurance today"
+    HasData="Policies is not null" Error="Error" OnRetry="OnRetry"
+    ErrorMessage="Could not load insurance."
+    StaleMessage="Could not refresh insurance. The list below may be out of date."
+    LoadingLabel="Loading insurance">
+    <Actions>
+        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="OpenSwapAsync" Disabled="!CanSwap">
+            Swap levels
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenAddPolicyAsync">
+            Add policy
+        </MudButton>
+    </Actions>
+    <ChildContent>
+        @if (!CanSwap)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">Add a policy before you can swap levels.</MudText>
+        }
+
+        <MudTable Items="Policies ?? []" Hover="true" Elevation="0">
+            <HeaderContent>
+                <MudTh>Level</MudTh>
+                <MudTh>Company id</MudTh>
+                <MudTh>Start</MudTh>
+                <MudTh>End</MudTh>
+            </HeaderContent>
+            <RowTemplate Context="policy">
+                <MudTd DataLabel="Level">@CodeLabels.Of(policy.Level)</MudTd>
+                <MudTd DataLabel="Company id">@policy.CompanyId</MudTd>
+                <MudTd DataLabel="Start">@(policy.Start?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
+                <MudTd DataLabel="End">@(policy.End?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudStack Spacing="2" AlignItems="AlignItems.Start" Class="py-2">
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">No effective insurance today.</MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="OpenAddPolicyAsync">Add the first policy</MudButton>
+                </MudStack>
+            </NoRecordsContent>
+        </MudTable>
+    </ChildContent>
+</PatientSectionCard>
+
+@code {
+    [Parameter, EditorRequired] public long Pid { get; set; }
+
+    /// <summary>Null while loading. The parent keeps the previous list on screen during a reload.</summary>
+    [Parameter] public IReadOnlyList<EffectiveInsuranceResponse>? Policies { get; set; }
+
+    [Parameter] public bool Error { get; set; }
+
+    /// <summary>Raised after a successful change; the parent reloads and refreshes the tab count.</summary>
+    [Parameter] public EventCallback Changed { get; set; }
+
+    [Parameter] public EventCallback OnRetry { get; set; }
+
+    private bool CanSwap => Policies?.Any(p => p.Uuid is not null) == true;
+
+    private async Task OpenAddPolicyAsync()
+    {
+        var parameters = new DialogParameters<AddPolicyDialog> { { x => x.Pid, Pid } };
+        var dialog = await DialogService.ShowAsync<AddPolicyDialog>("Add insurance policy", parameters, DialogDefaults.Standard);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            Snackbar.Add("Insurance policy added.", Severity.Success);
+            await Changed.InvokeAsync();
+        }
+    }
+
+    private async Task OpenSwapAsync()
+    {
+        var parameters = new DialogParameters<SwapPolicyDialog>
+        {
+            { x => x.Pid, Pid },
+            { x => x.Policies, Policies ?? [] },
+        };
+        var dialog = await DialogService.ShowAsync<SwapPolicyDialog>("Swap insurance levels", parameters, DialogDefaults.Standard);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            Snackbar.Add("Insurance levels swapped.", Severity.Success);
+            await Changed.InvokeAsync();
+        }
+    }
+}

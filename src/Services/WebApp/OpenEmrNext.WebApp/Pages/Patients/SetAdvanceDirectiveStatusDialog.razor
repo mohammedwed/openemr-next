@@ -1,0 +1,76 @@
+@using OpenEmrNext.PatientManagement.Client
+@using OpenEmrNext.WebApp.Shared
+@using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
+@inject IPatientManagementClient PatientManagement
+
+<MudDialog>
+    <DialogContent>
+        @if (_error is { } error)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">@error</MudAlert>
+        }
+        <MudStack Spacing="4">
+            <MudSelect T="string" @bind-Value="_status" Label="Status" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("yes")">Yes</MudSelectItem>
+                <MudSelectItem Value="@("no")">No</MudSelectItem>
+                <MudSelectItem Value="@("unknown")">Unknown</MudSelectItem>
+            </MudSelect>
+            <MudDatePicker @bind-Date="_reviewedOn" Label="Reviewed on (optional)" Editable="true" Variant="Variant.Outlined" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_saving">Save status</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    /// <summary>
+    /// The id of the user recording the status. Same tracked gap as <c>Register.razor</c>'s own
+    /// <c>PlaceholderRegisteredById</c> (ADR 0055): the signed-in user only has a string subject, not
+    /// OpenEMR's numeric id.
+    /// </summary>
+    private const long PlaceholderUserId = 1;
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public long Pid { get; set; }
+    [Parameter] public string CurrentStatus { get; set; } = "unknown";
+
+    private string _status = "unknown";
+    private DateTime? _reviewedOn;
+    private bool _saving;
+    private string? _error;
+
+    protected override void OnInitialized() => _status = CurrentStatus;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            var request = new SetAdvanceDirectiveStatusRequest
+            {
+                Status = _status,
+                ReviewedAtUtc = _reviewedOn is { } reviewed ? new DateTimeOffset(reviewed) : null,
+                AuthenticatorUserId = PlaceholderUserId
+            };
+            await PatientManagement.SetAdvanceDirectiveStatusAsync(Pid, request);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (PatientManagementApiException ex)
+        {
+            _error = PatientManagementErrorFormatter.Describe(ex, "Could not save this status. Please try again.");
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Could not reach the patient service. Check your connection, then try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

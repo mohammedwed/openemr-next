@@ -1,0 +1,108 @@
+@using OpenEmrNext.PatientManagement.Client
+@using OpenEmrNext.WebApp.Shared
+@using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
+@inject IPatientManagementClient PatientManagement
+
+@* Swapping displaces whichever policy holds the target level, so the dialog names both policies before
+   the user confirms. It is the only confirmation step: the button says exactly what it will do. *@
+<MudDialog>
+    <DialogContent>
+        @if (_error is { } error)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">@error</MudAlert>
+        }
+        <MudStack Spacing="4">
+            <MudSelect T="Guid?" @bind-Value="_policyUuid" Label="Policy to move" Variant="Variant.Outlined">
+                @foreach (var policy in Policies.Where(p => p.Uuid is not null))
+                {
+                    <MudSelectItem Value="@policy.Uuid">@CodeLabels.Of(policy.Level) (company @policy.CompanyId)</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="string" @bind-Value="_targetLevel" Label="Move it to level" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("primary")">Primary</MudSelectItem>
+                <MudSelectItem Value="@("secondary")">Secondary</MudSelectItem>
+                <MudSelectItem Value="@("tertiary")">Tertiary</MudSelectItem>
+            </MudSelect>
+            @if (_selected is { } selected)
+            {
+                @if (selected.Level == _targetLevel)
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">This policy is already at @CodeLabels.Of(_targetLevel). Choose a different level.</MudText>
+                }
+                else if (_occupant is { } occupant)
+                {
+                    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">
+                        @CodeLabels.Of(_targetLevel) is currently held by company @occupant.CompanyId. That policy will move to @CodeLabels.Of(selected.Level).
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Nothing holds @CodeLabels.Of(_targetLevel) right now, so this policy will simply move there.</MudText>
+                }
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="SubmitAsync" Disabled="!CanSubmit || _saving">
+            Swap levels
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public long Pid { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<EffectiveInsuranceResponse> Policies { get; set; } = [];
+
+    private Guid? _policyUuid;
+    private string _targetLevel = "primary";
+    private bool _saving;
+    private string? _error;
+
+    private EffectiveInsuranceResponse? _selected =>
+        _policyUuid is null ? null : Policies.FirstOrDefault(p => p.Uuid == _policyUuid);
+
+    // The policy currently holding the target level, if any, other than the one being moved.
+    private EffectiveInsuranceResponse? _occupant =>
+        _selected is null ? null : Policies.FirstOrDefault(p => p.Uuid != _selected.Uuid && p.Level == _targetLevel);
+
+    private bool CanSubmit => _selected is { } selected && selected.Level != _targetLevel;
+
+    protected override void OnInitialized()
+    {
+        // Start on the first policy so the common case is one click away.
+        _policyUuid = Policies.FirstOrDefault(p => p.Uuid is not null)?.Uuid;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        if (_policyUuid is not { } policyUuid)
+        {
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            var request = new SwapInsuranceRequest { TargetLevel = _targetLevel, PolicyUuid = policyUuid };
+            await PatientManagement.SwapInsuranceAsync(Pid, request);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (PatientManagementApiException ex)
+        {
+            _error = PatientManagementErrorFormatter.Describe(ex, "Could not swap these policies. Please try again.");
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Could not reach the patient service. Check your connection, then try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

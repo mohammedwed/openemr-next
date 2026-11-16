@@ -9,4 +9,8 @@ namespace OpenEmrNext.PatientManagement.Api.Contracts.Responses;
 /// <param name="Uuid">The patient's public identity, the same one <c>POST /api/v1/patients</c> returns.</param>
 /// <param name="Pid">OpenEMR's own internal join key -- needed to call the insurance/advance-directive
 /// endpoints, which are keyed by it, not <paramref name="Uuid"/>.</param>
-public sealed record PatientSummaryResponse(Guid Uuid, long Pid, string FirstName, string LastName, DateOnly? DateOfBirth, string? Email);
+/// <param name="PublicPatientId">The public patient ID (<c>pubpid</c>) that OpenEMR's own screens show as
+/// the patient's identifier. Distinct from <paramref name="Pid"/>; may differ for patients imported from
+/// legacy data. Not an MRN: this service does not model one.</param>
+public sealed record PatientSummaryResponse(
+    Guid Uuid, long Pid, string FirstName, string LastName, DateOnly? DateOfBirth, string? Email, string? PublicPatientId);

@@ -1003,7 +1003,8 @@
           "firstName",
           "lastName",
           "dateOfBirth",
-          "email"
+          "email",
+          "publicPatientId"
         ],
         "type": "object",
         "properties": {
@@ -1033,6 +1034,12 @@
             "format": "date"
           },
           "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "publicPatientId": {
             "type": [
               "null",
               "string"

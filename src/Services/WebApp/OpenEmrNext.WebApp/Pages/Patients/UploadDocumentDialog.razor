@@ -1,0 +1,136 @@
+@using OpenEmrNext.PatientManagement.Client
+@using OpenEmrNext.WebApp.Shared
+@using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
+@inject IPatientManagementClient PatientManagement
+
+<MudDialog>
+    <DialogContent>
+        @if (_error is { } error)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">@error</MudAlert>
+        }
+        <MudStack Spacing="4">
+            <MudSelect T="string" @bind-Value="_type" Label="Type" Required="true" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("living_will")">Living will</MudSelectItem>
+                <MudSelectItem Value="@("durable_power_attorney")">Durable power of attorney</MudSelectItem>
+                <MudSelectItem Value="@("dnr_order")">DNR order</MudSelectItem>
+            </MudSelect>
+            <InputFile OnChange="OnFileSelectedAsync" aria-label="Choose a document file to upload" />
+            @if (_reading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" role="status" aria-label="Reading file" />
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Reading file…</MudText>
+            }
+            else if (_fileName is { } fileName)
+            {
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Selected: @fileName</MudText>
+            }
+            <MudDatePicker @bind-Date="_effectiveDate" Label="Effective date (optional)" Editable="true" Variant="Variant.Outlined" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync"
+            Disabled="_saving || _reading || _contentBase64 is null">Upload document</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    /// <summary>
+    /// The id of the user uploading the document. Same tracked gap as <c>SetAdvanceDirectiveStatusDialog</c>
+    /// (ADR 0055): no numeric OpenEMR user id is available from the signed-in subject.
+    /// </summary>
+    private const long PlaceholderUserId = 1;
+
+    /// <summary>
+    /// 20 MB, below the 30 MB the Domain allows (<c>AdvanceDirectiveDocument.MaxContentBytes</c>). The file
+    /// travels as base64 inside a JSON body, which grows by about a third, and the API's default request
+    /// size limit (about 30 MB) would reject larger files after they were already read. Raising this means
+    /// raising the API's limit first.
+    /// </summary>
+    private const long MaxUploadBytes = 20 * 1024 * 1024;
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public long Pid { get; set; }
+
+    private string _type = "living_will";
+    private string? _fileName;
+    private string? _mimeType;
+    private string? _contentBase64;
+    private DateTime? _effectiveDate;
+    private bool _saving;
+    private bool _reading;
+    private string? _error;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        _error = null;
+        _contentBase64 = null;
+        _fileName = null;
+
+        if (file.Size > MaxUploadBytes)
+        {
+            _error = $"That file is {Formatting.FileSize(file.Size)}. Documents must be 20 MB or smaller.";
+            return;
+        }
+
+        _reading = true;
+        try
+        {
+            using var stream = file.OpenReadStream(MaxUploadBytes);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            _contentBase64 = Convert.ToBase64String(buffer.ToArray());
+            _fileName = file.Name;
+            _mimeType = file.ContentType;
+        }
+        catch (IOException)
+        {
+            _error = "Could not read that file. Choose it again.";
+        }
+        finally
+        {
+            _reading = false;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_contentBase64 is null || _fileName is null)
+        {
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            var request = new UploadAdvanceDirectiveDocumentRequest
+            {
+                Type = _type,
+                FileName = _fileName,
+                MimeType = _mimeType ?? "application/octet-stream",
+                ContentBase64 = _contentBase64,
+                EffectiveDate = _effectiveDate is { } effective ? new DateTimeOffset(effective) : null,
+                OwnerId = PlaceholderUserId
+            };
+            await PatientManagement.UploadAdvanceDirectiveDocumentAsync(Pid, request);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (PatientManagementApiException ex)
+        {
+            _error = PatientManagementErrorFormatter.Describe(ex, "Could not upload this document. Please try again.");
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Could not reach the patient service. Check your connection, then try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

@@ -1,20 +1,20 @@
 @page "/patients/{Uuid:guid}"
 @using OpenEmrNext.PatientManagement.Client
-@using AuthFacadeApiException = OpenEmrNext.AuthFacade.Client.ApiException
+@using OpenEmrNext.WebApp.Shared
 @using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
 @inject IAuthFacadeClient AuthFacade
 @inject IPatientManagementClient PatientManagement
 @inject NavigationManager Navigation
-@inject ISnackbar Snackbar
-@inject IDialogService DialogService
+@inject PatientPageContext PatientPage
+@implements IDisposable
 
-<PageTitle>Patient</PageTitle>
+<PageTitle>@(_patient is null ? "Patient" : $"{_patient.FirstName} {_patient.LastName}")</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Medium" Class="pa-0">
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-0">
     @switch (_state)
     {
         case State.Loading:
-            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" role="status" aria-label="Loading patient" />
             break;
 
         case State.SignedOut:
@@ -29,179 +29,44 @@
             break;
 
         case State.Error:
-            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">Could not load this patient. Please try again.</MudAlert>
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+                Could not load this patient. The patient service may be unavailable.
+                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="LoadPatientAsync">Try again</MudButton>
+            </MudAlert>
             break;
 
         case State.Ready:
-            <MudText Typo="Typo.h5" GutterBottom="true">@_patient!.FirstName @_patient.LastName</MudText>
-            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-6">
-                Date of birth: @(_patient!.DateOfBirth?.ToString("yyyy-MM-dd") ?? "—") · Pid: @_patient.Pid
-            </MudText>
+            var patient = _patient!;
 
-            <MudStack Spacing="4">
-                <MudPaper Elevation="1">
-                    <MudExpansionPanels Elevation="0">
-                        <MudExpansionPanel Text="Insurance" Expanded="true">
-                            @if (_insuranceError)
-                            {
-                                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">Could not load insurance.</MudAlert>
-                            }
-                            <MudTable Items="_effectiveInsurance" Hover="true" Elevation="0" Dense="true" Class="mb-4">
-                                <HeaderContent>
-                                    <MudTh>Level</MudTh>
-                                    <MudTh>Company id</MudTh>
-                                    <MudTh>Start</MudTh>
-                                    <MudTh>End</MudTh>
-                                </HeaderContent>
-                                <RowTemplate Context="policy">
-                                    <MudTd DataLabel="Level">@policy.Level</MudTd>
-                                    <MudTd DataLabel="Company id">@policy.CompanyId</MudTd>
-                                    <MudTd DataLabel="Start">@(policy.Start?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
-                                    <MudTd DataLabel="End">@(policy.End?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
-                                </RowTemplate>
-                                <NoRecordsContent>No effective insurance today.</NoRecordsContent>
-                            </MudTable>
+            @* Basic information stays above the tabs, so it is never one click away. The name is the page's
+               heading. Sections are loaded here, once, and each panel renders what it is given. *@
+            <MudPaper Outlined="true" Class="pa-5 mb-6">
+                <MudText Typo="Typo.h4" HtmlTag="h1" Class="mb-4">@patient.FirstName @patient.LastName</MudText>
+                <dl class="op-details">
+                    <dt>Patient ID</dt>
+                    <dd>@(patient.PublicPatientId ?? patient.Pid.ToString())</dd>
+                    <dt>Date of birth</dt>
+                    <dd>@Formatting.DateOfBirthWithAge(patient.DateOfBirth, _today)</dd>
+                    <dt>Email</dt>
+                    <dd>@(string.IsNullOrWhiteSpace(patient.Email) ? "—" : patient.Email)</dd>
+                </dl>
+            </MudPaper>
 
-                            <MudText Typo="Typo.subtitle2" Class="mb-3">Add a policy</MudText>
-                            @if (_addPolicyError is { } addPolicyError)
-                            {
-                                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-3">@addPolicyError</MudAlert>
-                            }
-                            <MudForm @ref="_addPolicyForm" Model="_addPolicyModel">
-                                <MudStack Spacing="4">
-                                    <MudSelect T="string" @bind-Value="_addPolicyModel.Level" Label="Level" Required="true" Variant="Variant.Outlined">
-                                        <MudSelectItem Value="@("primary")">Primary</MudSelectItem>
-                                        <MudSelectItem Value="@("secondary")">Secondary</MudSelectItem>
-                                        <MudSelectItem Value="@("tertiary")">Tertiary</MudSelectItem>
-                                    </MudSelect>
-                                    <MudNumericField @bind-Value="_addPolicyModel.CompanyId" Label="Company id" Required="true" Min="1" Variant="Variant.Outlined" />
-                                    <MudTextField @bind-Value="_addPolicyModel.PolicyNumber" Label="Policy number" Required="true" Variant="Variant.Outlined" />
-                                    <MudTextField @bind-Value="_addPolicyModel.GroupNumber" Label="Group number (optional)" Variant="Variant.Outlined" />
-                                    <MudTextField @bind-Value="_addPolicyModel.PlanName" Label="Plan name (optional)" Variant="Variant.Outlined" />
-                                    <MudDatePicker @bind-Date="_addPolicyModel.StartDate" Label="Start date" Required="true" Variant="Variant.Outlined" />
-                                    <MudDatePicker @bind-Date="_addPolicyModel.EndDate" Label="End date (optional)" Variant="Variant.Outlined" />
-                                    <div>
-                                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddPolicyAsync" Disabled="_addingPolicy">
-                                            Add policy
-                                        </MudButton>
-                                    </div>
-                                </MudStack>
-                            </MudForm>
+            @* Scroll arrows always show, so a second tab cannot be hidden off the edge of a narrow screen. *@
+            <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" AlwaysShowScrollButtons="true">
+                <MudTabPanel Text="@WithCount("Insurance", _policies?.Count)">
+                    <PatientInsurancePanel @key="patient.Pid" Pid="patient.Pid"
+                        Policies="_policies" Error="_policiesError"
+                        Changed="ReloadSectionsAsync" OnRetry="ReloadSectionsAsync" />
+                </MudTabPanel>
 
-                            <MudDivider Class="my-6" />
-
-                            <MudText Typo="Typo.subtitle2" Class="mb-3">Swap a policy's level</MudText>
-                            @if (_swapError is { } swapError)
-                            {
-                                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-3">@swapError</MudAlert>
-                            }
-                            @if (_effectiveInsurance.Any(p => p.Uuid is not null))
-                            {
-                                <MudStack Spacing="4">
-                                    <MudSelect T="Guid?" @bind-Value="_swapPolicyUuid" Label="Policy" Variant="Variant.Outlined">
-                                        @foreach (var policy in _effectiveInsurance.Where(p => p.Uuid is not null))
-                                        {
-                                            <MudSelectItem Value="@policy.Uuid">@policy.Level (company @policy.CompanyId)</MudSelectItem>
-                                        }
-                                    </MudSelect>
-                                    <MudSelect T="string" @bind-Value="_swapTargetLevel" Label="Target level" Variant="Variant.Outlined">
-                                        <MudSelectItem Value="@("primary")">Primary</MudSelectItem>
-                                        <MudSelectItem Value="@("secondary")">Secondary</MudSelectItem>
-                                        <MudSelectItem Value="@("tertiary")">Tertiary</MudSelectItem>
-                                    </MudSelect>
-                                    <div>
-                                        <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="SwapPolicyAsync" Disabled="_swapping">
-                                            Swap
-                                        </MudButton>
-                                    </div>
-                                </MudStack>
-                            }
-                            else
-                            {
-                                <MudText Typo="Typo.body2" Class="mud-text-secondary">No policies to swap yet.</MudText>
-                            }
-                        </MudExpansionPanel>
-                    </MudExpansionPanels>
-                </MudPaper>
-
-                <MudPaper Elevation="1">
-                    <MudExpansionPanels Elevation="0">
-                        <MudExpansionPanel Text="Advance directives" Expanded="true">
-                            @if (_advanceDirectiveError)
-                            {
-                                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">Could not load advance directives.</MudAlert>
-                            }
-
-                            <MudText Typo="Typo.subtitle2" Class="mb-2">Status</MudText>
-                            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
-                                @(_status?.Status ?? "unknown") · reviewed @(_status?.ReviewedAtUtc?.ToString("yyyy-MM-dd") ?? "—")
-                            </MudText>
-                            @if (_statusError is { } statusError)
-                            {
-                                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-3">@statusError</MudAlert>
-                            }
-                            <MudStack Row="true" Spacing="3" AlignItems="AlignItems.End" Class="mb-6">
-                                <MudSelect T="string" @bind-Value="_setStatusModel.Status" Label="Set status" Variant="Variant.Outlined">
-                                    <MudSelectItem Value="@("yes")">Yes</MudSelectItem>
-                                    <MudSelectItem Value="@("no")">No</MudSelectItem>
-                                    <MudSelectItem Value="@("unknown")">Unknown</MudSelectItem>
-                                </MudSelect>
-                                <MudDatePicker @bind-Date="_setStatusModel.ReviewedAtUtc" Label="Reviewed on (optional)" Variant="Variant.Outlined" />
-                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SetStatusAsync" Disabled="_settingStatus">
-                                    Save
-                                </MudButton>
-                            </MudStack>
-
-                            <MudDivider Class="my-6" />
-
-                            <MudText Typo="Typo.subtitle2" Class="mb-3">Documents</MudText>
-                            <MudTable Items="_documents" Hover="true" Elevation="0" Dense="true" Class="mb-4">
-                                <HeaderContent>
-                                    <MudTh>Type</MudTh>
-                                    <MudTh>Name</MudTh>
-                                    <MudTh>Size</MudTh>
-                                    <MudTh>Effective date</MudTh>
-                                    <MudTh></MudTh>
-                                </HeaderContent>
-                                <RowTemplate Context="document">
-                                    <MudTd DataLabel="Type">@document.Type</MudTd>
-                                    <MudTd DataLabel="Name">@document.Name</MudTd>
-                                    <MudTd DataLabel="Size">@document.Size bytes</MudTd>
-                                    <MudTd DataLabel="Effective date">@(document.EffectiveDate?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
-                                    <MudTd>
-                                        <MudLink Href="@DocumentContentUrl(document)" Target="_blank">Download</MudLink>
-                                    </MudTd>
-                                </RowTemplate>
-                                <NoRecordsContent>No documents uploaded yet.</NoRecordsContent>
-                            </MudTable>
-
-                            <MudText Typo="Typo.subtitle2" Class="mb-3">Upload a document</MudText>
-                            @if (_uploadError is { } uploadError)
-                            {
-                                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-3">@uploadError</MudAlert>
-                            }
-                            <MudStack Spacing="4">
-                                <MudSelect T="string" @bind-Value="_uploadType" Label="Type" Required="true" Variant="Variant.Outlined">
-                                    <MudSelectItem Value="@("living_will")">Living will</MudSelectItem>
-                                    <MudSelectItem Value="@("durable_power_attorney")">Durable power of attorney</MudSelectItem>
-                                    <MudSelectItem Value="@("dnr_order")">DNR order</MudSelectItem>
-                                </MudSelect>
-                                <InputFile OnChange="OnFileSelectedAsync" />
-                                @if (_uploadFileName is { } fileName)
-                                {
-                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Selected: @fileName</MudText>
-                                }
-                                <MudDatePicker @bind-Date="_uploadEffectiveDate" Label="Effective date (optional)" Variant="Variant.Outlined" />
-                                <div>
-                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="UploadDocumentAsync" Disabled="_uploading || _uploadContentBase64 is null">
-                                        Upload
-                                    </MudButton>
-                                </div>
-                            </MudStack>
-                        </MudExpansionPanel>
-                    </MudExpansionPanels>
-                </MudPaper>
-            </MudStack>
+                <MudTabPanel Text="@WithCount("Advance directives", _documents?.Count)">
+                    <PatientAdvanceDirectivesPanel @key="patient.Pid" Pid="patient.Pid"
+                        Status="_status" StatusError="_statusError"
+                        Documents="_documents" DocumentsError="_documentsError"
+                        Changed="ReloadSectionsAsync" OnRetry="ReloadSectionsAsync" />
+                </MudTabPanel>
+            </MudTabs>
             break;
     }
 </MudContainer>
@@ -209,55 +74,64 @@
 @code {
     private enum State { Loading, SignedOut, NotFound, Error, Ready }
 
-    /// <summary>
-    /// The id of the user performing insurance/advance-directive actions. Same tracked gap as
-    /// <c>Register.razor</c>'s own <c>PlaceholderRegisteredById</c> (ADR 0055) -- no real numeric id
-    /// exists to supply here yet, not a new decision made on this page.
-    /// </summary>
-    private const long PlaceholderUserId = 1;
-
     [Parameter] public Guid Uuid { get; set; }
 
     private State _state = State.Loading;
     private PatientSummaryResponse? _patient;
+    private Guid? _loadedUuid;
+    private DateOnly _today;
 
-    private List<EffectiveInsuranceResponse> _effectiveInsurance = [];
-    private bool _insuranceError;
-    private MudForm? _addPolicyForm;
-    private readonly AddPolicyModel _addPolicyModel = new();
-    private bool _addingPolicy;
-    private string? _addPolicyError;
-    private Guid? _swapPolicyUuid;
-    private string _swapTargetLevel = "primary";
-    private bool _swapping;
-    private string? _swapError;
-
+    // Null means "not loaded yet". Reloads keep the previous data on screen until the new data arrives.
+    private IReadOnlyList<EffectiveInsuranceResponse>? _policies;
+    private bool _policiesError;
     private AdvanceDirectiveStatusResponse? _status;
-    private List<AdvanceDirectiveDocumentResponse> _documents = [];
-    private bool _advanceDirectiveError;
-    private readonly SetStatusModel _setStatusModel = new();
-    private bool _settingStatus;
-    private string? _statusError;
-    private string _uploadType = "living_will";
-    private string? _uploadFileName;
-    private string? _uploadMimeType;
-    private string? _uploadContentBase64;
-    private DateTime? _uploadEffectiveDate;
-    private bool _uploading;
-    private string? _uploadError;
+    private bool _statusError;
+    private IReadOnlyList<AdvanceDirectiveDocumentResponse>? _documents;
+    private bool _documentsError;
+
+    private static string WithCount(string label, int? count) => count is null ? label : $"{label} ({count})";
 
     private string LoginUrl => $"/oidc/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
 
-    private string DocumentContentUrl(AdvanceDirectiveDocumentResponse document) =>
-        $"/api/v1/patients/{_patient!.Pid}/advance-directives/documents/{document.Uuid}/content";
-
-    protected override async Task OnInitializedAsync()
+    /// <summary>
+    /// Blazor reuses this page instance when only the route parameter changes (one patient to another),
+    /// so loading only on first render would keep showing the previous patient.
+    /// </summary>
+    protected override Task OnParametersSetAsync()
     {
-        try
+        if (_loadedUuid == Uuid)
         {
-            await AuthFacade.GetCurrentUserAsync();
+            return Task.CompletedTask;
         }
-        catch (AuthFacadeApiException)
+
+        _loadedUuid = Uuid;
+        return LoadPatientAsync();
+    }
+
+    /// <summary>
+    /// Loads the patient. Only the patient gates the page: a failed section shows its own message and retry.
+    /// </summary>
+    private async Task LoadPatientAsync()
+    {
+        PatientPage.PatientName = "Loading…";
+        await LoadCoreAsync();
+        if (_state != State.Ready)
+        {
+            PatientPage.PatientName = null; // the breadcrumb falls back to "Patient" when there is no patient
+        }
+    }
+
+    private async Task LoadCoreAsync()
+    {
+        var requested = Uuid;
+        _patient = null;
+        _policies = null;
+        _status = null;
+        _documents = null;
+        _policiesError = _statusError = _documentsError = false;
+        _state = State.Loading;
+
+        if (await AuthFacade.TryGetCurrentUserAsync() is null)
         {
             _state = State.SignedOut;
             return;
@@ -265,220 +139,108 @@
 
         try
         {
-            _patient = await PatientManagement.GetPatientAsync(Uuid);
+            var patient = await PatientManagement.GetPatientAsync(requested);
+            if (requested != Uuid)
+            {
+                return; // navigated to another patient while this was in flight
+            }
+
+            _patient = patient;
+            _today = DateOnly.FromDateTime(DateTime.Today); // read once per load, not on every render
+            _state = State.Ready;
+            PatientPage.PatientName = $"{patient.FirstName} {patient.LastName}";
         }
         catch (PatientManagementApiException ex) when (ex.StatusCode == 404)
         {
             _state = State.NotFound;
             return;
         }
-        catch (PatientManagementApiException)
+        catch (PatientManagementApiException ex) when (ex.StatusCode is 401 or 403)
+        {
+            _state = State.SignedOut;
+            return;
+        }
+        catch (Exception ex) when (ex is PatientManagementApiException or HttpRequestException)
         {
             _state = State.Error;
             return;
         }
 
-        _state = State.Ready;
-        await Task.WhenAll(LoadInsuranceAsync(), LoadAdvanceDirectivesAsync());
+        // Sections load after the patient is shown. A failure here never changes the page state.
+        await LoadSectionsAsync(_patient!.Pid);
     }
 
-    private async Task LoadInsuranceAsync()
+    /// <summary>Re-reads every section. Called after a change (so the data and tab counts stay current) and by retry.</summary>
+    private Task ReloadSectionsAsync() => _patient is null ? Task.CompletedTask : LoadSectionsAsync(_patient.Pid);
+
+    private Task LoadSectionsAsync(long pid) =>
+        Task.WhenAll(LoadPoliciesAsync(pid), LoadStatusAsync(pid), LoadDocumentsAsync(pid));
+
+    private async Task LoadPoliciesAsync(long pid)
     {
         try
         {
-            var policies = await PatientManagement.GetEffectiveInsuranceAsync(_patient!.Pid, null);
-            _effectiveInsurance = [.. policies];
-            _insuranceError = false;
-        }
-        catch (PatientManagementApiException)
-        {
-            _insuranceError = true;
-        }
-    }
-
-    private async Task LoadAdvanceDirectivesAsync()
-    {
-        try
-        {
-            _status = await PatientManagement.GetAdvanceDirectiveStatusAsync(_patient!.Pid);
-            var documents = await PatientManagement.GetAdvanceDirectiveDocumentsAsync(_patient.Pid);
-            _documents = [.. documents];
-            _advanceDirectiveError = false;
-        }
-        catch (PatientManagementApiException)
-        {
-            _advanceDirectiveError = true;
-        }
-    }
-
-    private async Task AddPolicyAsync()
-    {
-        await _addPolicyForm!.ValidateAsync();
-        if (!_addPolicyForm.IsValid || _addPolicyModel.StartDate is null)
-        {
-            return;
-        }
-
-        _addingPolicy = true;
-        _addPolicyError = null;
-        try
-        {
-            var request = new AddInsurancePolicyRequest
+            var policies = await PatientManagement.GetEffectiveInsuranceAsync(pid, null);
+            if (_patient?.Pid == pid)
             {
-                Level = _addPolicyModel.Level,
-                CompanyId = _addPolicyModel.CompanyId,
-                PolicyNumber = _addPolicyModel.PolicyNumber,
-                GroupNumber = string.IsNullOrWhiteSpace(_addPolicyModel.GroupNumber) ? null : _addPolicyModel.GroupNumber,
-                PlanName = string.IsNullOrWhiteSpace(_addPolicyModel.PlanName) ? null : _addPolicyModel.PlanName,
-                StartDate = new DateTimeOffset(_addPolicyModel.StartDate.Value),
-                EndDate = _addPolicyModel.EndDate is { } end ? new DateTimeOffset(end) : null
-            };
-            await PatientManagement.AddInsurancePolicyAsync(_patient!.Pid, request);
-            Snackbar.Add("Insurance policy added.", Severity.Success);
-            await LoadInsuranceAsync();
+                _policies = [.. policies];
+                _policiesError = false;
+            }
         }
-        catch (PatientManagementApiException ex)
+        catch (Exception ex) when (ex is PatientManagementApiException or HttpRequestException)
         {
-            _addPolicyError = PatientManagementErrorFormatter.Describe(
-                ex, "Could not add this policy. Please check the details and try again.");
-        }
-        finally
-        {
-            _addingPolicy = false;
-        }
-    }
-
-    private async Task SwapPolicyAsync()
-    {
-        if (_swapPolicyUuid is null)
-        {
-            return;
-        }
-
-        // Swapping changes which policy is in force at each of the two levels involved -- worth a
-        // confirmation, unlike adding a policy or setting a status, neither of which displaces
-        // something else that was already there.
-        var confirmed = await DialogService.ShowMessageBoxAsync(
-            "Swap insurance level",
-            $"Swap this policy to {_swapTargetLevel}? Whatever currently occupies {_swapTargetLevel} will take this policy's place.",
-            yesText: "Swap", cancelText: "Cancel");
-        if (confirmed != true)
-        {
-            return;
-        }
-
-        _swapping = true;
-        _swapError = null;
-        try
-        {
-            var request = new SwapInsuranceRequest { TargetLevel = _swapTargetLevel, PolicyUuid = _swapPolicyUuid.Value };
-            await PatientManagement.SwapInsuranceAsync(_patient!.Pid, request);
-            Snackbar.Add("Insurance levels swapped.", Severity.Success);
-            await LoadInsuranceAsync();
-        }
-        catch (PatientManagementApiException ex)
-        {
-            _swapError = PatientManagementErrorFormatter.Describe(ex, "Could not swap this policy. Please try again.");
-        }
-        finally
-        {
-            _swapping = false;
-        }
-    }
-
-    private async Task SetStatusAsync()
-    {
-        _settingStatus = true;
-        _statusError = null;
-        try
-        {
-            var request = new SetAdvanceDirectiveStatusRequest
+            if (_patient?.Pid == pid)
             {
-                Status = _setStatusModel.Status,
-                ReviewedAtUtc = _setStatusModel.ReviewedAtUtc is { } reviewed ? new DateTimeOffset(reviewed) : null,
-                AuthenticatorUserId = PlaceholderUserId
-            };
-            await PatientManagement.SetAdvanceDirectiveStatusAsync(_patient!.Pid, request);
-            Snackbar.Add("Advance directive status saved.", Severity.Success);
-            await LoadAdvanceDirectivesAsync();
+                _policiesError = true;
+            }
         }
-        catch (PatientManagementApiException ex)
-        {
-            _statusError = PatientManagementErrorFormatter.Describe(ex, "Could not save this status. Please try again.");
-        }
-        finally
-        {
-            _settingStatus = false;
-        }
+
+        StateHasChanged(); // each section appears as soon as it is ready, not when the slowest one finishes
     }
 
-    /// <summary>30 MB, matching <c>AdvanceDirectiveDocument.MaxContentBytes</c> -- the real limit the
-    /// Domain factory itself enforces; <c>InputFile</c>'s own default (512 KB) would reject a real
-    /// document long before that check ever ran.</summary>
-    private const long MaxUploadBytes = 30 * 1024 * 1024;
-
-    private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
+    private async Task LoadStatusAsync(long pid)
     {
-        var file = e.File;
-        using var stream = file.OpenReadStream(MaxUploadBytes);
-        using var buffer = new MemoryStream();
-        await stream.CopyToAsync(buffer);
-        _uploadContentBase64 = Convert.ToBase64String(buffer.ToArray());
-        _uploadFileName = file.Name;
-        _uploadMimeType = file.ContentType;
-    }
-
-    private async Task UploadDocumentAsync()
-    {
-        if (_uploadContentBase64 is null || _uploadFileName is null)
-        {
-            return;
-        }
-
-        _uploading = true;
-        _uploadError = null;
         try
         {
-            var request = new UploadAdvanceDirectiveDocumentRequest
+            var status = await PatientManagement.GetAdvanceDirectiveStatusAsync(pid);
+            if (_patient?.Pid == pid)
             {
-                Type = _uploadType,
-                FileName = _uploadFileName,
-                MimeType = _uploadMimeType ?? "application/octet-stream",
-                ContentBase64 = _uploadContentBase64,
-                EffectiveDate = _uploadEffectiveDate is { } effective ? new DateTimeOffset(effective) : null,
-                OwnerId = PlaceholderUserId
-            };
-            await PatientManagement.UploadAdvanceDirectiveDocumentAsync(_patient!.Pid, request);
-            Snackbar.Add("Document uploaded.", Severity.Success);
-            await LoadAdvanceDirectivesAsync();
-            _uploadContentBase64 = null;
-            _uploadFileName = null;
-            _uploadMimeType = null;
+                _status = status;
+                _statusError = false;
+            }
         }
-        catch (PatientManagementApiException ex)
+        catch (Exception ex) when (ex is PatientManagementApiException or HttpRequestException)
         {
-            _uploadError = PatientManagementErrorFormatter.Describe(ex, "Could not upload this document. Please try again.");
+            if (_patient?.Pid == pid)
+            {
+                _statusError = true;
+            }
         }
-        finally
-        {
-            _uploading = false;
-        }
+
+        StateHasChanged();
     }
 
-    private sealed class AddPolicyModel
+    private async Task LoadDocumentsAsync(long pid)
     {
-        public string Level { get; set; } = "primary";
-        public long CompanyId { get; set; }
-        public string PolicyNumber { get; set; } = "";
-        public string? GroupNumber { get; set; }
-        public string? PlanName { get; set; }
-        public DateTime? StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
+        try
+        {
+            var documents = await PatientManagement.GetAdvanceDirectiveDocumentsAsync(pid);
+            if (_patient?.Pid == pid)
+            {
+                _documents = [.. documents];
+                _documentsError = false;
+            }
+        }
+        catch (Exception ex) when (ex is PatientManagementApiException or HttpRequestException)
+        {
+            if (_patient?.Pid == pid)
+            {
+                _documentsError = true;
+            }
+        }
+
+        StateHasChanged();
     }
 
-    private sealed class SetStatusModel
-    {
-        public string Status { get; set; } = "unknown";
-        public DateTime? ReviewedAtUtc { get; set; }
-    }
+    public void Dispose() => PatientPage.PatientName = null;
 }

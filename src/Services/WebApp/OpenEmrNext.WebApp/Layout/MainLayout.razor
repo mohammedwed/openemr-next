@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 @inject ThemeService ThemeService
 @inject IBrowserViewportService BrowserViewportService
+@inject OpenEmrNext.WebApp.Shared.PatientPageContext PatientPage
 
 <MudLayout>
     @* Elevation 0 + a hairline border, not a shadow: a flat, light app bar reads closer to the plain
@@ -170,6 +171,7 @@
     protected override async Task OnInitializedAsync()
     {
         Navigation.LocationChanged += OnLocationChanged;
+        PatientPage.Changed += OnPatientPageChanged;
         BuildBreadcrumbs();
 
         try
@@ -238,15 +240,22 @@
             ["patients", _] =>
             [
                 new BreadcrumbItem("Patients", href: "/patients"),
-                new BreadcrumbItem("Patient", href: null)
+                new BreadcrumbItem(PatientPage.PatientName ?? "Patient", href: null)
             ],
             _ => []
         };
     }
 
+    private void OnPatientPageChanged()
+    {
+        BuildBreadcrumbs();
+        InvokeAsync(StateHasChanged);
+    }
+
     public async ValueTask DisposeAsync()
     {
         Navigation.LocationChanged -= OnLocationChanged;
+        PatientPage.Changed -= OnPatientPageChanged;
         await BrowserViewportService.UnsubscribeAsync(_viewportObserverId);
     }
 }

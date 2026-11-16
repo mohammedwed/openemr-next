@@ -88,5 +88,5 @@ public static class PatientEndpoints
     }
 
     private static PatientSummaryResponse ToSummary(PatientFhirView v) =>
-        new(v.Uuid, v.Pid, v.FirstName, v.LastName, v.DateOfBirth, v.Email);
+        new(v.Uuid, v.Pid, v.FirstName, v.LastName, v.DateOfBirth, v.Email, v.PublicPatientId);
 }

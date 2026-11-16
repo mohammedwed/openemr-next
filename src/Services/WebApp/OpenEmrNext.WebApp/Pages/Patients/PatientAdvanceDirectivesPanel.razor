@@ -1,0 +1,109 @@
+@using OpenEmrNext.PatientManagement.Client
+@using OpenEmrNext.WebApp.Shared
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+@* Two sections, each its own card with its own loading, error, and retry, so a failed document list does not
+   hide the status. Changes open their own dialogs and then ask the parent to reload. *@
+
+<PatientSectionCard Title="Advance directive status" Class="mb-6"
+    HasData="Status is not null" Error="StatusError" OnRetry="OnRetry"
+    ErrorMessage="Could not load the advance directive status."
+    StaleMessage="Could not refresh the status. It may be out of date."
+    LoadingLabel="Loading advance directive status">
+    <Summary>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            @CodeLabels.Of(Status?.Status ?? "unknown") · reviewed @(Status?.ReviewedAtUtc?.ToString("yyyy-MM-dd") ?? "—")
+        </MudText>
+    </Summary>
+    <Actions>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenSetStatusAsync">Set status</MudButton>
+    </Actions>
+</PatientSectionCard>
+
+<PatientSectionCard Title="Documents"
+    HasData="Documents is not null" Error="DocumentsError" OnRetry="OnRetry"
+    ErrorMessage="Could not load documents."
+    StaleMessage="Could not refresh documents. The list below may be out of date."
+    LoadingLabel="Loading documents">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenUploadAsync">Upload document</MudButton>
+    </Actions>
+    <ChildContent>
+        <MudTable Items="Documents ?? []" Hover="true" Elevation="0">
+            <HeaderContent>
+                <MudTh>Type</MudTh>
+                <MudTh>Name</MudTh>
+                <MudTh>Size</MudTh>
+                <MudTh>Effective date</MudTh>
+                <MudTh><span class="op-visually-hidden">Actions</span></MudTh>
+            </HeaderContent>
+            <RowTemplate Context="document">
+                <MudTd DataLabel="Type">@CodeLabels.Of(document.Type)</MudTd>
+                <MudTd DataLabel="Name">@document.Name</MudTd>
+                <MudTd DataLabel="Size">@Formatting.FileSize(document.Size)</MudTd>
+                <MudTd DataLabel="Effective date">@(document.EffectiveDate?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
+                <MudTd>
+                    @* Named per document: a row of identical "Download" links is not distinguishable to a screen reader. *@
+                    <MudLink Href="@DocumentContentUrl(document)" Target="_blank"
+                        aria-label="@($"Download {document.Name} (opens in a new tab)")">Download</MudLink>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudStack Spacing="2" AlignItems="AlignItems.Start" Class="py-2">
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">No documents uploaded yet.</MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="OpenUploadAsync">Upload the first document</MudButton>
+                </MudStack>
+            </NoRecordsContent>
+        </MudTable>
+    </ChildContent>
+</PatientSectionCard>
+
+@code {
+    [Parameter, EditorRequired] public long Pid { get; set; }
+
+    /// <summary>Null while loading. The parent keeps the previous value on screen during a reload.</summary>
+    [Parameter] public AdvanceDirectiveStatusResponse? Status { get; set; }
+
+    [Parameter] public bool StatusError { get; set; }
+
+    [Parameter] public IReadOnlyList<AdvanceDirectiveDocumentResponse>? Documents { get; set; }
+
+    [Parameter] public bool DocumentsError { get; set; }
+
+    /// <summary>Raised after a successful change; the parent reloads and refreshes the tab count.</summary>
+    [Parameter] public EventCallback Changed { get; set; }
+
+    [Parameter] public EventCallback OnRetry { get; set; }
+
+    private string DocumentContentUrl(AdvanceDirectiveDocumentResponse document) =>
+        $"/api/v1/patients/{Pid}/advance-directives/documents/{document.Uuid}/content";
+
+    private async Task OpenSetStatusAsync()
+    {
+        var parameters = new DialogParameters<SetAdvanceDirectiveStatusDialog>
+        {
+            { x => x.Pid, Pid },
+            { x => x.CurrentStatus, Status?.Status ?? "unknown" },
+        };
+        var dialog = await DialogService.ShowAsync<SetAdvanceDirectiveStatusDialog>("Set advance directive status", parameters, DialogDefaults.Standard);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            Snackbar.Add("Advance directive status saved.", Severity.Success);
+            await Changed.InvokeAsync();
+        }
+    }
+
+    private async Task OpenUploadAsync()
+    {
+        var parameters = new DialogParameters<UploadDocumentDialog> { { x => x.Pid, Pid } };
+        var dialog = await DialogService.ShowAsync<UploadDocumentDialog>("Upload advance directive document", parameters, DialogDefaults.Standard);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            Snackbar.Add("Document uploaded.", Severity.Success);
+            await Changed.InvokeAsync();
+        }
+    }
+}
