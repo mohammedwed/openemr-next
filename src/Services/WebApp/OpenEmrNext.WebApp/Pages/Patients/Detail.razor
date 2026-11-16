@@ -5,6 +5,8 @@
 @inject IAuthFacadeClient AuthFacade
 @inject IPatientManagementClient PatientManagement
 @inject NavigationManager Navigation
+@inject PatientPageContext PatientPage
+@implements IDisposable
 
 <PageTitle>@(_patient is null ? "Patient" : $"{_patient.FirstName} {_patient.LastName}")</PageTitle>
 
@@ -39,8 +41,8 @@
             @* Basic information stays on screen above the tabs, so it is never one click away. The tabs
                hold the two areas that are worth opening on demand. Each panel is keyed on the patient, so
                switching patients rebuilds it. *@
-            <MudPaper Outlined="true" Class="pa-4 mb-4">
-                <MudText Typo="Typo.h5" GutterBottom="true">@patient.FirstName @patient.LastName</MudText>
+            <MudPaper Outlined="true" Class="pa-5 mb-6">
+                <MudText Typo="Typo.h4" Class="mb-4">@patient.FirstName @patient.LastName</MudText>
                 <dl class="op-details">
                     <dt>Patient ID</dt>
                     <dd>@(patient.PublicPatientId ?? patient.Pid.ToString())</dd>
@@ -52,12 +54,12 @@
             </MudPaper>
 
             <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
-                <MudTabPanel Text="Insurance">
-                    <PatientInsurancePanel @key="patient.Pid" Pid="patient.Pid" />
+                <MudTabPanel Text="@WithCount("Insurance", _policyCount)">
+                    <PatientInsurancePanel @key="patient.Pid" Pid="patient.Pid" Changed="RefreshCountsAsync" />
                 </MudTabPanel>
 
-                <MudTabPanel Text="Advance directives">
-                    <PatientAdvanceDirectivesPanel @key="patient.Pid" Pid="patient.Pid" />
+                <MudTabPanel Text="@WithCount("Advance directives", _documentCount)">
+                    <PatientAdvanceDirectivesPanel @key="patient.Pid" Pid="patient.Pid" Changed="RefreshCountsAsync" />
                 </MudTabPanel>
             </MudTabs>
             break;
@@ -72,6 +74,52 @@
     private State _state = State.Loading;
     private PatientSummaryResponse? _patient;
     private Guid? _loadedUuid;
+
+    // Tab counts. Null means "not known" (still loading, or the call failed), and the tab shows no count.
+    private int? _policyCount;
+    private int? _documentCount;
+
+    private static string WithCount(string label, int? count) => count is null ? label : $"{label} ({count})";
+
+    /// <summary>Re-reads the two counts. Panels call this after a successful change so the tabs stay accurate.</summary>
+    private async Task RefreshCountsAsync()
+    {
+        if (_patient is not { } patient)
+        {
+            return;
+        }
+
+        var pid = patient.Pid;
+        try
+        {
+            var policies = await PatientManagement.GetEffectiveInsuranceAsync(pid, null);
+            if (_patient?.Pid == pid)
+            {
+                _policyCount = policies.Count;
+            }
+        }
+        catch (PatientManagementApiException)
+        {
+            _policyCount = null;
+        }
+
+        try
+        {
+            var documents = await PatientManagement.GetAdvanceDirectiveDocumentsAsync(pid);
+            if (_patient?.Pid == pid)
+            {
+                _documentCount = documents.Count;
+            }
+        }
+        catch (PatientManagementApiException)
+        {
+            _documentCount = null;
+        }
+
+        StateHasChanged();
+    }
+
+    public void Dispose() => PatientPage.PatientName = null;
 
     private string LoginUrl => $"/oidc/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
 
@@ -98,7 +146,10 @@
     {
         var requested = Uuid;
         _patient = null;
+        _policyCount = null;
+        _documentCount = null;
         _state = State.Loading;
+        PatientPage.PatientName = null;
 
         if (await AuthFacade.TryGetCurrentUserAsync() is null)
         {
@@ -116,6 +167,8 @@
 
             _patient = patient;
             _state = State.Ready;
+            PatientPage.PatientName = $"{patient.FirstName} {patient.LastName}";
+            await RefreshCountsAsync();
         }
         catch (PatientManagementApiException ex) when (ex.StatusCode == 404)
         {

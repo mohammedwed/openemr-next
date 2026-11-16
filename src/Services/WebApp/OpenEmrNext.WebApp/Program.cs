@@ -33,5 +33,6 @@ builder.Services.AddScoped<IPatientManagementClient>(_ => new PatientManagementC
 
 builder.Services.AddMudServices();
 builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<OpenEmrNext.WebApp.Shared.PatientPageContext>();
 
 await builder.Build().RunAsync();

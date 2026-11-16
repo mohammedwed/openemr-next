@@ -1,5 +1,19 @@
 # Changelog 2026-11-16
 
+## Changed — patient view polish, round 2
+
+- **Breadcrumb names the patient** ("Patients / BrowserTest Patient"). The layout builds breadcrumbs from the
+  URL alone, so a scoped `Shared/PatientPageContext` lets the patient page publish the name.
+- **Tab counts.** "Insurance (1)" and "Advance directives (1)". The parent loads both counts and refreshes them
+  after a successful change (the panels raise `Changed`). Counts are unknown (no suffix) while loading or
+  if the call fails. Trade-off: the counts add two requests on load, and the panels still load their own
+  data, so the same lists are fetched twice.
+- **Banner** has more padding and a larger name heading.
+- **Section headings** are `h6` on both tabs, so they read as headings instead of small labels.
+- **Empty states** give the next action: "Add the first policy" and "Upload the first document".
+- Verified in the browser: breadcrumb, tab counts, banner. Not verified: the empty-state buttons, and a change
+  that updates the counts (that would submit a change to the dev database).
+
 ## Changed — patient view reorganized
 
 - Basic information (patient ID, date of birth with age, email) is a banner above the tabs, always visible.

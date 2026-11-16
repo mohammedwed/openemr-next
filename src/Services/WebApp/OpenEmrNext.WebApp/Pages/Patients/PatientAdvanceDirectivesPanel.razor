@@ -22,7 +22,7 @@ else
 
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
         <div>
-            <MudText Typo="Typo.subtitle2">Advance directive status</MudText>
+            <MudText Typo="Typo.h6">Advance directive status</MudText>
             <MudText Typo="Typo.body2" Class="mud-text-secondary">
                 @CodeLabels.Of(_status?.Status ?? "unknown") · reviewed @(_status?.ReviewedAtUtc?.ToString("yyyy-MM-dd") ?? "—")
             </MudText>
@@ -33,7 +33,7 @@ else
     <MudDivider Class="my-5" />
 
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
-        <MudText Typo="Typo.subtitle2">Documents</MudText>
+        <MudText Typo="Typo.h6">Documents</MudText>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenUploadAsync">Upload document</MudButton>
     </MudStack>
 
@@ -56,12 +56,20 @@ else
                     aria-label="@($"Download {document.Name} (opens in a new tab)")">Download</MudLink>
             </MudTd>
         </RowTemplate>
-        <NoRecordsContent>No documents uploaded yet.</NoRecordsContent>
+        <NoRecordsContent>
+            <MudStack Spacing="2" AlignItems="AlignItems.Start" Class="py-2">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">No documents uploaded yet.</MudText>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="OpenUploadAsync">Upload the first document</MudButton>
+            </MudStack>
+        </NoRecordsContent>
     </MudTable>
 }
 
 @code {
     [Parameter, EditorRequired] public long Pid { get; set; }
+
+    /// <summary>Raised after a successful change, so the parent can refresh its tab counts.</summary>
+    [Parameter] public EventCallback Changed { get; set; }
 
     private AdvanceDirectiveStatusResponse? _status;
     private List<AdvanceDirectiveDocumentResponse> _documents = [];
@@ -106,6 +114,7 @@ else
         {
             Snackbar.Add("Advance directive status saved.", Severity.Success);
             await LoadAsync();
+            await Changed.InvokeAsync();
         }
     }
 
@@ -118,6 +127,7 @@ else
         {
             Snackbar.Add("Document uploaded.", Severity.Success);
             await LoadAsync();
+            await Changed.InvokeAsync();
         }
     }
 
