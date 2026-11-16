@@ -7,6 +7,8 @@
 @inject IPatientManagementClient PatientManagement
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@implements IDisposable
 
 <PageTitle>Register patient</PageTitle>
 
@@ -43,13 +45,16 @@
                     @* Paired fields share a row on wider screens and stack on phones. *@
                     <MudGrid Spacing="4">
                         <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="_model.FirstName" Label="First name" Required="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="_model.FirstName" Label="First name" Required="true" RequiredError="First name is required."
+                                Variant="Variant.Outlined" />
                         </MudItem>
                         <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="_model.LastName" Label="Last name" Required="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="_model.LastName" Label="Last name" Required="true" RequiredError="Last name is required."
+                                Variant="Variant.Outlined" />
                         </MudItem>
                         <MudItem xs="12" sm="6">
-                            <MudSelect T="string" @bind-Value="_model.Sex" Label="Sex" Required="true" Variant="Variant.Outlined">
+                            <MudSelect T="string" @bind-Value="_model.Sex" Label="Sex" Required="true" RequiredError="Choose a sex."
+                                Variant="Variant.Outlined">
                                 @foreach (var option in SexOptions)
                                 {
                                     <MudSelectItem Value="@option">@option</MudSelectItem>
@@ -57,8 +62,8 @@
                             </MudSelect>
                         </MudItem>
                         <MudItem xs="12" sm="6">
-                            <MudDatePicker @bind-Date="_model.DateOfBirth" Label="Date of birth" Required="true" Variant="Variant.Outlined"
-                                MaxDate="DateTime.Today" />
+                            <MudDatePicker @bind-Date="_model.DateOfBirth" Label="Date of birth" Required="true"
+                                RequiredError="Date of birth is required." Editable="true" MaxDate="DateTime.Today" Variant="Variant.Outlined" />
                         </MudItem>
                         <MudItem xs="12">
                             <MudTextField @bind-Value="_model.Email" Label="Email (optional)" Variant="Variant.Outlined" InputType="InputType.Email" />
@@ -101,7 +106,42 @@
 
     private string LoginUrl => $"/oidc/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
 
-    protected override Task OnInitializedAsync() => CheckSignInAsync();
+    private bool _saved;
+    private IDisposable? _leaveGuard;
+
+    protected override Task OnInitializedAsync()
+    {
+        _leaveGuard = Navigation.RegisterLocationChangingHandler(OnLocationChangingAsync);
+        return CheckSignInAsync();
+    }
+
+    private bool IsDirty =>
+        !string.IsNullOrEmpty(_model.FirstName) || !string.IsNullOrEmpty(_model.LastName) ||
+        !string.IsNullOrEmpty(_model.Sex) || _model.DateOfBirth is not null ||
+        !string.IsNullOrEmpty(_model.Email) || !string.IsNullOrEmpty(_model.TrustedEmail);
+
+    /// <summary>
+    /// Asks before leaving with typed-in details that have not been saved. Lost input is worse than one extra
+    /// click, so the prompt names what will be lost and defaults to keeping the form.
+    /// </summary>
+    private async ValueTask OnLocationChangingAsync(LocationChangingContext context)
+    {
+        if (_saved || _submitting || !IsDirty)
+        {
+            return;
+        }
+
+        var discard = await DialogService.ShowMessageBoxAsync(
+            "Discard this registration?",
+            "The details you entered have not been saved. Leaving this page will lose them.",
+            yesText: "Discard", cancelText: "Keep editing");
+        if (discard != true)
+        {
+            context.PreventNavigation();
+        }
+    }
+
+    public void Dispose() => _leaveGuard?.Dispose();
 
     /// <summary>
     /// An API rejection means signed out. A network failure is shown as an outage with "Try again", not as
@@ -144,6 +184,7 @@
             };
             var registered = await PatientManagement.RegisterPatientAsync(request);
             Snackbar.Add($"Registered {_model.FirstName} {_model.LastName} (patient ID {registered.Pubpid}).", Severity.Success);
+            _saved = true; // leaving now is expected, so the unsaved-changes prompt must not appear
             Navigation.NavigateTo($"/patients/{registered.Uuid}");
         }
         catch (PatientManagementApiException ex)

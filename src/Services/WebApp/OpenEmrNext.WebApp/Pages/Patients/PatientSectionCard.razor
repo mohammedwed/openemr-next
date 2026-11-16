@@ -25,7 +25,12 @@
     }
     else if (!HasData)
     {
-        <MudProgressCircular Indeterminate="true" Color="Color.Primary" role="status" aria-label="@LoadingLabel" />
+        @* Placeholder rows the shape of the content, so the page does not jump when the data arrives. *@
+        <div role="status" aria-label="@LoadingLabel" aria-busy="true">
+            <MudSkeleton Height="40px" Class="mb-2" />
+            <MudSkeleton Height="40px" Class="mb-2" />
+            <MudSkeleton Height="40px" />
+        </div>
     }
     else
     {

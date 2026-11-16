@@ -1,5 +1,23 @@
 # Changelog 2026-11-16
 
+## Changed — patient frontend polish
+
+- **Register form:** field-specific required messages (replacing "Required"); typed dates allowed in the
+  date pickers; a prompt before leaving with unsaved input ("Discard this registration?"), which "Keep
+  editing" cancels. Verified in the browser: the prompt appears, and Keep editing keeps the typed value.
+- **Dialogs:** typed dates allowed; the add-policy fields have specific required messages.
+- **Upload:** "Reading file…" with a progress bar while the file is read, and the button stays disabled until
+  it is ready. A read failure shows a message instead of an unhandled error.
+- **Loading:** sections show placeholder rows instead of a spinner, so content does not jump when it arrives.
+- **Outage wording:** a 503 (the circuit breaker is open, or the service is down) says the service is
+  temporarily unavailable and nothing was saved.
+- **Headings:** the patient list title is an `h1`.
+- **Breadcrumb:** shows "Loading…" while a patient loads, and falls back to "Patient" if the patient does not load.
+- **Not done, on purpose:** Enter-to-submit and first-field focus in the dialogs. Enter could submit from a
+  dropdown or date field by accident, and focus behavior needs a browser check before it is changed.
+- **Not verified in the browser:** phone width (the window resize did not take effect), light mode, keyboard focus,
+  the placeholder rows, the upload progress state, and the 503 wording (the breaker was not tripped).
+
 ## Changed — register form width and layout
 
 - Container widened from `Small` (600px) to `Large` (1280px), the same width as the patient list and detail pages.

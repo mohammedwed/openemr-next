@@ -112,6 +112,16 @@
     /// </summary>
     private async Task LoadPatientAsync()
     {
+        PatientPage.PatientName = "Loading…";
+        await LoadCoreAsync();
+        if (_state != State.Ready)
+        {
+            PatientPage.PatientName = null; // the breadcrumb falls back to "Patient" when there is no patient
+        }
+    }
+
+    private async Task LoadCoreAsync()
+    {
         var requested = Uuid;
         _patient = null;
         _policies = null;
@@ -119,7 +129,6 @@
         _documents = null;
         _policiesError = _statusError = _documentsError = false;
         _state = State.Loading;
-        PatientPage.PatientName = null;
 
         if (await AuthFacade.TryGetCurrentUserAsync() is null)
         {

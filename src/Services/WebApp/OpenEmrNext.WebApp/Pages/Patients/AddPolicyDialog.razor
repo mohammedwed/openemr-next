@@ -19,11 +19,13 @@
                     <MudSelectItem Value="@("tertiary")">Tertiary</MudSelectItem>
                 </MudSelect>
                 <MudNumericField @bind-Value="_model.CompanyId" Label="Company id" Required="true" Min="1" Variant="Variant.Outlined" />
-                <MudTextField @bind-Value="_model.PolicyNumber" Label="Policy number" Required="true" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_model.PolicyNumber" Label="Policy number" Required="true" RequiredError="Policy number is required."
+                    Variant="Variant.Outlined" />
                 <MudTextField @bind-Value="_model.GroupNumber" Label="Group number (optional)" Variant="Variant.Outlined" />
                 <MudTextField @bind-Value="_model.PlanName" Label="Plan name (optional)" Variant="Variant.Outlined" />
-                <MudDatePicker @bind-Date="_model.StartDate" Label="Start date" Required="true" Variant="Variant.Outlined" />
-                <MudDatePicker @bind-Date="_model.EndDate" Label="End date (optional)" Variant="Variant.Outlined" />
+                <MudDatePicker @bind-Date="_model.StartDate" Label="Start date" Required="true" RequiredError="Start date is required."
+                    Editable="true" Variant="Variant.Outlined" />
+                <MudDatePicker @bind-Date="_model.EndDate" Label="End date (optional)" Editable="true" Variant="Variant.Outlined" />
             </MudStack>
         </MudForm>
     </DialogContent>

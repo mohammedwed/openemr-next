@@ -11,8 +11,19 @@ namespace OpenEmrNext.WebApp.Shared;
 /// </summary>
 internal static class PatientManagementErrorFormatter
 {
-    public static string Describe(ApiException ex, string fallback) =>
-        ex is ApiException<HttpValidationProblemDetails> { Result.Errors: { } errors } && errors.Values.SelectMany(v => v).Any()
+    /// <summary>
+    /// Plain text for a failed call. A 503 is what the webapp's circuit breaker returns while the service is
+    /// known to be down, so it gets its own wording instead of a generic failure.
+    /// </summary>
+    public static string Describe(ApiException ex, string fallback)
+    {
+        if (ex.StatusCode == 503)
+        {
+            return "The patient service is temporarily unavailable. Nothing was saved. Try again in a moment.";
+        }
+
+        return ex is ApiException<HttpValidationProblemDetails> { Result.Errors: { } errors } && errors.Values.SelectMany(v => v).Any()
             ? string.Join(" ", errors.Values.SelectMany(v => v))
             : fallback;
+    }
 }

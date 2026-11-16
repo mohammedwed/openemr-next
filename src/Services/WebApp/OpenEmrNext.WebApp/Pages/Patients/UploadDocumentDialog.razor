@@ -16,17 +16,22 @@
                 <MudSelectItem Value="@("dnr_order")">DNR order</MudSelectItem>
             </MudSelect>
             <InputFile OnChange="OnFileSelectedAsync" aria-label="Choose a document file to upload" />
-            @if (_fileName is { } fileName)
+            @if (_reading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" role="status" aria-label="Reading file" />
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Reading file…</MudText>
+            }
+            else if (_fileName is { } fileName)
             {
                 <MudText Typo="Typo.body2" Class="mud-text-secondary">Selected: @fileName</MudText>
             }
-            <MudDatePicker @bind-Date="_effectiveDate" Label="Effective date (optional)" Variant="Variant.Outlined" />
+            <MudDatePicker @bind-Date="_effectiveDate" Label="Effective date (optional)" Editable="true" Variant="Variant.Outlined" />
         </MudStack>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">Cancel</MudButton>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync"
-            Disabled="_saving || _contentBase64 is null">Upload document</MudButton>
+            Disabled="_saving || _reading || _contentBase64 is null">Upload document</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -54,6 +59,7 @@
     private string? _contentBase64;
     private DateTime? _effectiveDate;
     private bool _saving;
+    private bool _reading;
     private string? _error;
 
     private void Cancel() => MudDialog.Cancel();
@@ -71,12 +77,24 @@
             return;
         }
 
-        using var stream = file.OpenReadStream(MaxUploadBytes);
-        using var buffer = new MemoryStream();
-        await stream.CopyToAsync(buffer);
-        _contentBase64 = Convert.ToBase64String(buffer.ToArray());
-        _fileName = file.Name;
-        _mimeType = file.ContentType;
+        _reading = true;
+        try
+        {
+            using var stream = file.OpenReadStream(MaxUploadBytes);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            _contentBase64 = Convert.ToBase64String(buffer.ToArray());
+            _fileName = file.Name;
+            _mimeType = file.ContentType;
+        }
+        catch (IOException)
+        {
+            _error = "Could not read that file. Choose it again.";
+        }
+        finally
+        {
+            _reading = false;
+        }
     }
 
     private async Task SubmitAsync()
