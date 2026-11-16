@@ -407,3 +407,27 @@ Tracked here so they are not lost. Ordered by how much they matter.
 - Corrected along the way: related persons. Legacy's `DemographicsRelatedPersonsService` uses a
   `patient_related_persons` table that no SQL file in the legacy checkout creates; the schema models a
   related person as `contact` → `person` → `contact_relation`.
+
+## Added — Microservice Migration Playbook (docs only)
+
+- New `docs/microservice-playbook/` (README plus 14 documents): a framework-neutral guide to extracting a
+  domain service from a legacy system with DDD and hexagonal architecture, derived from building Patient
+  Management. Covers principles and the nine early decisions (01), discovery and strategic design (02),
+  layering and its enforcement (03), tactical modeling (04), legacy-data integration (05), APIs, gateway,
+  and events (06), security (07), quality and testing (08), delivery and operations (09), a milestone
+  roadmap with a per-slice cycle (10), checklists (11), lessons learned (12), templates (13), and a map to
+  this repository (14). 204 numbered rules, each with its rationale; every checklist item cites a rule id.
+  Documents 01-13 name no product or framework; only 14 does.
+- Lessons are recorded as they happened, including the open ones (the ungated patient API, the unread
+  outbox, client-supplied acting users). Doc 14's deviation register lists 28 places this repository does
+  not yet follow the playbook.
+- **Three new findings, not yet in the findings register** (`docs/patient-management/07-gaps-and-evolution.md`
+  §3), found while checking the repository against the playbook:
+  - CI regenerates and diffs only the AuthFacade OpenAPI snapshot, not PatientManagement's.
+  - `scripts/README.md` omits `seeds/patient-management-db.sh` and `dev/generate-patientmanagement-openapi.sh`.
+  - `docs/configuration.md` and `docs/environments.md` have no PatientManagement or `INTERNAL_GATEWAY_SECRET`
+    entries (`.env.example` does).
+- README's "Documentation" section links the playbook beside the authentication guides.
+- **Verified:** every rule id cited in the set is defined exactly once (scripted check); no product names
+  outside doc 14 (grep). **Not verified:** the Mermaid diagrams (including one `quadrantChart`) were not
+  rendered, and the claims in doc 14 about repository status were read from documents and code, not run.
