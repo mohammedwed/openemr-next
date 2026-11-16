@@ -1,5 +1,18 @@
 # Changelog 2026-11-16
 
+## Changed — patient view split into panels
+
+- `Pages/Patients/Detail.razor` is now the header, the states, and the tabs. Its two sections moved
+  into `PatientInsurancePanel.razor` and `PatientAdvanceDirectivesPanel.razor`. Each takes the patient's
+  `Pid`, loads its own data, and owns its own forms and errors. Both are keyed on the patient's `Pid`, so
+  switching patients rebuilds them instead of carrying state across.
+- Each panel shows a spinner until its first load, so it no longer flashes "No effective insurance today"
+  before the data arrives. Both panels have "Try again" on a failed load.
+- Readable names moved to `Shared/CodeLabels.cs`.
+- Verified in the browser: both tabs load their data, the directive status and document show, and moving
+  to an unknown patient and back reloads correctly.
+- Open: view and edit controls share one screen (see the patient view design note).
+
 ## Changed — patient identifier and patient view (webapp and PatientManagement API)
 
 - **API: `PatientSummaryResponse` now includes `PublicPatientId`** (OpenEMR's `pubpid`, the identifier
