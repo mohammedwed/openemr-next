@@ -1,5 +1,11 @@
 # Changelog 2026-11-16
 
+## Changed — patient view sections are cards
+
+- Insurance is one outlined card (heading, actions, table). Advance directives has two cards: status, and
+  documents. Before, the sections sat flat on the same background, so they read as one stacked column.
+- Verified in the browser on both tabs.
+
 ## Changed — breathing room in the patient view tabs
 
 - Tab panels use more padding (`pa-6`). Insurance and document tables are no longer dense, so rows have
