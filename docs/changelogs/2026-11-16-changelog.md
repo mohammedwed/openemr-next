@@ -1,5 +1,14 @@
 # Changelog 2026-11-16
 
+## Changed — shared patient section card
+
+- `Pages/Patients/PatientSectionCard.razor` holds the card, title, summary, actions, and the three states
+  (loading, failed first load with "Try again", failed refresh with the old data kept and a warning). The
+  insurance and advance-directive panels now supply only their title, actions, and content.
+- Actions are hidden until there is data to act on. Before, the insurance buttons showed during loading.
+- Verified in the browser: both tabs render the same as before the refactor.
+- Open item 5 in the review pass is done.
+
 ## Changed — patient view review pass (robustness, structure, accessibility)
 
 - **Count bug fixed.** A failed count request no longer turns a loaded patient into "Could not load this patient".

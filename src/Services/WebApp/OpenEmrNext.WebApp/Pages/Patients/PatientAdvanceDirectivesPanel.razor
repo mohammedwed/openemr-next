@@ -3,67 +3,34 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-@* Two cards, each with its own loading, error, and retry, so a failed document list does not hide the status.
-   Changes open their own dialogs and then ask the parent to reload. *@
+@* Two sections, each its own card with its own loading, error, and retry, so a failed document list does not
+   hide the status. Changes open their own dialogs and then ask the parent to reload. *@
 
-<MudPaper Outlined="true" Class="pa-5 mb-6">
-    @if (Status is null && StatusError)
-    {
-        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true">
-            Could not load the advance directive status.
-            <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="OnRetry">Try again</MudButton>
-        </MudAlert>
-    }
-    else if (Status is null)
-    {
-        <MudProgressCircular Indeterminate="true" Color="Color.Primary" role="status" aria-label="Loading advance directive status" />
-    }
-    else
-    {
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-            <div>
-                <MudText Typo="Typo.h6">Advance directive status</MudText>
-                <MudText Typo="Typo.body2" Class="mud-text-secondary">
-                    @CodeLabels.Of(Status.Status) · reviewed @(Status.ReviewedAtUtc?.ToString("yyyy-MM-dd") ?? "—")
-                </MudText>
-                @if (StatusError)
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Error">Could not refresh. This may be out of date.</MudText>
-                }
-            </div>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenSetStatusAsync">Set status</MudButton>
-        </MudStack>
-    }
-</MudPaper>
+<PatientSectionCard Title="Advance directive status" Class="mb-6"
+    HasData="Status is not null" Error="StatusError" OnRetry="OnRetry"
+    ErrorMessage="Could not load the advance directive status."
+    StaleMessage="Could not refresh the status. It may be out of date."
+    LoadingLabel="Loading advance directive status">
+    <Summary>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            @CodeLabels.Of(Status?.Status ?? "unknown") · reviewed @(Status?.ReviewedAtUtc?.ToString("yyyy-MM-dd") ?? "—")
+        </MudText>
+    </Summary>
+    <Actions>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenSetStatusAsync">Set status</MudButton>
+    </Actions>
+</PatientSectionCard>
 
-<MudPaper Outlined="true" Class="pa-5">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-5">
-        <MudText Typo="Typo.h6">Documents</MudText>
+<PatientSectionCard Title="Documents"
+    HasData="Documents is not null" Error="DocumentsError" OnRetry="OnRetry"
+    ErrorMessage="Could not load documents."
+    StaleMessage="Could not refresh documents. The list below may be out of date."
+    LoadingLabel="Loading documents">
+    <Actions>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenUploadAsync">Upload document</MudButton>
-    </MudStack>
-
-    @if (Documents is null && DocumentsError)
-    {
-        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true">
-            Could not load documents.
-            <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="OnRetry">Try again</MudButton>
-        </MudAlert>
-    }
-    else if (Documents is null)
-    {
-        <MudProgressCircular Indeterminate="true" Color="Color.Primary" role="status" aria-label="Loading documents" />
-    }
-    else
-    {
-        @if (DocumentsError)
-        {
-            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">
-                Could not refresh documents. The list below may be out of date.
-                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="OnRetry">Try again</MudButton>
-            </MudAlert>
-        }
-
-        <MudTable Items="Documents" Hover="true" Elevation="0">
+    </Actions>
+    <ChildContent>
+        <MudTable Items="Documents ?? []" Hover="true" Elevation="0">
             <HeaderContent>
                 <MudTh>Type</MudTh>
                 <MudTh>Name</MudTh>
@@ -89,8 +56,8 @@
                 </MudStack>
             </NoRecordsContent>
         </MudTable>
-    }
-</MudPaper>
+    </ChildContent>
+</PatientSectionCard>
 
 @code {
     [Parameter, EditorRequired] public long Pid { get; set; }

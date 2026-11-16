@@ -5,9 +5,12 @@
 
 @* Shows the insurance it is given, read-only. Every change opens its own dialog and then asks the parent to
    reload, so the table and the tab count always come from the same data. *@
-<MudPaper Outlined="true" Class="pa-5">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-5">
-        <MudText Typo="Typo.h6">Effective insurance today</MudText>
+<PatientSectionCard Title="Effective insurance today"
+    HasData="Policies is not null" Error="Error" OnRetry="OnRetry"
+    ErrorMessage="Could not load insurance."
+    StaleMessage="Could not refresh insurance. The list below may be out of date."
+    LoadingLabel="Loading insurance">
+    <Actions>
         <MudStack Row="true" Spacing="2">
             <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="OpenSwapAsync" Disabled="!CanSwap">
                 Swap levels
@@ -16,38 +19,14 @@
                 Add policy
             </MudButton>
         </MudStack>
-    </MudStack>
-
-    @if (Policies is null)
-    {
-        @if (Error)
-        {
-            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true">
-                Could not load insurance.
-                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="OnRetry">Try again</MudButton>
-            </MudAlert>
-        }
-        else
-        {
-            <MudProgressCircular Indeterminate="true" Color="Color.Primary" role="status" aria-label="Loading insurance" />
-        }
-    }
-    else
-    {
-        @if (Error)
-        {
-            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">
-                Could not refresh insurance. The list below may be out of date.
-                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="OnRetry">Try again</MudButton>
-            </MudAlert>
-        }
-
+    </Actions>
+    <ChildContent>
         @if (!CanSwap)
         {
             <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">Add a policy before you can swap levels.</MudText>
         }
 
-        <MudTable Items="Policies" Hover="true" Elevation="0">
+        <MudTable Items="Policies ?? []" Hover="true" Elevation="0">
             <HeaderContent>
                 <MudTh>Level</MudTh>
                 <MudTh>Company id</MudTh>
@@ -67,8 +46,8 @@
                 </MudStack>
             </NoRecordsContent>
         </MudTable>
-    }
-</MudPaper>
+    </ChildContent>
+</PatientSectionCard>
 
 @code {
     [Parameter, EditorRequired] public long Pid { get; set; }

@@ -1,0 +1,73 @@
+@* One outlined card for a patient section. It owns the parts every section shares: a title, optional
+   summary and actions, and three states. Loading shows a spinner. A failed first load shows an error with
+   "Try again". A failed refresh keeps the last data on screen with a warning. *@
+<MudPaper Outlined="true" Class="@($"pa-5 {Class}".Trim())">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-5">
+        <div>
+            <MudText Typo="Typo.h6">@Title</MudText>
+            @if (Summary is not null)
+            {
+                @Summary
+            }
+        </div>
+        @if (HasData && Actions is not null)
+        {
+            <div>@Actions</div>
+        }
+    </MudStack>
+
+    @if (!HasData && Error)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true">
+            @ErrorMessage
+            <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="OnRetry">Try again</MudButton>
+        </MudAlert>
+    }
+    else if (!HasData)
+    {
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" role="status" aria-label="@LoadingLabel" />
+    }
+    else
+    {
+        @if (Error)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mb-4">
+                @StaleMessage
+                <MudButton Variant="Variant.Text" Color="Color.Warning" OnClick="OnRetry">Try again</MudButton>
+            </MudAlert>
+        }
+
+        @ChildContent
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    /// <summary>True once the section has data to show, even if a later refresh failed.</summary>
+    [Parameter] public bool HasData { get; set; }
+
+    /// <summary>True when the most recent load failed.</summary>
+    [Parameter] public bool Error { get; set; }
+
+    [Parameter] public EventCallback OnRetry { get; set; }
+
+    /// <summary>Shown when there is no data and the load failed.</summary>
+    [Parameter] public string ErrorMessage { get; set; } = "Could not load this section.";
+
+    /// <summary>Shown above the old data when a refresh failed.</summary>
+    [Parameter] public string StaleMessage { get; set; } = "Could not refresh. This may be out of date.";
+
+    [Parameter] public string LoadingLabel { get; set; } = "Loading";
+
+    /// <summary>Optional text under the title, such as a status line.</summary>
+    [Parameter] public RenderFragment? Summary { get; set; }
+
+    /// <summary>Buttons on the right of the title. Shown only once there is data to act on.</summary>
+    [Parameter] public RenderFragment? Actions { get; set; }
+
+    /// <summary>Extra CSS classes for the card, such as spacing between cards.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}
