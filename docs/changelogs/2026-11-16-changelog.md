@@ -1,5 +1,17 @@
 # Changelog 2026-11-16
 
+## Changed — patient view (`Pages/Patients/Detail.razor`)
+
+- **Retry on load failure.** The error state had no way to recover. "Try again" reloads the patient;
+  a 401/403 shows the sign-in prompt, and a network failure or 5xx shows the outage message.
+- **Readable codes.** Insurance levels, document types, and the advance-directive status showed raw
+  stored values (`living_will`, `dnr_order`, `unknown`). A single lookup now shows "Living will",
+  "DNR order", "Unknown", and so on. Unknown codes still show the raw value.
+- **Accessible names.** Each document's "Download" link is named for its document and says it opens in a
+  new tab. The documents table has a screen-reader label on its actions column, and the file input has a label.
+- Verified in the browser: retry after a backend outage, and the readable insurance level and status.
+  Document-related labels were checked in the DOM only, because the test patient has no documents.
+
 ## Changed — patient list (`Pages/Patients/Index.razor`)
 
 - **Search failures no longer hide the page.** A failed search shows an inline error above the last

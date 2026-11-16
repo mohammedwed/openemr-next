@@ -29,7 +29,10 @@
             break;
 
         case State.Error:
-            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">Could not load this patient. Please try again.</MudAlert>
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+                Could not load this patient. The patient service may be unavailable.
+                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="LoadPatientAsync">Try again</MudButton>
+            </MudAlert>
             break;
 
         case State.Ready:
@@ -54,7 +57,7 @@
                                     <MudTh>End</MudTh>
                                 </HeaderContent>
                                 <RowTemplate Context="policy">
-                                    <MudTd DataLabel="Level">@policy.Level</MudTd>
+                                    <MudTd DataLabel="Level">@Label(policy.Level)</MudTd>
                                     <MudTd DataLabel="Company id">@policy.CompanyId</MudTd>
                                     <MudTd DataLabel="Start">@(policy.Start?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
                                     <MudTd DataLabel="End">@(policy.End?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
@@ -101,7 +104,7 @@
                                     <MudSelect T="Guid?" @bind-Value="_swapPolicyUuid" Label="Policy" Variant="Variant.Outlined">
                                         @foreach (var policy in _effectiveInsurance.Where(p => p.Uuid is not null))
                                         {
-                                            <MudSelectItem Value="@policy.Uuid">@policy.Level (company @policy.CompanyId)</MudSelectItem>
+                                            <MudSelectItem Value="@policy.Uuid">@Label(policy.Level) (company @policy.CompanyId)</MudSelectItem>
                                         }
                                     </MudSelect>
                                     <MudSelect T="string" @bind-Value="_swapTargetLevel" Label="Target level" Variant="Variant.Outlined">
@@ -134,7 +137,7 @@
 
                             <MudText Typo="Typo.subtitle2" Class="mb-2">Status</MudText>
                             <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
-                                @(_status?.Status ?? "unknown") · reviewed @(_status?.ReviewedAtUtc?.ToString("yyyy-MM-dd") ?? "—")
+                                @Label(_status?.Status ?? "unknown") · reviewed @(_status?.ReviewedAtUtc?.ToString("yyyy-MM-dd") ?? "—")
                             </MudText>
                             @if (_statusError is { } statusError)
                             {
@@ -161,15 +164,17 @@
                                     <MudTh>Name</MudTh>
                                     <MudTh>Size</MudTh>
                                     <MudTh>Effective date</MudTh>
-                                    <MudTh></MudTh>
+                                    <MudTh><span class="op-visually-hidden">Actions</span></MudTh>
                                 </HeaderContent>
                                 <RowTemplate Context="document">
-                                    <MudTd DataLabel="Type">@document.Type</MudTd>
+                                    <MudTd DataLabel="Type">@Label(document.Type)</MudTd>
                                     <MudTd DataLabel="Name">@document.Name</MudTd>
                                     <MudTd DataLabel="Size">@document.Size bytes</MudTd>
                                     <MudTd DataLabel="Effective date">@(document.EffectiveDate?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
                                     <MudTd>
-                                        <MudLink Href="@DocumentContentUrl(document)" Target="_blank">Download</MudLink>
+                                        @* Named per document: a row of identical "Download" links is not distinguishable to a screen reader. *@
+                                        <MudLink Href="@DocumentContentUrl(document)" Target="_blank"
+                                            aria-label="@($"Download {document.Name} (opens in a new tab)")">Download</MudLink>
                                     </MudTd>
                                 </RowTemplate>
                                 <NoRecordsContent>No documents uploaded yet.</NoRecordsContent>
@@ -186,7 +191,7 @@
                                     <MudSelectItem Value="@("durable_power_attorney")">Durable power of attorney</MudSelectItem>
                                     <MudSelectItem Value="@("dnr_order")">DNR order</MudSelectItem>
                                 </MudSelect>
-                                <InputFile OnChange="OnFileSelectedAsync" />
+                                <InputFile OnChange="OnFileSelectedAsync" aria-label="Choose a document file to upload" />
                                 @if (_uploadFileName is { } fileName)
                                 {
                                     <MudText Typo="Typo.body2" Class="mud-text-secondary">Selected: @fileName</MudText>
@@ -248,11 +253,40 @@
 
     private string LoginUrl => $"/oidc/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
 
+    /// <summary>
+    /// Readable names for the codes the API stores (insurance levels, document types, directive status).
+    /// Unknown codes fall back to the raw value rather than hiding it.
+    /// </summary>
+    private static readonly Dictionary<string, string> Labels = new()
+    {
+        ["primary"] = "Primary",
+        ["secondary"] = "Secondary",
+        ["tertiary"] = "Tertiary",
+        ["living_will"] = "Living will",
+        ["durable_power_attorney"] = "Durable power of attorney",
+        ["dnr_order"] = "DNR order",
+        ["yes"] = "Yes",
+        ["no"] = "No",
+        ["unknown"] = "Unknown",
+    };
+
+    private static string Label(string? code) =>
+        code is null ? "—" : Labels.TryGetValue(code, out var label) ? label : code;
+
     private string DocumentContentUrl(AdvanceDirectiveDocumentResponse document) =>
         $"/api/v1/patients/{_patient!.Pid}/advance-directives/documents/{document.Uuid}/content";
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => LoadPatientAsync();
+
+    /// <summary>
+    /// Loads the patient, then their insurance and advance directives. Runs on first render and from
+    /// the "Try again" button. Only the patient itself gates the page: a failed insurance or directive
+    /// load shows its own message in its own section.
+    /// </summary>
+    private async Task LoadPatientAsync()
     {
+        _state = State.Loading;
+
         if (await AuthFacade.TryGetCurrentUserAsync() is null)
         {
             _state = State.SignedOut;
@@ -268,7 +302,12 @@
             _state = State.NotFound;
             return;
         }
-        catch (PatientManagementApiException)
+        catch (PatientManagementApiException ex) when (ex.StatusCode is 401 or 403)
+        {
+            _state = State.SignedOut;
+            return;
+        }
+        catch (Exception ex) when (ex is PatientManagementApiException or HttpRequestException)
         {
             _state = State.Error;
             return;
