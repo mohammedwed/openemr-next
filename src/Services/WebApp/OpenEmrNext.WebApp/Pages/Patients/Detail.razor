@@ -46,7 +46,7 @@
                     <dt>Patient ID</dt>
                     <dd>@(patient.PublicPatientId ?? patient.Pid.ToString())</dd>
                     <dt>Date of birth</dt>
-                    <dd>@Formatting.DateOfBirthWithAge(patient.DateOfBirth, DateOnly.FromDateTime(DateTime.Today))</dd>
+                    <dd>@Formatting.DateOfBirthWithAge(patient.DateOfBirth, _today)</dd>
                     <dt>Email</dt>
                     <dd>@(string.IsNullOrWhiteSpace(patient.Email) ? "—" : patient.Email)</dd>
                 </dl>
@@ -78,6 +78,7 @@
     private State _state = State.Loading;
     private PatientSummaryResponse? _patient;
     private Guid? _loadedUuid;
+    private DateOnly _today;
 
     // Null means "not loaded yet". Reloads keep the previous data on screen until the new data arrives.
     private IReadOnlyList<EffectiveInsuranceResponse>? _policies;
@@ -135,6 +136,7 @@
             }
 
             _patient = patient;
+            _today = DateOnly.FromDateTime(DateTime.Today); // read once per load, not on every render
             _state = State.Ready;
             PatientPage.PatientName = $"{patient.FirstName} {patient.LastName}";
         }

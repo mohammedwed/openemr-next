@@ -210,17 +210,30 @@
     /// A failed search keeps the search box and table on screen, so the user can correct the term and
     /// retry. Only the initial load replaces the whole page with <see cref="State.Error"/>.
     /// </summary>
+    /// <summary>
+    /// Applies a search's result only if the term is still the one on screen. Without this, a slow response
+    /// for an earlier term could arrive after a newer one and show the wrong patients.
+    /// </summary>
     private async Task SearchAsync()
     {
+        var term = _searchTerm;
         try
         {
-            var patients = await PatientManagement.GetPatientsAsync(string.IsNullOrWhiteSpace(_searchTerm) ? null! : _searchTerm);
+            var patients = await PatientManagement.GetPatientsAsync(string.IsNullOrWhiteSpace(term) ? null! : term);
+            if (term != _searchTerm)
+            {
+                return; // the user has typed something else since this search started
+            }
+
             _patients = [.. patients];
             _searchFailed = false;
         }
         catch (Exception ex) when (ex is PatientManagementApiException or HttpRequestException)
         {
-            _searchFailed = true;
+            if (term == _searchTerm)
+            {
+                _searchFailed = true;
+            }
         }
     }
 

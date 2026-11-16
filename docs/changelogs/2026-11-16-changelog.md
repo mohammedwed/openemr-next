@@ -1,5 +1,15 @@
 # Changelog 2026-11-16
 
+## Fixed — search results out of order; age read once per load
+
+- **Search results could arrive out of order.** A slow response for an earlier term could overwrite the results
+  for a newer one. A search now applies its result only if the term on screen is still the one it searched for.
+  A stale failure is ignored the same way. Not tested by forcing a slow response in the browser; checked that
+  search and the empty-result message still work.
+- **Age is read once per patient load** (`_today` in `Detail.razor`), not on every render.
+- **Still open, tracked in `docs/patient-view-pending-decisions.md`:** uploads read the file into memory as base64
+  before sending. That's part of the upload-size item, which needs an API change.
+
 ## Changed — no-API items from the patient view backlog
 
 - **Home page sign-in** now uses the shared `TryGetCurrentUserAsync`, the same rule as the patient pages.
