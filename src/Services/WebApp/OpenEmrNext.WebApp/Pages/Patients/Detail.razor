@@ -35,24 +35,23 @@
 
         case State.Ready:
             var patient = _patient!;
-            <MudText Typo="Typo.h5" GutterBottom="true" Class="mb-4">@patient.FirstName @patient.LastName</MudText>
 
-            @* The overview opens first. Insurance and advance directives load only when their tab is opened.
-               Each panel is keyed on the patient, so switching patients rebuilds it. *@
+            @* Basic information stays on screen above the tabs, so it is never one click away. The tabs
+               hold the two areas that are worth opening on demand. Each panel is keyed on the patient, so
+               switching patients rebuilds it. *@
+            <MudPaper Outlined="true" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h5" GutterBottom="true">@patient.FirstName @patient.LastName</MudText>
+                <dl class="op-details">
+                    <dt>Patient ID</dt>
+                    <dd>@(patient.PublicPatientId ?? patient.Pid.ToString())</dd>
+                    <dt>Date of birth</dt>
+                    <dd>@Formatting.DateOfBirthWithAge(patient.DateOfBirth, DateOnly.FromDateTime(DateTime.Today))</dd>
+                    <dt>Email</dt>
+                    <dd>@(string.IsNullOrWhiteSpace(patient.Email) ? "—" : patient.Email)</dd>
+                </dl>
+            </MudPaper>
+
             <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
-                <MudTabPanel Text="Overview">
-                    <dl class="op-details">
-                        <dt>Name</dt>
-                        <dd>@patient.FirstName @patient.LastName</dd>
-                        <dt>Patient ID</dt>
-                        <dd>@(patient.PublicPatientId ?? patient.Pid.ToString())</dd>
-                        <dt>Date of birth</dt>
-                        <dd>@Formatting.DateOfBirthWithAge(patient.DateOfBirth, DateOnly.FromDateTime(DateTime.Today))</dd>
-                        <dt>Email</dt>
-                        <dd>@(string.IsNullOrWhiteSpace(patient.Email) ? "—" : patient.Email)</dd>
-                    </dl>
-                </MudTabPanel>
-
                 <MudTabPanel Text="Insurance">
                     <PatientInsurancePanel @key="patient.Pid" Pid="patient.Pid" />
                 </MudTabPanel>

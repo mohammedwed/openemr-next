@@ -1,5 +1,14 @@
 # Changelog 2026-11-16
 
+## Changed — patient view reorganized
+
+- Basic information (patient ID, date of birth with age, email) is a banner above the tabs, always visible.
+  The name is shown once, in the banner. The Overview tab is removed, since it only repeated the banner.
+- Tabs hold only the two areas opened on demand: Insurance (default) and Advance directives.
+- Advance directives: status and its action sit in one block, separated by a divider from the documents
+  and their upload action.
+- Verified in the browser: banner, both tabs, and the advance-directives layout. Webapp only; no API changes.
+
 ## Changed — patient view polish (webapp only, no API change)
 
 - Browser tab title shows the patient's name instead of "Patient".

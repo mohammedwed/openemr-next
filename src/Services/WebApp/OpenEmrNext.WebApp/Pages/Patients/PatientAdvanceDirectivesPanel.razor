@@ -20,12 +20,17 @@ else
         </MudAlert>
     }
 
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
-        <MudText Typo="Typo.subtitle2">
-            Status: @CodeLabels.Of(_status?.Status ?? "unknown") · reviewed @(_status?.ReviewedAtUtc?.ToString("yyyy-MM-dd") ?? "—")
-        </MudText>
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+        <div>
+            <MudText Typo="Typo.subtitle2">Advance directive status</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                @CodeLabels.Of(_status?.Status ?? "unknown") · reviewed @(_status?.ReviewedAtUtc?.ToString("yyyy-MM-dd") ?? "—")
+            </MudText>
+        </div>
         <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenSetStatusAsync">Set status</MudButton>
     </MudStack>
+
+    <MudDivider Class="my-5" />
 
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
         <MudText Typo="Typo.subtitle2">Documents</MudText>
