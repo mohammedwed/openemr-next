@@ -1,6 +1,6 @@
 @page "/patients"
 @using OpenEmrNext.PatientManagement.Client
-@using AuthFacadeApiException = OpenEmrNext.AuthFacade.Client.ApiException
+@using OpenEmrNext.WebApp.Shared
 @using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
 @inject IAuthFacadeClient AuthFacade
 @inject IPatientManagementClient PatientManagement
@@ -8,7 +8,7 @@
 
 <PageTitle>Patients</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Medium" Class="pa-0">
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-0">
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-6">
         <MudText Typo="Typo.h5">Patients</MudText>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/patients/register" Size="Size.Medium">
@@ -19,7 +19,7 @@
     @switch (_state)
     {
         case State.Loading:
-            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" role="status" aria-label="Loading patients" />
             break;
 
         case State.SignedOut:
@@ -30,7 +30,10 @@
             break;
 
         case State.Error:
-            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">Could not load patients. Please try again.</MudAlert>
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+                Could not load patients. The patient service may be unavailable.
+                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="LoadAsync">Try again</MudButton>
+            </MudAlert>
             break;
 
         case State.Loaded:
@@ -38,32 +41,56 @@
                 Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" OnAdornmentClick="SearchAsync"
                 OnKeyDown="OnSearchKeyDownAsync" Immediate="true" Variant="Variant.Outlined" />
 
+            @if (_searchFailed)
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">
+                    Could not search patients. @(_patients.Count > 0 ? "The list below is from before this search. " : "")Try again.
+                </MudAlert>
+            }
+
             @if (_patients.Count == 0)
             {
-                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
-                    @(string.IsNullOrWhiteSpace(_searchTerm) ? "No patients registered yet." : $"No patients match \"{_searchTerm}\".")
-                </MudAlert>
+                @* A failed search never ran, so it must not claim "no patients match" for the new term. *@
+                @if (!_searchFailed)
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                        @(string.IsNullOrWhiteSpace(_searchTerm) ? "No patients registered yet." : $"No patients match \"{_searchTerm}\".")
+                    </MudAlert>
+                }
             }
             else
             {
-                <MudTable Items="_patients" Hover="true" Elevation="1" Dense="true">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2" role="status">
+                    @(_patients.Count == 1 ? "1 patient" : $"{_patients.Count} patients")
+                </MudText>
+                <MudTable Items="SortedPatients" RowsPerPage="10" Hover="true" Elevation="1" Dense="true" TableAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Patients" })">
                     <HeaderContent>
-                        <MudTh>First name</MudTh>
-                        <MudTh>Last name</MudTh>
-                        <MudTh>Date of birth</MudTh>
-                        <MudTh>Email</MudTh>
-                        <MudTh></MudTh>
+                        @* Real buttons, not MudTableSortLabel: its sort control is a focusless <span>, so keyboard
+                           and screen-reader users could not sort at all. aria-sort states the current order. *@
+                        @foreach (var (column, label) in SortableColumns)
+                        {
+                            <MudTh aria-sort="@AriaSort(column)">
+                                <MudButton Class="op-sort-button" Variant="Variant.Text" Size="Size.Small" EndIcon="@SortIcon(column)"
+                                    OnClick="() => SortBy(column)">@label</MudButton>
+                            </MudTh>
+                        }
+                        <MudTh><span class="op-visually-hidden">Actions</span></MudTh>
                     </HeaderContent>
                     <RowTemplate Context="patient">
+                        <MudTd DataLabel="Patient ID">@patient.Pid</MudTd>
                         <MudTd DataLabel="First name">@patient.FirstName</MudTd>
                         <MudTd DataLabel="Last name">@patient.LastName</MudTd>
                         <MudTd DataLabel="Date of birth">@(patient.DateOfBirth?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
                         <MudTd DataLabel="Email">@(patient.Email ?? "—")</MudTd>
                         <MudTd>
                             <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
-                                Href="@($"/patients/{patient.Uuid}")">View</MudButton>
+                                Href="@($"/patients/{patient.Uuid}")"
+                                aria-label="@($"View {patient.FirstName} {patient.LastName}")">View</MudButton>
                         </MudTd>
                     </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new[] { 10, 25, 50 }" RowsPerPageString="Rows per page" />
+                    </PagerContent>
                 </MudTable>
             }
             break;
@@ -76,6 +103,64 @@
     private State _state = State.Loading;
     private List<PatientSummaryResponse> _patients = [];
     private string? _searchTerm;
+    private bool _searchFailed;
+
+    private enum SortColumn { None, PatientId, FirstName, LastName, DateOfBirth, Email }
+
+    private SortColumn _sortColumn = SortColumn.None;
+    private bool _sortAscending = true;
+
+    /// <summary>
+    /// Header order and labels for the sortable columns. The table's own cells are written out by hand
+    /// in the row template, so this list is only the header's source of truth.
+    /// </summary>
+    private static readonly (SortColumn Column, string Label)[] SortableColumns =
+    [
+        (SortColumn.PatientId, "Patient ID"),
+        (SortColumn.FirstName, "First name"),
+        (SortColumn.LastName, "Last name"),
+        (SortColumn.DateOfBirth, "Date of birth"),
+        (SortColumn.Email, "Email"),
+    ];
+
+    /// <summary>
+    /// The list in the order the user chose. Unsorted until a header is clicked, so the server's own
+    /// order is what shows by default.
+    /// </summary>
+    private IEnumerable<PatientSummaryResponse> SortedPatients => _sortColumn switch
+    {
+        SortColumn.PatientId => Order(p => p.Pid, null),
+        SortColumn.FirstName => Order(p => p.FirstName, StringComparer.CurrentCultureIgnoreCase),
+        SortColumn.LastName => Order(p => p.LastName, StringComparer.CurrentCultureIgnoreCase),
+        SortColumn.DateOfBirth => Order(p => p.DateOfBirth, null),
+        SortColumn.Email => Order(p => p.Email, StringComparer.CurrentCultureIgnoreCase),
+        _ => _patients,
+    };
+
+    private IEnumerable<PatientSummaryResponse> Order<TKey>(Func<PatientSummaryResponse, TKey> key, IComparer<TKey>? comparer) =>
+        _sortAscending ? _patients.OrderBy(key, comparer) : _patients.OrderByDescending(key, comparer);
+
+    /// <summary>
+    /// Clicking the active column flips its direction; clicking a new column sorts it ascending.
+    /// </summary>
+    private void SortBy(SortColumn column)
+    {
+        if (_sortColumn == column)
+        {
+            _sortAscending = !_sortAscending;
+        }
+        else
+        {
+            _sortColumn = column;
+            _sortAscending = true;
+        }
+    }
+
+    private string AriaSort(SortColumn column) =>
+        _sortColumn != column ? "none" : _sortAscending ? "ascending" : "descending";
+
+    private string? SortIcon(SortColumn column) =>
+        _sortColumn != column ? null : _sortAscending ? Icons.Material.Filled.ArrowUpward : Icons.Material.Filled.ArrowDownward;
 
     private string LoginUrl => $"/oidc/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
 
@@ -84,13 +169,18 @@
     /// checks that the call came through this gateway, not which user is signed in -- so this page's own
     /// check is what actually keeps a signed-out visitor from seeing patient data, not the backend.
     /// </summary>
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    /// <summary>
+    /// Loads the whole list. Runs on first render and again from the "Try again" button. A 401/403 from
+    /// the backend means the session is not valid, so it gets the sign-in prompt; anything else (a 5xx,
+    /// or no response at all) is an outage and gets the retry prompt.
+    /// </summary>
+    private async Task LoadAsync()
     {
-        try
-        {
-            await AuthFacade.GetCurrentUserAsync();
-        }
-        catch (AuthFacadeApiException)
+        _state = State.Loading;
+
+        if (await AuthFacade.TryGetCurrentUserAsync() is null)
         {
             _state = State.SignedOut;
             return;
@@ -102,22 +192,31 @@
             _patients = [.. patients];
             _state = State.Loaded;
         }
-        catch (PatientManagementApiException)
+        catch (PatientManagementApiException ex) when (ex.StatusCode is 401 or 403)
+        {
+            _state = State.SignedOut;
+        }
+        catch (Exception ex) when (ex is PatientManagementApiException or HttpRequestException)
         {
             _state = State.Error;
         }
     }
 
+    /// <summary>
+    /// A failed search keeps the search box and table on screen, so the user can correct the term and
+    /// retry. Only the initial load replaces the whole page with <see cref="State.Error"/>.
+    /// </summary>
     private async Task SearchAsync()
     {
         try
         {
             var patients = await PatientManagement.GetPatientsAsync(string.IsNullOrWhiteSpace(_searchTerm) ? null! : _searchTerm);
             _patients = [.. patients];
+            _searchFailed = false;
         }
         catch (PatientManagementApiException)
         {
-            _state = State.Error;
+            _searchFailed = true;
         }
     }
 

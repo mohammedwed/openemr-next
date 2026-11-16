@@ -128,6 +128,16 @@
     font-size: 1.1rem;
 }
 
+/* Sortable column headers: MudButton would uppercase the label and restyle it, so it keeps the table
+   header's own look (case, weight, color) and only gains the button's focus and hover behavior. */
+.op-sort-button {
+    text-transform: none;
+    font-weight: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    padding-inline: 0;
+}
+
 /* The standard "sr-only" clip pattern: present in the accessibility tree's text content (so it can name
    the avatar button, see the comment above its own usage) but removed from visual and spatial layout --
    display:none or visibility:hidden would also hide it from screen readers, defeating the point. */

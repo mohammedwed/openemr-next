@@ -1,5 +1,39 @@
 # Changelog 2026-11-16
 
+## Changed — patient list (`Pages/Patients/Index.razor`)
+
+- **Search failures no longer hide the page.** A failed search shows an inline error above the last
+  results and keeps the search box usable. The error says when the list is from before the search, so
+  stale results are not mistaken for the new term's results. Only a failed first load replaces the page.
+- **Accessible names.** Each "View" link is named for its patient ("View [first] [last]"), the actions
+  column has a screen-reader label, the table is named "Patients", the spinner is labeled, and the
+  result count is a live status region.
+- **Sorting.** Patient ID, first name, last name, date of birth, and email sort on header click (second
+  click reverses). Headers are real buttons with `aria-sort`, not `MudTableSortLabel`, whose sort control
+  is a focusless `<span>` and cannot be reached by keyboard.
+- **Pagination.** `MudTablePager`, 10 rows by default, with 10/25/50 page sizes. Paging is client-side,
+  over the list the page already loads.
+- **Retry on load failure.** A failed first load shows "Try again". A 401/403 from PatientManagement is
+  treated as signed out (sign-in prompt); network failures and 5xx responses are treated as an outage
+  (retry prompt). Network failures used to escape as unhandled exceptions.
+- **Patient ID column.** Shows the OpenEMR internal `Pid`. It does not show the MRN: the API's
+  `PatientSummaryResponse` does not expose one.
+- **Column list.** The sortable headers are generated from one list, not four copies of the same markup.
+- **Width.** Patient list and detail pages use `MaxWidth.Large` (1280px) instead of `Medium` (960px).
+- **Shared sign-in check.** `Shared/AuthFacadeClientExtensions.TryGetCurrentUserAsync` is used by the
+  list and detail pages. The home page still has its own check (it needs the user's name).
+
+## Known gaps (patient list)
+
+- The patient API (`GET /api/v1/patients`) returns patient data without a user sign-in check. The
+  gateway passes the call through with the internal secret; the page's own sign-in check is the only
+  gate. This is intended per the owner's decision (ADR 0055's trust model); noted here so it stays visible.
+- Not browser-verified: light mode, phone width, moving between pages, sort order with more than one
+  patient, and the 401/403 path.
+- Row click was tried and removed: it added a second history entry when the "View" link was clicked.
+- The generated client's `GetPatientsAsync(string name)` is non-nullable, so the page passes `null!`
+  for "no filter". Fixing it means changing the API's OpenAPI output and regenerating the client.
+
 ## Fixed — page content had zero breathing room below the app bar, in both themes
 
 - **Reported as "a button bleeding into the navbar," with a screenshot.** First suspected a dark-mode

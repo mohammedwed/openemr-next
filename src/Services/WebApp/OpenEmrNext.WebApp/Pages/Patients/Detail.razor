@@ -1,6 +1,6 @@
 @page "/patients/{Uuid:guid}"
 @using OpenEmrNext.PatientManagement.Client
-@using AuthFacadeApiException = OpenEmrNext.AuthFacade.Client.ApiException
+@using OpenEmrNext.WebApp.Shared
 @using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
 @inject IAuthFacadeClient AuthFacade
 @inject IPatientManagementClient PatientManagement
@@ -10,7 +10,7 @@
 
 <PageTitle>Patient</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Medium" Class="pa-0">
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-0">
     @switch (_state)
     {
         case State.Loading:
@@ -253,11 +253,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        try
-        {
-            await AuthFacade.GetCurrentUserAsync();
-        }
-        catch (AuthFacadeApiException)
+        if (await AuthFacade.TryGetCurrentUserAsync() is null)
         {
             _state = State.SignedOut;
             return;
