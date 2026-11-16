@@ -42,6 +42,9 @@ jobs:
           AUTHFACADE_DB_PASSWORD: ${{ secrets.AUTHFACADE_DB_PASSWORD || 'ci-authfacade-db-password' }}
           PATIENT_MANAGEMENT_DB_PASSWORD: ${{ secrets.PATIENT_MANAGEMENT_DB_PASSWORD || 'ci-patient-management-db-password' }}
           INTERNAL_GATEWAY_SECRET: ${{ secrets.INTERNAL_GATEWAY_SECRET || 'ci-internal-gateway-secret' }}
+          CLINICAL_CARE_DB_PASSWORD: ${{ secrets.CLINICAL_CARE_DB_PASSWORD || 'ci-clinical-care-db-password' }}
+          CLINICAL_CARE_GATEWAY_SECRET: ${{ secrets.CLINICAL_CARE_GATEWAY_SECRET || 'ci-clinical-care-gateway-secret' }}
+          CLINICAL_CARE_EVENTS_SECRET: ${{ secrets.CLINICAL_CARE_EVENTS_SECRET || 'ci-clinical-care-events-secret' }}
         run: |
           cp .env.example .env
           source scripts/lib/env.sh
@@ -53,6 +56,9 @@ jobs:
           env_set AUTHFACADE_DB_PASSWORD "$AUTHFACADE_DB_PASSWORD"
           env_set PATIENT_MANAGEMENT_DB_PASSWORD "$PATIENT_MANAGEMENT_DB_PASSWORD"
           env_set INTERNAL_GATEWAY_SECRET "$INTERNAL_GATEWAY_SECRET"
+          env_set CLINICAL_CARE_DB_PASSWORD "$CLINICAL_CARE_DB_PASSWORD"
+          env_set CLINICAL_CARE_GATEWAY_SECRET "$CLINICAL_CARE_GATEWAY_SECRET"
+          env_set CLINICAL_CARE_EVENTS_SECRET "$CLINICAL_CARE_EVENTS_SECRET"
           env_set STACK_READY_TIMEOUT_MINUTES 3
           # Print variable names only, never values.
           cut -d= -f1 .env
@@ -100,7 +106,7 @@ jobs:
         run: bash scripts/setup/new-dev-cert.sh
 
       - name: Start stack
-        run: docker compose up -d --build --wait --wait-timeout 1200 openemr auth-facade patient-management webapp gateway phpmyadmin
+        run: docker compose up -d --build --wait --wait-timeout 1200 openemr auth-facade patient-management clinical-care webapp gateway phpmyadmin
 
       - name: Probe endpoints
         if: always()

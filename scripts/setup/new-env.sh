@@ -6,7 +6,8 @@
 #
 # Needs:   openssl, and .env.example in the repository root.
 # Sets:    DB_ROOT_PASSWORD, DB_PASSWORD, AUTHFACADE_CLIENT_SECRET, AUTHFACADE_DB_PASSWORD,
-#          PATIENT_MANAGEMENT_DB_PASSWORD and INTERNAL_GATEWAY_SECRET to random values, and
+#          PATIENT_MANAGEMENT_DB_PASSWORD, INTERNAL_GATEWAY_SECRET, CLINICAL_CARE_DB_PASSWORD and
+#          CLINICAL_CARE_GATEWAY_SECRET and CLINICAL_CARE_EVENTS_SECRET to random values, and
 #          OPENEMR_ADMIN_PASSWORD to the snapshot's fixed admin password.
 # Exits 1: if .env already exists, or .env.example is missing.
 set -euo pipefail
@@ -34,6 +35,9 @@ env_set AUTHFACADE_CLIENT_SECRET "$(secret)"
 env_set AUTHFACADE_DB_PASSWORD "$(secret)"
 env_set PATIENT_MANAGEMENT_DB_PASSWORD "$(secret)"
 env_set INTERNAL_GATEWAY_SECRET "$(secret)"
+env_set CLINICAL_CARE_DB_PASSWORD "$(secret)"
+env_set CLINICAL_CARE_GATEWAY_SECRET "$(secret)"
+env_set CLINICAL_CARE_EVENTS_SECRET "$(secret)"
 
 # The snapshot's admin hash matches this password, so it must not be generated.
 env_set OPENEMR_ADMIN_PASSWORD "ci-admin-password"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Creates the patient_management_outbox table inside OpenEMR's own database, and a least-privilege
 # user scoped to exactly that table plus patient_data, insurance_data, documents, categories,
-# categories_to_documents, sequences, users, and list_options (ADR 0049, ADR 0050) -- never OpenEMR's
+# categories_to_documents, sequences, users (id and uuid only), uuid_registry (insert only), and list_options (ADR 0049, ADR 0050) -- never OpenEMR's
 # existing app user, and never GRANT ... ON db.*, so every other table's privileges stay exactly as
 # they are.
 # Runs as a one-shot Compose service (seed-patient-management-db), against the bare MariaDB image
@@ -44,8 +44,22 @@ CREATE TABLE IF NOT EXISTS \`${DB_NAME}\`.\`patient_management_outbox\` (
   occurred_at DATETIME NOT NULL,
   published_at DATETIME DEFAULT NULL
 );
+-- The relay's bookkeeping (EVT-7, ADR 0066): attempts and back-off, a lease so a crashed relay loses nothing, and a
+-- dead-letter mark. ADD COLUMN IF NOT EXISTS keeps this idempotent on a database that already has the older table.
+ALTER TABLE \`${DB_NAME}\`.\`patient_management_outbox\`
+  ADD COLUMN IF NOT EXISTS attempts INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS next_attempt_at DATETIME DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS locked_until DATETIME DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS dead_lettered_at DATETIME DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS last_error VARCHAR(1000) DEFAULT NULL;
+CREATE INDEX IF NOT EXISTS ix_patient_management_outbox_pending
+  ON \`${DB_NAME}\`.\`patient_management_outbox\` (published_at, dead_lettered_at, id);
 CREATE USER IF NOT EXISTS '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 ALTER USER '${PATIENT_MANAGEMENT_DB_USER}'@'%' IDENTIFIED BY $(sql_quote "$PATIENT_MANAGEMENT_DB_PASSWORD");
+-- Start from nothing, then grant exactly the list below. CREATE USER IF NOT EXISTS keeps whatever an older version of this
+-- script granted, so without this a grant removed or narrowed here would linger on an existing database (it is how the
+-- broad users grant below is actually replaced).
+REVOKE ALL PRIVILEGES, GRANT OPTION FROM '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.patient_data TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 GRANT SELECT, INSERT, UPDATE ON \`${DB_NAME}\`.insurance_data TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 -- Advance directive documents: this service only ever inserts a new documents row and reads rows
@@ -64,10 +78,14 @@ GRANT SELECT, INSERT, DELETE ON \`${DB_NAME}\`.categories_to_documents TO '${PAT
 -- real seeded user, a gap the Testcontainers integration tests never catch (that fixture connects
 -- with a more permissive user, not this exact least-privilege grant set).
 GRANT SELECT, UPDATE ON \`${DB_NAME}\`.sequences TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
--- FHIR Patient API: read-only lookups for generalPractitioner (users.uuid) and every coded extension
--- (list_options) -- this service never writes to either.
-GRANT SELECT ON \`${DB_NAME}\`.users TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
+-- FHIR Patient API: read-only lookups for generalPractitioner and every coded extension -- this service never writes to
+-- either. users is granted on the two columns the lookup reads (EfPatientFhirRepository selects id, uuid) and nothing
+-- else: the table also holds a password column and other credential data this service must never see (finding F-CC-7).
+GRANT SELECT (id, uuid) ON \`${DB_NAME}\`.users TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 GRANT SELECT ON \`${DB_NAME}\`.list_options TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
+-- Legacy records every uuid it hands out here; this service now does the same for the ones it creates (finding F-CC-3).
+-- Insert-only: it adds its own rows and never reads or edits anyone's.
+GRANT INSERT ON \`${DB_NAME}\`.uuid_registry TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.patient_management_outbox TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 FLUSH PRIVILEGES;
 SQL

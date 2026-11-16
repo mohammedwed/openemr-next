@@ -25,7 +25,7 @@ graph LR
         PM((PatientManagement.Api))
     end
     subgraph Downstream[Downstream contexts]
-        CC[Clinical Care<br/>M5, not built]
+        CC[Clinical Care<br/>M5, built: encounters, vitals, events]
         BIL[Billing and Claims<br/>not built]
         SCH[Scheduling<br/>not built]
     end
@@ -154,6 +154,10 @@ using Firely (ADR 0052). Scope limits are deliberate and recorded in `m4-domain-
 
 ### R7. Clinical Care (M5)
 
+> **Status 2026-11-16:** built. Clinical Care keeps a **reference** (uuid, pid) in its own `clinical_care_patient_ref`, filled by
+> `PatientRegistered` delivered by an outbox relay over HTTP ([ADR 0066](../architecture/0066-patient-registered-reaches-clinical-care-through-an-outbox-relay-over-http.md),
+> [slice 3](../clinical-care/03-patient-registered-consumption.md)). It reads no `patient_data`. The analysis below is kept as written.
+
 The first real downstream. ROADMAP M5: *consumes `PatientRegistered` through the outbox*. Clinical Care
 keeps its own model and holds only a **patient reference**. It must not call back synchronously to
 create an encounter. The boundary is verified: `patient_data` here, `form_encounter` there, coupled only
@@ -190,7 +194,7 @@ and are not part of this map.
 | ID | Decision | Options | Recommendation |
 |---|---|---|---|
 | **D1** | **What other contexts use to refer to a patient** (doc 02, L2) | `uuid` only; `pid` only; both | **Both, with a rule.** `uuid` is the identity and the shared-kernel `PatientId`. `pid` is carried as a **correlation key** only while legacy tables joined on `pid` (`form_encounter.pid`) still exist. Events carry both; new contracts expose `uuid`; `pid` is dropped from public contracts when the shared database ends. Today `PatientRegistered` already has both; the insurance and directive **routes** use `pid`, which should move to `uuid`. |
-| **D2** | **Event versioning and delivery** | none (today); schema version field plus relay | Add an explicit `schemaVersion` to every event before a second consumer exists, and build the relay. The outbox has no relay today, so M5's consume story is not yet real. Detail in doc 05. |
+| **D2** | **Event versioning and delivery** | none (today); schema version field plus relay | Add an explicit `schemaVersion` to every event before a second consumer exists, and build the relay. The outbox has no relay today, so M5's consume story is not yet real. Detail in doc 05. **Decided and built (2026-11-16, ADR 0066):** the relay, an envelope built at publish time with `eventId` and `schemaVersion` 1, and an idempotent consumer. |
 | **D3** | **Where FHIR lives** | In this context (today); in a separate Interoperability context | Keep it here for Patient while it is the only resource. When Interoperability exists, it **consumes** our read model and owns the FHIR surface for all contexts; it does not re-implement patient rules. Until then, record that FHIR for Patient is intentionally inside this context. |
 | **D4** | **Shared kernel** | Package of shared types; no shared types | Smallest possible: `PatientId` (the `uuid`) only. Do not share `Address`, `ContactPoint`, or `CodedValue` yet; with one consumer each, the cost of coupling is higher than the duplication. Revisit when a second context needs the same value object. |
 | **D5** | **Who owns identity resolution** | AuthFacade; this context | AuthFacade (R4). |
@@ -203,7 +207,7 @@ and are not part of this map.
 | M1 | **The shared secret protects nothing from a browser.** The Gateway has no authentication, and attaches the secret **unconditionally** to every request on the patient routes. Anyone who can reach the Gateway can register, read, and change patient data without signing in. | Gateway `Program.cs`: the patient routes carry no auth requirement, only the secret transform; ADR 0055 states the Gateway makes no authentication decisions. Already recorded in the patient-list review as an open critical finding. | **Critical** |
 | M2 | **Caller-supplied acting user.** Registration, directive status, and uploads accept a user id from the client. | ADR 0055, doc 02 L5 | High |
 | M3 | **Single-writer assumption is only true for inserts** (R1). | ADR 0049 retires only registration | Medium; grows when C2 is built |
-| M4 | **Event with no relay.** `PatientRegistered` is written but nothing delivers it. | `OutboxMessage` doc comment: relay "deliberately a separate concern" | Medium; blocks M5 |
+| M4 | **Event with no relay.** `PatientRegistered` is written but nothing delivers it. | `OutboxMessage` doc comment: relay "deliberately a separate concern" | **Closed 2026-11-16:** the relay exists (ADR 0066) |
 | M5 | **Table-level coupling to Organization data** (payers, code lists, staff). | R10 | Low now |
 | M6 | **`sequences` shared counter.** Document ids come from a counter legacy also increments. Correct only if every writer uses the same locking idiom. | `EfAdvanceDirectiveRepository`, `m4-domain-notes.md` | Medium |
 | M7 | **File and row not atomic** across the documents volume. | doc 06 | Low to medium |

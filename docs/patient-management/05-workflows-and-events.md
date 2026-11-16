@@ -362,6 +362,8 @@ the patient need `uuid` and `pid`.
 - Only **registration** writes an event. Insurance changes and directive changes open their own
   transactions and write **none** (F-5).
 - **Nothing reads the table.** `PublishedAtUtc` is never set. No relay exists.
+  - **Status 2026-11-16: no longer true.** The relay exists and sets `PublishedAtUtc`; see [ADR 0066](../architecture/0066-patient-registered-reaches-clinical-care-through-an-outbox-relay-over-http.md) and
+    [slice 3](../clinical-care/03-patient-registered-consumption.md). The bullet below is the finding as originally recorded.
 
 ### 6.2 Target design
 
@@ -421,7 +423,7 @@ are the same whichever transport wins, so they can be built now without the deci
 | F-3 | **No patient existence check** on insurance and directive routes. Orphan rows are possible and legacy has no foreign key to catch them. | `AddInsurancePolicyUseCase` has no lookup; domain rule tests only `pid > 0` | Medium | Patient-lookup port, `404`; fix the misleading message |
 | F-4 | **Directive file and row are not atomic.** | Doc 06; `EfAdvanceDirectiveRepository` compensates only handled failures | Low to medium | Reconciliation report |
 | F-5 | **Only registration produces an event.** Insurance and directive changes are invisible to every consumer and to audit. | `EfInsurancePolicyRepository` and `EfAdvanceDirectiveRepository` write no outbox row | Medium | Section 6.2 |
-| F-6 | **No relay and no `eventId`.** `PatientRegistered` can never reach Clinical Care. | `OutboxMessage`; no reader | Medium, blocks M5 | Section 6.2 |
+| F-6 | **No relay and no `eventId`.** `PatientRegistered` can never reach Clinical Care. | `OutboxMessage`; no reader | Medium, blocks M5 | **Fixed 2026-11-16** (ADR 0066) | Section 6.2 |
 | F-7 | **A state conflict is returned as `400`.** A duplicate policy at a level and date is a conflict with existing state, not a malformed request. | `InsuranceEndpoints` maps the validation exception | Low | `409` (section 1.2) |
 | F-8 | **No way to read insurance history.** Only the effective view is exposed, so a clerk cannot see an ended or superseded policy. | Endpoint list | Low | QRY-6 |
 | F-9 | **Whole-list query.** QRY-2 returns every patient. | `patient-view-pending-decisions.md` item 5 | Medium at scale | Paging |

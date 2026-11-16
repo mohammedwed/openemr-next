@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Testcontainers.MariaDb" Version="4.2.0" />
+    <!-- Pins past Testcontainers' transitive SSH.NET 2024.1.0 (GHSA-mggc-4xg6-vcxf, GHSA-q939-rpr3-3284);
+         not used directly, same precedent as PatientManagement's IntegrationTests. -->
+    <PackageReference Include="SSH.NET" Version="2026.0.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\src\Services\ClinicalCare\OpenEmrNext.ClinicalCare.Api\OpenEmrNext.ClinicalCare.Api.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Services\ClinicalCare\OpenEmrNext.ClinicalCare.Domain\OpenEmrNext.ClinicalCare.Domain.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Services\ClinicalCare\OpenEmrNext.ClinicalCare.Domain.ReadModels\OpenEmrNext.ClinicalCare.Domain.ReadModels.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Services\ClinicalCare\OpenEmrNext.ClinicalCare.Application\OpenEmrNext.ClinicalCare.Application.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Services\ClinicalCare\OpenEmrNext.ClinicalCare.Application.Ports\OpenEmrNext.ClinicalCare.Application.Ports.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Services\ClinicalCare\OpenEmrNext.ClinicalCare.Infrastructure\OpenEmrNext.ClinicalCare.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -233,10 +233,32 @@ public sealed class PatientDataContainerFixture : IAsyncLifetime
                 event_type varchar(255) NOT NULL,
                 payload longtext NOT NULL,
                 occurred_at datetime NOT NULL,
-                published_at datetime DEFAULT NULL
+                published_at datetime DEFAULT NULL,
+                attempts int NOT NULL DEFAULT 0,
+                next_attempt_at datetime DEFAULT NULL,
+                locked_until datetime DEFAULT NULL,
+                dead_lettered_at datetime DEFAULT NULL,
+                last_error varchar(1000) DEFAULT NULL
             );
             """;
         await createOutbox.ExecuteNonQueryAsync();
+
+        // Legacy's own uuid registry, in its real shape (snapshots/db.sql): every uuid this service hands out is recorded here.
+        await using var createUuidRegistry = connection.CreateCommand();
+        createUuidRegistry.CommandText = """
+            CREATE TABLE uuid_registry (
+                uuid binary(16) NOT NULL DEFAULT x'00000000000000000000000000000000',
+                table_name varchar(255) NOT NULL DEFAULT '',
+                table_id varchar(255) NOT NULL DEFAULT '',
+                table_vertical varchar(255) NOT NULL DEFAULT '',
+                couchdb varchar(255) NOT NULL DEFAULT '',
+                document_drive tinyint(4) NOT NULL DEFAULT 0,
+                mapped tinyint(4) NOT NULL DEFAULT 0,
+                created timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (uuid)
+            );
+            """;
+        await createUuidRegistry.ExecuteNonQueryAsync();
     }
 
     public async Task DisposeAsync() => await _container.DisposeAsync();

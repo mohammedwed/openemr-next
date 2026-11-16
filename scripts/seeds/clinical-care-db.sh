@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# Creates the clinical_care_outbox table inside OpenEMR's own database, and a least-privilege user scoped to
+# exactly the tables Clinical Care reads and writes (ADR 0064, building on ADR 0049 and ADR 0050) -- never
+# OpenEMR's existing app user, and never GRANT ... ON db.*, so every other table's privileges stay as they are.
+# Every grant below carries a one-line reason (LEG-6). Where a legacy table holds columns this service has no
+# business reading (users), the grant is on named columns only.
+#
+# Runs as a one-shot Compose service (seed-clinical-care-db) against the bare MariaDB image already used for the
+# mysql service itself -- no extra image to pull. It also runs, unchanged, inside the integration-test
+# container (QLT-8): the tests connect as the user this script creates, so the grants are tested, not assumed.
+#
+# Must run after OpenEMR's own installer has created its tables.
+#
+# Idempotent: safe to rerun, same as seed-patient-management-db (LEG-18). Compose reruns a one-shot service
+# whenever its resolved config changes and something still depends on it, so a changed
+# CLINICAL_CARE_DB_PASSWORD takes effect on the next `docker compose up` without any manual step.
+#
+# Also backfills clinical_care_patient_ref once from patient_data (see the end of the SQL).
+#
+# Needs:  DB_NAME (OpenEMR's own database), CLINICAL_CARE_DB_USER, CLINICAL_CARE_DB_PASSWORD and MYSQL_PWD
+#         (the root password) in the environment -- set by docker-compose.yml, not passed on the command line.
+# Optional: DB_HOST, the MariaDB host to connect to (default: mysql, the Compose service name).
+set -euo pipefail
+
+: "${DB_NAME:?DB_NAME is required}"
+: "${CLINICAL_CARE_DB_USER:?CLINICAL_CARE_DB_USER is required}"
+: "${CLINICAL_CARE_DB_PASSWORD:?CLINICAL_CARE_DB_PASSWORD is required}"
+: "${MYSQL_PWD:?MYSQL_PWD (the root password) is required}"
+DB_HOST="${DB_HOST:-mysql}"
+
+# Quotes a value as a MariaDB string literal: escape backslashes, then single quotes. Mirrors
+# scripts/lib/env.sh's sql_quote -- that file is not available inside this container, so it is repeated here
+# rather than shared, the same way the other seed scripts already do.
+sql_quote() {
+  local s=$1
+  s=${s//\\/\\\\}
+  s=${s//\'/\'\'}
+  printf "'%s'" "$s"
+}
+
+# The database and user names are operator-controlled config, not secrets, so they are interpolated directly as
+# identifiers/usernames; only the password (sql_quote'd below) can hold arbitrary characters.
+mariadb -h "${DB_HOST}" -uroot <<SQL
+CREATE TABLE IF NOT EXISTS \`${DB_NAME}\`.\`clinical_care_outbox\` (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  event_type VARCHAR(255) NOT NULL,
+  payload LONGTEXT NOT NULL,
+  occurred_at DATETIME NOT NULL,
+  published_at DATETIME DEFAULT NULL
+);
+
+-- The patients Clinical Care has been told about: a reference (uuid, pid) and nothing else, never demographics (design set
+-- R7, decision D4). Filled by PatientRegistered events (ADR 0066) and by the one-time backfill below. pid is unique because
+-- legacy tables still join on it; a different uuid claiming a held pid is a real conflict and must fail loudly.
+CREATE TABLE IF NOT EXISTS \`${DB_NAME}\`.\`clinical_care_patient_ref\` (
+  patient_uuid BINARY(16) NOT NULL PRIMARY KEY,
+  pid BIGINT NOT NULL,
+  registered_at DATETIME DEFAULT NULL,
+  source VARCHAR(20) NOT NULL DEFAULT 'event' COMMENT 'event or backfill',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_clinical_care_patient_ref_pid (pid)
+);
+-- Which events have been applied (EVT-3). Written in the same transaction as the effect.
+CREATE TABLE IF NOT EXISTS \`${DB_NAME}\`.\`clinical_care_processed_events\` (
+  event_id CHAR(36) NOT NULL PRIMARY KEY,
+  event_type VARCHAR(100) NOT NULL,
+  processed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE USER IF NOT EXISTS '${CLINICAL_CARE_DB_USER}'@'%';
+ALTER USER '${CLINICAL_CARE_DB_USER}'@'%' IDENTIFIED BY $(sql_quote "$CLINICAL_CARE_DB_PASSWORD");
+-- Start from nothing, then grant exactly the list below. Without this a grant removed from this script would linger on a
+-- database that already ran an older version (CREATE USER IF NOT EXISTS keeps old grants), which is how the interim
+-- patient_data grant is retired.
+REVOKE ALL PRIVILEGES, GRANT OPTION FROM '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- The encounter itself: this service inserts new rows and reads them back (including the uuid lookup that
+-- makes a retried insert safe). No UPDATE or DELETE: slice 1 never changes or removes an encounter, and the
+-- other legacy writers still own those paths (ADR 0064 #2).
+GRANT SELECT, INSERT ON \`${DB_NAME}\`.form_encounter TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- The legacy 'newpatient' registry row every encounter needs (CC-7). Insert-only for the same reason.
+GRANT SELECT, INSERT ON \`${DB_NAME}\`.forms TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- A set of vital signs (slice 2): inserted and read back, never updated or deleted (CV-10). form_vitals has no
+-- encounter column; its link to an encounter is the forms row granted above.
+GRANT SELECT, INSERT ON \`${DB_NAME}\`.form_vitals TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- Legacy records every uuid it hands out here (CC-6). This service only ever adds its own; never reads or edits.
+GRANT INSERT ON \`${DB_NAME}\`.uuid_registry TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- The single shared id counter (legacy's QueryUtils::generateId()). "SET id = LAST_INSERT_ID(id + 1)" needs
+-- SELECT too, not just UPDATE: MariaDB requires read privilege on any column referenced on the right-hand side
+-- of a SET expression (learned the hard way in ADR 0050's grant for the same table).
+GRANT SELECT, UPDATE ON \`${DB_NAME}\`.sequences TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- Encounter classes (_ActEncounterCode): only the columns the class lookup reads.
+GRANT SELECT (list_id, option_id, title, seq, is_default) ON \`${DB_NAME}\`.list_options TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- Facility name and default place-of-service code, copied onto the encounter (CC-8). Nothing else about a facility.
+GRANT SELECT (id, name, pos_code) ON \`${DB_NAME}\`.facility TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- The acting provider's username and group, for the legacy forms row (CC-7). users also holds credential and
+-- contact columns this service must never see, so the grant is on id and username only.
+GRANT SELECT (id, username) ON \`${DB_NAME}\`.users TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT SELECT (name, \`user\`) ON \`${DB_NAME}\`.\`groups\` TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- No grant on patient_data. The interim stand-in that read it was removed when events arrived (ADR 0064 #5, ADR 0066):
+-- Clinical Care now learns about patients only from PatientRegistered and its own reference table.
+
+-- This service's own outbox: fully owned, so the relay can mark rows published and purge them (EVT-7).
+GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.clinical_care_outbox TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- Its own patient reference and its own record of processed events: fully owned.
+GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.clinical_care_patient_ref TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.clinical_care_processed_events TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- ONE-TIME PROVISIONING BACKFILL (ADR 0064 #5): patients registered before events existed have no PatientRegistered to
+-- deliver, so their reference is copied once, here, as root. This is provisioning, not a runtime read: the service itself
+-- has no privilege on patient_data. INSERT IGNORE makes a rerun harmless and never overwrites a reference an event wrote.
+-- It runs at every compose up, which also picks up a patient created by a legacy writer while events are not flowing.
+INSERT IGNORE INTO \`${DB_NAME}\`.clinical_care_patient_ref (patient_uuid, pid, source)
+  SELECT uuid, pid, 'backfill' FROM \`${DB_NAME}\`.patient_data WHERE uuid IS NOT NULL AND pid > 0;
+FLUSH PRIVILEGES;
+SQL
+
+echo "clinical_care_outbox table and user '${CLINICAL_CARE_DB_USER}' ready."

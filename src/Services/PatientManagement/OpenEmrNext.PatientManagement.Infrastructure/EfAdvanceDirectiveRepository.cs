@@ -39,26 +39,28 @@ public sealed class EfAdvanceDirectiveRepository(PatientManagementDbContext db, 
             var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(document.Uuid);
             var driveUuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(document.DriveUuid);
 
+            // documents.id is NOT an AUTO_INCREMENT column in legacy -- it's allocated from a single global counter (the
+            // `sequences` table, one row, shared by many legacy tables) via QueryUtils::generateId() / ADOdb's GenID().
+            // We have to draw from that exact same counter, not our own, so a ever-still-running legacy writer never
+            // collides with an id we hand out.
+            //
+            // The number is drawn in its OWN short transaction, before the one below (finding F-CC-9). The UPDATE takes a
+            // row lock on the single counter row that every legacy writer also needs; drawing it inside the document
+            // insert's transaction held that lock until commit, serializing every other writer in the system behind
+            // this one's slower multi-statement insert. An allocated number that is then not used is simply skipped, as
+            // in legacy.
+            var generatedId = await AllocateDocumentIdAsync(ct);
+
             // The whole unit of work runs through an execution strategy, not a bare
             // BeginTransactionAsync/CommitAsync, because the DbContext has EnableRetryOnFailure on --
             // a user-initiated transaction has to be replayable wholesale for that to work.
             // AssignGeneratedIdentity stays outside the delegate and runs exactly once, after a
             // successful commit: it throws if called twice, and a retried attempt re-executes the
-            // whole delegate (including a fresh id from the sequences counter) from scratch.
+            // whole delegate from scratch with the same, already-allocated id.
             var strategy = db.Database.CreateExecutionStrategy();
             var id = await strategy.ExecuteAsync(async () =>
             {
-                // A transaction pins the connection for both statements below -- see
-                // DatabaseFacadeExtensions.GetLastInsertIdAsync for why that's required.
                 await using var transaction = await db.Database.BeginTransactionAsync(ct);
-
-                // documents.id is NOT an AUTO_INCREMENT column in legacy -- it's allocated from a
-                // single global counter (the `sequences` table, one row, shared by many legacy tables)
-                // via QueryUtils::generateId() / ADOdb's GenID(). We have to draw from that exact same
-                // counter, not our own, so a ever-still-running legacy writer never collides with an
-                // id we hand out.
-                await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE sequences SET id = LAST_INSERT_ID(id + 1)", ct);
-                var generatedId = await db.Database.GetLastInsertIdAsync(ct);
 
                 await db.Database.ExecuteSqlInterpolatedAsync(
                     $"""
@@ -69,6 +71,14 @@ public sealed class EfAdvanceDirectiveRepository(PatientManagementDbContext db, 
                         ({generatedId}, {uuidBytes}, 'file_url', {document.Size}, NOW(), {url}, {document.MimeType},
                          {document.OwnerId}, NOW(), {document.Pid}, {document.EffectiveDate?.ToString("yyyy-MM-dd")}, {document.Sha3Hash},
                          {document.Name}, {driveUuidBytes}, 0, 1, 0)
+                    """, ct);
+
+                // Legacy's UuidRegistry::createUuid records every uuid it hands out (finding F-CC-3). The drive_uuid is
+                // a different kind of registry entry (document_drive) and is not written here: see finding F-PM-5.
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                    INSERT INTO uuid_registry (uuid, table_name, table_id, table_vertical, couchdb, document_drive, mapped, created)
+                    VALUES ({uuidBytes}, 'documents', 'id', '', '', 0, 0, NOW())
                     """, ct);
 
                 var categoryId = await db.Database.SqlQueryRaw<long>(
@@ -101,6 +111,25 @@ public sealed class EfAdvanceDirectiveRepository(PatientManagementDbContext db, 
 
             throw;
         }
+    }
+
+    /// <summary>
+    /// Draws the next number from legacy's shared <c>sequences</c> counter in its own short transaction, so the counter's
+    /// row lock is held for microseconds, not for the length of a document insert (finding F-CC-9). A transaction is still
+    /// needed: <c>LAST_INSERT_ID()</c> is per connection, so the read must run on the same connection as the update (see
+    /// <see cref="DatabaseFacadeExtensions.GetLastInsertIdAsync"/>).
+    /// </summary>
+    private async Task<long> AllocateDocumentIdAsync(CancellationToken ct)
+    {
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE sequences SET id = LAST_INSERT_ID(id + 1)", ct);
+            var generated = await db.Database.GetLastInsertIdAsync(ct);
+            await transaction.CommitAsync(ct);
+            return generated;
+        });
     }
 
     public async Task<IReadOnlyList<AdvanceDirectiveDocumentSummary>> GetDocumentsAsync(long pid, CancellationToken ct)

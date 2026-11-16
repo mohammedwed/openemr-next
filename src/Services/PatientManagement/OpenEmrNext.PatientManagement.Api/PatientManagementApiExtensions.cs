@@ -77,6 +77,31 @@ public static class PatientManagementApiExtensions
         // Firely's own Validator/resolvers are meant to be built once and reused, not once per request.
         builder.Services.AddSingleton<Endpoints.FhirProfileValidator>();
 
+        // The outbox relay (slice 3, ADR 0066): drains patient_management_outbox and pushes each event to its consumer.
+        // The transport is the HTTP adapter behind IEventPublisher; its address, timeout and secret are set here, at the
+        // composition root, so Infrastructure reads no configuration. Disabled unless EventRelay:Enabled.
+        builder.Services.AddHttpClient<IEventPublisher, HttpEventPublisher>((provider, client) =>
+        {
+            var relay = provider.GetRequiredService<IOptions<EventRelayOptions>>().Value;
+            if (!relay.Enabled)
+                return;
+
+            client.BaseAddress = new Uri(relay.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(relay.HttpTimeoutSeconds);
+            client.DefaultRequestHeaders.Add("X-Internal-Events-Secret", relay.Secret);
+        });
+        builder.Services.AddScoped<IOutboxRelayStore, EfOutboxRelayStore>();
+        builder.Services.AddScoped(provider =>
+        {
+            var relay = provider.GetRequiredService<IOptions<EventRelayOptions>>().Value;
+            var policy = new RelayPolicy(
+                relay.BatchSize, relay.MaxAttempts, TimeSpan.FromSeconds(relay.LeaseSeconds),
+                RelayPolicy.Default.BaseBackoff, RelayPolicy.Default.MaxBackoff);
+            return new RelayOutboxUseCase(
+                provider.GetRequiredService<IOutboxRelayStore>(), provider.GetRequiredService<IEventPublisher>(), policy);
+        });
+        builder.Services.AddHostedService<OutboxRelayHostedService>();
+
         builder.Services.AddOpenApi(options => options.ConfigurePatientManagement());
 
         // Every endpoint catches its own known Domain validation exceptions and maps them to a clean

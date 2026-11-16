@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.18.3" />
+    <PackageReference Include="Microting.EntityFrameworkCore.MySql" Version="10.0.3" />
+    <!-- Pins past the transitive MySqlConnector 2.5.0's known moderate vulnerability (GHSA-473q-m89c-ghf8),
+         matching PatientManagement's and AuthFacade's pin for the same reason. -->
+    <PackageReference Include="MySqlConnector" Version="2.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenEmrNext.ClinicalCare.Composition\OpenEmrNext.ClinicalCare.Composition.csproj" />
+    <ProjectReference Include="..\OpenEmrNext.ClinicalCare.Domain\OpenEmrNext.ClinicalCare.Domain.csproj" />
+    <ProjectReference Include="..\OpenEmrNext.ClinicalCare.Domain.ReadModels\OpenEmrNext.ClinicalCare.Domain.ReadModels.csproj" />
+    <ProjectReference Include="..\OpenEmrNext.ClinicalCare.Application\OpenEmrNext.ClinicalCare.Application.csproj" />
+    <ProjectReference Include="..\OpenEmrNext.ClinicalCare.Application.Ports\OpenEmrNext.ClinicalCare.Application.Ports.csproj" />
+    <ProjectReference Include="..\OpenEmrNext.ClinicalCare.Infrastructure\OpenEmrNext.ClinicalCare.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
