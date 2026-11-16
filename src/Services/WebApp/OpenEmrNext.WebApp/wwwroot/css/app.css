@@ -128,6 +128,15 @@
     font-size: 1.1rem;
 }
 
+/* Keyboard focus must be visible. MudBlazor removes the outline on buttons and tabs and relies on a
+   shadow that is hard to see on the filled primary button, so a keyboard user could not tell where they were. */
+.mud-button-root:focus-visible,
+.mud-tab:focus-visible,
+a:focus-visible {
+    outline: 2px solid var(--mud-palette-primary) !important;
+    outline-offset: 2px;
+}
+
 /* Label/value pairs on the patient overview. A description list, so screen readers announce each pair. */
 .op-details {
     display: grid;

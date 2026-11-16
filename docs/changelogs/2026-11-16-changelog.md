@@ -1,5 +1,23 @@
 # Changelog 2026-11-16
 
+## Verified — patient frontend polish round
+
+- **Phone width:** checked by loading the page in a 390px frame (the window resize tool does not change the viewport
+  here). No sideways scroll; insurance rows stack as label/value pairs. Two problems found, not fixed yet:
+  the section action buttons wrap ("Swap levels" on two lines), and the second tab ("Advance directives")
+  is cut off at the right edge, so it is not obvious there is another tab.
+- **Light mode:** checked on the patient page. Cards and text read clearly.
+- **Keyboard focus (fixed):** MudBlazor removed the focus outline on buttons, and the filled primary button showed
+  no visible focus at all. `app.css` now draws a 2px outline for buttons, tabs, and links on `:focus-visible`.
+  Verified after a hard reload: the outline is visible on "Swap levels".
+- **503 wording:** verified. With the backend stopped and six submits from the add-policy dialog, the breaker opened
+  and the dialog showed "The patient service is temporarily unavailable. Nothing was saved. Try again in a moment."
+  No test policy was saved; after the backend was restarted the insurance table still showed only the original row.
+- **Breadcrumb:** the "Loading…" state is transient; after the load it shows the patient's name.
+- **Not yet verified:** the placeholder rows (too brief to capture) and the upload "Reading file…" state (needs a file upload).
+- **Observed gateway behavior:** with the backend down, submits fail with the generic "Could not add this policy"
+  message, not the network-error message, because the gateway answers first.
+
 ## Changed — patient frontend polish
 
 - **Register form:** field-specific required messages (replacing "Required"); typed dates allowed in the
