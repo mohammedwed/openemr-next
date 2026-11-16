@@ -5,6 +5,7 @@
 @inject IAuthFacadeClient AuthFacade
 @inject IPatientManagementClient PatientManagement
 @inject NavigationManager Navigation
+@implements IDisposable
 
 <PageTitle>Patients</PageTitle>
 
@@ -37,8 +38,9 @@
             break;
 
         case State.Loaded:
-            <MudTextField T="string" @bind-Value="_searchTerm" Label="Search by name" Class="mb-4"
-                Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" OnAdornmentClick="SearchAsync"
+            @* Typing searches after a short pause; Enter and the icon search at once. *@
+            <MudTextField T="string" Value="_searchTerm" ValueChanged="OnSearchTermChangedAsync" Label="Search by name" Class="mb-4"
+                Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" OnAdornmentClick="SearchNowAsync"
                 OnKeyDown="OnSearchKeyDownAsync" Immediate="true" Variant="Variant.Outlined" />
 
             @if (_searchFailed)
@@ -216,17 +218,58 @@
             _patients = [.. patients];
             _searchFailed = false;
         }
-        catch (PatientManagementApiException)
+        catch (Exception ex) when (ex is PatientManagementApiException or HttpRequestException)
         {
             _searchFailed = true;
         }
+    }
+
+    /// <summary>Waits this long after the last keystroke before searching.</summary>
+    private static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(350);
+
+    private CancellationTokenSource? _pendingSearch;
+
+    /// <summary>
+    /// Each keystroke cancels the previous wait, so only the last pause in typing runs a search.
+    /// </summary>
+    private async Task OnSearchTermChangedAsync(string? value)
+    {
+        _searchTerm = value;
+        _pendingSearch?.Cancel();
+        _pendingSearch?.Dispose();
+        var pending = _pendingSearch = new CancellationTokenSource();
+
+        try
+        {
+            await Task.Delay(SearchDelay, pending.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return; // typing continued; a newer wait has taken over
+        }
+
+        await SearchAsync();
+        StateHasChanged(); // this continuation runs outside a UI event, so the page must be asked to redraw
+    }
+
+    /// <summary>Enter and the search icon search at once, without waiting for a pause.</summary>
+    private async Task SearchNowAsync()
+    {
+        _pendingSearch?.Cancel();
+        await SearchAsync();
     }
 
     private async Task OnSearchKeyDownAsync(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
         {
-            await SearchAsync();
+            await SearchNowAsync();
         }
+    }
+
+    public void Dispose()
+    {
+        _pendingSearch?.Cancel();
+        _pendingSearch?.Dispose();
     }
 }

@@ -1,5 +1,15 @@
 # Changelog 2026-11-16
 
+## Changed — no-API items from the patient view backlog
+
+- **Home page sign-in** now uses the shared `TryGetCurrentUserAsync`, the same rule as the patient pages.
+  Behavior is unchanged: an API rejection shows signed out, and a network failure still throws.
+- **Patient list search** waits 350 ms after the last keystroke before searching, so typing sends one request
+  instead of one per letter (verified in the browser: one request for "Brow"). Enter and the search icon
+  still search at once. A network failure during search now shows the search error instead of escaping.
+- **Items that need an API change or a decision** are listed in `docs/patient-view-pending-decisions.md`
+  for the architect.
+
 ## Changed — shared patient section card
 
 - `Pages/Patients/PatientSectionCard.razor` holds the card, title, summary, actions, and the three states
