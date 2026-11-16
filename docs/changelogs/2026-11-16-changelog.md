@@ -431,3 +431,155 @@ Tracked here so they are not lost. Ordered by how much they matter.
 - **Verified:** every rule id cited in the set is defined exactly once (scripted check); no product names
   outside doc 14 (grep). **Not verified:** the Mermaid diagrams (including one `quadrantChart`) were not
   rendered, and the claims in doc 14 about repository status were read from documents and code, not run.
+
+## Added — M5 (Clinical Care) design and decisions
+
+- **ADR 0064:** Clinical Care shares OpenEMR's database and coexists with the legacy encounter writers;
+  slice order is Create Encounter, then Record Vitals, then relay and `PatientRegistered` consumption;
+  events travel by an HTTP push behind a port; an interim `patient_data` lookup is the named stand-in,
+  with its removal criterion.
+- **`docs/clinical-care/01-create-encounter-slice.md`:** research notes with file and line evidence, the
+  `CC-1` to `CC-11` rule catalogue (parity vs new), ownership matrix, slice plan, findings and not-verified
+  lists. Written from the playbook (`docs/microservice-playbook/`), with PatientManagement as the reference.
+- **Findings recorded, not fixed:** `form_encounter` has at least six legacy writers; M4's patient
+  registration writes no `uuid_registry` row (legacy does), which needs a check (F-CC-3).
+- ROADMAP M5 moves to In progress; its "own database" bullet is marked superseded. No code yet.
+
+## Added — Clinical Care scaffold (M5, slice 1 step: skeleton)
+
+- **Six source projects** under `src/Services/ClinicalCare/`: `Domain`, `Application.Ports`, `Application`,
+  `Infrastructure`, `Composition`, `Api`, with the same reference rules and package versions as
+  PatientManagement (playbook ARC §2). `Domain` exposes internals only to `Infrastructure` and `UnitTests`
+  (DOM-5, DOM-9).
+- **Three test projects** under `tests/Services/ClinicalCare/`: `UnitTests`, `ArchitectureTests`,
+  `IntegrationTests` (Testcontainers MariaDB, ready for the integration slice). All nine are in the solution.
+- **`LayerDependencyTests`:** the inward-only layering rules, run against assemblies loaded by name. A
+  `Every_layer_assembly_loads` test guards against a layer being renamed or dropped. While a layer has no
+  code the rules hold trivially; they gain force as code lands.
+- **Composition:** `ClinicalCareDbOptions` and `InternalGatewayOptions`, both `[Required]` and validated on
+  start (OPS-3). **Api:** shared-secret handler with constant-time compare (SEC-3), a `/api/v1` group that
+  requires authorization (SEC-1), problem-details error handling, request validation, OpenAPI and Scalar in
+  Development.
+- **Deliberately not built yet:** `Domain.ReadModels` (waits for the first real read model, ADR 0054),
+  `Client` (needs an OpenAPI snapshot), the DbContext, the Dockerfile, the compose service, the seed script
+  and the gateway route. No endpoints exist.
+- Verified: `dotnet build` of the whole solution, 0 errors. Tests were not run.
+
+## Added — Clinical Care slice 1: Create Encounter, end to end
+
+- **Domain:** `Encounter` aggregate, `EncounterCreation` (collects every error, CC-2 to CC-14), `PatientReference`,
+  `EncounterIdentity`, and `EncounterClassRule` (pure, cited). Identity and the clock are inputs, not
+  generated inside the aggregate (DOM-7, DOM-8).
+- **Ports and use case:** `CreateEncounterUseCase` resolves the patient (404 if unknown), reads the class list
+  and facility through ports, validates, and only then takes a number from the shared counter, so a rejected
+  request never burns one.
+- **Adapters (legacy anti-corruption layer):** one transaction writes `form_encounter`, the legacy `forms` row,
+  `uuid_registry` and the outbox row. Retry-safe by uuid. The encounter number comes from the shared
+  `sequences` counter in its own short transaction, so the counter's row lock is not held across the insert.
+  Events are wrapped in a pinned camelCase envelope (`eventId`, `schemaVersion`, `correlationId`, ...).
+- **API:** `POST /api/v1/encounters` (201 + Location, 400 listing every error, 404 problem+json). Request
+  attributes carry the same messages as the domain rules (ARC-11). Flat route because `/api/v1/patients/**`
+  already belongs to PatientManagement at the gateway.
+- **Deploy:** `scripts/seeds/clinical-care-db.sh` (idempotent; one commented grant each; column-level grants on
+  `users`, `groups`, `facility`, `list_options` and `patient_data`), `Dockerfile`, compose services
+  `seed-clinical-care-db` and `clinical-care` (no published port), gateway cluster and route with **its own
+  secret**, and the two new variables in `.env.example`, `new-env.sh` and CI. **An existing `.env` needs
+  `CLINICAL_CARE_DB_PASSWORD` and `CLINICAL_CARE_GATEWAY_SECRET` added by hand** (`new-env.sh` never overwrites).
+- **Tests written (not run):** domain and use-case unit tests with rule ids in the names; invariant and layer
+  architecture tests; integration tests against a MariaDB container built from the **real** `snapshots/db.sql`
+  DDL, with the **real seed script** creating the production principal the tests connect as, covering the
+  adapters, grants (what the principal may not do), concurrency of the counter, the HTTP pipeline (401s, 201,
+  400s, 404), the exception handler and startup validation; and one gateway route test for the stack.
+- **Findings recorded** (`docs/clinical-care/01-create-encounter-slice.md` section 7): provider existence is
+  unchecked (F-CC-6); PatientManagement's seed grants `SELECT` on all of `users`, including a `password` column
+  (F-CC-7); create is not idempotent (F-CC-8); PatientManagement holds the `sequences` lock across its insert
+  (F-CC-9).
+- **Verified:** `dotnet build` of the whole solution, 0 errors; the Docker image builds; `docker compose config`
+  validates. **Not verified:** no test has been run, and the stack has not been started.
+
+## Added — Clinical Care read side and typed client
+
+- **Reads:** `GET /api/v1/encounters/{uuid}` and `GET /api/v1/encounters?patientUuid=&limit=&offset=` (newest first
+  **by date**, bounded to 100 per page, default 25, `total` returned; no "all encounters" read exists). A
+  soft-deleted encounter is 404, by `NOT EXISTS` on the `newpatient` forms row, as legacy does (CC-9).
+- **Tolerant read model** (`Domain.ReadModels`, ADR 0054): a half-filled legacy row (no date, class or number, or a
+  pid that matches no patient) is returned, not turned into an error; a row with no uuid is left out of lists.
+- **`OpenEmrNext.ClinicalCare.Client`:** NSwag client generated from the committed `OpenAPIs/ClinicalCare.json`,
+  itself produced by running the real API (`scripts/dev/generate-clinicalcare-openapi.sh`). A new test fails if
+  the snapshot drifts from the live document; PatientManagement has no such guard.
+- **Tests written (not run):** adapter tests against deliberately awkward legacy rows (deleted, half-filled, no uuid,
+  late-entered old visit, several `newpatient` rows with one deleted); paging; the GET endpoints incl. 401, 404,
+  400; `PageRequest` and read use-case unit tests; OpenAPI document and drift tests; architecture rules extended
+  for `ReadModels`.
+- **Findings added:** F-CC-10 (`forms.authorized` is a `tinyint` that legacy fills with the provider id) and F-CC-11
+  (the OpenAPI document marks nullable request properties `required`, as PatientManagement's does).
+
+## Verified — Clinical Care slice 1 against tests and the running stack
+
+- **Tests run:** unit 63/63, architecture 23/23, integration 77/77, gateway stack 8/8. The first integration run was
+  74/76: one test bug (`{}` in a format string) and **one real defect**.
+- **Fixed — `forms.authorized` overflow (F-CC-10):** legacy writes the provider id into a `tinyint`; legacy runs
+  with `sql_mode = ''` and silently truncates above 127, but this service is strict, so provider id 999 failed.
+  `authorized` is now `1` (the 0/1 flag every other legacy caller passes). A recorded deviation (CC-7).
+- **End to end:** the new services were started on the live stack; an encounter was created through the gateway
+  (201, number 3 from the shared counter) and read back. **Legacy's own `EncounterService` reads the row and its
+  patient-screen list shows it** under "Office Visit". The browser half of LEG-15 is pending an OpenEMR login.
+- **Version skew found:** the stack runs OpenEMR **8.0.0**; the source tree used for research is **8.6.0-dev**,
+  and every file I cited differs. Key claims were re-verified in the running container: they hold, except that
+  8.0.0's `EncounterService` has no soft-delete handling (only its UI does), so CC-9 is stricter than 8.0.0's
+  REST service. Line citations in the slice doc are to 8.6.0-dev.
+- **`.env`:** `CLINICAL_CARE_DB_PASSWORD` and `CLINICAL_CARE_GATEWAY_SECRET` were generated and added (the file is
+  git-ignored; a copy of the previous one was kept in the session scratchpad).
+
+## Added — Clinical Care slice 2: Record Vitals
+
+- **ADR 0065:** vitals are **stored in US units, and the API takes and returns explicit units**. Found by reading the
+  8.0.0 code the stack runs: the database always holds lb, in and degF, a global only changes *display*, and the
+  wire carries a bare number, so `70` would be silently misread. A weight is `{ "value": 70, "unit": "kg" }`; an
+  unknown or wrong-dimension unit is a 400.
+- **Domain:** `Vitals`, `VitalsRecording` (collects every error; plausibility bounds, all marked *new*),
+  `UnitConversion` (legacy's `MeasurementUtils` factors, half-away-from-zero rounding like PHP), `BmiRule`
+  (legacy's formula and strictly-greater-than thresholds). BMI is derived, never accepted.
+- **Adapters:** one transaction writes `form_vitals`, the `forms` link (vitals have no encounter column), `uuid_registry`
+  and the outbox, retry-safe. Reads use `EXISTS` against `forms`, treat a stored `0` as "not recorded", and read
+  free-text blood pressure as absent instead of failing.
+- **API:** `POST`, list and get under `/api/v1/encounters/{uuid}/vitals`, `?units=metric`. The existing gateway route
+  already covers it: no new route, no new secret. `VitalsRecorded` names the measurements taken but carries no values.
+- **Deploy:** one new grant, `form_vitals` `SELECT, INSERT`.
+- **Verified:** unit 155/155, integration 114/114 (first run, no failures). On the live stack, legacy's own
+  `VitalsService` and `EncounterService::getVitals` read the row; legacy's metric display shows the same numbers as
+  `?units=metric` to the digit.
+- **Open:** F-CV-1 (`form_vitals_calculation`), and the legacy-UI view pending a login.
+
+## Added — Clinical Care slice 3: the outbox relay and `PatientRegistered` consumption (ADR 0066)
+
+- **Relay (PatientManagement):** a hosted service drains `patient_management_outbox` and pushes each event to Clinical Care over HTTP, behind
+  an `IEventPublisher` port. In-order, leased (a crashed relay loses nothing), exponential back-off, dead-letter after 8 attempts or a permanent
+  rejection (logged at error level for an alert), safe with several instances. Off unless `EventRelay:Enabled`; when on, missing config fails startup.
+- **Envelope built at publish time** from the row, so the one **pre-existing, never-delivered PascalCase row** and new rows leave identically
+  with pinned camelCase names, `eventId` (a stable v5 id derived from the row), `schemaVersion` 1 and `correlationId`. 401, 403 and 404 from the
+  consumer back off and recover rather than dead-letter; only 400 and 422 are permanent.
+- **Consumer (Clinical Care):** `POST /internal/events`, hidden from the public OpenAPI and the client, no gateway route, its **own secret and
+  scheme** (`CLINICAL_CARE_EVENTS_SECRET`): the gateway cannot deliver events and the relay cannot call the public API. Idempotent on `eventId`:
+  the id and the effect commit in one transaction. Unknown types are `202`, unsupported versions `400`, a tolerant reader.
+- **The `patient_data` stand-in is gone.** Clinical Care keeps a reference (uuid, pid) in `clinical_care_patient_ref`; its encounter reader joins
+  that, and its `patient_data` grant is **revoked**. Patients registered before events existed are copied once by the seed script, as root.
+- **Seed scripts now `REVOKE ALL` before granting**, so a removed or narrowed grant really disappears from a database that ran an older version.
+- **PatientManagement fixes in the same change:** **F-CC-7** `users` grant narrowed from the whole table (it has a `password` column) to
+  `(id, uuid)`; **F-CC-3** it now records the uuids it creates (`patient_data`, `insurance_data`, `documents`) in legacy's `uuid_registry`,
+  in the same transaction; **F-CC-9** a document's number is drawn from the shared counter in its own short transaction instead of holding the
+  counter's row lock across the insert.
+- **Verified:** Clinical Care unit 160, architecture 31, integration 139; PatientManagement unit 166, integration 73 (all pre-existing tests
+  still pass); all green on first run. **Live:** the old row was delivered; a new patient's encounter is `404` at once and `201` about 5 s later;
+  with the consumer stopped the event stays in the outbox backing off and is delivered within ~9 s of it returning (and the patient registered
+  during the outage then gets an encounter); both grant changes confirmed on the live database; FHIR still `200` on the narrowed grant.
+- **New secret:** `CLINICAL_CARE_EVENTS_SECRET` (in `.env.example`, `new-env.sh`, CI, compose). Added to your local `.env`.
+- **Findings:** F-PM-1 to F-PM-7 in `docs/clinical-care/03-patient-registered-consumption.md` (the 5 s consistency window, `drive_uuid` registry
+  entries, no purge of processed events, event id derivation, no dead-letter alert yet).
+
+## Verified — shadow comparison of encounter creation (ROADMAP M5)
+
+- Created three synthetic scenarios through **legacy's own `insertEncounter`** and through the new API on the live stack, and compared every column
+  of `form_encounter`, `forms` and `uuid_registry`: **142 identical, 2 differ**, both being rule CC-4 (REST-path midnight date vs a real time).
+  Details and limits in `docs/clinical-care/01-create-encounter-slice.md` section 12.
+

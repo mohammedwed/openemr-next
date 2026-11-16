@@ -68,3 +68,6 @@ old one's status is updated to point to it.
 | [0060](0060-patientmanagement-is-deployed-and-reachable-through-the-gateway.md) | PatientManagement is deployed and reachable through the Gateway; WebApp gets a first frontend slice | Accepted | 2026-11-15 |
 | [0061](0061-webapp-covers-insurance-and-advance-directives.md) | WebApp's frontend extends to insurance and advance directives | Accepted | 2026-11-15 |
 | [0062](0062-webapp-chrome-flattens-toward-the-plain-blazor-template.md) | WebApp's chrome flattens toward the plain Blazor template's look | Accepted | 2026-11-15 |
+| [0064](0064-clinical-care-shares-the-legacy-database-and-coexists-with-legacy-encounter-writers.md) | Clinical Care shares the legacy database and coexists with the legacy encounter writers | Accepted | 2026-11-16 |
+| [0065](0065-vitals-are-stored-in-us-units-and-the-api-takes-explicit-units.md) | Vitals are stored in US units, and the API takes and returns explicit units | Accepted | 2026-11-16 |
+| [0066](0066-patient-registered-reaches-clinical-care-through-an-outbox-relay-over-http.md) | PatientRegistered reaches Clinical Care through an outbox relay over HTTP, with a secret of its own | Accepted | 2026-11-16 |

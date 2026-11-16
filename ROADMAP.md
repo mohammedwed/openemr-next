@@ -44,7 +44,7 @@ a compatibility constraint.
 | M2 | Schema inventory for slice contexts | Done | Oct 4 (entities scaffolded), Nov 13 (inventory) |
 | M3 | Gateway and token validation | In progress | Nov 13 |
 | M4 | Patient Management service | In progress | Nov 14 (registration, duplicate detection, insurance, advance directives, and the FHIR Patient API all done; the FHIR API now uses the real Firely .NET SDK with US Core validation, ADR 0052; insurance swap is a multi-entity aggregate, ADR 0053; only patient merge remains, deferred to M5+, ADR 0051; WebApp frontend for the patient list, patient view, and registration merged Nov 16, PR #73) |
-| M5 | Clinical Care service | Not started | — |
+| M5 | Clinical Care service | In progress | Nov 16 (slices 1 Create Encounter, 2 Record Vitals and 3 relay + `PatientRegistered` consumption built, tested and verified on the running stack; legacy's own `EncounterService` and `VitalsService` read the rows; the `patient_data` stand-in is removed; shadow comparison against legacy creation done: 142 columns identical, 2 differ by documented rule; remaining: browser check of the legacy UI (needs a login) and the layered review) |
 | M6 | Portfolio polish | Not started | — |
 
 **Done beyond the original plan:** a privilege boundary that limits the
@@ -299,15 +299,22 @@ block further M4 work are:
 4. Server-side paging and search for the patient list.
 5. Webapp tests, which need an approval to run.
 
-### M5: Clinical Care service (not started)
+### M5: Clinical Care service (in progress)
 
-- Own database and migrations, slim model from `form_encounter` and related
-  tables
+- ~~Own database and migrations~~ **Superseded by ADR 0064:** writes into OpenEMR's own database through
+  a least-privilege user, like M4 (ADR 0049); the legacy encounter screen stays live, so creation is the
+  only write in slice 1 (shared `sequences` counter keeps encounter numbers safe)
 - `Encounter` and `Vitals` aggregates
-- Anti-corruption adapter for `form_encounter`
-- Consumes `PatientRegistered` through the outbox
+- Anti-corruption adapter for `form_encounter`, `forms` and (slice 2) `form_vitals`
+- Consumes `PatientRegistered`: a relay in PatientManagement pushes outbox events over HTTP to a
+  secret-gated Clinical Care endpoint, behind an `IEventPublisher` port; idempotent on event id
 - Shadow comparison: legacy and new encounter creation match for the synthetic
   scenarios
+
+**Slices (ADR 0064, MIG-10), all built:** 1 Create Encounter (`docs/clinical-care/01-create-encounter-slice.md`),
+2 Record Vitals (`02-record-vitals-slice.md`, ADR 0065), 3 relay and `PatientRegistered` consumption
+(`03-patient-registered-consumption.md`, ADR 0066), which removed the interim `patient_data` lookup. **Shadow comparison done**
+(`01-create-encounter-slice.md` section 12). **Remaining:** the layered review and the legacy-UI check.
 
 **Exit criteria:** An encounter is created for a registered patient and vitals
 are recorded, end to end. The shadow comparison shows no unexplained

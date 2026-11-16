@@ -118,7 +118,8 @@
 | API-14/15/16/17 | `src/Services/Gateway/…/Program.cs` (specific routes, per-cluster secret transform, original Host, TLS, HSTS); ADR 0033, 0034, 0039, 0060 |
 | API-18 | ADR 0030 |
 | EVT-1 | `EfPatientRegistry` (patient + outbox in one `SaveChanges`) |
-| EVT-2…EVT-14 | **Target** in `docs/patient-management/05-workflows-and-events.md` §5-6 (not yet built) |
+| EVT-2…EVT-8 | **Built 2026-11-16** for `PatientRegistered`: envelope at publish time (`OutboundEventFactory`), relay with leases, back-off and dead letters (`RelayOutboxUseCase`, `EfOutboxRelayStore`), HTTP adapter behind `IEventPublisher`, idempotent consumer (`/internal/events`, `EfPatientReferenceStore`); ADR 0066, `docs/clinical-care/03-patient-registered-consumption.md` |
+| EVT-9…EVT-14 | **Target** in `docs/patient-management/05-workflows-and-events.md` §5-6 (not yet built) |
 
 ### 07 Security
 
