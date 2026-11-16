@@ -1,5 +1,12 @@
 # Changelog 2026-11-16
 
+## Changed — patient view polish (webapp only, no API change)
+
+- Browser tab title shows the patient's name instead of "Patient".
+- Date of birth on the Overview shows the age in completed years: "1990-01-01 (36 years)".
+- Document sizes read "11 B", "1.5 KB", or "2.0 MB" instead of raw byte counts (`Shared/Formatting.cs`).
+- Verified in the browser: title, age, and size. Not changed: the API, the client, and package references.
+
 ## Changed — patient view opens on an Overview with basic information
 
 - New first tab, **Overview**, is the default. It shows name, patient ID, date of birth, and email as a

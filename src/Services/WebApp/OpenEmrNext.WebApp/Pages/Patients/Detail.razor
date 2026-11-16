@@ -6,7 +6,7 @@
 @inject IPatientManagementClient PatientManagement
 @inject NavigationManager Navigation
 
-<PageTitle>Patient</PageTitle>
+<PageTitle>@(_patient is null ? "Patient" : $"{_patient.FirstName} {_patient.LastName}")</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-0">
     @switch (_state)
@@ -47,7 +47,7 @@
                         <dt>Patient ID</dt>
                         <dd>@(patient.PublicPatientId ?? patient.Pid.ToString())</dd>
                         <dt>Date of birth</dt>
-                        <dd>@(patient.DateOfBirth?.ToString("yyyy-MM-dd") ?? "—")</dd>
+                        <dd>@Formatting.DateOfBirthWithAge(patient.DateOfBirth, DateOnly.FromDateTime(DateTime.Today))</dd>
                         <dt>Email</dt>
                         <dd>@(string.IsNullOrWhiteSpace(patient.Email) ? "—" : patient.Email)</dd>
                     </dl>

@@ -43,7 +43,7 @@ else
         <RowTemplate Context="document">
             <MudTd DataLabel="Type">@CodeLabels.Of(document.Type)</MudTd>
             <MudTd DataLabel="Name">@document.Name</MudTd>
-            <MudTd DataLabel="Size">@document.Size bytes</MudTd>
+            <MudTd DataLabel="Size">@Formatting.FileSize(document.Size)</MudTd>
             <MudTd DataLabel="Effective date">@(document.EffectiveDate?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
             <MudTd>
                 @* Named per document: a row of identical "Download" links is not distinguishable to a screen reader. *@
