@@ -200,4 +200,44 @@ public class EncounterCreationTests
 
         Assert.Equal(5, ex.Errors.Count);
     }
+
+    [Theory]
+    [InlineData("0001-01-01T00:00:00")]
+    [InlineData("1899-12-31T23:59:59")]
+    [InlineData("2027-11-18T00:00:00")]   // more than a year past the injected "now" (2026-11-16)
+    [InlineData("9999-12-31T23:59:59")]
+    public void CC_17_an_encounter_or_onset_date_outside_1900_to_a_year_ahead_is_rejected(string text)
+    {
+        var date = DateTime.Parse(text);
+
+        Assert.Contains("Date must be between 1900-01-01 and one year from now.",
+            Assert.Throws<EncounterValidationException>(() => Create(date: date)).Errors);
+        Assert.Contains("Onset date must be between 1900-01-01 and one year from now.",
+            Assert.Throws<EncounterValidationException>(() => Create(onsetDate: date)).Errors);
+    }
+
+    [Theory]
+    [InlineData("1900-01-01T00:00:00")]
+    [InlineData("1970-06-15T08:00:00")]
+    [InlineData("2027-11-16T09:30:00")]   // exactly a year ahead is allowed: a scheduled visit
+    public void CC_17_the_edges_of_the_date_range_are_accepted(string text)
+    {
+        var date = DateTime.Parse(text);
+
+        Assert.Equal(date, Create(date: date).Date);
+        Assert.Equal(date, Create(onsetDate: date).OnsetDate);
+    }
+
+    [Theory]
+    [InlineData(3_000_000_000L)]
+    [InlineData(int.MaxValue + 1L)]
+    public void R_1_a_provider_id_that_does_not_fit_the_int_column_is_rejected(long providerId)
+    {
+        Assert.Contains("ProviderId must identify the acting provider.",
+            Assert.Throws<EncounterValidationException>(() => Create(providerId: providerId)).Errors);
+    }
+
+    [Fact]
+    public void R_1_the_largest_provider_id_the_column_holds_is_accepted() =>
+        Assert.Equal(int.MaxValue, Create(providerId: int.MaxValue).ProviderId);
 }

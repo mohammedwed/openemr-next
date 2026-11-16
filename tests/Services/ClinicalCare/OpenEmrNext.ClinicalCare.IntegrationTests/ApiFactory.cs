@@ -16,7 +16,8 @@ internal static class ApiFactory
     public const string EventsSecretHeader = "X-Internal-Events-Secret";
 
     public static WebApplicationFactory<Program> Create(
-        ClinicalCareContainerFixture fixture, Action<IWebHostBuilder>? configure = null, string? secret = Secret)
+        ClinicalCareContainerFixture fixture, Action<IWebHostBuilder>? configure = null, string? secret = Secret,
+        string? eventsSecret = EventsSecret)
     {
         return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -32,7 +33,8 @@ internal static class ApiFactory
                 };
                 if (secret is not null)
                     values.Add(new("InternalGateway:Secret", secret));
-                values.Add(new("InternalEvents:Secret", EventsSecret));
+                if (eventsSecret is not null)
+                    values.Add(new("InternalEvents:Secret", eventsSecret));
                 config.AddInMemoryCollection(values);
             });
             configure?.Invoke(builder);

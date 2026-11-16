@@ -238,4 +238,12 @@ public class EncounterEndpointTests(ClinicalCareContainerFixture fixture) : IAsy
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/v1/encounters/{Guid.NewGuid()}")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/v1/encounters?patientUuid={EncounterTestData.PatientUuid}")).StatusCode);
     }
+
+    [Fact]
+    public async Task OPS_3_the_service_refuses_to_start_without_its_events_secret_so_it_never_silently_accepts_events_from_anyone()
+    {
+        using var factory = ApiFactory.Create(fixture, eventsSecret: null);
+
+        await Assert.ThrowsAnyAsync<Exception>(() => Task.Run(() => factory.CreateClient()));
+    }
 }

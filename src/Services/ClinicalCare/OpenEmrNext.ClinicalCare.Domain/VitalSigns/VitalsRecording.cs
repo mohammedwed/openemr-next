@@ -10,8 +10,23 @@ namespace OpenEmrNext.ClinicalCare.Domain.VitalSigns;
 public sealed record VitalsRecording
 {
     // Plausibility bounds (CV-3, all (new)): wide on purpose. They catch a typo or a wrong unit, not a clinical judgement.
+    public const decimal MinWeightPounds = 0.1m;
     public const decimal MaxWeightPounds = 1500m;
+
+    /// <summary>
+    /// A height floor, not only a ceiling (review finding R-2): BMI is weight over height squared, so a height near zero makes a
+    /// BMI far larger than <c>form_vitals.BMI</c> (<c>decimal(12,6)</c>) can hold, a 500. With these floors the largest possible
+    /// BMI is 1500 / 5^2 * 703, about 42,000.
+    /// </summary>
+    public const decimal MinHeightInches = 5m;
     public const decimal MaxHeightInches = 120m;
+
+    /// <summary>
+    /// The largest number accepted before any conversion (review finding R-3). <c>System.Decimal</c> overflows inside a
+    /// multiplication long before any plausibility bound is reached (<c>7e28 kg * 2.2</c>), which was a 500; anything above this
+    /// is rejected as out of bounds first. Far above every legitimate raw value (1500 lb is under 700 kg and about 3,300 cm-equivalents).
+    /// </summary>
+    public const decimal MaxRawMeasurement = 1_000_000m;
     public const decimal MinTemperatureFahrenheit = 50m;
     public const decimal MaxTemperatureFahrenheit = 120m;
     public const decimal MaxCircumferenceInches = 200m;
@@ -80,8 +95,8 @@ public sealed record VitalsRecording
         var errors = new List<string>();
         var taken = new List<string>();
 
-        var weight = Convert(MeasurementKind.Weight, "Weight", input.Weight, 0m, MaxWeightPounds, "lb", errors, taken, "weight");
-        var height = Convert(MeasurementKind.Height, "Height", input.Height, 0m, MaxHeightInches, "in", errors, taken, "height");
+        var weight = Convert(MeasurementKind.Weight, "Weight", input.Weight, MinWeightPounds, MaxWeightPounds, "lb", errors, taken, "weight", lowerInclusive: true);
+        var height = Convert(MeasurementKind.Height, "Height", input.Height, MinHeightInches, MaxHeightInches, "in", errors, taken, "height", lowerInclusive: true);
         var temperature = Convert(MeasurementKind.Temperature, "Temperature", input.Temperature,
             MinTemperatureFahrenheit, MaxTemperatureFahrenheit, "degF", errors, taken, "temperature", lowerInclusive: true);
         var waist = Convert(MeasurementKind.WaistCircumference, "Waist circumference", input.WaistCircumference, 0m,
@@ -94,12 +109,19 @@ public sealed record VitalsRecording
         CheckWhole(input.Pulse, MaxPulse, "Pulse", errors, taken, "pulse");
         CheckWhole(input.Respiration, MaxRespiration, "Respiration", errors, taken, "respiration");
 
+        // form_vitals.oxygen_saturation is decimal(6,2); rounding here means the value the caller is told about is the one stored.
+        decimal? saturationStored = null;
         if (input.OxygenSaturation is { } saturation)
         {
             if (saturation <= 0m || saturation > MaxOxygenSaturation)
+            {
                 errors.Add($"Oxygen saturation must be greater than 0 and at most {MaxOxygenSaturation:0}.");
+            }
             else
+            {
+                saturationStored = Math.Round(saturation, 2, MidpointRounding.AwayFromZero);
                 taken.Add("oxygenSaturation");
+            }
         }
 
         if (input.Note is { Length: > MaxTextLength })
@@ -112,8 +134,9 @@ public sealed record VitalsRecording
         if (taken.Count == 0 && errors.Count == 0)
             errors.Add("At least one measurement is required.");
 
-        // CV-10 sibling rule: the provider must be identifiable (as CC-10 for encounters).
-        if (providerId <= 0)
+        // The provider must be identifiable (as CC-10 for encounters), and its id must fit the int column legacy keeps it in
+        // (review finding R-1).
+        if (providerId is <= 0 or > EncounterCreation.MaxProviderId)
             errors.Add("ProviderId must identify the acting provider.");
 
         if (errors.Count > 0)
@@ -128,7 +151,7 @@ public sealed record VitalsRecording
 
         return new VitalsRecording(
             encounter, providerId, now, weight, height, temperature, method, input.Systolic, input.Diastolic,
-            input.Pulse, input.Respiration, input.OxygenSaturation, waist, head, bmi, status,
+            input.Pulse, input.Respiration, saturationStored, waist, head, bmi, status,
             string.IsNullOrEmpty(input.Note) ? null : input.Note, taken);
     }
 
@@ -145,19 +168,30 @@ public sealed record VitalsRecording
             return null;
         }
 
+        // Before any arithmetic: a number this large would overflow System.Decimal inside the conversion (review finding R-3).
+        // It is out of bounds in every unit, so it is reported with the same message as any other out-of-bounds value.
+        if (Math.Abs(quantity.Value) > MaxRawMeasurement)
+        {
+            errors.Add(BoundsMessage(label, lower, upper, storedUnit, lowerInclusive));
+            return null;
+        }
+
         var stored = UnitConversion.ToStored(kind, quantity);
         var aboveLower = lowerInclusive ? stored >= lower : stored > lower;
         if (!aboveLower || stored > upper)
         {
-            errors.Add(lowerInclusive
-                ? $"{label} must be between {lower:0} and {upper:0} {storedUnit}."
-                : $"{label} must be greater than {lower:0} and at most {upper:0} {storedUnit}.");
+            errors.Add(BoundsMessage(label, lower, upper, storedUnit, lowerInclusive));
             return null;
         }
 
         taken.Add(name);
         return stored;
     }
+
+    private static string BoundsMessage(string label, decimal lower, decimal upper, string unit, bool lowerInclusive) =>
+        lowerInclusive
+            ? $"{label} must be between {lower:0.##} and {upper:0.##} {unit}."
+            : $"{label} must be greater than {lower:0.##} and at most {upper:0.##} {unit}.";
 
     private static void CheckWhole(int? value, int max, string label, List<string> errors, List<string> taken, string name)
     {

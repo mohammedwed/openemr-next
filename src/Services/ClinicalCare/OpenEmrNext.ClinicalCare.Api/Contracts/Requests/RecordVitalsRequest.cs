@@ -48,4 +48,4 @@ public sealed record RecordVitalsRequest(
     QuantityRequest? WaistCircumference,
     QuantityRequest? HeadCircumference,
     [StringLength(255, ErrorMessage = "Note must be at most 255 characters.")] string? Note,
-    [Range(1, long.MaxValue, ErrorMessage = "ProviderId must identify the acting provider.")] long ProviderId);
+    [Range(1, int.MaxValue, ErrorMessage = "ProviderId must identify the acting provider.")] long ProviderId);

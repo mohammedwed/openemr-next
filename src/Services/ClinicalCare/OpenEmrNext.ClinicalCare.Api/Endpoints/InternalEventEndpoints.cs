@@ -41,6 +41,11 @@ public static class InternalEventEndpoints
             return ValidationProblems.Single(
                 $"{PatientRegistered} schemaVersion {request.SchemaVersion} is not supported; this service reads version {SupportedSchemaVersion}.");
 
+        // A missing payload property leaves an Undefined JsonElement, which throws (not a JsonException) if deserialized: that was a
+        // 500 (review finding R-4), and a 500 is "retry me", for an event that can never succeed.
+        if (request.Payload.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
+            return ValidationProblems.Single($"The {PatientRegistered} event has no payload.");
+
         PatientRegisteredPayload? payload;
         try
         {

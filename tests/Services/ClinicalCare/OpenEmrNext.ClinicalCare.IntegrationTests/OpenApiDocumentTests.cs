@@ -98,11 +98,10 @@ public class OpenApiDocumentTests : IDisposable
         Assert.Equal(1, schema.GetProperty("posCode").GetProperty("minimum").GetInt32());
         Assert.Equal(99, schema.GetProperty("posCode").GetProperty("maximum").GetInt32());
 
-        // [Range(1, long.MaxValue)] is a "must be positive" idiom, not a real upper bound (the transformer omits a
-        // wrong "maximum" rather than write a lossy one).
+        // providerId is bounded by the int column legacy keeps it in (review finding R-1), so the document states a real maximum.
         var providerId = schema.GetProperty("providerId");
         Assert.Equal(1, providerId.GetProperty("minimum").GetInt32());
-        Assert.False(providerId.TryGetProperty("maximum", out _));
+        Assert.Equal(int.MaxValue, providerId.GetProperty("maximum").GetInt64());
     }
 
     [Fact]

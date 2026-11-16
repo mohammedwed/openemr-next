@@ -487,6 +487,7 @@
             "format": "int32"
           },
           "providerId": {
+            "maximum": 2147483647,
             "minimum": 1,
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
@@ -948,6 +949,7 @@
             ]
           },
           "providerId": {
+            "maximum": 2147483647,
             "minimum": 1,
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
