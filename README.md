@@ -473,6 +473,13 @@ they apply outside this repository:
 - [Starting a legacy system fast in a test pipeline](docs/fast-legacy-stack-startup.md) —
   how this project's snapshot-and-restore cuts the legacy stack's CI boot from
   twenty minutes to under one
+- [Microservice migration playbook](docs/microservice-playbook/README.md) —
+  how to extract a domain service from a legacy system with DDD and hexagonal
+  architecture: principles and early decisions, discovery, layering, domain
+  modeling, legacy-data integration, APIs and events, security, testing,
+  operations, a milestone roadmap, checklists, templates, and the lessons
+  learned building Patient Management. Framework-neutral; the last document
+  maps every rule to this repository
 
 ## License
 
