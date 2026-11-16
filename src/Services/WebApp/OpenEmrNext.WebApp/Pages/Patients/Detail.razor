@@ -53,7 +53,7 @@
                 </dl>
             </MudPaper>
 
-            <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+            <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
                 <MudTabPanel Text="@WithCount("Insurance", _policyCount)">
                     <PatientInsurancePanel @key="patient.Pid" Pid="patient.Pid" Changed="RefreshCountsAsync" />
                 </MudTabPanel>

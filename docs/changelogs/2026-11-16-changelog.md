@@ -1,5 +1,13 @@
 # Changelog 2026-11-16
 
+## Changed — breathing room in the patient view tabs
+
+- Tab panels use more padding (`pa-6`). Insurance and document tables are no longer dense, so rows have
+  normal height. The gap under each section heading is larger, and the divider between status and documents has more space.
+- Verified in the browser: layout only.
+- Open: the insurance row displayed "Secondary" in an earlier check and "Primary" in the latest one. No swap
+  was submitted (only the dialog was opened and cancelled). The cause has not been confirmed.
+
 ## Changed — patient view polish, round 2
 
 - **Breadcrumb names the patient** ("Patients / BrowserTest Patient"). The layout builds breadcrumbs from the
