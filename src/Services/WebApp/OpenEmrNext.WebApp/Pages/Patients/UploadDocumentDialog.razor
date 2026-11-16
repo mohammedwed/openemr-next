@@ -37,9 +37,13 @@
     /// </summary>
     private const long PlaceholderUserId = 1;
 
-    /// <summary>30 MB, matching <c>AdvanceDirectiveDocument.MaxContentBytes</c> -- the real limit the
-    /// Domain factory enforces. <c>InputFile</c>'s own default (512 KB) would reject real documents first.</summary>
-    private const long MaxUploadBytes = 30 * 1024 * 1024;
+    /// <summary>
+    /// 20 MB, below the 30 MB the Domain allows (<c>AdvanceDirectiveDocument.MaxContentBytes</c>). The file
+    /// travels as base64 inside a JSON body, which grows by about a third, and the API's default request
+    /// size limit (about 30 MB) would reject larger files after they were already read. Raising this means
+    /// raising the API's limit first.
+    /// </summary>
+    private const long MaxUploadBytes = 20 * 1024 * 1024;
 
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter, EditorRequired] public long Pid { get; set; }
@@ -57,6 +61,16 @@
     private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
     {
         var file = e.File;
+        _error = null;
+        _contentBase64 = null;
+        _fileName = null;
+
+        if (file.Size > MaxUploadBytes)
+        {
+            _error = $"That file is {Formatting.FileSize(file.Size)}. Documents must be 20 MB or smaller.";
+            return;
+        }
+
         using var stream = file.OpenReadStream(MaxUploadBytes);
         using var buffer = new MemoryStream();
         await stream.CopyToAsync(buffer);
@@ -91,6 +105,10 @@
         catch (PatientManagementApiException ex)
         {
             _error = PatientManagementErrorFormatter.Describe(ex, "Could not upload this document. Please try again.");
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Could not reach the patient service. Check your connection, then try again.";
         }
         finally
         {

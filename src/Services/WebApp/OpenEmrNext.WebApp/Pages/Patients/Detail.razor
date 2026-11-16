@@ -38,11 +38,10 @@
         case State.Ready:
             var patient = _patient!;
 
-            @* Basic information stays on screen above the tabs, so it is never one click away. The tabs
-               hold the two areas that are worth opening on demand. Each panel is keyed on the patient, so
-               switching patients rebuilds it. *@
+            @* Basic information stays above the tabs, so it is never one click away. The name is the page's
+               heading. Sections are loaded here, once, and each panel renders what it is given. *@
             <MudPaper Outlined="true" Class="pa-5 mb-6">
-                <MudText Typo="Typo.h4" Class="mb-4">@patient.FirstName @patient.LastName</MudText>
+                <MudText Typo="Typo.h4" HtmlTag="h1" Class="mb-4">@patient.FirstName @patient.LastName</MudText>
                 <dl class="op-details">
                     <dt>Patient ID</dt>
                     <dd>@(patient.PublicPatientId ?? patient.Pid.ToString())</dd>
@@ -54,12 +53,17 @@
             </MudPaper>
 
             <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
-                <MudTabPanel Text="@WithCount("Insurance", _policyCount)">
-                    <PatientInsurancePanel @key="patient.Pid" Pid="patient.Pid" Changed="RefreshCountsAsync" />
+                <MudTabPanel Text="@WithCount("Insurance", _policies?.Count)">
+                    <PatientInsurancePanel @key="patient.Pid" Pid="patient.Pid"
+                        Policies="_policies" Error="_policiesError"
+                        Changed="ReloadSectionsAsync" OnRetry="ReloadSectionsAsync" />
                 </MudTabPanel>
 
-                <MudTabPanel Text="@WithCount("Advance directives", _documentCount)">
-                    <PatientAdvanceDirectivesPanel @key="patient.Pid" Pid="patient.Pid" Changed="RefreshCountsAsync" />
+                <MudTabPanel Text="@WithCount("Advance directives", _documents?.Count)">
+                    <PatientAdvanceDirectivesPanel @key="patient.Pid" Pid="patient.Pid"
+                        Status="_status" StatusError="_statusError"
+                        Documents="_documents" DocumentsError="_documentsError"
+                        Changed="ReloadSectionsAsync" OnRetry="ReloadSectionsAsync" />
                 </MudTabPanel>
             </MudTabs>
             break;
@@ -75,51 +79,15 @@
     private PatientSummaryResponse? _patient;
     private Guid? _loadedUuid;
 
-    // Tab counts. Null means "not known" (still loading, or the call failed), and the tab shows no count.
-    private int? _policyCount;
-    private int? _documentCount;
+    // Null means "not loaded yet". Reloads keep the previous data on screen until the new data arrives.
+    private IReadOnlyList<EffectiveInsuranceResponse>? _policies;
+    private bool _policiesError;
+    private AdvanceDirectiveStatusResponse? _status;
+    private bool _statusError;
+    private IReadOnlyList<AdvanceDirectiveDocumentResponse>? _documents;
+    private bool _documentsError;
 
     private static string WithCount(string label, int? count) => count is null ? label : $"{label} ({count})";
-
-    /// <summary>Re-reads the two counts. Panels call this after a successful change so the tabs stay accurate.</summary>
-    private async Task RefreshCountsAsync()
-    {
-        if (_patient is not { } patient)
-        {
-            return;
-        }
-
-        var pid = patient.Pid;
-        try
-        {
-            var policies = await PatientManagement.GetEffectiveInsuranceAsync(pid, null);
-            if (_patient?.Pid == pid)
-            {
-                _policyCount = policies.Count;
-            }
-        }
-        catch (PatientManagementApiException)
-        {
-            _policyCount = null;
-        }
-
-        try
-        {
-            var documents = await PatientManagement.GetAdvanceDirectiveDocumentsAsync(pid);
-            if (_patient?.Pid == pid)
-            {
-                _documentCount = documents.Count;
-            }
-        }
-        catch (PatientManagementApiException)
-        {
-            _documentCount = null;
-        }
-
-        StateHasChanged();
-    }
-
-    public void Dispose() => PatientPage.PatientName = null;
 
     private string LoginUrl => $"/oidc/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
 
@@ -139,15 +107,16 @@
     }
 
     /// <summary>
-    /// Loads the patient header data. The insurance and advance-directive panels load their own data.
-    /// A response for a patient the user has already left is dropped.
+    /// Loads the patient. Only the patient gates the page: a failed section shows its own message and retry.
     /// </summary>
     private async Task LoadPatientAsync()
     {
         var requested = Uuid;
         _patient = null;
-        _policyCount = null;
-        _documentCount = null;
+        _policies = null;
+        _status = null;
+        _documents = null;
+        _policiesError = _statusError = _documentsError = false;
         _state = State.Loading;
         PatientPage.PatientName = null;
 
@@ -168,19 +137,98 @@
             _patient = patient;
             _state = State.Ready;
             PatientPage.PatientName = $"{patient.FirstName} {patient.LastName}";
-            await RefreshCountsAsync();
         }
         catch (PatientManagementApiException ex) when (ex.StatusCode == 404)
         {
             _state = State.NotFound;
+            return;
         }
         catch (PatientManagementApiException ex) when (ex.StatusCode is 401 or 403)
         {
             _state = State.SignedOut;
+            return;
         }
         catch (Exception ex) when (ex is PatientManagementApiException or HttpRequestException)
         {
             _state = State.Error;
+            return;
         }
+
+        // Sections load after the patient is shown. A failure here never changes the page state.
+        await LoadSectionsAsync(_patient!.Pid);
     }
+
+    /// <summary>Re-reads every section. Called after a change (so the data and tab counts stay current) and by retry.</summary>
+    private Task ReloadSectionsAsync() => _patient is null ? Task.CompletedTask : LoadSectionsAsync(_patient.Pid);
+
+    private Task LoadSectionsAsync(long pid) =>
+        Task.WhenAll(LoadPoliciesAsync(pid), LoadStatusAsync(pid), LoadDocumentsAsync(pid));
+
+    private async Task LoadPoliciesAsync(long pid)
+    {
+        try
+        {
+            var policies = await PatientManagement.GetEffectiveInsuranceAsync(pid, null);
+            if (_patient?.Pid == pid)
+            {
+                _policies = [.. policies];
+                _policiesError = false;
+            }
+        }
+        catch (Exception ex) when (ex is PatientManagementApiException or HttpRequestException)
+        {
+            if (_patient?.Pid == pid)
+            {
+                _policiesError = true;
+            }
+        }
+
+        StateHasChanged(); // each section appears as soon as it is ready, not when the slowest one finishes
+    }
+
+    private async Task LoadStatusAsync(long pid)
+    {
+        try
+        {
+            var status = await PatientManagement.GetAdvanceDirectiveStatusAsync(pid);
+            if (_patient?.Pid == pid)
+            {
+                _status = status;
+                _statusError = false;
+            }
+        }
+        catch (Exception ex) when (ex is PatientManagementApiException or HttpRequestException)
+        {
+            if (_patient?.Pid == pid)
+            {
+                _statusError = true;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task LoadDocumentsAsync(long pid)
+    {
+        try
+        {
+            var documents = await PatientManagement.GetAdvanceDirectiveDocumentsAsync(pid);
+            if (_patient?.Pid == pid)
+            {
+                _documents = [.. documents];
+                _documentsError = false;
+            }
+        }
+        catch (Exception ex) when (ex is PatientManagementApiException or HttpRequestException)
+        {
+            if (_patient?.Pid == pid)
+            {
+                _documentsError = true;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    public void Dispose() => PatientPage.PatientName = null;
 }

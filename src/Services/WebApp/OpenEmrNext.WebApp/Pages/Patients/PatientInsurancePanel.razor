@@ -1,30 +1,15 @@
 @using OpenEmrNext.PatientManagement.Client
 @using OpenEmrNext.WebApp.Shared
-@using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
-@inject IPatientManagementClient PatientManagement
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
-@* Read-only by default. Every change opens its own dialog, so a view can never be edited by accident. *@
-@if (_loading)
-{
-    <MudProgressCircular Indeterminate="true" Color="Color.Primary" role="status" aria-label="Loading insurance" />
-}
-else
-{
-    @if (_insuranceError)
-    {
-        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">
-            Could not load insurance.
-            <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="LoadAsync">Try again</MudButton>
-        </MudAlert>
-    }
-
-    <MudPaper Outlined="true" Class="pa-5">
+@* Shows the insurance it is given, read-only. Every change opens its own dialog and then asks the parent to
+   reload, so the table and the tab count always come from the same data. *@
+<MudPaper Outlined="true" Class="pa-5">
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-5">
         <MudText Typo="Typo.h6">Effective insurance today</MudText>
         <MudStack Row="true" Spacing="2">
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="OpenSwapAsync" Disabled="!_effectiveInsurance.Any(p => p.Uuid is not null)">
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="OpenSwapAsync" Disabled="!CanSwap">
                 Swap levels
             </MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenAddPolicyAsync">
@@ -33,69 +18,81 @@ else
         </MudStack>
     </MudStack>
 
-    <MudTable Items="_effectiveInsurance" Hover="true" Elevation="0">
-        <HeaderContent>
-            <MudTh>Level</MudTh>
-            <MudTh>Company id</MudTh>
-            <MudTh>Start</MudTh>
-            <MudTh>End</MudTh>
-        </HeaderContent>
-        <RowTemplate Context="policy">
-            <MudTd DataLabel="Level">@CodeLabels.Of(policy.Level)</MudTd>
-            <MudTd DataLabel="Company id">@policy.CompanyId</MudTd>
-            <MudTd DataLabel="Start">@(policy.Start?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
-            <MudTd DataLabel="End">@(policy.End?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
-        </RowTemplate>
-        <NoRecordsContent>
-            <MudStack Spacing="2" AlignItems="AlignItems.Start" Class="py-2">
-                <MudText Typo="Typo.body2" Class="mud-text-secondary">No effective insurance today.</MudText>
-                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="OpenAddPolicyAsync">Add the first policy</MudButton>
-            </MudStack>
-        </NoRecordsContent>
-    </MudTable>
-    </MudPaper>
-}
+    @if (Policies is null)
+    {
+        @if (Error)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true">
+                Could not load insurance.
+                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="OnRetry">Try again</MudButton>
+            </MudAlert>
+        }
+        else
+        {
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" role="status" aria-label="Loading insurance" />
+        }
+    }
+    else
+    {
+        @if (Error)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4">
+                Could not refresh insurance. The list below may be out of date.
+                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="OnRetry">Try again</MudButton>
+            </MudAlert>
+        }
+
+        @if (!CanSwap)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">Add a policy before you can swap levels.</MudText>
+        }
+
+        <MudTable Items="Policies" Hover="true" Elevation="0">
+            <HeaderContent>
+                <MudTh>Level</MudTh>
+                <MudTh>Company id</MudTh>
+                <MudTh>Start</MudTh>
+                <MudTh>End</MudTh>
+            </HeaderContent>
+            <RowTemplate Context="policy">
+                <MudTd DataLabel="Level">@CodeLabels.Of(policy.Level)</MudTd>
+                <MudTd DataLabel="Company id">@policy.CompanyId</MudTd>
+                <MudTd DataLabel="Start">@(policy.Start?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
+                <MudTd DataLabel="End">@(policy.End?.ToString("yyyy-MM-dd") ?? "—")</MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudStack Spacing="2" AlignItems="AlignItems.Start" Class="py-2">
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">No effective insurance today.</MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="OpenAddPolicyAsync">Add the first policy</MudButton>
+                </MudStack>
+            </NoRecordsContent>
+        </MudTable>
+    }
+</MudPaper>
 
 @code {
     [Parameter, EditorRequired] public long Pid { get; set; }
 
-    /// <summary>Raised after a successful change, so the parent can refresh its tab counts.</summary>
+    /// <summary>Null while loading. The parent keeps the previous list on screen during a reload.</summary>
+    [Parameter] public IReadOnlyList<EffectiveInsuranceResponse>? Policies { get; set; }
+
+    [Parameter] public bool Error { get; set; }
+
+    /// <summary>Raised after a successful change; the parent reloads and refreshes the tab count.</summary>
     [Parameter] public EventCallback Changed { get; set; }
 
-    private List<EffectiveInsuranceResponse> _effectiveInsurance = [];
-    private bool _loading = true;
-    private bool _insuranceError;
+    [Parameter] public EventCallback OnRetry { get; set; }
 
-    protected override Task OnInitializedAsync() => LoadAsync();
-
-    // Only the first load shows the spinner. Reloads after a change keep the table on screen.
-    private async Task LoadAsync()
-    {
-        try
-        {
-            var policies = await PatientManagement.GetEffectiveInsuranceAsync(Pid, null);
-            _effectiveInsurance = [.. policies];
-            _insuranceError = false;
-        }
-        catch (PatientManagementApiException)
-        {
-            _insuranceError = true;
-        }
-        finally
-        {
-            _loading = false;
-        }
-    }
+    private bool CanSwap => Policies?.Any(p => p.Uuid is not null) == true;
 
     private async Task OpenAddPolicyAsync()
     {
         var parameters = new DialogParameters<AddPolicyDialog> { { x => x.Pid, Pid } };
-        var dialog = await DialogService.ShowAsync<AddPolicyDialog>("Add insurance policy", parameters, DialogOptionsFor());
+        var dialog = await DialogService.ShowAsync<AddPolicyDialog>("Add insurance policy", parameters, DialogDefaults.Standard);
         var result = await dialog.Result;
         if (result is { Canceled: false })
         {
             Snackbar.Add("Insurance policy added.", Severity.Success);
-            await LoadAsync();
             await Changed.InvokeAsync();
         }
     }
@@ -105,18 +102,14 @@ else
         var parameters = new DialogParameters<SwapPolicyDialog>
         {
             { x => x.Pid, Pid },
-            { x => x.Policies, _effectiveInsurance },
+            { x => x.Policies, Policies ?? [] },
         };
-        var dialog = await DialogService.ShowAsync<SwapPolicyDialog>("Swap insurance levels", parameters, DialogOptionsFor());
+        var dialog = await DialogService.ShowAsync<SwapPolicyDialog>("Swap insurance levels", parameters, DialogDefaults.Standard);
         var result = await dialog.Result;
         if (result is { Canceled: false })
         {
             Snackbar.Add("Insurance levels swapped.", Severity.Success);
-            await LoadAsync();
             await Changed.InvokeAsync();
         }
     }
-
-    private static DialogOptions DialogOptionsFor() =>
-        new() { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
 }

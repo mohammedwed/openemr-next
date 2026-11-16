@@ -1,5 +1,39 @@
 # Changelog 2026-11-16
 
+## Changed — patient view review pass (robustness, structure, accessibility)
+
+- **Count bug fixed.** A failed count request no longer turns a loaded patient into "Could not load this patient".
+  Sections now load after the patient is shown, and their failures stay inside their own section.
+- **Sections load once, in the parent.** `Detail.razor` fetches insurance, directive status, and documents, and
+  passes them to the panels. Before, the parent and the panels fetched the same lists. Tab counts come from the
+  same data, so they cannot disagree with the table. Each section shows its own loading state, error, and "Try again".
+- **Panels are presentational.** `PatientInsurancePanel` and `PatientAdvanceDirectivesPanel` render what they
+  are given and raise `Changed` after a successful change. The parent reloads.
+- **Network failures are handled** in the four change dialogs ("Could not reach the patient service") and in
+  the sections, instead of surfacing as unhandled errors.
+- **Upload limit lowered to 20 MB**, checked before the file is read, with a message that gives the size.
+  The old 30 MB limit could let a file through the browser that the API then rejected.
+- **Shared dialog style** in `Shared/DialogDefaults.cs`.
+- **Accessibility:** the patient's name is the page `h1`. "Swap levels" explains why it is disabled when there are no policies.
+- Verified in the browser: heading, both tabs with counts, no stray spinners, outage shows the patient error,
+  and "Try again" recovers. Section-level errors and the upload limit were not browser-tested.
+
+## Open items — patient view and insurance
+
+Tracked here so they are not lost. Ordered by how much they matter.
+
+1. **Hardcoded user ID.** `PlaceholderUserId = 1` in the status and upload dialogs means every directive change is
+   attributed to user 1. Needs a decision on mapping the signed-in subject to OpenEMR's numeric user ID.
+2. **Automated tests.** The webapp has no test project. Needs approval before running `dotnet test`.
+3. **API request size.** The API uses ASP.NET Core's default request limit (about 30 MB, not confirmed in this
+   environment). Documents travel as base64 in JSON, which adds about a third. Raising the upload limit needs the
+   API limit raised, or the upload contract changed to multipart or streaming.
+4. **Browser checks not done:** tab counts after a successful change, a successful dialog submit, the upload size
+   rejection, network-failure messages in the dialogs, and a single section failing while the patient loads.
+   Submitting changes would modify the dev database, so these need approval.
+5. **Duplicated panel shell.** Both panels repeat the same card, loading, and error markup. Could become one component.
+6. **Stored insurance level changed** from "Secondary" to "Primary" between two checks. Resolved: the owner changed it.
+
 ## Changed — patient view sections are cards
 
 - Insurance is one outlined card (heading, actions, table). Advance directives has two cards: status, and

@@ -96,6 +96,10 @@
         {
             _error = PatientManagementErrorFormatter.Describe(ex, "Could not swap these policies. Please try again.");
         }
+        catch (HttpRequestException)
+        {
+            _error = "Could not reach the patient service. Check your connection, then try again.";
+        }
         finally
         {
             _saving = false;
