@@ -43,7 +43,7 @@ a compatibility constraint.
 | M1 | Harden the identity bridge | Done | Oct 10, Oct 11, Oct 21, Oct 24, Oct 29, Oct 30, Oct 31, Nov 1, Nov 2 |
 | M2 | Schema inventory for slice contexts | Done | Oct 4 (entities scaffolded), Nov 13 (inventory) |
 | M3 | Gateway and token validation | In progress | Nov 13 |
-| M4 | Patient Management service | In progress | Nov 14 (registration, duplicate detection, insurance, advance directives, and the FHIR Patient API all done; the FHIR API now uses the real Firely .NET SDK with US Core validation, ADR 0052; insurance swap is a multi-entity aggregate, ADR 0053; only patient merge remains, deferred to M5+, ADR 0051) |
+| M4 | Patient Management service | In progress | Nov 14 (registration, duplicate detection, insurance, advance directives, and the FHIR Patient API all done; the FHIR API now uses the real Firely .NET SDK with US Core validation, ADR 0052; insurance swap is a multi-entity aggregate, ADR 0053; only patient merge remains, deferred to M5+, ADR 0051; WebApp frontend for the patient list, patient view, and registration merged Nov 16, PR #73) |
 | M5 | Clinical Care service | Not started | — |
 | M6 | Portfolio polish | Not started | — |
 
@@ -267,8 +267,37 @@ is no concurrent-writer race to design around.
 (Dockerfile, docker-compose service) and reachable through the Gateway (ADR 0060); verified against the
 real stack by registering a patient through `https://localhost:7131` with no caller-presented
 credential, the Gateway attaching the internal secret server-side. A first WebApp frontend slice
-(registration + list pages, `OpenEmrNext.PatientManagement.Client`) exercises the same path. The event
+(the list, patient view, and registration pages, `OpenEmrNext.PatientManagement.Client`; see the frontend
+section below) exercises the same path. The event
 is published exactly once. Tests pass.
+
+### M4 frontend: WebApp patient pages (done Nov 16, PR #73)
+
+What the WebApp now does for patients, all through the gateway and the generated PatientManagement client:
+
+- **List:** search by name (debounced, stale results ignored), sortable columns, 10/25/50 paging, retry on
+  failure, and the public patient ID.
+- **Patient view:** a basic-information banner above two tabs, Insurance and Advance directives, with counts in
+  the tab labels. Each section loads its own data and has its own retry. Changes (add policy, swap levels, set
+  status, upload document) open dialogs and only close on success. The breadcrumb shows the patient's name.
+- **Registration:** sex dropdown, required date of birth that cannot be in the future, an unsaved-changes prompt,
+  and it opens the new patient on success.
+- **Resilience:** a per-dependency circuit breaker in the browser (the webapp's own `TransientFailureCircuitBreakingHandler`),
+  verified with the backend down: an open breaker shows "temporarily unavailable, nothing was saved".
+- **Accessibility:** heading structure, labeled actions, visible keyboard focus, and phone-width layout.
+
+Verified by hand in the browser. Not yet verified: a successful submit of each change dialog (it would change
+the dev database), the upload progress state, and skeleton placeholders on slow loads. There are no automated
+webapp tests yet.
+
+Open items, each with options and costs, are in `docs/patient-view-pending-decisions.md`. The ones that
+block further M4 work are:
+
+1. Recording directive changes under the signed-in person (the user ID is a placeholder today).
+2. Raising the document upload limit (capped at 20 MB, base64 over JSON).
+3. Whether `pubpid` serves as the MRN, or a separate MRN is needed.
+4. Server-side paging and search for the patient list.
+5. Webapp tests, which need an approval to run.
 
 ### M5: Clinical Care service (not started)
 

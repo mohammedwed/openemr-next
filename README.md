@@ -27,9 +27,9 @@ research vision below is the long-term direction, not the current deliverable.
 | Database baseline | Reproducible schema and seed data from the OpenEMR installer | Built, not yet cleaned |
 | `OpenEmr.Data` | EF Core model scaffolded from the live database | Built |
 | AuthFacade | BFF (browser login via OIDC/PKCE, a revocable session cookie, logout, proxies browser calls to OpenEMR's API) — rate limited, circuit-broken, audit-logged, over HTTPS, with its own session state in a dedicated database | Built, hardened ([ADR 0047](docs/architecture/0047-the-identity-bridge-design.md)) |
-| WebApp dashboard | Blazor WebAssembly: shows the signed-in identity via a generated typed client; stub nav for Patients/Encounters | Built |
+| WebApp | Blazor WebAssembly: sign-in and identity; patient list (search, sort, paging, retry), patient view (overview, insurance, advance directives with change dialogs), and registration. Encounters is still a stub | Built |
 | API gateway | Terminates TLS and routes a browser's requests by path: AuthFacade's own prefixes to it, everything else to the dashboard's static files (ADR 0033, ADR 0039). No token validation of its own yet, and nothing to route to beyond AuthFacade until a domain service exists | Built, narrower than originally planned |
-| Patient Management | Registers patients, publishes `PatientRegistered` | Planned |
+| Patient Management | Registers, lists, and reads patients; insurance; advance directives and documents; the FHIR Patient API; publishes `PatientRegistered`. Patient merge is still to do | Built, merge pending |
 | Clinical Care | Creates encounters and records vitals for registered patients | Planned |
 
 ## What exists today
@@ -107,8 +107,10 @@ own nginx container — reached only through the gateway below, never directly:
 publishing its own port would let someone load it from the wrong origin and find
 the session cookie never attaches. Calls `GET /api/v1/me` through a generated
 typed client ([ADR 0031](docs/architecture/0031-nswag-client-generated-from-a-committed-snapshot.md))
-and shows the signed-in identity, or a login link if unauthenticated. Nav for
-Patients and Encounters is disabled: nothing beyond identity is real yet.
+and shows the signed-in identity, or a login link if unauthenticated. Patients is
+enabled: the list, the patient view with insurance and advance directives, and
+registration all call PatientManagement through the same gateway. Encounters is
+still disabled.
 
 **Gateway (`src/Services/Gateway`).** A YARP reverse proxy — the one external
 address a browser talks to, for the dashboard and for AuthFacade alike. Terminates TLS with a local dev
@@ -245,10 +247,26 @@ gateway. It does not store passwords or user records.
   revocation endpoint (confirmed against its own discovery document and source), so the underlying OpenEMR
   refresh token stays valid there until it naturally expires, independent of anything AuthFacade does with
   its own session record.
+- The patient API's list, detail, and insurance endpoints are reachable through the gateway without a user
+  sign-in check. This is the intended trust model (ADR 0055), so the webapp's own sign-in check is the only
+  per-user gate on patient data.
+- Directive changes and uploads are recorded under a placeholder user ID (`1`). The signed-in user has no
+  numeric OpenEMR ID yet, so the audit trail is wrong for those changes.
+- Document uploads are capped at 20 MB in the webapp, because the API's request size limit is about 30 MB and
+  documents travel as base64 JSON. Raising the limit is an API change.
+- The webapp has no automated tests yet. Patient pages have been checked by hand in the browser.
+- The patient list loads every patient on each visit and pages and searches in the browser. Server-side paging
+  and search are not built.
+- The generated patient client types `GetPatientsAsync`'s name parameter as non-nullable, so the webapp passes
+  `null!` for "no filter".
+
 - The gateway does no token validation of its own — it only routes by path.
   Every auth decision still happens in AuthFacade. If a future domain service
   needs authenticated requests, whether it validates its own token or the
   gateway starts validating once at the edge is not yet decided.
+
+The full list of pending decisions, with options and costs, is in
+[`docs/patient-view-pending-decisions.md`](docs/patient-view-pending-decisions.md).
 
 ## Legacy database compatibility
 
