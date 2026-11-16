@@ -1,7 +1,7 @@
 @page "/patients/register"
 @using System.ComponentModel.DataAnnotations
 @using OpenEmrNext.PatientManagement.Client
-@using AuthFacadeApiException = OpenEmrNext.AuthFacade.Client.ApiException
+@using OpenEmrNext.WebApp.Shared
 @using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
 @inject IAuthFacadeClient AuthFacade
 @inject IPatientManagementClient PatientManagement
@@ -11,18 +11,25 @@
 <PageTitle>Register patient</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="pa-0">
-    <MudText Typo="Typo.h5" Class="mb-6">Register patient</MudText>
+    <MudText Typo="Typo.h4" HtmlTag="h1" Class="mb-6">Register patient</MudText>
 
     @switch (_state)
     {
         case State.Loading:
-            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" role="status" aria-label="Checking sign-in" />
             break;
 
         case State.SignedOut:
             <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
                 You need to be signed in to register a patient.
                 <MudButton Variant="Variant.Text" Color="Color.Warning" Href="@LoginUrl">Log in with OpenEMR</MudButton>
+            </MudAlert>
+            break;
+
+        case State.Error:
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+                Could not check your sign-in. The service may be unavailable.
+                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="CheckSignInAsync">Try again</MudButton>
             </MudAlert>
             break;
 
@@ -36,11 +43,16 @@
                     <MudStack Spacing="4">
                         <MudTextField @bind-Value="_model.FirstName" Label="First name" Required="true" Variant="Variant.Outlined" />
                         <MudTextField @bind-Value="_model.LastName" Label="Last name" Required="true" Variant="Variant.Outlined" />
-                        <MudTextField @bind-Value="_model.Sex" Label="Sex" Required="true" Variant="Variant.Outlined"
-                            HelperText="Free text, matching OpenEMR's own sex column" />
-                        <MudDatePicker @bind-Date="_model.DateOfBirth" Label="Date of birth" Required="true" Variant="Variant.Outlined" />
-                        <MudTextField @bind-Value="_model.Email" Label="Email (optional)" Variant="Variant.Outlined" />
-                        <MudTextField @bind-Value="_model.TrustedEmail" Label="Trusted email (optional)" Variant="Variant.Outlined" />
+                        <MudSelect T="string" @bind-Value="_model.Sex" Label="Sex" Required="true" Variant="Variant.Outlined">
+                            @foreach (var option in SexOptions)
+                            {
+                                <MudSelectItem Value="@option">@option</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudDatePicker @bind-Date="_model.DateOfBirth" Label="Date of birth" Required="true" Variant="Variant.Outlined"
+                            MaxDate="DateTime.Today" />
+                        <MudTextField @bind-Value="_model.Email" Label="Email (optional)" Variant="Variant.Outlined" InputType="InputType.Email" />
+                        <MudTextField @bind-Value="_model.TrustedEmail" Label="Trusted email (optional)" Variant="Variant.Outlined" InputType="InputType.Email" />
                         <div>
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_submitting">
                                 Register
@@ -54,13 +66,17 @@
 </MudContainer>
 
 @code {
-    private enum State { Loading, SignedOut, Ready }
+    private enum State { Loading, SignedOut, Error, Ready }
 
     /// <summary>
-    /// The id of the user performing the registration. No real numeric id exists to supply here --
-    /// AuthFacade's session only carries OpenEMR's UUID <c>sub</c> claim, and there's no lookup from
-    /// that to a numeric <c>users.id</c> (ADR 0055's tracked gap). A fixed placeholder, same framing
-    /// the backend itself already uses for this exact gap, not a new decision made here.
+    /// The values offered for sex. Matches the values already used for administrative sex in OpenEMR's own
+    /// list and in the patient tests ("Female", "Male"), so a registered patient reads the same everywhere.
+    /// </summary>
+    private static readonly string[] SexOptions = ["Male", "Female", "Other", "Unknown"];
+
+    /// <summary>
+    /// The id of the user performing the registration. Same tracked gap as the directive dialogs: the signed-in
+    /// user has no numeric OpenEMR id yet. See docs/patient-view-pending-decisions.md, item 1.
     /// </summary>
     private const long PlaceholderRegisteredById = 1;
 
@@ -72,16 +88,22 @@
 
     private string LoginUrl => $"/oidc/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => CheckSignInAsync();
+
+    /// <summary>
+    /// An API rejection means signed out. A network failure is shown as an outage with "Try again", not as
+    /// signed out, so a visitor is not sent to log in because the service was down.
+    /// </summary>
+    private async Task CheckSignInAsync()
     {
+        _state = State.Loading;
         try
         {
-            await AuthFacade.GetCurrentUserAsync();
-            _state = State.Ready;
+            _state = await AuthFacade.TryGetCurrentUserAsync() is null ? State.SignedOut : State.Ready;
         }
-        catch (AuthFacadeApiException)
+        catch (HttpRequestException)
         {
-            _state = State.SignedOut;
+            _state = State.Error;
         }
     }
 
@@ -107,14 +129,18 @@
                 TrustedEmail = string.IsNullOrWhiteSpace(_model.TrustedEmail) ? null : _model.TrustedEmail,
                 RegisteredBy = PlaceholderRegisteredById
             };
-            await PatientManagement.RegisterPatientAsync(request);
-            Snackbar.Add($"Registered {_model.FirstName} {_model.LastName}.", Severity.Success);
-            Navigation.NavigateTo("/patients");
+            var registered = await PatientManagement.RegisterPatientAsync(request);
+            Snackbar.Add($"Registered {_model.FirstName} {_model.LastName} (patient ID {registered.Pubpid}).", Severity.Success);
+            Navigation.NavigateTo($"/patients/{registered.Uuid}");
         }
         catch (PatientManagementApiException ex)
         {
             _errorMessage = PatientManagementErrorFormatter.Describe(
                 ex, "Something went wrong registering this patient. Please check the details and try again.");
+        }
+        catch (HttpRequestException)
+        {
+            _errorMessage = "Could not reach the patient service. Nothing was saved. Check your connection, then try again.";
         }
         finally
         {
@@ -124,21 +150,35 @@
 
     private sealed class FormModel
     {
-        [Required, MinLength(1), MaxLength(255)]
+        [Required(ErrorMessage = "First name is required.")]
+        [MaxLength(255, ErrorMessage = "First name must be 255 characters or fewer.")]
         public string FirstName { get; set; } = "";
 
-        [Required, MinLength(2), MaxLength(255)]
+        [Required(ErrorMessage = "Last name is required.")]
+        [MinLength(2, ErrorMessage = "Last name must be at least 2 characters.")]
+        [MaxLength(255, ErrorMessage = "Last name must be 255 characters or fewer.")]
         public string LastName { get; set; } = "";
 
-        [Required, MinLength(4), MaxLength(30)]
+        [Required(ErrorMessage = "Choose a sex.")]
         public string Sex { get; set; } = "";
 
+        [Required(ErrorMessage = "Date of birth is required.")]
+        [NotInFuture]
         public DateTime? DateOfBirth { get; set; }
 
-        [EmailAddress]
+        [EmailAddress(ErrorMessage = "Enter a valid email address.")]
         public string? Email { get; set; }
 
-        [EmailAddress]
+        [EmailAddress(ErrorMessage = "Enter a valid email address.")]
         public string? TrustedEmail { get; set; }
+    }
+
+    /// <summary>A date of birth cannot be after today. Shown on the field, not as a form-wide error.</summary>
+    private sealed class NotInFutureAttribute : ValidationAttribute
+    {
+        public NotInFutureAttribute() : base("Date of birth cannot be in the future.") { }
+
+        public override bool IsValid(object? value) =>
+            value is not DateTime date || date.Date <= DateTime.Today;
     }
 }

@@ -1,5 +1,22 @@
 # Changelog 2026-11-16
 
+## Changed — register patient page
+
+- **Sex is a dropdown** (Male, Female, Other, Unknown) instead of free text. The values match the ones the
+  codebase already uses for administrative sex. The domain accepts any text, so existing free-text records are unaffected.
+- **Date of birth is required and cannot be in the future.** Before, an empty date did nothing when Register was
+  clicked, with no message. The calendar's maximum date is today.
+- **Network failures are handled**: the sign-in check shows "Try again" instead of an unhandled error, and a
+  failed submit says nothing was saved.
+- **After registering**, the page opens the new patient, and the message shows their patient ID.
+- **Heading is `h1`**, and the spinner has a label.
+- Verified in the browser: validation on empty submit (no patient was created). Not verified: a successful
+  registration (it would create a patient in the dev database), the future-date rule (typing into the picker did
+  not register), and the network-failure messages.
+- Open: `PlaceholderRegisteredById` is the same tracked gap as the directive dialogs (pending decisions, item 1).
+- Observation for the architect: sex values are capitalized in the registration path and the tests, but the FHIR
+  mapper matches lowercase `"female"`. Worth checking which casing the stored data uses.
+
 ## Fixed — search results out of order; age read once per load
 
 - **Search results could arrive out of order.** A slow response for an earlier term could overwrite the results
