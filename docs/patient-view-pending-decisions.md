@@ -87,3 +87,28 @@ preference, tests are not run without asking first.
 - A single section failing while the patient loads.
 
 **Needs approval:** permission to submit changes in the dev stack.
+
+## 9. Dates that cross a time zone (encounters)
+
+**Blocked:** the ClinicalCare client types every date as `DateTimeOffset`, so the webapp always sends an offset, and the API (review finding R-11)
+converts a date with an offset to the **server's** local time. For the encounter date that is correct (an instant). For a **date-only** field
+(onset date, sent as the browser's local midnight) it moves to the neighbouring day when the browser and the server are in different zones, and the
+encounter list shows the server's digits rather than the ones typed. Invisible while both are in one zone, as in the dev stack.
+
+**Options:**
+- Send date-only fields without an offset: a string-typed `date` in the OpenAPI schema (or `DateOnly`), then regenerate the client.
+- Decide that clinical dates are the server's local time everywhere and show a zone label next to them in the webapp.
+
+**Cost:** the first is an API contract change plus a client regeneration; the second is a UI change only.
+
+## 10. Lookups for the encounter form
+
+**Blocked:** creating an encounter takes a class code, a calendar category id, a facility id and a provider id, and nothing returns the valid
+values. The webapp offers the 11 legacy class codes from a fixed list, plain numeric fields for category and facility, and a placeholder provider
+(`1`, see item 1). The API still rejects an unknown class or facility, so a wrong entry fails safe, but the user has to know the ids.
+
+**Options:** add read endpoints to ClinicalCare for classes (`_ActEncounterCode`), facilities and calendar categories (the service already reads
+the first two through `IEncounterCodeLists` and `IFacilityDirectory`), and, once identity is forwarded, resolve the provider from the session.
+
+**Cost:** API endpoints with tests, an OpenAPI snapshot and client regeneration, then selects in `CreateEncounterDialog`.
+

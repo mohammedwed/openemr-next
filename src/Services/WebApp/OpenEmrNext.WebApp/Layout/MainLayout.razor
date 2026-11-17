@@ -88,11 +88,9 @@
             {
                 <MudNavLink Href="@item.Href" Match="@(item.ExactMatch ? NavLinkMatch.All : NavLinkMatch.Prefix)" Icon="@item.Icon">@item.Label</MudNavLink>
             }
-            @* MudNavLink's own Disabled state already handles the focusable/announced-as-disabled
-               concerns the flat nav's hand-rolled tabindex/role/aria-disabled trio existed to work
-               around -- that trio went away with the flat nav itself; a first-party disabled nav-link
-               component already covers it. The "Soon" badge added after ADR 0062 shipped is kept. *@
-            <MudNavLink Disabled="true" Icon="@Icons.Material.Filled.EventNote">Encounters<span class="op-soon-badge">Soon</span></MudNavLink>
+            @* No "Encounters" entry: ClinicalCare only lists one patient's encounters (there is no cross-patient
+               read, API-6), so they are reached from a patient's Encounters tab, not from a drawer page. This
+               replaces the disabled "Encounters / Soon" placeholder that stood in until the service existed. *@
         </MudNavMenu>
     </MudDrawer>
     @* px-4/pb-4, not pa-4: pa-4's padding: 16px !important overrides MudMainContent's own
@@ -126,8 +124,6 @@
 
 @code {
     // Single source for the drawer's two real routes, rendered into MudNavLinks via MudNavMenu below.
-    // The disabled "Encounters" placeholder stays hand-written instead -- see the comment above its
-    // own MudNavLink.
     private static readonly (string Label, string Href, bool ExactMatch, string Icon)[] _navItems =
     [
         ("Dashboard", "", true, Icons.Material.Filled.Dashboard),
@@ -241,6 +237,12 @@
             [
                 new BreadcrumbItem("Patients", href: "/patients"),
                 new BreadcrumbItem(PatientPage.PatientName ?? "Patient", href: null)
+            ],
+            ["patients", var patientId, "encounters", _] =>
+            [
+                new BreadcrumbItem("Patients", href: "/patients"),
+                new BreadcrumbItem(PatientPage.PatientName ?? "Patient", href: $"/patients/{patientId}"),
+                new BreadcrumbItem(PatientPage.EncounterLabel ?? "Encounter", href: null)
             ],
             _ => []
         };

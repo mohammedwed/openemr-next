@@ -71,3 +71,4 @@ old one's status is updated to point to it.
 | [0064](0064-clinical-care-shares-the-legacy-database-and-coexists-with-legacy-encounter-writers.md) | Clinical Care shares the legacy database and coexists with the legacy encounter writers | Accepted | 2026-11-16 |
 | [0065](0065-vitals-are-stored-in-us-units-and-the-api-takes-explicit-units.md) | Vitals are stored in US units, and the API takes and returns explicit units | Accepted | 2026-11-16 |
 | [0066](0066-patient-registered-reaches-clinical-care-through-an-outbox-relay-over-http.md) | PatientRegistered reaches Clinical Care through an outbox relay over HTTP, with a secret of its own | Accepted | 2026-11-16 |
+| [0067](0067-webapp-covers-encounters-and-vitals.md) | WebApp's frontend extends to encounters and vitals | Accepted | 2026-11-17 |

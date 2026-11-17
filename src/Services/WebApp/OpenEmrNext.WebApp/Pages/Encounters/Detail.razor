@@ -1,0 +1,204 @@
+@page "/patients/{PatientUuid:guid}/encounters/{Uuid:guid}"
+@using OpenEmrNext.ClinicalCare.Client
+@using OpenEmrNext.PatientManagement.Client
+@using OpenEmrNext.WebApp.Shared
+@using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
+@using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
+@inject IAuthFacadeClient AuthFacade
+@inject IClinicalCareClient ClinicalCare
+@inject IPatientManagementClient PatientManagement
+@inject NavigationManager Navigation
+@inject PatientPageContext PatientPage
+@implements IDisposable
+
+<PageTitle>@(_encounter is null ? "Encounter" : $"Encounter {_encounter.Number}")</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-0">
+    @switch (_state)
+    {
+        case State.Loading:
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" role="status" aria-label="Loading encounter" />
+            break;
+
+        case State.SignedOut:
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
+                You need to be signed in to see this encounter.
+                <MudButton Variant="Variant.Text" Color="Color.Warning" Href="@LoginUrl">Log in with OpenEMR</MudButton>
+            </MudAlert>
+            break;
+
+        case State.NotFound:
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
+                No encounter with that id was found for this patient.
+                <MudButton Variant="Variant.Text" Color="Color.Warning" Href="@PatientUrl">Back to the patient</MudButton>
+            </MudAlert>
+            break;
+
+        case State.Error:
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+                Could not load this encounter. The clinical care service may be unavailable.
+                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="LoadAsync">Try again</MudButton>
+            </MudAlert>
+            break;
+
+        case State.Ready:
+            var encounter = _encounter!;
+
+            @* The visit's own details stay above the vitals, so they are never one click away. The encounter's
+               number is the page's heading; the patient is a link back, since this page is reached from the
+               patient's Encounters tab. *@
+            <MudPaper Outlined="true" Class="pa-5 mb-6">
+                <div class="op-section-header mb-5">
+                    <MudText Typo="Typo.h4" HtmlTag="h1">@EncounterLabel(encounter)</MudText>
+                    <div class="op-section-actions">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="@PatientUrl"
+                            StartIcon="@Icons.Material.Filled.ArrowBack">Back to @(_patientName ?? "patient")</MudButton>
+                    </div>
+                </div>
+                <dl class="op-details">
+                    <dt>Patient</dt>
+                    <dd><MudLink Href="@PatientUrl">@(_patientName ?? "Patient")</MudLink></dd>
+                    <dt>Date</dt>
+                    <dd>@Formatting.DateTimeText(encounter.Date)</dd>
+                    <dt>Class</dt>
+                    <dd>@CodeLabels.Of(encounter.ClassCode)</dd>
+                    <dt>Reason</dt>
+                    <dd class="op-prewrap">@(string.IsNullOrWhiteSpace(encounter.Reason) ? "—" : encounter.Reason)</dd>
+                    <dt>Facility</dt>
+                    <dd>@(string.IsNullOrWhiteSpace(encounter.FacilityName) ? "—" : encounter.FacilityName)</dd>
+                    <dt>Place of service</dt>
+                    <dd>@(encounter.PosCode?.ToString() ?? "—")</dd>
+                    <dt>Provider ID</dt>
+                    <dd>@encounter.ProviderId</dd>
+                    <dt>Onset date</dt>
+                    <dd>@Formatting.DateText(encounter.OnsetDate)</dd>
+                    <dt>Sensitivity</dt>
+                    <dd>@(string.IsNullOrWhiteSpace(encounter.Sensitivity) ? "—" : encounter.Sensitivity)</dd>
+                </dl>
+            </MudPaper>
+
+            <EncounterVitalsPanel @key="encounter.Uuid" EncounterUuid="encounter.Uuid" />
+            break;
+    }
+</MudContainer>
+
+@code {
+    private enum State { Loading, SignedOut, NotFound, Error, Ready }
+
+    [Parameter] public Guid PatientUuid { get; set; }
+
+    [Parameter] public Guid Uuid { get; set; }
+
+    private State _state = State.Loading;
+    private EncounterResponse? _encounter;
+    private string? _patientName;
+    private (Guid Patient, Guid Encounter)? _loaded;
+
+    private string LoginUrl => $"/oidc/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
+
+    private string PatientUrl => $"/patients/{PatientUuid}";
+
+    private static string EncounterLabel(EncounterResponse encounter) =>
+        encounter.Number is { } number ? $"Encounter {number}" : "Encounter";
+
+    /// <summary>
+    /// Blazor reuses this page instance when only a route parameter changes, so loading only on first render
+    /// would keep showing the previous encounter.
+    /// </summary>
+    protected override Task OnParametersSetAsync()
+    {
+        if (_loaded == (PatientUuid, Uuid))
+        {
+            return Task.CompletedTask;
+        }
+
+        _loaded = (PatientUuid, Uuid);
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        PatientPage.PatientName = "Loading…";
+        PatientPage.EncounterLabel = "Loading…";
+        await LoadCoreAsync();
+        if (_state != State.Ready)
+        {
+            // The breadcrumb falls back to "Patient" / "Encounter" when there is nothing to name.
+            PatientPage.PatientName = null;
+            PatientPage.EncounterLabel = null;
+        }
+    }
+
+    private async Task LoadCoreAsync()
+    {
+        var requestedPatient = PatientUuid;
+        var requestedEncounter = Uuid;
+        _encounter = null;
+        _patientName = null;
+        _state = State.Loading;
+
+        try
+        {
+            if (await AuthFacade.TryGetCurrentUserAsync() is null)
+            {
+                _state = State.SignedOut;
+                return;
+            }
+
+            // The patient's name is only for the heading and breadcrumb, so it loads alongside the encounter and
+            // a failure there never fails the page.
+            var patientTask = TryGetPatientNameAsync(requestedPatient);
+            var encounter = await ClinicalCare.GetEncounterAsync(requestedEncounter);
+            var patientName = await patientTask;
+
+            if (requestedPatient != PatientUuid || requestedEncounter != Uuid)
+            {
+                return; // navigated to another encounter while this was in flight
+            }
+
+            // An encounter shown under the wrong patient's URL would mislead, so the pair has to match.
+            if (encounter.PatientUuid != requestedPatient)
+            {
+                _state = State.NotFound;
+                return;
+            }
+
+            _encounter = encounter;
+            _patientName = patientName;
+            _state = State.Ready;
+            PatientPage.PatientName = patientName ?? "Patient";
+            PatientPage.EncounterLabel = EncounterLabel(encounter);
+        }
+        catch (ClinicalCareApiException ex) when (ex.StatusCode == 404)
+        {
+            _state = State.NotFound;
+        }
+        catch (ClinicalCareApiException ex) when (ex.StatusCode is 401 or 403)
+        {
+            _state = State.SignedOut;
+        }
+        catch (Exception ex) when (ex is ClinicalCareApiException or HttpRequestException)
+        {
+            _state = State.Error;
+        }
+    }
+
+    private async Task<string?> TryGetPatientNameAsync(Guid patientUuid)
+    {
+        try
+        {
+            var patient = await PatientManagement.GetPatientAsync(patientUuid);
+            return $"{patient.FirstName} {patient.LastName}";
+        }
+        catch (Exception ex) when (ex is PatientManagementApiException or HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    public void Dispose()
+    {
+        PatientPage.PatientName = null;
+        PatientPage.EncounterLabel = null;
+    }
+}

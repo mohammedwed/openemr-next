@@ -1,0 +1,203 @@
+@using OpenEmrNext.ClinicalCare.Client
+@using OpenEmrNext.WebApp.Shared
+@using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
+@inject IClinicalCareClient ClinicalCare
+
+@* Recording vitals is a change, so it lives in its own dialog. It closes only when the save succeeds, handing the
+   recorded set (with the BMI the service derived) back to the caller; on failure it stays open with the typed values
+   intact. Every measurement is optional, but at least one is needed (CV-2). *@
+<MudDialog>
+    <DialogContent>
+        @if (_error is { } error)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4" role="alert">@error</MudAlert>
+        }
+        <MudForm @ref="_form" Model="_model">
+            <MudStack Spacing="4">
+                @* One switch for the whole form, not a unit menu per field: a clinician works in one system at a time, and
+                   the unit sent with each value follows it. The service converts to its stored units (ADR 0065). *@
+                <MudSwitch T="bool" @bind-Value="_metric" Color="Color.Primary" Label="Metric units (kg, cm, °C)" />
+
+                @* Validation messages, not Min/Max, on every number: a numeric field with bounds silently rewrites a typed
+                   value to the nearest bound, which for a clinical reading would store a value nobody measured. *@
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="int?" @bind-Value="_model.Systolic" Label="Systolic (mmHg)" Validation="_validateSystolic"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="int?" @bind-Value="_model.Diastolic" Label="Diastolic (mmHg)" Validation="_validateDiastolic"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="int?" @bind-Value="_model.Pulse" Label="Pulse (/min)" Validation="_validatePulse"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="int?" @bind-Value="_model.Respiration" Label="Respiration (/min)" Validation="_validateRespiration"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="double?" @bind-Value="_model.OxygenSaturation" Label="Oxygen saturation (%)" Validation="_validateSaturation"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="double?" @bind-Value="_model.Weight" Label="@($"Weight ({(_metric ? "kg" : "lb")})")" Validation="_validatePositive"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="double?" @bind-Value="_model.Height" Label="@($"Height ({(_metric ? "cm" : "in")})")" Validation="_validatePositive"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="double?" @bind-Value="_model.Temperature" Label="@($"Temperature ({(_metric ? "°C" : "°F")})")" Validation="_validatePositive"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        @* Only meaningful with a temperature; the service clears it otherwise (CV-7), so it is off until there is one. *@
+                        <MudTextField @bind-Value="_model.TemperatureMethod" Label="Temperature method (optional)" Variant="Variant.Outlined"
+                            MaxLength="255" Disabled="@(_model.Temperature is null)" HelperText="For example oral, ear, forehead." />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="double?" @bind-Value="_model.Waist" Label="@($"Waist circumference ({(_metric ? "cm" : "in")})")" Validation="_validatePositive"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="double?" @bind-Value="_model.Head" Label="@($"Head circumference ({(_metric ? "cm" : "in")})")" Validation="_validatePositive"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_model.Note" Label="Note (optional)" Variant="Variant.Outlined"
+                            Lines="2" Sizing="InputSizing.Auto" MaxLength="255" />
+                    </MudItem>
+                </MudGrid>
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_saving">Record vitals</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    /// <summary>
+    /// The id of the acting provider. Same tracked gap as <c>CreateEncounterDialog</c> and the directive dialogs: the
+    /// signed-in user has no numeric OpenEMR id yet. See docs/patient-view-pending-decisions.md, item 1, and
+    /// ClinicalCare finding F-CC-1.
+    /// </summary>
+    private const long PlaceholderProviderId = 1;
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public Guid EncounterUuid { get; set; }
+
+    /// <summary>The units the vitals table is showing, so the form starts in the system the user is already reading.</summary>
+    [Parameter] public bool Metric { get; set; }
+
+    // The service's own bounds (CV-3) for the ones that do not depend on the unit, with the same wording. The unit-
+    // dependent ones (weight, height, temperature, circumferences) are checked by the service after conversion.
+    private readonly Func<int?, string?> _validateSystolic = v => Whole(v, 400, "Systolic blood pressure");
+    private readonly Func<int?, string?> _validateDiastolic = v => Whole(v, 400, "Diastolic blood pressure");
+    private readonly Func<int?, string?> _validatePulse = v => Whole(v, 400, "Pulse");
+    private readonly Func<int?, string?> _validateRespiration = v => Whole(v, 150, "Respiration");
+    private readonly Func<double?, string?> _validateSaturation = v =>
+        v is <= 0 or > 100 ? "Oxygen saturation must be greater than 0 and at most 100." : null;
+    private readonly Func<double?, string?> _validatePositive = v => v is <= 0 ? "Enter a value greater than zero." : null;
+
+    private static string? Whole(int? value, int max, string label) =>
+        value is { } v && (v < 1 || v > max) ? $"{label} must be a whole number from 1 to {max}." : null;
+
+    private MudForm _form = null!;
+    private readonly Model _model = new();
+    private bool _metric;
+    private bool _saving;
+    private string? _error;
+
+    protected override void OnInitialized() => _metric = Metric;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        if ((_model.Systolic is null) != (_model.Diastolic is null))
+        {
+            _error = "Enter both blood pressure values, or neither.";
+            return;
+        }
+
+        if (!_model.HasAnyMeasurement)
+        {
+            _error = "At least one measurement is required.";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var request = new RecordVitalsRequest
+            {
+                Weight = Quantity(_model.Weight, _metric ? "kg" : "lb"),
+                Height = Quantity(_model.Height, _metric ? "cm" : "in"),
+                Temperature = Quantity(_model.Temperature, _metric ? "degC" : "degF"),
+                TemperatureMethod = _model.Temperature is not null && !string.IsNullOrWhiteSpace(_model.TemperatureMethod)
+                    ? _model.TemperatureMethod
+                    : null,
+                BloodPressureSystolic = _model.Systolic,
+                BloodPressureDiastolic = _model.Diastolic,
+                Pulse = _model.Pulse,
+                Respiration = _model.Respiration,
+                OxygenSaturation = _model.OxygenSaturation,
+                WaistCircumference = Quantity(_model.Waist, _metric ? "cm" : "in"),
+                HeadCircumference = Quantity(_model.Head, _metric ? "cm" : "in"),
+                Note = string.IsNullOrWhiteSpace(_model.Note) ? null : _model.Note,
+                ProviderId = PlaceholderProviderId
+            };
+            var recorded = await ClinicalCare.RecordVitalsAsync(EncounterUuid, request);
+            MudDialog.Close(DialogResult.Ok(recorded));
+        }
+        catch (ClinicalCareApiException ex)
+        {
+            _error = ClinicalCareErrorFormatter.Describe(ex, "Could not record these vitals. Please check the values and try again.");
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Could not reach the clinical care service. Nothing was saved. Check your connection, then try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static QuantityRequest? Quantity(double? value, string unit) =>
+        value is { } v ? new QuantityRequest { Value = v, Unit = unit } : null;
+
+    private sealed class Model
+    {
+        public int? Systolic { get; set; }
+        public int? Diastolic { get; set; }
+        public int? Pulse { get; set; }
+        public int? Respiration { get; set; }
+        public double? OxygenSaturation { get; set; }
+        public double? Weight { get; set; }
+        public double? Height { get; set; }
+        public double? Temperature { get; set; }
+        public string? TemperatureMethod { get; set; }
+        public double? Waist { get; set; }
+        public double? Head { get; set; }
+        public string? Note { get; set; }
+
+        /// <summary>A note alone is not a measurement, matching the service's rule (CV-2).</summary>
+        public bool HasAnyMeasurement =>
+            Systolic is not null || Diastolic is not null || Pulse is not null || Respiration is not null ||
+            OxygenSaturation is not null || Weight is not null || Height is not null || Temperature is not null ||
+            Waist is not null || Head is not null;
+    }
+}

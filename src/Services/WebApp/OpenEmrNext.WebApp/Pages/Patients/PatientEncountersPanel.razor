@@ -1,0 +1,153 @@
+@using OpenEmrNext.ClinicalCare.Client
+@using OpenEmrNext.WebApp.Shared
+@using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
+@inject IClinicalCareClient ClinicalCare
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+@* Unlike the insurance and directive panels, this one loads its own data: ClinicalCare pages on the server
+   (the API never returns "all encounters", API-6), so the panel owns the page it is showing. It reports the
+   total up through TotalChanged so the tab label can show a count. A failed first load shows an error with
+   "Try again"; a failed page change keeps the last page on screen with a warning. *@
+<PatientSectionCard Title="Encounters"
+    HasData="_items is not null" Error="_error" OnRetry="LoadAsync"
+    ErrorMessage="Could not load encounters. The clinical care service may be unavailable."
+    StaleMessage="Could not refresh encounters. The list below may be out of date."
+    LoadingLabel="Loading encounters">
+    <Summary>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary" role="status">
+            @(_total == 1 ? "1 encounter" : $"{_total} encounters")@(_total > PageSize ? $" · page {_page} of {PageCount}" : "")
+        </MudText>
+    </Summary>
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenCreateAsync">New encounter</MudButton>
+    </Actions>
+    <ChildContent>
+        <MudTable Items="_items ?? []" Hover="true" Elevation="0"
+            TableAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Encounters" })">
+            <HeaderContent>
+                <MudTh>Date</MudTh>
+                <MudTh>No.</MudTh>
+                <MudTh>Class</MudTh>
+                <MudTh>Reason</MudTh>
+                <MudTh>Facility</MudTh>
+                <MudTh><span class="op-visually-hidden">Actions</span></MudTh>
+            </HeaderContent>
+            <RowTemplate Context="encounter">
+                <MudTd DataLabel="Date">@Formatting.DateTimeText(encounter.Date)</MudTd>
+                <MudTd DataLabel="No.">@(encounter.Number?.ToString() ?? "—")</MudTd>
+                <MudTd DataLabel="Class">@CodeLabels.Of(encounter.ClassCode)</MudTd>
+                <MudTd DataLabel="Reason">
+                    @if (string.IsNullOrWhiteSpace(encounter.Reason))
+                    {
+                        <span>—</span>
+                    }
+                    else
+                    {
+                        <span class="op-clamp" title="@encounter.Reason">@encounter.Reason</span>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Facility">@(string.IsNullOrWhiteSpace(encounter.FacilityName) ? "—" : encounter.FacilityName)</MudTd>
+                <MudTd>
+                    @* Named per encounter: a column of identical "View" links is not distinguishable to a screen reader. *@
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                        Href="@EncounterUrl(encounter)"
+                        aria-label="@($"View encounter {encounter.Number} from {Formatting.DateText(encounter.Date)}")">View</MudButton>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudStack Spacing="2" AlignItems="AlignItems.Start" Class="py-2">
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">No encounters recorded for this patient yet.</MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="OpenCreateAsync">Create the first encounter</MudButton>
+                </MudStack>
+            </NoRecordsContent>
+        </MudTable>
+
+        @if (PageCount > 1)
+        {
+            <MudStack AlignItems="AlignItems.Center" Class="mt-4">
+                <MudPagination Count="PageCount" Selected="_page" SelectedChanged="OnPageChangedAsync"
+                    ShowFirstButton="true" ShowLastButton="true" Disabled="_loading" aria-label="Encounter pages" />
+            </MudStack>
+        }
+    </ChildContent>
+</PatientSectionCard>
+
+@code {
+    private const int PageSize = 10;
+
+    [Parameter, EditorRequired] public Guid PatientUuid { get; set; }
+
+    /// <summary>Raised with the patient's total encounter count after each successful load, for the tab label.</summary>
+    [Parameter] public EventCallback<int> TotalChanged { get; set; }
+
+    // Null means "not loaded yet". A failed page change keeps the previous page here on purpose.
+    private List<EncounterResponse>? _items;
+    private int _total;
+    private int _page = 1;
+    private bool _error;
+    private bool _loading;
+
+    // Each load takes a number; only the latest one may apply its result, so a slow response for an
+    // earlier page can never overwrite a newer one.
+    private int _loadCounter;
+
+    private int PageCount => Math.Max(1, (int)Math.Ceiling(_total / (double)PageSize));
+
+    private string EncounterUrl(EncounterResponse encounter) => $"/patients/{PatientUuid}/encounters/{encounter.Uuid}";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task OnPageChangedAsync(int page) => LoadAsync(page);
+
+    private Task LoadAsync() => LoadAsync(_page);
+
+    private async Task LoadAsync(int page)
+    {
+        var ticket = ++_loadCounter;
+        _loading = true;
+        try
+        {
+            var result = await ClinicalCare.ListEncountersAsync(PatientUuid, PageSize, (page - 1) * PageSize);
+            if (ticket != _loadCounter)
+            {
+                return; // a newer load has started since this one
+            }
+
+            _items = [.. result.Items];
+            _total = result.Total;
+            _page = page;
+            _error = false;
+            await TotalChanged.InvokeAsync(_total);
+        }
+        catch (Exception ex) when (ex is ClinicalCareApiException or HttpRequestException)
+        {
+            if (ticket == _loadCounter)
+            {
+                _error = true;
+            }
+        }
+        finally
+        {
+            if (ticket == _loadCounter)
+            {
+                _loading = false;
+            }
+        }
+    }
+
+    private async Task OpenCreateAsync()
+    {
+        var parameters = new DialogParameters<CreateEncounterDialog> { { x => x.PatientUuid, PatientUuid } };
+        var dialog = await DialogService.ShowAsync<CreateEncounterDialog>("New encounter", parameters, DialogDefaults.Standard);
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: EncounterCreatedResponse created })
+        {
+            Snackbar.Add($"Encounter {created.Number} created.", Severity.Success);
+            // Straight into the new visit: recording vitals is the natural next step, and the list reloads
+            // when the user comes back to this tab.
+            Navigation.NavigateTo($"/patients/{PatientUuid}/encounters/{created.Uuid}");
+        }
+    }
+}

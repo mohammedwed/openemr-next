@@ -1,0 +1,179 @@
+@using OpenEmrNext.ClinicalCare.Client
+@using OpenEmrNext.WebApp.Shared
+@using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
+@inject IClinicalCareClient ClinicalCare
+
+@* Creating an encounter is a change, so it lives in its own dialog. It closes only when the save succeeds,
+   handing the created encounter back to the caller; on failure it stays open with the typed values intact. *@
+<MudDialog>
+    <DialogContent>
+        @if (_error is { } error)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4" role="alert">@error</MudAlert>
+        }
+        <MudForm @ref="_form" Model="_model">
+            <MudStack Spacing="4">
+                <MudSelect T="string" @bind-Value="_model.ClassCode" Label="Class" Required="true" RequiredError="Choose a class."
+                    Variant="Variant.Outlined">
+                    @* Not named "code": "@code" is Razor's own directive. *@
+                    @foreach (var classCode in CodeLabels.EncounterClassCodes)
+                    {
+                        <MudSelectItem Value="@classCode">@CodeLabels.Of(classCode)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                @* Both prefilled with now: the common case is "this visit, just now", and the usual edit is back-dating
+                   a late entry. A date needs a time with it, so the time becomes required once a date is chosen. *@
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="7">
+                        <MudDatePicker @bind-Date="_model.Date" Label="Date" Editable="true" Variant="Variant.Outlined"
+                            MinDate="MinDate" MaxDate="MaxDate" />
+                    </MudItem>
+                    <MudItem xs="12" sm="5">
+                        <MudTimePicker @bind-Time="_model.Time" Label="Time" Editable="true" Variant="Variant.Outlined"
+                            Required="@(_model.Date is not null)" RequiredError="Choose a time." />
+                    </MudItem>
+                </MudGrid>
+
+                <MudTextField @bind-Value="_model.Reason" Label="Reason for visit (optional)" Variant="Variant.Outlined"
+                    Lines="3" Sizing="InputSizing.Auto" MaxLength="65535" />
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        @* Validation messages, not Min/Max: a numeric field with bounds silently rewrites a typed value to
+                           the nearest bound, so a typo would be saved as something the user never entered. *@
+                        <MudNumericField T="int" @bind-Value="_model.CalendarCategoryId" Label="Calendar category id" Required="true"
+                            Validation="_validateCategory"
+                            Variant="Variant.Outlined" HelperText="Legacy calendar category (pc_catid)." />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="int" @bind-Value="_model.FacilityId" Label="Facility id"
+                            Validation="_validateFacility"
+                            Variant="Variant.Outlined" HelperText="0 for none. Any other id must exist." />
+                    </MudItem>
+                </MudGrid>
+
+                <MudExpansionPanels Elevation="0" Class="op-expander">
+                    <MudExpansionPanel Text="More details">
+                        <MudStack Spacing="4">
+                            <MudNumericField T="int?" @bind-Value="_model.PosCode" Label="Place of service code (optional)"
+                                Validation="_validatePos"
+                                Variant="Variant.Outlined" HelperText="1 to 99. Blank takes the facility's." />
+                            <MudDatePicker @bind-Date="_model.OnsetDate" Label="Onset date (optional)" Editable="true" Variant="Variant.Outlined"
+                                MinDate="MinDate" MaxDate="MaxDate" />
+                            <MudTextField @bind-Value="_model.Sensitivity" Label="Sensitivity (optional)" Variant="Variant.Outlined"
+                                MaxLength="30" HelperText="Stored for legacy; not enforced yet." />
+                        </MudStack>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_saving">Create encounter</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    /// <summary>
+    /// The id of the acting provider. Same tracked gap as the directive dialogs and <c>Register.razor</c>: the signed-in
+    /// user has no numeric OpenEMR id yet, so the API's caller-supplied provider cannot be filled with the real one.
+    /// See docs/patient-view-pending-decisions.md, item 1, and ClinicalCare finding F-CC-1.
+    /// </summary>
+    private const long PlaceholderProviderId = 1;
+
+    // The API's own bounds (CC-17): 1900-01-01 up to one year ahead. Stopping them in the picker saves a round trip.
+    private static readonly DateTime MinDate = new(1900, 1, 1);
+    private static DateTime MaxDate => DateTime.Today.AddYears(1);
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public Guid PatientUuid { get; set; }
+
+    // The API's own rules (CC-2, CC-8, CC-13), with the same wording, so the message is the same whether it comes
+    // from here or from the server.
+    private readonly Func<int, string?> _validateCategory = v => v < 1 ? "A calendar category is required." : null;
+    private readonly Func<int, string?> _validateFacility = v => v < 0 ? "FacilityId cannot be negative." : null;
+    private readonly Func<int?, string?> _validatePos = v => v is < 1 or > 99 ? "PosCode must be between 1 and 99." : null;
+
+    private MudForm _form = null!;
+    private readonly Model _model = new();
+    private bool _saving;
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        var now = DateTime.Now;
+        _model.Date = now.Date;
+        _model.Time = new TimeSpan(now.Hour, now.Minute, 0);
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            var request = new CreateEncounterRequest
+            {
+                PatientUuid = PatientUuid,
+                ClassCode = _model.ClassCode,
+                CalendarCategoryId = _model.CalendarCategoryId,
+                // A date with a zone is an instant; the API converts it to its own local time (R-11). Left null,
+                // the API uses its own "now".
+                Date = _model.Date is { } date ? new DateTimeOffset(date.Date + (_model.Time ?? TimeSpan.Zero)) : null,
+                Reason = string.IsNullOrWhiteSpace(_model.Reason) ? null : _model.Reason,
+                FacilityId = _model.FacilityId,
+                PosCode = _model.PosCode,
+                ProviderId = PlaceholderProviderId,
+                OnsetDate = _model.OnsetDate is { } onset ? new DateTimeOffset(onset.Date) : null,
+                Sensitivity = string.IsNullOrWhiteSpace(_model.Sensitivity) ? null : _model.Sensitivity
+            };
+            var created = await ClinicalCare.CreateEncounterAsync(request);
+            MudDialog.Close(DialogResult.Ok(created));
+        }
+        catch (ClinicalCareApiException ex)
+        {
+            _error = ClinicalCareErrorFormatter.Describe(ex, "Could not create this encounter. Please check the details and try again.");
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Could not reach the clinical care service. Nothing was saved. Check your connection, then try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private sealed class Model
+    {
+        public string ClassCode { get; set; } = "AMB";
+
+        public DateTime? Date { get; set; }
+
+        public TimeSpan? Time { get; set; }
+
+        public string? Reason { get; set; }
+
+        // 5 is the category the slice's own tests and smoke runs use; there is no lookup endpoint to read the
+        // real list from yet, so it is a plain field.
+        public int CalendarCategoryId { get; set; } = 5;
+
+        public int FacilityId { get; set; }
+
+        public int? PosCode { get; set; }
+
+        public DateTime? OnsetDate { get; set; }
+
+        public string? Sensitivity { get; set; }
+    }
+}

@@ -60,3 +60,25 @@ accept a value this column cannot hold?* Ten probes were written first and run a
   the payload alone and on the full stored weight (`154.323584`). It had not failed in CI yet; it would have, at random. Three consecutive full runs
   pass, and no other assertion of that shape exists.
 
+## Added — WebApp screens for Clinical Care (encounters and vitals)
+
+Decisions and limits: [ADR 0067](../architecture/0067-webapp-covers-encounters-and-vitals.md). Same look and states as the patient pages
+(`PatientSectionCard`, dialogs that close only on success, per-section retry), through the generated `ClinicalCare.Client`.
+
+- **Patient page, new Encounters tab** (first tab, with the total in its label): server-paged list (10 a page), a **New encounter** dialog
+  (class, date and time, reason, calendar category, facility, and under "More details" place of service, onset date, sensitivity), and a
+  **View** link per row. Creating an encounter opens it.
+- **Encounter page** `/patients/{patientUuid}/encounters/{encounterUuid}`: the visit's details, then a **Vitals** card with a server-paged list,
+  a **Metric units** switch (the API's `?units=`), and a **Record vitals** dialog. The snackbar reports the BMI the service derived. An encounter
+  under another patient's URL is "not found".
+- **Layout:** breadcrumb Patients / Name / Encounter N; the disabled "Encounters, Soon" drawer item and its `.op-soon-badge` style are gone.
+- **Shared:** `ClinicalCareErrorFormatter` (shows the API's own validation text and a 404's detail), encounter class labels, date, measurement
+  and blood-pressure formatting, a wider dialog preset.
+- **Deliberate:** numeric fields show validation messages instead of using `Min`/`Max` (a bounded numeric field rewrites a typed value).
+  The vitals unit switch reverts if the converted data fails to load.
+- **Placeholders, same as the directive dialogs:** the provider id is a fixed `1`; facility and calendar category are plain numeric fields because
+  there are no lookup endpoints (`docs/patient-view-pending-decisions.md`, items 1, 9, 10).
+- **Dockerfile:** `src/Services/WebApp/Dockerfile` now copies `OpenEmrNext.ClinicalCare.Client`; without it the container build failed on the new project reference.
+- **Verification:** `dotnet build` of the WebApp, 0 warnings, 0 errors. **Not yet run in a browser** (needs an OpenEMR login and would write to the
+  dev database), and the WebApp still has no automated tests (item 7). Nothing in this change touches the API, the OpenAPI snapshot or the gateway.
+
