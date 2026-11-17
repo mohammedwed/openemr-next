@@ -19,9 +19,10 @@ public static class ClinicalCareOpenApi
         {
             document.Info.Title = "ClinicalCare API";
             document.Info.Description =
-                "Clinical encounters (and, later, vitals). Every endpoint requires the shared " +
-                "X-Internal-Gateway-Secret header (ADR 0055, ADR 0064) -- there is no per-user authentication yet, " +
-                "so the acting provider is supplied by the caller.";
+                "Clinical encounters, vitals, problems, allergies, immunizations and notes. Every endpoint requires the shared " +
+                "X-Internal-Gateway-Secret header (ADR 0055, ADR 0064), which proves the request came from the gateway, and a verified user in " +
+                "X-Authenticated-User, which only the gateway sets after checking the session (ADR 0075). The verified user is the acting provider and the " +
+                "audit actor; a providerId in a request body is ignored.";
 
             document.Components ??= new OpenApiComponents();
             document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();

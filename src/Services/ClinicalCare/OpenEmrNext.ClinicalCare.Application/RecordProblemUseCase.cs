@@ -44,7 +44,7 @@ public sealed class RecordProblemUseCase(
             // No problem exists yet, so the row names the patient the caller asked about; if this write fails the request fails (fail closed).
             await auditLog.AppendAsync(
                 new AuditEntry(
-                    clock.GetUtcNow().UtcDateTime, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false),
+                    clock.GetUtcNow().UtcDateTime, Actors.Of(command.Origin, command.ProviderId),
                     AuditActions.ProblemRecord, command.PatientUuid, AuditOutcome.Failed,
                     command.Origin?.CorrelationId, command.Origin?.SourceAddress),
                 ct);
@@ -73,7 +73,7 @@ public sealed class RecordProblemUseCase(
             problem,
             new ProblemRecordedEvent(problem.Uuid, patient.Uuid, patient.Pid, nowUtc),
             new AuditEntry(
-                nowUtc, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false), AuditActions.ProblemRecord,
+                nowUtc, Actors.Of(command.Origin, command.ProviderId), AuditActions.ProblemRecord,
                 problem.Uuid, AuditOutcome.Success, command.Origin?.CorrelationId, command.Origin?.SourceAddress),
             ct);
 

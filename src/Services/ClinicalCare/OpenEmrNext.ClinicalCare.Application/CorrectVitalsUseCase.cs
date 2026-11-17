@@ -92,7 +92,7 @@ public sealed class CorrectVitalsUseCase(
             // A refused correction changed nothing, so its audit row is its own statement (ADR 0069 #4); it fails closed like the others.
             await auditLog.AppendAsync(
                 new AuditEntry(
-                    clock.GetUtcNow().UtcDateTime, AuditActor.Unknown, AuditActions.VitalsCorrect, command.VitalsUuid, AuditOutcome.Failed,
+                    clock.GetUtcNow().UtcDateTime, Actors.Of(command.Origin), AuditActions.VitalsCorrect, command.VitalsUuid, AuditOutcome.Failed,
                     command.Origin?.CorrelationId, command.Origin?.SourceAddress),
                 ct);
             throw;
@@ -128,7 +128,7 @@ public sealed class CorrectVitalsUseCase(
                 new VitalsCorrectedEvent(
                     command.VitalsUuid, encounter.Uuid, encounter.Number, encounter.Patient.Uuid, encounter.Patient.Pid, changed, nowUtc),
                 new AuditEntry(
-                    nowUtc, AuditActor.Unknown, AuditActions.VitalsCorrect, command.VitalsUuid, AuditOutcome.Success,
+                    nowUtc, Actors.Of(command.Origin), AuditActions.VitalsCorrect, command.VitalsUuid, AuditOutcome.Success,
                     command.Origin?.CorrelationId, command.Origin?.SourceAddress, changed)),
             ct);
 

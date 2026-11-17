@@ -77,7 +77,7 @@ public static class VitalsEndpoints
                         weight, height, temperature, request.TemperatureMethod, request.BloodPressureSystolic,
                         request.BloodPressureDiastolic, request.Pulse, request.Respiration, request.OxygenSaturation,
                         waist, head, request.Note),
-                    request.ProviderId,
+                    RequestOrigins.ProviderOf(http, request.ProviderId),
                     RequestOrigins.From(http)),
                 ct);
 

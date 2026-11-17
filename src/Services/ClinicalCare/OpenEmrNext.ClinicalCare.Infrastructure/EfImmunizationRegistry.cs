@@ -17,7 +17,7 @@ public sealed class EfImmunizationRegistry(ClinicalCareDbContext db, IAuditLog a
         var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(immunization.Uuid);
         var f = immunization.Facts;
         var envelope = EventEnvelope.Serialize(
-            ImmunizationRecordedEvent.EventType, @event.RecordedAtUtc, immunization.Uuid.ToString(), actor: $"user:{immunization.ProviderId}", @event);
+            ImmunizationRecordedEvent.EventType, @event.RecordedAtUtc, immunization.Uuid.ToString(), actor: audit.Actor.Subject, @event);
 
         var strategy = db.Database.CreateExecutionStrategy();
         var id = await strategy.ExecuteAsync(async () =>

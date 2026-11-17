@@ -23,7 +23,7 @@ namespace OpenEmrNext.ClinicalCare.Api.Contracts.Requests;
 /// <param name="OrderingProvider">The ordering provider's user id.</param>
 /// <param name="EncounterUuid">An encounter of the same patient to link it to, or <c>null</c>. Unknown encounters get 404.</param>
 /// <param name="EnteredInError">Marks the record as entered in error: legacy's non-destructive way to void a mistaken entry.</param>
-/// <param name="ProviderId">The acting provider. Caller-supplied until identity forwarding exists (finding F-CC-1).</param>
+/// <param name="ProviderId">Ignored: the acting provider is the signed-in user the gateway verified (ADR 0075), so a caller can no longer name who is acting. Kept optional so existing callers do not break; it will be removed in a later contract version..</param>
 public sealed record RecordImmunizationRequest(
     [Required] Guid PatientUuid,
     [Required(ErrorMessage = "An administered date is required.")] DateTime? AdministeredDate,
@@ -49,7 +49,7 @@ public sealed record RecordImmunizationRequest(
     string? ReasonDescription,
     string? Note,
     bool EnteredInError,
-    [Range(1, int.MaxValue, ErrorMessage = "ProviderId must identify the acting provider.")] long ProviderId);
+    [Range(1, int.MaxValue, ErrorMessage = "ProviderId must identify the acting provider.")] long? ProviderId);
 
 /// <summary>
 /// The body of <c>PUT /api/v1/immunizations/{uuid}</c>: the <b>whole</b> editable set, replacing what is stored (a field left out is cleared), conditional on the <c>ETag</c> in <c>If-Match</c>. Same fields and rules as

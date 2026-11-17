@@ -75,7 +75,7 @@ public sealed class RecordImmunizationUseCase(
         {
             await auditLog.AppendAsync(
                 new AuditEntry(
-                    clock.GetUtcNow().UtcDateTime, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false),
+                    clock.GetUtcNow().UtcDateTime, Actors.Of(command.Origin, command.ProviderId),
                     AuditActions.ImmunizationRecord, command.PatientUuid, AuditOutcome.Failed, command.Origin?.CorrelationId, command.Origin?.SourceAddress),
                 ct);
             throw;
@@ -97,7 +97,7 @@ public sealed class RecordImmunizationUseCase(
         await registry.RegisterAsync(
             immunization, new ImmunizationRecordedEvent(immunization.Uuid, patient.Uuid, patient.Pid, nowUtc),
             new AuditEntry(
-                nowUtc, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false), AuditActions.ImmunizationRecord, immunization.Uuid,
+                nowUtc, Actors.Of(command.Origin, command.ProviderId), AuditActions.ImmunizationRecord, immunization.Uuid,
                 AuditOutcome.Success, command.Origin?.CorrelationId, command.Origin?.SourceAddress),
             ct);
 
@@ -137,7 +137,7 @@ public sealed class CorrectImmunizationUseCase(
         {
             await auditLog.AppendAsync(
                 new AuditEntry(
-                    clock.GetUtcNow().UtcDateTime, AuditActor.Unknown, AuditActions.ImmunizationCorrect, command.ImmunizationUuid, AuditOutcome.Failed,
+                    clock.GetUtcNow().UtcDateTime, Actors.Of(command.Origin), AuditActions.ImmunizationCorrect, command.ImmunizationUuid, AuditOutcome.Failed,
                     command.Origin?.CorrelationId, command.Origin?.SourceAddress),
                 ct);
             throw;
@@ -170,7 +170,7 @@ public sealed class CorrectImmunizationUseCase(
                 command.ImmunizationUuid, pid, currentVersion, facts,
                 new ImmunizationCorrectedEvent(current.Uuid, current.PatientUuid, current.PatientPid, changed, nowUtc),
                 new AuditEntry(
-                    nowUtc, AuditActor.Unknown, AuditActions.ImmunizationCorrect, command.ImmunizationUuid, AuditOutcome.Success,
+                    nowUtc, Actors.Of(command.Origin), AuditActions.ImmunizationCorrect, command.ImmunizationUuid, AuditOutcome.Success,
                     command.Origin?.CorrelationId, command.Origin?.SourceAddress, changed)),
             ct);
 

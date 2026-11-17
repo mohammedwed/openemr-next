@@ -25,7 +25,7 @@ public sealed class EfAllergyRegistry(ClinicalCareDbContext db, IAuditLog auditL
         var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(allergy.Uuid);
         var envelope = EventEnvelope.Serialize(
             AllergyRecordedEvent.EventType, @event.RecordedAtUtc, allergy.Uuid.ToString(),
-            actor: $"user:{allergy.ProviderId}", @event);
+            actor: audit.Actor.Subject, @event);
 
         var strategy = db.Database.CreateExecutionStrategy();
         var id = await strategy.ExecuteAsync(async () =>

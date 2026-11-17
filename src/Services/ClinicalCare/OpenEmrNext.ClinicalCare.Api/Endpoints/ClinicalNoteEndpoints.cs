@@ -57,7 +57,7 @@ public static class ClinicalNoteEndpoints
         {
             var note = await useCase.ExecuteAsync(
                 new RecordClinicalNoteCommand(
-                    encounterUuid, new ClinicalNoteInput(ClientTime.ToServerLocal(request.Date), request.Type, request.Category, request.Description), request.ProviderId,
+                    encounterUuid, new ClinicalNoteInput(ClientTime.ToServerLocal(request.Date), request.Type, request.Category, request.Description), RequestOrigins.ProviderOf(http, request.ProviderId),
                     RequestOrigins.From(http)),
                 ct);
 

@@ -33,7 +33,7 @@ public sealed class EfClinicalNoteRegistry(ClinicalCareDbContext db, IAuditLog a
         var number = note.Encounter.Number;
         var numberText = number.ToString(CultureInfo.InvariantCulture);
         var envelope = EventEnvelope.Serialize(
-            ClinicalNoteRecordedEvent.EventType, @event.RecordedAtUtc, note.Uuid.ToString(), actor: $"user:{note.ProviderId}", @event);
+            ClinicalNoteRecordedEvent.EventType, @event.RecordedAtUtc, note.Uuid.ToString(), actor: audit.Actor.Subject, @event);
 
         var strategy = db.Database.CreateExecutionStrategy();
         var id = await strategy.ExecuteAsync(async () =>

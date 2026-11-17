@@ -144,11 +144,6 @@
 </MudDialog>
 
 @code {
-    /// <summary>
-    /// The id of the acting provider. The same tracked gap as the other clinical dialogs (docs/patient-view-pending-decisions.md, item 1; ClinicalCare finding F-CC-1). A correction names no provider.
-    /// </summary>
-    private const long PlaceholderProviderId = 1;
-
     // The service's own bounds (IM-1): 1900-01-01 up to tomorrow (a day of slack covers zones).
     private static readonly DateTime MinDate = new(1900, 1, 1);
     private static DateTime MaxDate => DateTime.Today.AddDays(1);
@@ -302,8 +297,7 @@
                     ReasonCode = Blank(_model.ReasonCode),
                     ReasonDescription = Blank(_model.ReasonDescription),
                     Note = Blank(_model.Note),
-                    EnteredInError = _model.EnteredInError,
-                    ProviderId = PlaceholderProviderId
+                    EnteredInError = _model.EnteredInError
                 });
             }
             else

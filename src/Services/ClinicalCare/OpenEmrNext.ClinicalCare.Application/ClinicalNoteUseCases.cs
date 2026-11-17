@@ -50,7 +50,7 @@ public sealed class RecordClinicalNoteUseCase(
         {
             await auditLog.AppendAsync(
                 new AuditEntry(
-                    clock.GetUtcNow().UtcDateTime, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false), AuditActions.ClinicalNoteRecord,
+                    clock.GetUtcNow().UtcDateTime, Actors.Of(command.Origin, command.ProviderId), AuditActions.ClinicalNoteRecord,
                     command.EncounterUuid, AuditOutcome.Failed, command.Origin?.CorrelationId, command.Origin?.SourceAddress),
                 ct);
             throw;
@@ -72,7 +72,7 @@ public sealed class RecordClinicalNoteUseCase(
         await registry.RegisterAsync(
             note, new ClinicalNoteRecordedEvent(note.Uuid, encounter.Uuid, encounter.Number, encounter.Patient.Uuid, encounter.Patient.Pid, nowUtc),
             new AuditEntry(
-                nowUtc, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false), AuditActions.ClinicalNoteRecord, note.Uuid, AuditOutcome.Success,
+                nowUtc, Actors.Of(command.Origin, command.ProviderId), AuditActions.ClinicalNoteRecord, note.Uuid, AuditOutcome.Success,
                 command.Origin?.CorrelationId, command.Origin?.SourceAddress),
             ct);
 
@@ -99,7 +99,7 @@ public sealed class CorrectClinicalNoteUseCase(
         {
             await auditLog.AppendAsync(
                 new AuditEntry(
-                    clock.GetUtcNow().UtcDateTime, AuditActor.Unknown, AuditActions.ClinicalNoteCorrect, command.NoteUuid, AuditOutcome.Failed,
+                    clock.GetUtcNow().UtcDateTime, Actors.Of(command.Origin), AuditActions.ClinicalNoteCorrect, command.NoteUuid, AuditOutcome.Failed,
                     command.Origin?.CorrelationId, command.Origin?.SourceAddress),
                 ct);
             throw;
@@ -128,7 +128,7 @@ public sealed class CorrectClinicalNoteUseCase(
                 command.NoteUuid, encounter.Number, encounter.Patient.Pid, ConcurrencyToken.From(stamp), facts,
                 new ClinicalNoteCorrectedEvent(command.NoteUuid, encounter.Uuid, encounter.Number, encounter.Patient.Uuid, encounter.Patient.Pid, changed, nowUtc),
                 new AuditEntry(
-                    nowUtc, AuditActor.Unknown, AuditActions.ClinicalNoteCorrect, command.NoteUuid, AuditOutcome.Success, command.Origin?.CorrelationId,
+                    nowUtc, Actors.Of(command.Origin), AuditActions.ClinicalNoteCorrect, command.NoteUuid, AuditOutcome.Success, command.Origin?.CorrelationId,
                     command.Origin?.SourceAddress, changed)),
             ct);
 

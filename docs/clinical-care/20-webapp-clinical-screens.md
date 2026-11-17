@@ -26,7 +26,7 @@ All follow the existing panel and dialog conventions: a server-paged card that l
 | # | Limitation |
 |---|---|
 | L1 | **Not browser-verified, no automated UI tests.** Layout, the dialogs' behaviour and accessibility are checked by reading and compiling only. |
-| L2 | The acting provider is the placeholder `1`, as in every other dialog, until identity is forwarded (decision 1, finding F-CC-1). |
+| L2 | ~~The acting provider is the placeholder `1`~~ **Resolved (ADR 0075):** the dialogs send no provider; the signed-in user is the actor. |
 | L3 | A note's date and an immunization's dates go as wall-clock at offset zero: exact only when the API runs in UTC (decision 9). |
 | L4 | No delete anywhere (the permission port). SOAP and clinical notes have no "void" either, unlike immunizations. |
 | L5 | The immunization dialog does not offer the linked encounter, the ordering provider or the user id; it preserves them but cannot set them. |

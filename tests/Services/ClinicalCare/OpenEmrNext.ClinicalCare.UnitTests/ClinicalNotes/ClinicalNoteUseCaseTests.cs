@@ -298,4 +298,49 @@ public class ClinicalNoteUseCaseTests
         Assert.Equal(["progress_note", "nurse_note"], (await lookups.TypesAsync(CancellationToken.None)).Select(t => t.Id));   // the retired one is not offered
         Assert.Equal(["cardiology"], (await lookups.CategoriesAsync(CancellationToken.None)).Select(c => c.Id));
     }
+
+    // The audit actor (ADR 0075)
+
+    private static readonly VerifiedActor Nurse = new(Guid.Parse("7e57c0de-0000-4000-8000-000000000008"), 8, "nurse_joy");
+
+    [Fact]
+    public async Task A_verified_user_is_the_audit_actor_of_a_record_and_beats_the_provider_id_the_command_names()
+    {
+        var (useCase, registry, _) = BuildRecord(Encounter());
+
+        await useCase.ExecuteAsync(new RecordClinicalNoteCommand(EncounterUuid, Same(), 7, new RequestOrigin("t", "a", Nurse)), CancellationToken.None);
+
+        var actor = registry.Audit!.Actor;
+        Assert.Equal(Nurse.Uuid.ToString(), actor.Subject);
+        Assert.Equal(8, actor.UserId);
+        Assert.True(actor.Verified);
+    }
+
+    [Fact]
+    public async Task With_no_verified_user_the_named_provider_is_recorded_as_unverified_and_an_update_has_no_actor_at_all()
+    {
+        var (record, registry, _) = BuildRecord(Encounter());
+        var (correct, _, updater, _) = BuildCorrect(Encounter(), Stored());
+
+        await record.ExecuteAsync(new RecordClinicalNoteCommand(EncounterUuid, Same(), 7), CancellationToken.None);
+        await correct.ExecuteAsync(Correct(Same() with { Description = "changed" }), CancellationToken.None);
+
+        Assert.Equal(("user:7", false), (registry.Audit!.Actor.Subject, registry.Audit.Actor.Verified));
+        Assert.Equal(AuditActor.Unknown, updater.Request!.Audit.Actor);
+    }
+
+    [Fact]
+    public async Task A_correction_and_a_refusal_are_audited_as_the_verified_user()
+    {
+        var (useCase, _, updater, log) = BuildCorrect(Encounter(), Stored());
+        var origin = new RequestOrigin("t", "a", Nurse);
+
+        await useCase.ExecuteAsync(Correct(Same() with { Description = "changed" }) with { Origin = origin }, CancellationToken.None);
+        await Assert.ThrowsAsync<ConcurrencyConflictException>(() => useCase.ExecuteAsync(Correct(Same(), []) with { Origin = origin }, CancellationToken.None));
+
+        Assert.Equal(8, updater.Request!.Audit.Actor.UserId);
+        Assert.True(updater.Request.Audit.Actor.Verified);
+        var refusal = Assert.Single(log.Entries);
+        Assert.Equal((AuditOutcome.Failed, 8L, true), (refusal.Outcome, refusal.Actor.UserId, refusal.Actor.Verified));
+    }
 }

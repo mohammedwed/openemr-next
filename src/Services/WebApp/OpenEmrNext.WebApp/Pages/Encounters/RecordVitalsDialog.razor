@@ -102,13 +102,6 @@
 </MudDialog>
 
 @code {
-    /// <summary>
-    /// The id of the acting provider. Same tracked gap as <c>CreateEncounterDialog</c> and the directive dialogs: the
-    /// signed-in user has no numeric OpenEMR id yet. See docs/patient-view-pending-decisions.md, item 1, and
-    /// ClinicalCare finding F-CC-1.
-    /// </summary>
-    private const long PlaceholderProviderId = 1;
-
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter, EditorRequired] public Guid EncounterUuid { get; set; }
 
@@ -248,8 +241,7 @@
                 OxygenSaturation = _model.OxygenSaturation,
                 WaistCircumference = Quantity(_model.Waist, _metric ? "cm" : "in"),
                 HeadCircumference = Quantity(_model.Head, _metric ? "cm" : "in"),
-                Note = string.IsNullOrWhiteSpace(_model.Note) ? null : _model.Note,
-                ProviderId = PlaceholderProviderId
+                Note = string.IsNullOrWhiteSpace(_model.Note) ? null : _model.Note
             };
             var recorded = await ClinicalCare.RecordVitalsAsync(EncounterUuid, request);
             MudDialog.Close(DialogResult.Ok(recorded));

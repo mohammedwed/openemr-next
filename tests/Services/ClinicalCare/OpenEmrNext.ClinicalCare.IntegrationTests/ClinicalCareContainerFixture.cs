@@ -49,6 +49,9 @@ public sealed class ClinicalCareContainerFixture : IAsyncLifetime
          // Visit categories (M5d slice 4): the lookup reads a few columns of legacy's calendar categories.
          "openemr_postcalendar_categories"];
 
+    /// <summary>The uuid of the seeded user (id 7, <c>dr_who</c>) the test client acts as: what the gateway would forward once it had verified their session (ADR 0075).</summary>
+    public static readonly Guid TestUserUuid = Guid.Parse("7e57c0de-0000-4000-8000-000000000007");
+
     public string Hostname => _container.Hostname;
     public ushort Port => _container.GetMappedPublicPort(3306);
     public string Database => DatabaseName;
@@ -116,7 +119,7 @@ public sealed class ClinicalCareContainerFixture : IAsyncLifetime
 
         // Reference rows: ids and values chosen to match the real snapshot (AMB is the default class; list order is `seq`).
         await ExecuteAsync(root, "INSERT INTO sequences VALUES (1000)");
-        await ExecuteAsync(root, "INSERT INTO users (id, username) VALUES (7, 'dr_who')");
+        await ExecuteAsync(root, $"INSERT INTO users (id, username, uuid, active) VALUES (7, 'dr_who', UNHEX('{TestUserUuid:N}'), 1)");
         await ExecuteAsync(root, "INSERT INTO `groups` (name, `user`) VALUES ('Default', 'dr_who')");
         await ExecuteAsync(root, "INSERT INTO facility (id, name, pos_code) VALUES (3, 'Main Clinic', 11), (4, 'Unnamed POS', NULL)");
         await ExecuteAsync(root,

@@ -108,13 +108,6 @@
 </MudDialog>
 
 @code {
-    /// <summary>
-    /// The id of the acting provider. Same tracked gap as the directive dialogs and <c>Register.razor</c>: the signed-in
-    /// user has no numeric OpenEMR id yet, so the API's caller-supplied provider cannot be filled with the real one.
-    /// See docs/patient-view-pending-decisions.md, item 1, and ClinicalCare finding F-CC-1.
-    /// </summary>
-    private const long PlaceholderProviderId = 1;
-
     // The API's own bounds (CC-17): 1900-01-01 up to one year ahead. Stopping them in the picker saves a round trip.
     private static readonly DateTime MinDate = new(1900, 1, 1);
     private static DateTime MaxDate => DateTime.Today.AddYears(1);
@@ -210,7 +203,6 @@
                 Reason = string.IsNullOrWhiteSpace(_model.Reason) ? null : _model.Reason,
                 FacilityId = _model.FacilityId,
                 PosCode = _model.PosCode,
-                ProviderId = PlaceholderProviderId,
                 OnsetDate = _model.OnsetDate is { } onset ? new DateTimeOffset(onset.Date) : null,
                 Sensitivity = string.IsNullOrWhiteSpace(_model.Sensitivity) ? null : _model.Sensitivity
             };

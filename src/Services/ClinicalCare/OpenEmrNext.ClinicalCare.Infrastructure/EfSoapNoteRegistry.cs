@@ -41,16 +41,17 @@ public sealed class EfSoapNoteRegistry(ClinicalCareDbContext db, IAuditLog audit
                 VALUES ({note.RecordedAt}, {number}, 'SOAP', {rowId}, {pid}, {actor.Username}, {actor.GroupName}, 1, 0, 'soap')
                 """, ct);
 
+            var audit = auditFor(rowId);
             var recorded = @event with { NoteId = rowId };
             var envelope = EventEnvelope.Serialize(
-                SoapNoteRecordedEvent.EventType, recorded.RecordedAtUtc, $"soap:{rowId}", actor: $"user:{note.ProviderId}", recorded);
+                SoapNoteRecordedEvent.EventType, recorded.RecordedAtUtc, $"soap:{rowId}", actor: audit.Actor.Subject, recorded);
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO clinical_care_outbox (event_type, payload, occurred_at)
                 VALUES ({SoapNoteRecordedEvent.EventType}, {envelope}, {recorded.RecordedAtUtc})
                 """, ct);
 
-            await auditLog.AppendAsync(auditFor(rowId), ct);   // last statement, same transaction (SEC-9)
+            await auditLog.AppendAsync(audit, ct);   // last statement, same transaction (SEC-9)
 
             await transaction.CommitAsync(ct);
             return rowId;

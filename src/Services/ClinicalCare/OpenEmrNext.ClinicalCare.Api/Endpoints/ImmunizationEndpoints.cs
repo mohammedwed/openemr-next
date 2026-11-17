@@ -63,7 +63,7 @@ public static class ImmunizationEndpoints
                     Input(r.AdministeredDate, r.ImmunizationId, r.CvxCode, r.Manufacturer, r.LotNumber, r.ExpirationDate, r.AmountAdministered, r.AmountUnit, r.Route,
                         r.AdministrationSite, r.CompletionStatus, r.InformationSource, r.RefusalReason, r.EducationDate, r.VisDate, r.AdministeredBy,
                         r.AdministeredById, r.OrderingProvider, r.ReasonCode, r.ReasonDescription, r.Note, r.EnteredInError),
-                    r.EncounterUuid, r.ProviderId, RequestOrigins.From(http)),
+                    r.EncounterUuid, RequestOrigins.ProviderOf(http, r.ProviderId), RequestOrigins.From(http)),
                 ct);
 
             return Results.Created(

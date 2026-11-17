@@ -50,7 +50,7 @@ public sealed class UpdateAllergyUseCase(
         {
             await auditLog.AppendAsync(
                 new AuditEntry(
-                    clock.GetUtcNow().UtcDateTime, AuditActor.Unknown, AuditActions.AllergyUpdate, command.AllergyUuid,
+                    clock.GetUtcNow().UtcDateTime, Actors.Of(command.Origin), AuditActions.AllergyUpdate, command.AllergyUuid,
                     AuditOutcome.Failed, command.Origin?.CorrelationId, command.Origin?.SourceAddress),
                 ct);
             throw;
@@ -81,7 +81,7 @@ public sealed class UpdateAllergyUseCase(
                 command.AllergyUuid, ConcurrencyToken.From(stamp), change,
                 new AllergyUpdatedEvent(current.Uuid, current.PatientUuid, current.PatientPid, changed, nowUtc),
                 new AuditEntry(
-                    nowUtc, AuditActor.Unknown, AuditActions.AllergyUpdate, command.AllergyUuid, AuditOutcome.Success,
+                    nowUtc, Actors.Of(command.Origin), AuditActions.AllergyUpdate, command.AllergyUuid, AuditOutcome.Success,
                     command.Origin?.CorrelationId, command.Origin?.SourceAddress, changed)),
             ct);
 

@@ -58,7 +58,7 @@ public static class ProblemEndpoints
             var problem = await useCase.ExecuteAsync(
                 new RecordProblemCommand(
                     request.PatientUuid, request.Title, ClientTime.ToServerLocal(request.BeginDate), ClientTime.ToServerLocal(request.EndDate),
-                    request.Diagnosis, request.Outcome, request.Occurrence, request.ReferredBy, request.Comments, request.ProviderId,
+                    request.Diagnosis, request.Outcome, request.Occurrence, request.ReferredBy, request.Comments, RequestOrigins.ProviderOf(http, request.ProviderId),
                     RequestOrigins.From(http), request.Verification),
                 ct);
 

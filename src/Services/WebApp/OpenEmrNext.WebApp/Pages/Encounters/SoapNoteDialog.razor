@@ -40,12 +40,6 @@
 </MudDialog>
 
 @code {
-    /// <summary>
-    /// The id of the acting provider. The same tracked gap as the other encounter dialogs: the signed-in user has no numeric OpenEMR id yet (docs/patient-view-pending-decisions.md, item 1;
-    /// ClinicalCare finding F-CC-1). A correction names no provider.
-    /// </summary>
-    private const long PlaceholderProviderId = 1;
-
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter, EditorRequired] public Guid EncounterUuid { get; set; }
 
@@ -100,8 +94,7 @@
                     Subjective = Blank(_model.Subjective),
                     Objective = Blank(_model.Objective),
                     Assessment = Blank(_model.Assessment),
-                    Plan = Blank(_model.Plan),
-                    ProviderId = PlaceholderProviderId
+                    Plan = Blank(_model.Plan)
                 });
             }
             else

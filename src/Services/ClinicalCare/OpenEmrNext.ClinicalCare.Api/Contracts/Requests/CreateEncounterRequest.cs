@@ -21,8 +21,8 @@ namespace OpenEmrNext.ClinicalCare.Api.Contracts.Requests;
 /// <param name="FacilityId">Optional facility id; <c>0</c> for none. A non-zero id must exist.</param>
 /// <param name="PosCode">Optional place-of-service code (1 to 99); defaults to the facility's.</param>
 /// <param name="ProviderId">
-/// The id of the acting provider. Caller-supplied for now and not verified against any signed-in user (ADR
-/// 0055, finding F-CC-1); revisit when identity forwarding exists.
+/// The encounter's own provider (a field of the visit, not who is making the request). Optional: when omitted it is the signed-in user the gateway verified (ADR 0075). Who is acting is always
+/// the verified user, whatever this says.
 /// </param>
 /// <param name="OnsetDate">Optional onset date of the condition the visit is about; the same zone and range rules as <paramref name="Date"/>.</param>
 /// <param name="Sensitivity">Optional legacy sensitivity label (up to 30 characters). Stored, not yet enforced (finding F-CC-2).</param>
@@ -34,6 +34,6 @@ public sealed record CreateEncounterRequest(
     [StringLength(65_535, ErrorMessage = "Reason must be at most 65535 characters.")] string? Reason,
     [Range(0, int.MaxValue, ErrorMessage = "FacilityId cannot be negative.")] int FacilityId,
     [Range(1, 99, ErrorMessage = "PosCode must be between 1 and 99.")] int? PosCode,
-    [Range(1, int.MaxValue, ErrorMessage = "ProviderId must identify the acting provider.")] long ProviderId,
+    [Range(1, int.MaxValue, ErrorMessage = "ProviderId must identify the acting provider.")] long? ProviderId,
     DateTime? OnsetDate,
     [StringLength(30, ErrorMessage = "Sensitivity must be at most 30 characters.")] string? Sensitivity);

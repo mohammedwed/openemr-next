@@ -52,7 +52,7 @@ public sealed class RecordSoapNoteUseCase(IEncounterReader encounters, ISoapNote
         {
             await auditLog.AppendAsync(
                 new AuditEntry(
-                    clock.GetUtcNow().UtcDateTime, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false), AuditActions.SoapRecord,
+                    clock.GetUtcNow().UtcDateTime, Actors.Of(command.Origin, command.ProviderId), AuditActions.SoapRecord,
                     command.EncounterUuid, AuditOutcome.Failed, command.Origin?.CorrelationId, command.Origin?.SourceAddress),
                 ct);
             throw;
@@ -73,7 +73,7 @@ public sealed class RecordSoapNoteUseCase(IEncounterReader encounters, ISoapNote
             new SoapNoteRecordedEvent(0, encounter.Uuid, encounter.Number, encounter.Patient.Uuid, encounter.Patient.Pid, SoapSectionNames.Written(sections), nowUtc),
             // The note's id exists only after the insert, so the registry asks for the audit row once it has it.
             id => new AuditEntry(
-                nowUtc, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false), AuditActions.SoapRecord, CorrectSoapNoteUseCase.Key(id),
+                nowUtc, Actors.Of(command.Origin, command.ProviderId), AuditActions.SoapRecord, CorrectSoapNoteUseCase.Key(id),
                 AuditOutcome.Success, command.Origin?.CorrelationId, command.Origin?.SourceAddress, SoapSectionNames.Written(sections)),
             ct);
 
@@ -98,7 +98,7 @@ public sealed class CorrectSoapNoteUseCase(IEncounterReader encounters, ISoapNot
         {
             await auditLog.AppendAsync(
                 new AuditEntry(
-                    clock.GetUtcNow().UtcDateTime, AuditActor.Unknown, AuditActions.SoapCorrect, Key(command.NoteId), AuditOutcome.Failed,
+                    clock.GetUtcNow().UtcDateTime, Actors.Of(command.Origin), AuditActions.SoapCorrect, Key(command.NoteId), AuditOutcome.Failed,
                     command.Origin?.CorrelationId, command.Origin?.SourceAddress),
                 ct);
             throw;
@@ -127,7 +127,7 @@ public sealed class CorrectSoapNoteUseCase(IEncounterReader encounters, ISoapNot
                 command.NoteId, encounter.Number, encounter.Patient.Pid, currentVersion, sections,
                 new SoapNoteCorrectedEvent(command.NoteId, encounter.Uuid, encounter.Number, encounter.Patient.Uuid, encounter.Patient.Pid, changed, nowUtc),
                 new AuditEntry(
-                    nowUtc, AuditActor.Unknown, AuditActions.SoapCorrect, Key(command.NoteId), AuditOutcome.Success, command.Origin?.CorrelationId,
+                    nowUtc, Actors.Of(command.Origin), AuditActions.SoapCorrect, Key(command.NoteId), AuditOutcome.Success, command.Origin?.CorrelationId,
                     command.Origin?.SourceAddress, changed)),
             ct);
 

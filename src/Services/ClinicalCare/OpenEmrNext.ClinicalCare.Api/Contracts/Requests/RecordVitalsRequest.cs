@@ -33,7 +33,7 @@ public sealed record QuantityRequest(
 /// <param name="HeadCircumference">Head circumference, in <c>in</c> or <c>cm</c>.</param>
 /// <param name="Note">A free-text note, up to 255 characters.</param>
 /// <param name="ProviderId">
-/// The acting provider. Caller-supplied for now and not verified against any signed-in user (ADR 0055, finding F-CC-1).
+/// Ignored: the acting provider is the signed-in user the gateway verified (ADR 0075), so a caller can no longer name who is acting. Kept optional so existing callers do not break; it will be removed in a later contract version.
 /// </param>
 public sealed record RecordVitalsRequest(
     QuantityRequest? Weight,
@@ -48,4 +48,4 @@ public sealed record RecordVitalsRequest(
     QuantityRequest? WaistCircumference,
     QuantityRequest? HeadCircumference,
     [StringLength(255, ErrorMessage = "Note must be at most 255 characters.")] string? Note,
-    [Range(1, int.MaxValue, ErrorMessage = "ProviderId must identify the acting provider.")] long ProviderId);
+    [Range(1, int.MaxValue, ErrorMessage = "ProviderId must identify the acting provider.")] long? ProviderId);

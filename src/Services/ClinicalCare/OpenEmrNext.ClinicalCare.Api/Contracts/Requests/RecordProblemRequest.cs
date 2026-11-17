@@ -21,8 +21,7 @@ namespace OpenEmrNext.ClinicalCare.Api.Contracts.Requests;
 /// <param name="Comments">Optional free-text comments.</param>
 /// <param name="Verification">Optional <c>condition-verification</c> code (<c>unconfirmed</c>, <c>confirmed</c>, <c>refuted</c>, <c>entered-in-error</c>). Must be a configured code.</param>
 /// <param name="ProviderId">
-/// The id of the acting provider. Caller-supplied for now and not verified against any signed-in user (ADR 0055, finding F-CC-1); revisit when identity
-/// forwarding exists.
+/// Ignored: the acting provider is the signed-in user the gateway verified (ADR 0075), so a caller can no longer name who is acting. Kept optional so existing callers do not break; it will be removed in a later contract version.
 /// </param>
 public sealed record RecordProblemRequest(
     [Required] Guid PatientUuid,
@@ -35,5 +34,5 @@ public sealed record RecordProblemRequest(
     [Range(0, int.MaxValue, ErrorMessage = "Occurrence must not be negative.")] int Occurrence,
     [StringLength(255, ErrorMessage = "Referred by must be at most 255 characters.")] string? ReferredBy,
     [StringLength(65_535, ErrorMessage = "Comments must be at most 65535 characters.")] string? Comments,
-    [Range(1, int.MaxValue, ErrorMessage = "ProviderId must identify the acting provider.")] long ProviderId,
+    [Range(1, int.MaxValue, ErrorMessage = "ProviderId must identify the acting provider.")] long? ProviderId,
     [StringLength(36, ErrorMessage = "Verification is longer than a record can hold.")] string? Verification = null);

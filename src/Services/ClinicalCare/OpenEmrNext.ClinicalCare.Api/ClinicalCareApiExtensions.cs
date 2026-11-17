@@ -39,6 +39,7 @@ public static class ClinicalCareApiExtensions
 
         // The only place each port is wired to its real adapter; Application only ever sees the port.
         builder.Services.AddScoped<IPatientDirectory, EfPatientDirectory>();
+        builder.Services.AddScoped<IUserDirectory, EfUserDirectory>();
         builder.Services.AddScoped<IPatientReferenceStore, EfPatientReferenceStore>();
         builder.Services.AddScoped<ConsumePatientRegisteredUseCase>();
         builder.Services.AddScoped<IEncounterCodeLists, EfEncounterCodeLists>();

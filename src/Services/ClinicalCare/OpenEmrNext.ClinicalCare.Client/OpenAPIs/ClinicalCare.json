@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "ClinicalCare API",
-    "description": "Clinical encounters (and, later, vitals). Every endpoint requires the shared X-Internal-Gateway-Secret header (ADR 0055, ADR 0064) -- there is no per-user authentication yet, so the acting provider is supplied by the caller.",
+    "description": "Clinical encounters, vitals, problems, allergies, immunizations and notes. Every endpoint requires the shared X-Internal-Gateway-Secret header (ADR 0055, ADR 0064), which proves the request came from the gateway, and a verified user in X-Authenticated-User, which only the gateway sets after checking the session (ADR 0075). The verified user is the acting provider and the audit actor; a providerId in a request body is ignored.",
     "version": "1.0.0"
   },
   "paths": {
@@ -3258,6 +3258,7 @@
             "minimum": 1,
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
+              "null",
               "integer",
               "string"
             ],
@@ -4383,6 +4384,7 @@
             "minimum": 1,
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
+              "null",
               "integer",
               "string"
             ],
@@ -4430,6 +4432,7 @@
             "minimum": 1,
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
+              "null",
               "integer",
               "string"
             ],
@@ -4641,6 +4644,7 @@
             "minimum": 1,
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
+              "null",
               "integer",
               "string"
             ],
@@ -4735,6 +4739,7 @@
             "minimum": 1,
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
+              "null",
               "integer",
               "string"
             ],
@@ -4788,6 +4793,7 @@
             "minimum": 1,
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
+              "null",
               "integer",
               "string"
             ],
@@ -4935,6 +4941,7 @@
             "minimum": 1,
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
+              "null",
               "integer",
               "string"
             ],

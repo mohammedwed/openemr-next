@@ -58,7 +58,7 @@ public static class SoapNoteEndpoints
         {
             var note = await useCase.ExecuteAsync(
                 new RecordSoapNoteCommand(
-                    encounterUuid, new SoapInput(request.Subjective, request.Objective, request.Assessment, request.Plan), request.ProviderId, RequestOrigins.From(http)),
+                    encounterUuid, new SoapInput(request.Subjective, request.Objective, request.Assessment, request.Plan), RequestOrigins.ProviderOf(http, request.ProviderId), RequestOrigins.From(http)),
                 ct);
 
             return Results.Created($"/api/v1/encounters/{encounterUuid}/soap-notes/{note.Id}", new SoapNoteRecordedResponse(note.Id, encounterUuid));

@@ -82,12 +82,20 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("INSERT INTO patient_data (pid) VALUES (1)")]
     [InlineData("UPDATE patient_data SET fname = 'x'")]
     [InlineData("INSERT INTO users (username) VALUES ('intruder')")]
+    [InlineData("UPDATE users SET active = 0")]
+    [InlineData("UPDATE users SET uuid = NULL")]
+    [InlineData("UPDATE users SET username = 'x'")]
     [InlineData("DROP TABLE form_encounter")]
     public async Task The_production_principal_cannot_change_what_it_does_not_own(string sql) =>
         await AssertDeniedAsync(sql);
 
     [Theory]
     [InlineData("SELECT password FROM users")]
+    [InlineData("SELECT fname FROM users")]
+    [InlineData("SELECT email FROM users")]
+    [InlineData("SELECT authorized FROM users")]
+    [InlineData("SELECT npi FROM users")]
+    [InlineData("SELECT federaldrugid FROM users")]
     [InlineData("SELECT * FROM users")]
     [InlineData("SELECT fname FROM patient_data")]
     [InlineData("SELECT * FROM patient_data")]
@@ -206,6 +214,15 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("TRUNCATE TABLE issue_encounter")]
     public async Task The_production_principal_cannot_change_or_remove_issues_beyond_inserting_a_problems_columns(string sql) =>
         await AssertDeniedAsync(sql);
+
+    [Fact]
+    public async Task The_production_principal_can_read_exactly_the_user_columns_that_identify_and_name_the_acting_user()
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // The forwarded uuid resolves to an id and username, and an inactive account is refused (ADR 0075): four columns, none of the credential or contact ones.
+        await db.Database.ExecuteSqlRawAsync("SELECT id, username, uuid, active FROM users LIMIT 1");
+    }
 
     [Fact]
     public async Task The_production_principal_can_read_the_option_columns_the_lookups_use_including_a_note_types_loinc_code_and_whether_it_is_active()

@@ -43,7 +43,7 @@ public sealed class LinkIssueToEncounterUseCase(
         {
             await auditLog.AppendAsync(
                 new AuditEntry(
-                    clock.GetUtcNow().UtcDateTime, AuditActor.Unknown, AuditActions.EncounterIssueLink, command.EncounterUuid, AuditOutcome.Failed,
+                    clock.GetUtcNow().UtcDateTime, Actors.Of(command.Origin), AuditActions.EncounterIssueLink, command.EncounterUuid, AuditOutcome.Failed,
                     command.Origin?.CorrelationId, command.Origin?.SourceAddress),
                 ct);
             throw;
@@ -66,7 +66,7 @@ public sealed class LinkIssueToEncounterUseCase(
             new IssueLinkedToEncounterEvent(
                 link.Uuid, link.EncounterUuid, link.EncounterNumber, issue.Uuid, KindName(issue.Kind), link.Patient.Uuid, link.Patient.Pid, nowUtc),
             new AuditEntry(
-                nowUtc, AuditActor.Unknown, AuditActions.EncounterIssueLink, command.EncounterUuid, AuditOutcome.Success,
+                nowUtc, Actors.Of(command.Origin), AuditActions.EncounterIssueLink, command.EncounterUuid, AuditOutcome.Success,
                 command.Origin?.CorrelationId, command.Origin?.SourceAddress),
             ct);
 
@@ -103,7 +103,7 @@ public sealed class UnlinkIssueFromEncounterUseCase(
         {
             await auditLog.AppendAsync(
                 new AuditEntry(
-                    clock.GetUtcNow().UtcDateTime, AuditActor.Unknown, AuditActions.EncounterIssueUnlink, command.EncounterUuid, AuditOutcome.Failed,
+                    clock.GetUtcNow().UtcDateTime, Actors.Of(command.Origin), AuditActions.EncounterIssueUnlink, command.EncounterUuid, AuditOutcome.Failed,
                     command.Origin?.CorrelationId, command.Origin?.SourceAddress),
                 ct);
             throw;
@@ -129,7 +129,7 @@ public sealed class UnlinkIssueFromEncounterUseCase(
                     encounter.Uuid, encounter.Number.Value, issue.Uuid, LinkIssueToEncounterUseCase.KindName(issue.Kind), encounter.PatientUuid,
                     encounter.PatientPid.Value, nowUtc),
                 new AuditEntry(
-                    nowUtc, AuditActor.Unknown, AuditActions.EncounterIssueUnlink, command.EncounterUuid, AuditOutcome.Success,
+                    nowUtc, Actors.Of(command.Origin), AuditActions.EncounterIssueUnlink, command.EncounterUuid, AuditOutcome.Success,
                     command.Origin?.CorrelationId, command.Origin?.SourceAddress)),
             ct);
     }
