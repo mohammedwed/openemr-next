@@ -477,3 +477,16 @@ Full record: `docs/clinical-care/20-webapp-clinical-screens.md`. **Compile-check
 - **Tests (run, green):** the 32 new `FhirImmunizationTests`, the route test and the OpenAPI tests (58 in that set), and the gateway proxy tests (32, 3 of them new). The full Clinical Care suites were not run on this change.
 - **Found by the US Core check:** an `education` entry needs a document type (`imm-1`) and the first mapping gave only dates; fixed ("Vaccine Information Statement" when there is a VIS date, "Patient education" otherwise).
 - **Mutation check:** accepting unsupported search parameters, and ignoring the entered-in-error flag, each fail tests (5 in all); restored.
+
+## Added — FHIR AllergyIntolerance, Condition, Encounter and Observation (M5e, slices 2 to 5, ADR 0079)
+
+- **Four more read-only FHIR R4 resources**, each with read by id and search by patient, on the flow built for Immunization: `AllergyIntolerance`, `Condition` (problem list), `Encounter`, and vital-sign `Observation`. Mapping rules and limitations: `docs/clinical-care/25-fhir-clinical-resources.md`.
+- **Vitals become up to ten Observations** (blood-pressure panel, heart rate, respiratory rate, temperature, oxygen saturation, weight, height, BMI, waist and head circumference), with LOINC codes and UCUM units. Their ids are derived, `{vitalsUuid}-{measurement}`, as decided (no write, differs from any id legacy issued). A search counts and pages over the Observations, and reads a patient's most recent 1000 sets.
+- **Two differences from the ADR, stated:** the id form above (reversible, where a hash is not) and **`_lastUpdated` search not built** (refused as unsupported; `meta.lastUpdated` is served).
+- **Diagnosis text becomes codings** (`SYSTEM:code;SYSTEM:code`: ICD-10, SNOMED and the rest mapped to FHIR code-system URIs).
+- **Two new reads:** `IVitalsReader.FindAnywhereAsync` and `ListForPatientAsync` (vitals were only reachable through an encounter), and `IUserDirectory.FindPeopleAsync` (uuid and display name).
+- **Gateway:** `/fhir/AllergyIntolerance`, `/fhir/Condition`, `/fhir/Encounter` and `/fhir/Observation` route to Clinical Care; all five clinical paths need a session and the proxy tests pin each to the right service.
+- **No database change.**
+- **Tests (run, green):** 45 new `FhirClinicalResourceTests`; with the Immunization tests, the route test and the OpenAPI tests that set is 103, and the gateway proxy tests are 44 (12 of them new across the FHIR work). **Every resource served validates against its US Core profile**, each of the ten Observation measurements against its own. The full Clinical Care suites were not run on this change.
+- **Mutation check:** making every problem active, dropping the diastolic component, and serving deleted vitals each fail tests (5 in all); restored.
+- **A test fixed, not the code:** a diagnosis that is not `SYSTEM:code` cannot be created through the JSON API, so that test writes it straight into the table, as legacy could.

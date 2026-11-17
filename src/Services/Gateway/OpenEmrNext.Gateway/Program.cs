@@ -65,7 +65,8 @@ string[] clinicalCareRoutePatterns =
 [
     "/api/v1/encounters/{**catch-all}", "/api/v1/problems/{**catch-all}", "/api/v1/allergies/{**catch-all}",
     "/api/v1/immunizations/{**catch-all}", "/api/v1/lookups/{**catch-all}",
-    "/fhir/Immunization/{**catch-all}"
+    "/fhir/Immunization/{**catch-all}", "/fhir/AllergyIntolerance/{**catch-all}", "/fhir/Condition/{**catch-all}", "/fhir/Encounter/{**catch-all}",
+    "/fhir/Observation/{**catch-all}"
 ];
 
 // The only routes that need a signed-in user (ADR 0075): the two services that hold clinical and patient data. AuthFacade's own routes are how a user signs in, and WebApp's are static files.

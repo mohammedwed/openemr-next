@@ -4,7 +4,8 @@ using Task = System.Threading.Tasks.Task;
 namespace OpenEmrNext.ClinicalCare.Api.Fhir;
 
 /// <summary>A search the service understood: whose records, which one, and which page.</summary>
-internal sealed record FhirSearch(Guid? Patient, Guid? Id, int Count, int Offset);
+/// <param name="IdText">The <c>_id</c> as sent, for a resource whose id is not a bare uuid (an Observation's is <c>{uuid}-{measurement}</c>); <paramref name="Id"/> is then <c>null</c>.</param>
+internal sealed record FhirSearch(Guid? Patient, Guid? Id, int Count, int Offset, string? IdText = null);
 
 /// <summary>
 /// Reads a FHIR search (ADR 0079 #6): a small, strict set of parameters. <c>patient</c> (a patient uuid, bare or as <c>Patient/{uuid}</c>), <c>_id</c>, <c>_count</c> (default 20, at most 100) and <c>_offset</c> for paging,
@@ -17,7 +18,9 @@ internal static class FhirSearchParser
     /// <param name="resourceType">For the message.</param>
     /// <param name="extraParameters">The parameters this resource adds to the common ones.</param>
     /// <returns>The search, or a ready 400 answer in <paramref name="refusal"/>.</returns>
-    public static bool TryParse(string resourceType, IQueryCollection query, IReadOnlySet<string> extraParameters, out FhirSearch search, out IResult refusal)
+    /// <param name="idValid">For a resource whose id is not a bare uuid: judges the <c>_id</c> text. Left <c>null</c>, <c>_id</c> must be a uuid.</param>
+    public static bool TryParse(
+        string resourceType, IQueryCollection query, IReadOnlySet<string> extraParameters, out FhirSearch search, out IResult refusal, Func<string, bool>? idValid = null)
     {
         search = new FhirSearch(null, null, DefaultCount, 0);
         refusal = Results.Empty;
@@ -52,18 +55,31 @@ internal static class FhirSearchParser
             patient = parsed;
         }
 
+        string? idText = null;
         if (query.TryGetValue("_id", out var i))
         {
-            if (!Guid.TryParse(i[0], out var parsed) || parsed == Guid.Empty)
+            if (idValid is not null)
+            {
+                if (!idValid(i[0]!))
+                {
+                    refusal = FhirOutcomes.Invalid("The search parameter '_id' must be a resource id.");
+                    return false;
+                }
+
+                idText = i[0];
+            }
+            else if (!Guid.TryParse(i[0], out var parsed) || parsed == Guid.Empty)
             {
                 refusal = FhirOutcomes.Invalid("The search parameter '_id' must be a resource id.");
                 return false;
             }
-
-            id = parsed;
+            else
+            {
+                id = parsed;
+            }
         }
 
-        if (patient is null && id is null)
+        if (patient is null && id is null && idText is null)
         {
             refusal = FhirOutcomes.Invalid($"A search for {resourceType} needs 'patient' (or '_id'): Clinical Care does not return every patient's records at once.");
             return false;
@@ -83,7 +99,7 @@ internal static class FhirSearchParser
             return false;
         }
 
-        search = new FhirSearch(patient, id, count, offset);
+        search = new FhirSearch(patient, id, count, offset, idText);
         return true;
     }
 }
