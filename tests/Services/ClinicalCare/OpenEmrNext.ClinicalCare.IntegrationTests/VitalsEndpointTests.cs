@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using OpenEmrNext.ClinicalCare.Api.Contracts.Requests;
 using OpenEmrNext.ClinicalCare.Api.Contracts.Responses;
+using OpenEmrNext.ClinicalCare.Domain.ValueObjects;
 
 namespace OpenEmrNext.ClinicalCare.IntegrationTests;
 
@@ -138,6 +139,36 @@ public class VitalsEndpointTests(ClinicalCareContainerFixture fixture) : IAsyncL
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("Systolic blood pressure must be between 1 and 400.", await ErrorsOf(response));
+    }
+
+    [Fact]
+    public async Task GET_vitals_returns_a_strong_etag_from_last_updated_and_it_changes_when_another_writer_edits_the_row()
+    {
+        var created = await (await _client.PostAsJsonAsync(VitalsUrl, Request(pulse: 64))).Content.ReadFromJsonAsync<VitalsRecordedResponse>();
+        await fixture.RootExecuteAsync("UPDATE form_vitals SET last_updated = '2026-02-03 04:05:06'");
+
+        var first = await _client.GetAsync($"{VitalsUrl}/{created!.Uuid}");
+        await fixture.RootExecuteAsync("UPDATE form_vitals SET pulse = 70");   // the database moves last_updated
+        var afterLegacyEdit = await _client.GetAsync($"{VitalsUrl}/{created.Uuid}");
+
+        var expected = ConcurrencyToken.From(new DateTime(2026, 2, 3, 4, 5, 6)).ToETag();
+        Assert.Equal(expected, first.Headers.ETag?.ToString());
+        Assert.NotEqual(expected, afterLegacyEdit.Headers.ETag?.ToString());
+    }
+
+    [Fact]
+    public async Task SEC_9_a_404_for_an_unknown_encounter_leaves_a_failed_audit_row_naming_it()
+    {
+        var unknown = Guid.NewGuid();
+
+        var response = await _client.PostAsJsonAsync($"/api/v1/encounters/{unknown}/vitals", Request(pulse: 64));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        // InitializeAsync created one encounter (a success row); the refusal adds exactly one failed row.
+        Assert.Equal(1L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_audit WHERE outcome = 'failed'"));
+        Assert.Equal("vitals.record", await fixture.RootScalarAsync<string>("SELECT action FROM clinical_care_audit WHERE outcome = 'failed'"));
+        Assert.Equal(unknown.ToString(),
+            await fixture.RootScalarAsync<string>("SELECT CONCAT(subject, '') FROM clinical_care_audit WHERE outcome = 'failed'"));
     }
 
     [Fact]

@@ -1,0 +1,143 @@
+@using OpenEmrNext.ClinicalCare.Client
+@using OpenEmrNext.WebApp.Pages.Patients
+@using OpenEmrNext.WebApp.Shared
+@using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
+@inject IClinicalCareClient ClinicalCare
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+@* The problems and allergies this visit addressed (legacy's issue_encounter, ADR 0070). It loads its own data so a clinical care hiccup shows here and nowhere else. A link is
+   never edited: to change whether an issue was resolved during the visit, unlink it and link it again. Unlinking removes only the relation, never the problem or the allergy,
+   and it asks first all the same because it is not undone by a single click. *@
+<PatientSectionCard Title="Problems and allergies addressed"
+    HasData="_items is not null" Error="_error" OnRetry="LoadAsync"
+    ErrorMessage="Could not load the problems and allergies linked to this visit. The clinical care service may be unavailable."
+    StaleMessage="Could not refresh the linked problems and allergies. The list below may be out of date."
+    LoadingLabel="Loading linked problems and allergies" Class="mb-6">
+    <Summary>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary" role="status">
+            @(_total == 1 ? "1 linked" : $"{_total} linked")@(_total > PageSize ? $" · showing the first {PageSize}" : "")
+        </MudText>
+    </Summary>
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenLinkAsync">Link a problem or allergy</MudButton>
+    </Actions>
+    <ChildContent>
+        <MudTable Items="_items ?? []" Hover="true" Elevation="0"
+            TableAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Problems and allergies addressed in this encounter" })">
+            <HeaderContent>
+                <MudTh>Kind</MudTh>
+                <MudTh>Title</MudTh>
+                <MudTh>Resolved at this visit</MudTh>
+                <MudTh><span class="op-visually-hidden">Actions</span></MudTh>
+            </HeaderContent>
+            <RowTemplate Context="issue">
+                <MudTd DataLabel="Kind">@(issue.Kind == "allergy" ? "Allergy" : "Problem")</MudTd>
+                <MudTd DataLabel="Title"><span class="op-clamp" title="@issue.Title">@(string.IsNullOrWhiteSpace(issue.Title) ? "(untitled)" : issue.Title)</span></MudTd>
+                <MudTd DataLabel="Resolved at this visit">@(issue.Resolved ? "Yes" : "—")</MudTd>
+                <MudTd>
+                    <MudButton Variant="Variant.Text" Color="Color.Warning" Size="Size.Small" Disabled="@(_busy == issue.IssueUuid)" OnClick="@(() => UnlinkAsync(issue))"
+                        aria-label="@($"Unlink {issue.Title} from this encounter")">Unlink</MudButton>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudStack Spacing="2" AlignItems="AlignItems.Start" Class="py-2">
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Nothing linked to this visit yet.</MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="OpenLinkAsync">Link a problem or allergy</MudButton>
+                </MudStack>
+            </NoRecordsContent>
+        </MudTable>
+    </ChildContent>
+</PatientSectionCard>
+
+@code {
+    // One page is enough for a visit: an encounter addresses a handful of issues. The total says so if there are more.
+    private const int PageSize = 50;
+
+    [Parameter, EditorRequired] public Guid EncounterUuid { get; set; }
+    [Parameter, EditorRequired] public Guid PatientUuid { get; set; }
+
+    // Null means "not loaded yet". A failed refresh keeps the previous list here on purpose.
+    private List<EncounterIssueResponse>? _items;
+    private int _total;
+    private bool _error;
+    private Guid? _busy;
+
+    // Each load takes a number; only the latest one may apply its result.
+    private int _loadCounter;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var ticket = ++_loadCounter;
+        try
+        {
+            var result = await ClinicalCare.ListEncounterIssuesAsync(EncounterUuid, PageSize, 0);
+            if (ticket != _loadCounter)
+            {
+                return;
+            }
+
+            _items = [.. result.Items];
+            _total = result.Total;
+            _error = false;
+        }
+        catch (Exception ex) when (ex is ClinicalCareApiException or HttpRequestException)
+        {
+            if (ticket == _loadCounter)
+            {
+                _error = true;
+            }
+        }
+    }
+
+    private async Task OpenLinkAsync()
+    {
+        var linked = (_items ?? []).Select(i => i.IssueUuid).ToHashSet();
+        var parameters = new DialogParameters<LinkIssueDialog>
+        {
+            { x => x.PatientUuid, PatientUuid }, { x => x.EncounterUuid, EncounterUuid }, { x => x.AlreadyLinked, linked }
+        };
+        var dialog = await DialogService.ShowAsync<LinkIssueDialog>("Link a problem or allergy", parameters, DialogDefaults.Standard);
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: EncounterIssueLinkResponse })
+        {
+            Snackbar.Add("Linked to this encounter.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task UnlinkAsync(EncounterIssueResponse issue)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Unlink from this encounter?",
+            $"\"{issue.Title}\" will no longer be listed as addressed in this encounter. The {(issue.Kind == "allergy" ? "allergy" : "problem")} itself is not changed or removed.",
+            yesText: "Unlink", cancelText: "Keep it linked");
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        _busy = issue.IssueUuid;
+        try
+        {
+            await ClinicalCare.UnlinkIssueFromEncounterAsync(EncounterUuid, issue.IssueUuid);
+            Snackbar.Add("Unlinked from this encounter.", Severity.Success);
+        }
+        catch (ClinicalCareApiException ex)
+        {
+            Snackbar.Add(ClinicalCareErrorFormatter.Describe(ex, "Could not unlink this. Please try again."), Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("Could not reach the clinical care service. Nothing was changed. Check your connection, then try again.", Severity.Error);
+        }
+        finally
+        {
+            _busy = null;
+        }
+
+        await LoadAsync();
+    }
+}

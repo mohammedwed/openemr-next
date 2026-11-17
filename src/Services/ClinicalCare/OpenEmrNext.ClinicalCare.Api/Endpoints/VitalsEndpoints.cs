@@ -43,7 +43,7 @@ public static class VitalsEndpoints
     }
 
     private static async Task<IResult> RecordVitals(
-        Guid encounterUuid, RecordVitalsRequest request, RecordVitalsUseCase useCase, CancellationToken ct)
+        Guid encounterUuid, RecordVitalsRequest request, RecordVitalsUseCase useCase, HttpContext http, CancellationToken ct)
     {
         // A unit that is not one of ours is a 400 with the same shape as every other validation failure, listed
         // together with whatever else is wrong (DOM-3), not a binding exception.
@@ -66,7 +66,8 @@ public static class VitalsEndpoints
                         weight, height, temperature, request.TemperatureMethod, request.BloodPressureSystolic,
                         request.BloodPressureDiastolic, request.Pulse, request.Respiration, request.OxygenSaturation,
                         waist, head, request.Note),
-                    request.ProviderId),
+                    request.ProviderId,
+                    RequestOrigins.From(http)),
                 ct);
 
             return Results.Created(
@@ -119,7 +120,7 @@ public static class VitalsEndpoints
 
             return view is null
                 ? NotFound("Vitals not found.", $"Encounter {encounterUuid} has no vitals with uuid {vitalsUuid}.")
-                : Results.Ok(VitalsResponse.From(view, system));
+                : Preconditions.Ok(VitalsResponse.From(view, system), view.LastUpdated);
         }
         catch (EncounterNotFoundException ex)
         {

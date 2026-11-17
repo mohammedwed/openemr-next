@@ -36,6 +36,23 @@ public class EncounterReaderTests(ClinicalCareContainerFixture fixture) : IAsync
             $"(NOW(), {number}, 'New Patient Encounter', {number}, {pid}, 'newpatient', {(deleted ? 1 : 0)})");
 
     [Fact]
+    public async Task The_view_carries_the_rows_last_update_stamp_and_it_moves_when_any_writer_changes_the_row()
+    {
+        await InsertEncounterAsync(Uuid1, 1001, EncounterTestData.PatientPid, "2026-11-10 09:00:00");
+        await fixture.RootExecuteAsync("UPDATE form_encounter SET last_update = '2026-01-02 03:04:05'");
+
+        await using var db = fixture.CreateDbContext();
+        var before = await new EfEncounterReader(db).FindAsync(Uuid1, CancellationToken.None);
+
+        // Any writer changing a column bumps the stamp (ON UPDATE CURRENT_TIMESTAMP): that is what makes it a usable token.
+        await fixture.RootExecuteAsync("UPDATE form_encounter SET reason = 'changed by a legacy screen'");
+        var after = await new EfEncounterReader(db).FindAsync(Uuid1, CancellationToken.None);
+
+        Assert.Equal(new DateTime(2026, 1, 2, 3, 4, 5), before!.LastUpdate);
+        Assert.True(after!.LastUpdate > before.LastUpdate);
+    }
+
+    [Fact]
     public async Task An_encounter_is_found_by_uuid_with_its_patients_uuid()
     {
         await InsertEncounterAsync(Uuid1, 501, 42, "2026-11-01 10:00:00");

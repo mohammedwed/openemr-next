@@ -33,10 +33,14 @@ public class VitalsRegistryTests(ClinicalCareContainerFixture fixture) : IAsyncL
         v.Uuid, v.Encounter.Uuid, v.Encounter.Number, v.Encounter.Patient.Uuid, v.Encounter.Patient.Pid,
         v.MeasurementsTaken, Now.ToUniversalTime());
 
+    internal static AuditEntry AuditFor(Vitals v) =>
+        new(Now.ToUniversalTime(), new AuditActor($"user:{v.ProviderId}", v.ProviderId, Verified: false),
+            AuditActions.VitalsRecord, v.Uuid, AuditOutcome.Success, correlationId: "corr-vit", sourceAddress: "10.4.5.6");
+
     private async Task RegisterAsync(Vitals vitals)
     {
         await using var db = fixture.CreateDbContext();
-        await new EfVitalsRegistry(db).RegisterAsync(vitals, EventFor(vitals), CancellationToken.None);
+        await new EfVitalsRegistry(db, new EfAuditLog(db)).RegisterAsync(vitals, EventFor(vitals), AuditFor(vitals), CancellationToken.None);
     }
 
     [Fact]
@@ -185,5 +189,49 @@ public class VitalsRegistryTests(ClinicalCareContainerFixture fixture) : IAsyncL
 
         Assert.True(vitals.Id > 0);
         Assert.Equal(1L, await fixture.RootScalarAsync<long>("SELECT authorized FROM form_vitals"));
+    }
+
+    [Fact]
+    public async Task Register_writes_its_audit_row_in_the_same_transaction()
+    {
+        var vitals = NewVitals();
+
+        await RegisterAsync(vitals);
+
+        Assert.Equal(1L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_audit"));
+        Assert.Equal("vitals.record", await fixture.RootScalarAsync<string>("SELECT action FROM clinical_care_audit"));
+        Assert.Equal(vitals.Uuid.ToString(), await fixture.RootScalarAsync<string>("SELECT CONCAT(subject, '') FROM clinical_care_audit"));
+        Assert.Equal("success", await fixture.RootScalarAsync<string>("SELECT outcome FROM clinical_care_audit"));
+        Assert.Equal("corr-vit", await fixture.RootScalarAsync<string>("SELECT correlation_id FROM clinical_care_audit"));
+        Assert.Equal("10.4.5.6", await fixture.RootScalarAsync<string>("SELECT source_address FROM clinical_care_audit"));
+        // Names, never values: no measurement may appear in the audit row.
+        Assert.Null(await fixture.RootScalarAsync<string?>("SELECT details FROM clinical_care_audit"));
+    }
+
+    [Fact]
+    public async Task OPS_9_a_retried_registration_does_not_audit_twice()
+    {
+        var uuid = Guid.CreateVersion7();
+
+        await RegisterAsync(NewVitals(uuid: uuid));
+        await RegisterAsync(NewVitals(uuid: uuid));
+
+        Assert.Equal(1L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_audit"));
+    }
+
+    [Fact]
+    public async Task SEC_9_vitals_cannot_commit_without_their_audit_row()
+    {
+        var vitals = NewVitals();
+        await using var db = fixture.CreateDbContext();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new EfVitalsRegistry(db, new ThrowingAuditLog()).RegisterAsync(vitals, EventFor(vitals), AuditFor(vitals), CancellationToken.None));
+
+        Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM form_vitals"));
+        Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM forms"));
+        Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_outbox"));
+        Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_audit"));
+        Assert.Equal(0, vitals.Id);
     }
 }

@@ -60,6 +60,16 @@
                     <PatientEncountersPanel @key="Uuid" PatientUuid="Uuid" TotalChanged="OnEncounterTotalChanged" />
                 </MudTabPanel>
 
+                @* Problems and allergies are ClinicalCare's too (ADR 0070) and load their own pages. A tab's content is created when it is first shown, so its count appears in the
+                   label after the first visit, not before. *@
+                <MudTabPanel Text="@WithCount("Problems", _problemTotal)">
+                    <PatientProblemsPanel @key="Uuid" PatientUuid="Uuid" TotalChanged="OnProblemTotalChanged" />
+                </MudTabPanel>
+
+                <MudTabPanel Text="@WithCount("Allergies", _allergyTotal)">
+                    <PatientAllergiesPanel @key="Uuid" PatientUuid="Uuid" TotalChanged="OnAllergyTotalChanged" />
+                </MudTabPanel>
+
                 <MudTabPanel Text="@WithCount("Insurance", _policies?.Count)">
                     <PatientInsurancePanel @key="patient.Pid" Pid="patient.Pid"
                         Policies="_policies" Error="_policiesError"
@@ -99,6 +109,14 @@
     private int? _encounterTotal;
 
     private void OnEncounterTotalChanged(int total) => _encounterTotal = total;
+
+    // Null until the Problems and Allergies panels have loaded their first page (they load when their tab is first shown).
+    private int? _problemTotal;
+    private int? _allergyTotal;
+
+    private void OnProblemTotalChanged(int total) => _problemTotal = total;
+
+    private void OnAllergyTotalChanged(int total) => _allergyTotal = total;
 
     private static string WithCount(string label, int? count) => count is null ? label : $"{label} ({count})";
 
@@ -140,6 +158,8 @@
         _status = null;
         _documents = null;
         _encounterTotal = null;
+        _problemTotal = null;
+        _allergyTotal = null;
         _policiesError = _statusError = _documentsError = false;
         _state = State.Loading;
 

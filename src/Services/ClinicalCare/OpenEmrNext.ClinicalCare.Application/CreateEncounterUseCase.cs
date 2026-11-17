@@ -15,11 +15,33 @@ public sealed class CreateEncounterUseCase(
     IFacilityDirectory facilities,
     IEncounterIdentityAllocator identities,
     IEncounterRegistry registry,
+    IAuditLog auditLog,
     TimeProvider clock)
 {
-    /// <exception cref="PatientNotFoundException">No patient has the requested uuid (CC-1). Nothing is persisted.</exception>
-    /// <exception cref="ClinicalCareValidationException">One or more fields fail validation. Nothing is persisted and no number is allocated.</exception>
+    /// <exception cref="PatientNotFoundException">No patient has the requested uuid (CC-1). Nothing is persisted; a <c>failed</c> audit row is written.</exception>
+    /// <exception cref="ClinicalCareValidationException">One or more fields fail validation. Nothing is persisted and no number is allocated; a <c>failed</c> audit row is written.</exception>
     public async Task<Encounter> ExecuteAsync(CreateEncounterCommand command, CancellationToken ct)
+    {
+        try
+        {
+            return await CreateAsync(command, ct);
+        }
+        catch (Exception ex) when (ex is PatientNotFoundException or ClinicalCareValidationException)
+        {
+            // A refused request changed nothing, so its audit row is its own statement (ADR 0069 #4). There is no encounter yet, so the
+            // row names the patient the caller asked about. If this write fails the caller gets a 500: an action that cannot be
+            // audited is not answered as if it had been (fail closed).
+            await auditLog.AppendAsync(
+                new AuditEntry(
+                    clock.GetUtcNow().UtcDateTime, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false),
+                    AuditActions.EncounterCreate, command.PatientUuid, AuditOutcome.Failed,
+                    command.Origin?.CorrelationId, command.Origin?.SourceAddress),
+                ct);
+            throw;
+        }
+    }
+
+    private async Task<Encounter> CreateAsync(CreateEncounterCommand command, CancellationToken ct)
     {
         // CC-1: a missing patient is a 404, decided before any field is judged.
         var patient = await patients.FindAsync(command.PatientUuid, ct)
@@ -45,7 +67,12 @@ public sealed class CreateEncounterUseCase(
         var @event = new EncounterCreatedEvent(
             encounter.Uuid, encounter.Number, patient.Uuid, patient.Pid, encounter.ClassCode, encounter.Date, nowUtc);
 
-        await registry.RegisterAsync(encounter, @event, ct);
+        // Until the gateway forwards a validated session (ADR 0069 #5) the actor is the provider the caller named, flagged unverified.
+        var audit = new AuditEntry(
+            nowUtc, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false), AuditActions.EncounterCreate,
+            encounter.Uuid, AuditOutcome.Success, command.Origin?.CorrelationId, command.Origin?.SourceAddress);
+
+        await registry.RegisterAsync(encounter, @event, audit, ct);
 
         return encounter;
     }

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using OpenEmrNext.ClinicalCare.Api.Contracts.Requests;
 using OpenEmrNext.ClinicalCare.Api.Contracts.Responses;
+using OpenEmrNext.ClinicalCare.Domain.ValueObjects;
 
 namespace OpenEmrNext.ClinicalCare.IntegrationTests;
 
@@ -62,6 +63,23 @@ public class EncounterEndpointTests(ClinicalCareContainerFixture fixture) : IAsy
     }
 
     [Fact]
+    public async Task SEC_9_POST_encounters_audits_the_create_with_the_forwarded_address_and_a_trace_id()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/encounters") { Content = JsonContent.Create(Valid()) };
+        request.Headers.Add("X-Forwarded-For", "203.0.113.7, 10.0.0.2");
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<EncounterCreatedResponse>();
+        Assert.Equal("encounter.create", await fixture.RootScalarAsync<string>("SELECT action FROM clinical_care_audit"));
+        Assert.Equal(body!.Uuid.ToString(), await fixture.RootScalarAsync<string>("SELECT CONCAT(subject, '') FROM clinical_care_audit"));
+        // The first entry of X-Forwarded-For is the original caller; the rest are proxies.
+        Assert.Equal("203.0.113.7", await fixture.RootScalarAsync<string>("SELECT source_address FROM clinical_care_audit"));
+        Assert.False(string.IsNullOrWhiteSpace(await fixture.RootScalarAsync<string>("SELECT correlation_id FROM clinical_care_audit")));
+    }
+
+    [Fact]
     public async Task POST_encounters_with_no_gateway_secret_returns_401_and_writes_nothing()
     {
         using var anonymous = _factory.CreateClient();
@@ -99,6 +117,29 @@ public class EncounterEndpointTests(ClinicalCareContainerFixture fixture) : IAsy
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("Class 'XYZ' is not a known encounter class.", await ErrorsOf(response));
+    }
+
+    [Fact]
+    public async Task SEC_9_a_404_for_an_unknown_patient_leaves_a_failed_audit_row_naming_that_patient()
+    {
+        var unknown = Guid.NewGuid();
+
+        var response = await _client.PostAsJsonAsync("/api/v1/encounters", Valid(patient: unknown));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(1L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_audit"));
+        Assert.Equal("failed", await fixture.RootScalarAsync<string>("SELECT outcome FROM clinical_care_audit"));
+        Assert.Equal(unknown.ToString(), await fixture.RootScalarAsync<string>("SELECT CONCAT(subject, '') FROM clinical_care_audit"));
+    }
+
+    [Fact]
+    public async Task SEC_9_a_400_for_invalid_input_leaves_a_failed_audit_row_and_no_encounter()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/encounters", Valid(classCode: "NOPE"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM form_encounter"));
+        Assert.Equal("failed", await fixture.RootScalarAsync<string>("SELECT outcome FROM clinical_care_audit"));
     }
 
     [Fact]
@@ -164,6 +205,47 @@ public class EncounterEndpointTests(ClinicalCareContainerFixture fixture) : IAsy
         Assert.Equal("AMB", body.ClassCode);
         Assert.Equal("Main Clinic", body.FacilityName);
         Assert.Equal("Cough", body.Reason);
+    }
+
+    [Fact]
+    public async Task GET_encounter_returns_a_strong_etag_that_is_the_rows_stamp_and_changes_when_another_writer_edits_it()
+    {
+        var created = await (await _client.PostAsJsonAsync("/api/v1/encounters", Valid())).Content.ReadFromJsonAsync<EncounterCreatedResponse>();
+        await fixture.RootExecuteAsync("UPDATE form_encounter SET last_update = '2026-01-02 03:04:05'");
+
+        var first = await _client.GetAsync($"/api/v1/encounters/{created!.Uuid}");
+        var again = await _client.GetAsync($"/api/v1/encounters/{created.Uuid}");
+        await fixture.RootExecuteAsync("UPDATE form_encounter SET reason = 'edited in the legacy screen'");   // not setting last_update: the database does
+        var afterLegacyEdit = await _client.GetAsync($"/api/v1/encounters/{created.Uuid}");
+
+        var expected = ConcurrencyToken.From(new DateTime(2026, 1, 2, 3, 4, 5)).ToETag();
+        Assert.Equal(expected, first.Headers.ETag?.ToString());
+        Assert.False(first.Headers.ETag!.IsWeak);
+        Assert.Equal(expected, again.Headers.ETag?.ToString());           // unchanged row, unchanged tag
+        Assert.NotEqual(expected, afterLegacyEdit.Headers.ETag?.ToString());
+    }
+
+    [Fact]
+    public async Task The_body_etag_is_the_header_etag_on_a_get_and_every_list_item_carries_its_own()
+    {
+        var created = await (await _client.PostAsJsonAsync("/api/v1/encounters", Valid())).Content.ReadFromJsonAsync<EncounterCreatedResponse>();
+
+        var get = await _client.GetAsync($"/api/v1/encounters/{created!.Uuid}");
+        var body = await get.Content.ReadFromJsonAsync<EncounterResponse>();
+        var list = await (await _client.GetAsync($"/api/v1/encounters?patientUuid={EncounterTestData.PatientUuid}")).Content.ReadFromJsonAsync<EncounterListResponse>();
+
+        Assert.False(string.IsNullOrEmpty(body!.ETag));
+        Assert.Equal(get.Headers.ETag?.ToString(), body.ETag);
+        Assert.Equal(body.ETag, Assert.Single(list!.Items).ETag);
+    }
+
+    [Fact]
+    public async Task A_404_carries_no_etag()
+    {
+        var response = await _client.GetAsync($"/api/v1/encounters/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Null(response.Headers.ETag);
     }
 
     [Fact]

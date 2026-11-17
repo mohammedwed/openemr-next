@@ -31,7 +31,51 @@ public static class CodeLabels
         ["PRENC"] = "Pre-admission",
         ["SS"] = "Short stay",
         ["VR"] = "Virtual",
+
+        // Allergy and problem codes (legacy lists reaction, severity_ccda, allergyintolerance-verification and condition-verification).
+        // Only a label: the code is what is sent, and a code the site has not configured is rejected by the API.
+        ["unassigned"] = "Unassigned",
+        ["hives"] = "Hives",
+        ["nausea"] = "Nausea",
+        ["shortness_of_breath"] = "Shortness of breath",
+        ["mild"] = "Mild",
+        ["mild_to_moderate"] = "Mild to moderate",
+        ["moderate"] = "Moderate",
+        ["moderate_to_severe"] = "Moderate to severe",
+        ["severe"] = "Severe",
+        ["life_threatening_severity"] = "Life threatening",
+        ["fatal"] = "Fatal",
+        ["unconfirmed"] = "Unconfirmed",
+        ["confirmed"] = "Confirmed",
+        ["refuted"] = "Refuted",
+        ["entered-in-error"] = "Entered in error",
     };
+
+    /// <summary>
+    /// The problem outcomes the forms offer (legacy list <c>outcome</c>), 0 first. There is no lookup endpoint yet, so this mirrors the snapshot; an unconfigured code is still
+    /// rejected by the API (PB-5). 1 is "Resolved": the quick Resolve action sets it together with an end date.
+    /// </summary>
+    public static readonly IReadOnlyList<(int Code, string Label)> ProblemOutcomes =
+        [(0, "Unassigned"), (1, "Resolved"), (2, "Improved"), (3, "Status quo"), (4, "Worse"), (5, "Pending followup")];
+
+    /// <summary>The problem occurrences the forms offer (legacy list <c>occurrence</c>), 0 first. Mirrors the snapshot; the API checks the real list (PB-6).</summary>
+    public static readonly IReadOnlyList<(int Code, string Label)> ProblemOccurrences =
+        [(0, "Unknown or N/A"), (1, "First"), (4, "Chronic/recurrent"), (5, "Acute on chronic"), (6, "Early recurrence (under 2 months)"),
+         (7, "Late recurrence (2 to 12 months)"), (8, "Delayed recurrence (over 12 months)")];
+
+    /// <summary>The allergy reactions the form offers (legacy list <c>reaction</c>). Mirrors the snapshot; the API checks the real list (AL-4).</summary>
+    public static readonly IReadOnlyList<string> AllergyReactionCodes = ["unassigned", "hives", "nausea", "shortness_of_breath"];
+
+    /// <summary>The allergy severities the form offers (legacy list <c>severity_ccda</c>). Mirrors the snapshot; the API checks the real list (AL-5).</summary>
+    public static readonly IReadOnlyList<string> SeverityCodes =
+        ["unassigned", "mild", "mild_to_moderate", "moderate", "moderate_to_severe", "severe", "life_threatening_severity", "fatal"];
+
+    /// <summary>The verification statuses both an allergy and a problem offer (their two lists hold the same four codes in the snapshot, but are separate lists to the API: AL-6, PB-21).</summary>
+    public static readonly IReadOnlyList<string> VerificationCodes = ["unconfirmed", "confirmed", "refuted", "entered-in-error"];
+
+    public static string OutcomeOf(int code) => ProblemOutcomes.FirstOrDefault(o => o.Code == code).Label ?? $"Outcome {code}";
+
+    public static string OccurrenceOf(int code) => ProblemOccurrences.FirstOrDefault(o => o.Code == code).Label ?? $"Occurrence {code}";
 
     /// <summary>
     /// The encounter classes the create form offers, in the order legacy lists them with the default (AMB)

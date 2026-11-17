@@ -14,6 +14,9 @@ public static class ClinicalCareEndpoints
         var v1 = app.MapGroup("/api/v1").RequireAuthorization();
         v1.MapEncounterEndpoints();
         v1.MapVitalsEndpoints();
+        v1.MapProblemEndpoints();
+        v1.MapAllergyEndpoints();
+        v1.MapEncounterIssueEndpoints();
 
         // Event delivery: a separate path, a separate scheme, never routed by the gateway (ADR 0066).
         app.MapInternalEventEndpoints();

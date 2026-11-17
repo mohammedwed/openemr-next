@@ -18,7 +18,7 @@ public class GlobalExceptionHandlingTests(ClinicalCareContainerFixture fixture) 
 {
     private sealed class AlwaysThrowingRegistry : IEncounterRegistry
     {
-        public Task RegisterAsync(Encounter encounter, EncounterCreatedEvent @event, CancellationToken ct) =>
+        public Task RegisterAsync(Encounter encounter, EncounterCreatedEvent @event, AuditEntry audit, CancellationToken ct) =>
             throw new InvalidOperationException("simulated storage failure");
     }
 

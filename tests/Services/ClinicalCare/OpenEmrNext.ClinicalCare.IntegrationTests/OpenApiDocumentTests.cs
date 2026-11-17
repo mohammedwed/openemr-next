@@ -105,6 +105,39 @@ public class OpenApiDocumentTests : IDisposable
         Assert.Equal(int.MaxValue, providerId.GetProperty("maximum").GetInt64());
     }
 
+    [Theory]
+    [InlineData("/api/v1/encounters/{uuid}")]
+    [InlineData("/api/v1/problems/{uuid}")]
+    [InlineData("/api/v1/allergies/{uuid}")]
+    public async Task Every_PUT_declares_the_if_match_header_so_the_generated_client_can_send_it(string path)
+    {
+        using var document = await ReadDocumentAsync();
+
+        var put = document.RootElement.GetProperty("paths").GetProperty(path).GetProperty("put");
+        var ifMatch = put.GetProperty("parameters").EnumerateArray()
+            .Single(p => string.Equals(p.GetProperty("name").GetString(), "If-Match", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal("header", ifMatch.GetProperty("in").GetString());
+        // Not marked required in the document: an absent header is a 428 with an explanation, not an opaque binding failure.
+        Assert.False(ifMatch.TryGetProperty("required", out var required) && required.GetBoolean());
+        // The two answers an update can get besides success are documented, so a client generates handling for them.
+        Assert.True(put.GetProperty("responses").TryGetProperty("412", out _));
+        Assert.True(put.GetProperty("responses").TryGetProperty("428", out _));
+    }
+
+    [Theory]
+    [InlineData("EncounterResponse")]
+    [InlineData("ProblemResponse")]
+    [InlineData("AllergyResponse")]
+    public async Task The_updatable_responses_carry_an_etag_property_because_a_list_has_no_per_item_header(string schemaName)
+    {
+        using var document = await ReadDocumentAsync();
+
+        var properties = document.RootElement.GetProperty("components").GetProperty("schemas").GetProperty(schemaName).GetProperty("properties");
+
+        Assert.True(properties.TryGetProperty("eTag", out _));
+    }
+
     [Fact]
     public async Task The_committed_snapshot_matches_the_live_document_so_the_client_cannot_silently_drift()
     {

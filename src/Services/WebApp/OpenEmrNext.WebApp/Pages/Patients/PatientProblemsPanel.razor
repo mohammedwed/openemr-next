@@ -1,0 +1,235 @@
+@using OpenEmrNext.ClinicalCare.Client
+@using OpenEmrNext.WebApp.Shared
+@using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
+@inject IClinicalCareClient ClinicalCare
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+@* Loads its own data, like the Encounters panel: ClinicalCare pages on the server (the API never returns "all problems", API-6), so the panel owns the page it is
+   showing and reports the total up through TotalChanged for the tab label. A failed first load shows an error with "Try again"; a failed page change keeps the last
+   page on screen with a warning. A problem is resolved by an end date, not by a flag (ADR 0070), so Resolve and Reopen are updates, made with the version the row was
+   listed with: if someone changed it in the meantime the save is refused and the list reloads. *@
+<PatientSectionCard Title="Problems"
+    HasData="_items is not null" Error="_error" OnRetry="LoadAsync"
+    ErrorMessage="Could not load problems. The clinical care service may be unavailable."
+    StaleMessage="Could not refresh problems. The list below may be out of date."
+    LoadingLabel="Loading problems">
+    <Summary>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary" role="status">
+            @(_total == 1 ? "1 problem" : $"{_total} problems")@(_total > PageSize ? $" · page {_page} of {PageCount}" : "")
+        </MudText>
+    </Summary>
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenRecordAsync">Record problem</MudButton>
+    </Actions>
+    <ChildContent>
+        <MudTable Items="_items ?? []" Hover="true" Elevation="0"
+            TableAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Problems" })">
+            <HeaderContent>
+                <MudTh>Problem</MudTh>
+                <MudTh>Began</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Verification</MudTh>
+                <MudTh><span class="op-visually-hidden">Actions</span></MudTh>
+            </HeaderContent>
+            <RowTemplate Context="problem">
+                <MudTd DataLabel="Problem">
+                    <span class="op-clamp" title="@problem.Title">@(string.IsNullOrWhiteSpace(problem.Title) ? "(untitled)" : problem.Title)</span>
+                    @if (!string.IsNullOrWhiteSpace(problem.Diagnosis))
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@problem.Diagnosis</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Began">@Formatting.DateText(problem.BeginDate)</MudTd>
+                <MudTd DataLabel="Status">
+                    @if (problem.EndDate is null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning">Active</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Success">Resolved @Formatting.DateText(problem.EndDate)</MudChip>
+                    }
+                    @if (problem.Outcome != 0)
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@CodeLabels.OutcomeOf(problem.Outcome)</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Verification">@(string.IsNullOrWhiteSpace(problem.Verification) ? "—" : CodeLabels.Of(problem.Verification))</MudTd>
+                <MudTd>
+                    @* Named per problem: a column of identical "Edit" buttons is not distinguishable to a screen reader. *@
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Disabled="@Busy(problem)" OnClick="@(() => OpenEditAsync(problem))"
+                        aria-label="@($"Edit problem {problem.Title}")">Edit</MudButton>
+                    @if (problem.EndDate is null)
+                    {
+                        <MudButton Variant="Variant.Text" Color="Color.Success" Size="Size.Small" Disabled="@Busy(problem)" OnClick="@(() => SetResolvedAsync(problem, resolved: true))"
+                            aria-label="@($"Resolve problem {problem.Title}")">Resolve</MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Text" Color="Color.Warning" Size="Size.Small" Disabled="@Busy(problem)" OnClick="@(() => SetResolvedAsync(problem, resolved: false))"
+                            aria-label="@($"Reopen problem {problem.Title}")">Reopen</MudButton>
+                    }
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudStack Spacing="2" AlignItems="AlignItems.Start" Class="py-2">
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">No problems recorded for this patient yet.</MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="OpenRecordAsync">Record the first problem</MudButton>
+                </MudStack>
+            </NoRecordsContent>
+        </MudTable>
+
+        @if (PageCount > 1)
+        {
+            <MudStack AlignItems="AlignItems.Center" Class="mt-4">
+                <MudPagination Count="PageCount" Selected="_page" SelectedChanged="OnPageChangedAsync"
+                    ShowFirstButton="true" ShowLastButton="true" Disabled="_loading" aria-label="Problem pages" />
+            </MudStack>
+        }
+    </ChildContent>
+</PatientSectionCard>
+
+@code {
+    private const int PageSize = 10;
+
+    [Parameter, EditorRequired] public Guid PatientUuid { get; set; }
+
+    /// <summary>Raised with the patient's total problem count after each successful load, for the tab label.</summary>
+    [Parameter] public EventCallback<int> TotalChanged { get; set; }
+
+    // Null means "not loaded yet". A failed page change keeps the previous page here on purpose.
+    private List<ProblemResponse>? _items;
+    private int _total;
+    private int _page = 1;
+    private bool _error;
+    private bool _loading;
+
+    // The row whose quick action is in flight, so it cannot be clicked twice and cannot race itself.
+    private Guid? _busy;
+
+    // Each load takes a number; only the latest one may apply its result, so a slow response for an earlier page can never overwrite a newer one.
+    private int _loadCounter;
+
+    private int PageCount => Math.Max(1, (int)Math.Ceiling(_total / (double)PageSize));
+
+    private bool Busy(ProblemResponse problem) => _busy == problem.Uuid;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task OnPageChangedAsync(int page) => LoadAsync(page);
+
+    private Task LoadAsync() => LoadAsync(_page);
+
+    private async Task LoadAsync(int page)
+    {
+        var ticket = ++_loadCounter;
+        _loading = true;
+        try
+        {
+            var result = await ClinicalCare.ListProblemsAsync(PatientUuid, PageSize, (page - 1) * PageSize);
+            if (ticket != _loadCounter)
+            {
+                return; // a newer load has started since this one
+            }
+
+            _items = [.. result.Items];
+            _total = result.Total;
+            _page = page;
+            _error = false;
+            await TotalChanged.InvokeAsync(_total);
+        }
+        catch (Exception ex) when (ex is ClinicalCareApiException or HttpRequestException)
+        {
+            if (ticket == _loadCounter)
+            {
+                _error = true;
+            }
+        }
+        finally
+        {
+            if (ticket == _loadCounter)
+            {
+                _loading = false;
+            }
+        }
+    }
+
+    private async Task OpenRecordAsync()
+    {
+        var parameters = new DialogParameters<ProblemDialog> { { x => x.PatientUuid, PatientUuid } };
+        await ShowDialogAsync("Record problem", parameters);
+    }
+
+    private async Task OpenEditAsync(ProblemResponse problem)
+    {
+        var parameters = new DialogParameters<ProblemDialog> { { x => x.PatientUuid, PatientUuid }, { x => x.Existing, problem } };
+        await ShowDialogAsync("Edit problem", parameters);
+    }
+
+    private async Task ShowDialogAsync(string title, DialogParameters<ProblemDialog> parameters)
+    {
+        var dialog = await DialogService.ShowAsync<ProblemDialog>(title, parameters, DialogDefaults.Standard);
+        var result = await dialog.Result;
+        if (result is not { Canceled: false, Data: IssueDialogResult saved })
+        {
+            return;
+        }
+
+        if (saved.Stale)
+        {
+            Snackbar.Add("That problem was changed by someone else, so nothing was saved. The list now shows what is stored.", Severity.Warning);
+        }
+        else
+        {
+            Snackbar.Add(saved.IsNew ? $"Problem recorded: {saved.Title}." : $"Problem saved: {saved.Title}.", Severity.Success);
+        }
+
+        await LoadAsync();
+    }
+
+    /// <summary>
+    /// Resolving is an update that sets an end date (and outcome 1); reopening clears the end date (and outcome 1 with it). It re-sends every other field exactly as listed, and
+    /// is based on the version the row was listed with, so a change made elsewhere in the meantime is refused and not overwritten.
+    /// </summary>
+    private async Task SetResolvedAsync(ProblemResponse problem, bool resolved)
+    {
+        _busy = problem.Uuid;
+        try
+        {
+            var (_, beginTime) = IssueWire.FromWire(problem.BeginDate);
+            await ClinicalCare.UpdateProblemAsync(problem.Uuid, problem.ETag, new UpdateProblemRequest
+            {
+                Title = problem.Title,
+                BeginDate = IssueWire.ToWire(IssueWire.FromWire(problem.BeginDate).Date, beginTime),
+                EndDate = resolved ? IssueWire.Today() : null,
+                Diagnosis = problem.Diagnosis,
+                Outcome = resolved ? 1 : (problem.Outcome == 1 ? 0 : problem.Outcome),
+                Occurrence = problem.Occurrence,
+                ReferredBy = problem.ReferredBy,
+                Comments = problem.Comments,
+                Verification = problem.Verification
+            });
+            Snackbar.Add(resolved ? $"Problem resolved: {problem.Title}." : $"Problem reopened: {problem.Title}.", Severity.Success);
+        }
+        catch (ClinicalCareApiException ex)
+        {
+            Snackbar.Add(
+                ClinicalCareErrorFormatter.IsStale(ex)
+                    ? "That problem was changed by someone else, so nothing was saved. The list now shows what is stored."
+                    : ClinicalCareErrorFormatter.Describe(ex, "Could not update this problem. Please try again."),
+                ClinicalCareErrorFormatter.IsStale(ex) ? Severity.Warning : Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("Could not reach the clinical care service. Nothing was saved. Check your connection, then try again.", Severity.Error);
+        }
+        finally
+        {
+            _busy = null;
+        }
+
+        // Always reload: on success to show the new state and version, on a stale refusal to show what is stored now.
+        await LoadAsync();
+    }
+}

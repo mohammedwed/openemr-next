@@ -9,6 +9,6 @@ namespace OpenEmrNext.ClinicalCare.Application.Ports;
 /// </summary>
 public interface IVitalsRegistry
 {
-    /// <summary>Persists <paramref name="vitals"/> and <paramref name="event"/> in one transaction and records the database-assigned id on the vitals. If it throws, nothing was written.</summary>
-    Task RegisterAsync(Vitals vitals, VitalsRecordedEvent @event, CancellationToken ct);
+    /// <summary>Persists <paramref name="vitals"/>, <paramref name="event"/> and <paramref name="audit"/> in one transaction (SEC-9) and records the database-assigned id on the vitals. If it throws, nothing was written.</summary>
+    Task RegisterAsync(Vitals vitals, VitalsRecordedEvent @event, AuditEntry audit, CancellationToken ct);
 }

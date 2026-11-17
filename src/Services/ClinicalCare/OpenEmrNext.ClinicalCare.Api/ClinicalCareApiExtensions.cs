@@ -44,8 +44,42 @@ public static class ClinicalCareApiExtensions
         builder.Services.AddScoped<IEncounterCodeLists, EfEncounterCodeLists>();
         builder.Services.AddScoped<IFacilityDirectory, EfFacilityDirectory>();
         builder.Services.AddScoped<IEncounterIdentityAllocator, EfEncounterIdentityAllocator>();
+        builder.Services.AddScoped<IAuditLog, EfAuditLog>();
         builder.Services.AddScoped<IEncounterRegistry, EfEncounterRegistry>();
         builder.Services.AddScoped<CreateEncounterUseCase>();
+        builder.Services.AddScoped<IEncounterUpdater, EfEncounterUpdater>();
+        builder.Services.AddScoped<UpdateEncounterUseCase>();
+
+        // Problems (M5c slice 1, ADR 0070).
+        builder.Services.AddScoped<IIssueCodeLists, EfIssueCodeLists>();
+        builder.Services.AddSingleton<IProblemIdentityAllocator, GuidProblemIdentityAllocator>();
+        builder.Services.AddScoped<IProblemRegistry, EfProblemRegistry>();
+        builder.Services.AddScoped<IProblemReader, EfProblemReader>();
+        builder.Services.AddScoped<RecordProblemUseCase>();
+        builder.Services.AddScoped<GetProblemUseCase>();
+        builder.Services.AddScoped<ListPatientProblemsUseCase>();
+        builder.Services.AddScoped<IProblemUpdater, EfProblemUpdater>();
+        builder.Services.AddScoped<UpdateProblemUseCase>();
+
+        // Allergies (M5c slice 2, ADR 0070).
+        builder.Services.AddScoped<IAllergyCodeLists, EfAllergyCodeLists>();
+        builder.Services.AddSingleton<IAllergyIdentityAllocator, GuidAllergyIdentityAllocator>();
+        builder.Services.AddScoped<IAllergyRegistry, EfAllergyRegistry>();
+        builder.Services.AddScoped<IAllergyReader, EfAllergyReader>();
+        builder.Services.AddScoped<RecordAllergyUseCase>();
+        builder.Services.AddScoped<GetAllergyUseCase>();
+        builder.Services.AddScoped<ListPatientAllergiesUseCase>();
+        builder.Services.AddScoped<IAllergyUpdater, EfAllergyUpdater>();
+        builder.Services.AddScoped<UpdateAllergyUseCase>();
+
+        // Linking issues to encounters (M5c slice 4, ADR 0070).
+        builder.Services.AddScoped<IIssueDirectory, EfIssueDirectory>();
+        builder.Services.AddSingleton<IEncounterIssueLinkIdentityAllocator, GuidEncounterIssueLinkIdentityAllocator>();
+        builder.Services.AddScoped<IEncounterIssueRegistry, EfEncounterIssueRegistry>();
+        builder.Services.AddScoped<IEncounterIssueReader, EfEncounterIssueReader>();
+        builder.Services.AddScoped<LinkIssueToEncounterUseCase>();
+        builder.Services.AddScoped<UnlinkIssueFromEncounterUseCase>();
+        builder.Services.AddScoped<ListEncounterIssuesUseCase>();
         builder.Services.AddScoped<IEncounterReader, EfEncounterReader>();
         builder.Services.AddScoped<GetEncounterUseCase>();
         builder.Services.AddScoped<ListPatientEncountersUseCase>();

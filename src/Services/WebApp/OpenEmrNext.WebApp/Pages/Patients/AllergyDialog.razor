@@ -1,0 +1,225 @@
+@using OpenEmrNext.ClinicalCare.Client
+@using OpenEmrNext.WebApp.Shared
+@using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
+@inject IClinicalCareClient ClinicalCare
+
+@* One dialog for recording an allergy and for editing one, like the problem dialog: the fields are the same and the update replaces the whole set. It closes only when the
+   save succeeds (or the record turns out to be stale, which hands back a marker so the list reloads); on any other failure it stays open with the typed values intact. *@
+<MudDialog>
+    <DialogContent>
+        @if (_error is { } error)
+        {
+            <MudAlert Severity="@(_stale ? Severity.Warning : Severity.Error)" Variant="Variant.Outlined" Dense="true" Class="mb-4" role="alert">@error</MudAlert>
+        }
+        <MudForm @ref="_form" Model="_model">
+            <MudStack Spacing="4">
+                <MudTextField @bind-Value="_model.Title" Label="Substance" Required="true" RequiredError="A title is required."
+                    Validation="_validateTitle" Variant="Variant.Outlined" MaxLength="255" />
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="string" @bind-Value="_model.Reaction" Label="Reaction (optional)" Variant="Variant.Outlined" Clearable="true">
+                            @foreach (var option in CodeLabels.AllergyReactionCodes)
+                            {
+                                <MudSelectItem Value="@option">@CodeLabels.Of(option)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="string" @bind-Value="_model.Severity" Label="Severity (optional)" Variant="Variant.Outlined" Clearable="true">
+                            @foreach (var option in CodeLabels.SeverityCodes)
+                            {
+                                <MudSelectItem Value="@option">@CodeLabels.Of(option)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+
+                <MudSelect T="string" @bind-Value="_model.Verification" Label="Verification (optional)" Variant="Variant.Outlined" Clearable="true">
+                    @foreach (var option in CodeLabels.VerificationCodes)
+                    {
+                        <MudSelectItem Value="@option">@CodeLabels.Of(option)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                @* Unlike a problem, an allergy needs no begin date. *@
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="_model.BeginDate" Label="Began (optional)" Editable="true" Variant="Variant.Outlined"
+                            MinDate="MinDate" MaxDate="MaxDate" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="_model.EndDate" Label="Ended (blank while active)" Editable="true" Variant="Variant.Outlined"
+                            MinDate="MinDate" MaxDate="MaxDate" Validation="_validateEnd" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudTextField @bind-Value="_model.Comments" Label="Comments (optional)" Variant="Variant.Outlined" Lines="3" Sizing="InputSizing.Auto"
+                    MaxLength="65535" />
+
+                <MudExpansionPanels Elevation="0" Class="op-expander">
+                    <MudExpansionPanel Text="More details">
+                        <MudTextField @bind-Value="_model.Diagnosis" Label="Diagnosis codes (optional)" Variant="Variant.Outlined" MaxLength="255"
+                            Validation="_validateDiagnosis" HelperText="Code pairs separated by semicolons, for example SNOMED-CT:91936005." />
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        @if (_stale)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseStale">Close and reload</MudButton>
+        }
+        else
+        {
+            <MudButton OnClick="Cancel">Cancel</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_saving">@(Existing is null ? "Record allergy" : "Save changes")</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    /// <summary>The acting provider's id: the same tracked gap as the problem and encounter dialogs (F-CC-1). An update names no provider at all.</summary>
+    private const long PlaceholderProviderId = 1;
+
+    // The API's own bounds (AL-2): 1900-01-01 up to one year ahead.
+    private static readonly DateTime MinDate = new(1900, 1, 1);
+    private static DateTime MaxDate => DateTime.Today.AddYears(1);
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    /// <summary>The patient to record the allergy for. Used only when <see cref="Existing"/> is <c>null</c>.</summary>
+    [Parameter] public Guid PatientUuid { get; set; }
+
+    /// <summary>The allergy to edit, as listed (it carries the version the update must be based on). <c>null</c> records a new allergy.</summary>
+    [Parameter] public AllergyResponse? Existing { get; set; }
+
+    // The API's own rules (AL-1, AL-3), with the same wording.
+    private readonly Func<string?, string?> _validateTitle = v => string.IsNullOrWhiteSpace(v) || v.Trim().Length >= 2 ? null : "Title must be between 2 and 255 characters.";
+    private readonly Func<string?, string?> _validateDiagnosis = v =>
+        string.IsNullOrWhiteSpace(v) || System.Text.RegularExpressions.Regex.IsMatch(v.Trim(), @"^[A-Za-z0-9._\-]+:[^;\s][^;]*(;[A-Za-z0-9._\-]+:[^;\s][^;]*)*$")
+            ? null
+            : "Diagnosis must be code pairs written SYSTEM:code, separated by semicolons (for example SNOMED-CT:91936005).";
+
+    private MudForm _form = null!;
+    private readonly Model _model = new();
+    private bool _saving;
+    private bool _stale;
+    private string? _error;
+
+    // The time of day the stored row already had; a calendar date picked here keeps it, or is midnight for a new row (see IssueWire).
+    private TimeSpan _beginTime;
+    private TimeSpan _endTime;
+
+    // A delegate field, not a method: the picker's Validation parameter is untyped, so a bare method group does not convert.
+    private Func<DateTime?, string?> _validateEnd = _ => null;
+
+    protected override void OnInitialized()
+    {
+        _validateEnd = end =>
+            end is not null && _model.BeginDate is { } begin && end.Value.Date < begin.Date ? "End date cannot be before the begin date." : null;
+
+        if (Existing is { } a)
+        {
+            _model.Title = a.Title;
+            (_model.BeginDate, _beginTime) = IssueWire.FromWire(a.BeginDate);
+            (_model.EndDate, _endTime) = IssueWire.FromWire(a.EndDate);
+            _model.Diagnosis = a.Diagnosis;
+            _model.Reaction = a.Reaction;
+            _model.Severity = a.Severity;
+            _model.Verification = a.Verification;
+            _model.Comments = a.Comments;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void CloseStale() => MudDialog.Close(DialogResult.Ok(IssueDialogResult.OutOfDate()));
+
+    private async Task SubmitAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            var begin = IssueWire.ToWire(_model.BeginDate, _beginTime);
+            var end = IssueWire.ToWire(_model.EndDate, _endTime);
+
+            if (Existing is null)
+            {
+                await ClinicalCare.RecordAllergyAsync(new RecordAllergyRequest
+                {
+                    PatientUuid = PatientUuid,
+                    Title = _model.Title,
+                    BeginDate = begin,
+                    EndDate = end,
+                    Diagnosis = Blank(_model.Diagnosis),
+                    Reaction = Blank(_model.Reaction),
+                    Severity = Blank(_model.Severity),
+                    Verification = Blank(_model.Verification),
+                    Comments = Blank(_model.Comments),
+                    ProviderId = PlaceholderProviderId
+                });
+            }
+            else
+            {
+                await ClinicalCare.UpdateAllergyAsync(Existing.Uuid, Existing.ETag, new UpdateAllergyRequest
+                {
+                    Title = _model.Title,
+                    BeginDate = begin,
+                    EndDate = end,
+                    Diagnosis = Blank(_model.Diagnosis),
+                    Reaction = Blank(_model.Reaction),
+                    Severity = Blank(_model.Severity),
+                    Verification = Blank(_model.Verification),
+                    Comments = Blank(_model.Comments)
+                });
+            }
+
+            MudDialog.Close(DialogResult.Ok(IssueDialogResult.Saved(_model.Title!.Trim(), isNew: Existing is null)));
+        }
+        catch (ClinicalCareApiException ex)
+        {
+            _stale = ClinicalCareErrorFormatter.IsStale(ex);
+            _error = ClinicalCareErrorFormatter.Describe(ex, Existing is null
+                ? "Could not record this allergy. Please check the details and try again."
+                : "Could not save this allergy. Please check the details and try again.");
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Could not reach the clinical care service. Nothing was saved. Check your connection, then try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private sealed class Model
+    {
+        public string? Title { get; set; }
+
+        public DateTime? BeginDate { get; set; }
+
+        public DateTime? EndDate { get; set; }
+
+        public string? Diagnosis { get; set; }
+
+        public string? Reaction { get; set; }
+
+        public string? Severity { get; set; }
+
+        public string? Verification { get; set; }
+
+        public string? Comments { get; set; }
+    }
+}

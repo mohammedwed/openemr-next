@@ -11,8 +11,8 @@ namespace OpenEmrNext.ClinicalCare.Application.Ports;
 public interface IEncounterRegistry
 {
     /// <summary>
-    /// Persists <paramref name="encounter"/> and <paramref name="event"/> in one transaction and records the
-    /// database-assigned id on the encounter. If it throws, nothing was written.
+    /// Persists <paramref name="encounter"/>, <paramref name="event"/> and <paramref name="audit"/> in one transaction (SEC-9: a
+    /// change cannot commit without its audit row) and records the database-assigned id on the encounter. If it throws, nothing was written.
     /// </summary>
-    Task RegisterAsync(Encounter encounter, EncounterCreatedEvent @event, CancellationToken ct);
+    Task RegisterAsync(Encounter encounter, EncounterCreatedEvent @event, AuditEntry audit, CancellationToken ct);
 }

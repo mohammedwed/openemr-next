@@ -49,6 +49,25 @@ CREATE TABLE IF NOT EXISTS \`${DB_NAME}\`.\`clinical_care_outbox\` (
   published_at DATETIME DEFAULT NULL
 );
 
+-- The audit trail (SEC-9, ADR 0069): who did what to which record, field names only, never values. Append-only: the service
+-- user is granted INSERT and SELECT below and nothing else. Subject is the record's uuid as text so the table reads without a
+-- converter. Widths here must match AuditEntry's limits (the unit test pins them).
+CREATE TABLE IF NOT EXISTS \`${DB_NAME}\`.\`clinical_care_audit\` (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  at DATETIME(6) NOT NULL,
+  actor VARCHAR(100) NOT NULL,
+  actor_id BIGINT DEFAULT NULL,
+  actor_verified TINYINT(1) NOT NULL DEFAULT 0,
+  action VARCHAR(50) NOT NULL,
+  subject CHAR(36) NOT NULL,
+  outcome VARCHAR(10) NOT NULL,
+  correlation_id VARCHAR(100) DEFAULT NULL,
+  source_address VARCHAR(45) DEFAULT NULL,
+  details VARCHAR(1000) DEFAULT NULL,
+  KEY ix_clinical_care_audit_subject (subject, at),
+  KEY ix_clinical_care_audit_at (at)
+);
+
 -- The patients Clinical Care has been told about: a reference (uuid, pid) and nothing else, never demographics (design set
 -- R7, decision D4). Filled by PatientRegistered events (ADR 0066) and by the one-time backfill below. pid is unique because
 -- legacy tables still join on it; a different uuid claiming a held pid is a real conflict and must fail loudly.
@@ -75,9 +94,37 @@ ALTER USER '${CLINICAL_CARE_DB_USER}'@'%' IDENTIFIED BY $(sql_quote "$CLINICAL_C
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM '${CLINICAL_CARE_DB_USER}'@'%';
 
 -- The encounter itself: this service inserts new rows and reads them back (including the uuid lookup that
--- makes a retried insert safe). No UPDATE or DELETE: slice 1 never changes or removes an encounter, and the
--- other legacy writers still own those paths (ADR 0064 #2).
+-- makes a retried insert safe). No DELETE, and UPDATE only on the named columns below: the other legacy writers
+-- still own every other column and the delete paths (ADR 0064 #2, ADR 0068).
 GRANT SELECT, INSERT ON \`${DB_NAME}\`.form_encounter TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- An encounter edit (M5b, ADR 0068) may change exactly the columns this service owns and nothing else: no billing or collection column,
+-- no identity (id, uuid, pid, encounter), no sensitivity (needs the sensitivities ACL, F-CC-2). last_update is not listed: the database sets it.
+GRANT UPDATE (\`date\`, onset_date, reason, class_code, pc_catid, facility_id, facility, pos_code, provider_id)
+  ON \`${DB_NAME}\`.form_encounter TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- Problems (M5c, ADR 0070). The lists table holds every issue type (problems, allergies, medications, surgeries, ...), so this service is granted only the
+-- columns a problem uses, for reading and for inserting: it cannot read a medication's udi or a surgery's injury_* columns. SELECT includes type and
+-- modifydate (the ETag token, ADR 0068); INSERT includes type because every row this service writes names its own. Which ROWS it touches is a
+-- code rule (every statement filters on type), pinned by tests, because a grant cannot say it. UPDATE columns come with the update slice.
+-- Allergies (M5c slice 2) add three columns: reaction, severity_al and verification.
+-- (No backticks in these comments: this block is an unquoted heredoc, where a backtick runs a command.)
+GRANT SELECT (id, uuid, \`date\`, type, title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, activity, pid, \`user\`, modifydate,
+  reaction, severity_al, verification)
+  ON \`${DB_NAME}\`.lists TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT INSERT (uuid, \`date\`, type, title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, activity, pid, \`user\`, groupname,
+  reaction, severity_al, verification)
+  ON \`${DB_NAME}\`.lists TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- Updating an issue (M5c slice 3, ADR 0068): UPDATE on exactly the columns a problem or an allergy owns, and nothing else. No identity (id, uuid, pid, type),
+-- no date, user or groupname (who recorded it and when), no activity, none of the other issue types' columns. modifydate is not listed: the database sets it.
+-- Which ROWS an update may touch is the type filter in every statement, not this grant.
+GRANT UPDATE (title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, verification, reaction, severity_al)
+  ON \`${DB_NAME}\`.lists TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- Linking an issue to an encounter (M5c slice 4): legacy's issue_encounter row. SELECT and INSERT to read and make links, DELETE to remove a link (legacy's encounter
+-- screen does so on every save). It is a table of ids and a resolved flag with no clinical text. The link's uuid_registry row is not deleted on unlink (that would need
+-- DELETE on a table shared by every uuid in the system); a stale registry row is harmless because a uuid is never reused.
+GRANT SELECT, INSERT, DELETE ON \`${DB_NAME}\`.issue_encounter TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- The "this list has been addressed" marker the issue screen writes (legacy's summary reads it as listTouched). Tiny table, no clinical content.
+GRANT SELECT, INSERT ON \`${DB_NAME}\`.lists_touch TO '${CLINICAL_CARE_DB_USER}'@'%';
 
 -- The legacy 'newpatient' registry row every encounter needs (CC-7). Insert-only for the same reason.
 GRANT SELECT, INSERT ON \`${DB_NAME}\`.forms TO '${CLINICAL_CARE_DB_USER}'@'%';
@@ -111,6 +158,9 @@ GRANT SELECT (name, \`user\`) ON \`${DB_NAME}\`.\`groups\` TO '${CLINICAL_CARE_D
 -- This service's own outbox: fully owned, so the relay can mark rows published and purge them (EVT-7).
 GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.clinical_care_outbox TO '${CLINICAL_CARE_DB_USER}'@'%';
 
+-- The audit trail is append-only by privilege: no UPDATE, no DELETE, and the retention job never touches it (ADR 0069 #2, #7).
+GRANT INSERT, SELECT ON \`${DB_NAME}\`.clinical_care_audit TO '${CLINICAL_CARE_DB_USER}'@'%';
+
 -- Its own patient reference and its own record of processed events: fully owned.
 GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.clinical_care_patient_ref TO '${CLINICAL_CARE_DB_USER}'@'%';
 GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.clinical_care_processed_events TO '${CLINICAL_CARE_DB_USER}'@'%';
@@ -124,4 +174,4 @@ INSERT IGNORE INTO \`${DB_NAME}\`.clinical_care_patient_ref (patient_uuid, pid, 
 FLUSH PRIVILEGES;
 SQL
 
-echo "clinical_care_outbox table and user '${CLINICAL_CARE_DB_USER}' ready."
+echo "clinical_care_outbox and clinical_care_audit tables and user '${CLINICAL_CARE_DB_USER}' ready."

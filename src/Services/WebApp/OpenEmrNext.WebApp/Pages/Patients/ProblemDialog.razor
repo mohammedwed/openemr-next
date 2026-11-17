@@ -1,0 +1,237 @@
+@using OpenEmrNext.ClinicalCare.Client
+@using OpenEmrNext.WebApp.Shared
+@using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
+@inject IClinicalCareClient ClinicalCare
+
+@* One dialog for recording a problem and for editing one: the fields are the same, and the update replaces the whole set. It closes only when the save succeeds
+   (or the record turns out to be stale, which hands back a marker so the list reloads); on any other failure it stays open with the typed values intact. *@
+<MudDialog>
+    <DialogContent>
+        @if (_error is { } error)
+        {
+            <MudAlert Severity="@(_stale ? Severity.Warning : Severity.Error)" Variant="Variant.Outlined" Dense="true" Class="mb-4" role="alert">@error</MudAlert>
+        }
+        <MudForm @ref="_form" Model="_model">
+            <MudStack Spacing="4">
+                <MudTextField @bind-Value="_model.Title" Label="Problem" Required="true" RequiredError="A title is required."
+                    Validation="_validateTitle" Variant="Variant.Outlined" MaxLength="255" />
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="_model.BeginDate" Label="Began" Required="true" RequiredError="A begin date is required."
+                            Editable="true" Variant="Variant.Outlined" MinDate="MinDate" MaxDate="MaxDate" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="_model.EndDate" Label="Ended (blank while active)" Editable="true" Variant="Variant.Outlined"
+                            MinDate="MinDate" MaxDate="MaxDate" Validation="_validateEnd" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="int" @bind-Value="_model.Outcome" Label="Outcome" Variant="Variant.Outlined">
+                            @* Not named "code": "@code" is Razor's own directive. *@
+                            @foreach (var (outcomeId, outcomeLabel) in CodeLabels.ProblemOutcomes)
+                            {
+                                <MudSelectItem Value="@outcomeId">@outcomeLabel</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="string" @bind-Value="_model.Verification" Label="Verification (optional)" Variant="Variant.Outlined" Clearable="true">
+                            @foreach (var status in CodeLabels.VerificationCodes)
+                            {
+                                <MudSelectItem Value="@status">@CodeLabels.Of(status)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+
+                <MudTextField @bind-Value="_model.Comments" Label="Comments (optional)" Variant="Variant.Outlined" Lines="3" Sizing="InputSizing.Auto"
+                    MaxLength="65535" />
+
+                <MudExpansionPanels Elevation="0" Class="op-expander">
+                    <MudExpansionPanel Text="More details">
+                        <MudStack Spacing="4">
+                            <MudTextField @bind-Value="_model.Diagnosis" Label="Diagnosis codes (optional)" Variant="Variant.Outlined" MaxLength="255"
+                                Validation="_validateDiagnosis" HelperText="Code pairs separated by semicolons, for example ICD10:J45.909;SNOMED-CT:195967001." />
+                            <MudSelect T="int" @bind-Value="_model.Occurrence" Label="Occurrence" Variant="Variant.Outlined">
+                                @foreach (var (occurrenceId, occurrenceLabel) in CodeLabels.ProblemOccurrences)
+                                {
+                                    <MudSelectItem Value="@occurrenceId">@occurrenceLabel</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudTextField @bind-Value="_model.ReferredBy" Label="Referred by (optional)" Variant="Variant.Outlined" MaxLength="255" />
+                        </MudStack>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        @if (_stale)
+        {
+            @* The record changed under the user: saving again would fail the same way. Close and reload is the only useful next step. *@
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseStale">Close and reload</MudButton>
+        }
+        else
+        {
+            <MudButton OnClick="Cancel">Cancel</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_saving">@(Existing is null ? "Record problem" : "Save changes")</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    /// <summary>
+    /// The id of the acting provider. The same tracked gap as the encounter dialogs: the signed-in user has no numeric OpenEMR id yet, so the API's caller-supplied provider
+    /// cannot be filled with the real one (docs/patient-view-pending-decisions.md, item 1; ClinicalCare finding F-CC-1). An update names no provider at all.
+    /// </summary>
+    private const long PlaceholderProviderId = 1;
+
+    // The API's own bounds (PB-2, PB-3): 1900-01-01 up to one year ahead. Stopping them in the picker saves a round trip.
+    private static readonly DateTime MinDate = new(1900, 1, 1);
+    private static DateTime MaxDate => DateTime.Today.AddYears(1);
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    /// <summary>The patient to record the problem for. Used only when <see cref="Existing"/> is <c>null</c>.</summary>
+    [Parameter] public Guid PatientUuid { get; set; }
+
+    /// <summary>The problem to edit, as listed (it carries the version the update must be based on). <c>null</c> records a new problem.</summary>
+    [Parameter] public ProblemResponse? Existing { get; set; }
+
+    // The API's own rules (PB-1, PB-3, PB-4), with the same wording, so the message is the same whether it comes from here or from the server.
+    private readonly Func<string?, string?> _validateTitle = v => string.IsNullOrWhiteSpace(v) || v.Trim().Length >= 2 ? null : "Title must be between 2 and 255 characters.";
+    private readonly Func<string?, string?> _validateDiagnosis = v =>
+        string.IsNullOrWhiteSpace(v) || System.Text.RegularExpressions.Regex.IsMatch(v.Trim(), @"^[A-Za-z0-9._\-]+:[^;\s][^;]*(;[A-Za-z0-9._\-]+:[^;\s][^;]*)*$")
+            ? null
+            : "Diagnosis must be code pairs written SYSTEM:code, separated by semicolons (for example ICD10:J45.909).";
+
+    private MudForm _form = null!;
+    private readonly Model _model = new();
+    private bool _saving;
+    private bool _stale;
+    private string? _error;
+
+    // The time of day the stored row already had (legacy's issue screen can save one); a calendar date picked here keeps it, or is midnight for a new row.
+    private TimeSpan _beginTime;
+    private TimeSpan _endTime;
+
+    // A delegate field, not a method: the picker's Validation parameter is untyped, so a bare method group does not convert.
+    private Func<DateTime?, string?> _validateEnd = _ => null;
+
+    protected override void OnInitialized()
+    {
+        _validateEnd = end =>
+            end is not null && _model.BeginDate is { } begin && end.Value.Date < begin.Date ? "End date cannot be before the begin date." : null;
+
+        if (Existing is { } p)
+        {
+            _model.Title = p.Title;
+            (_model.BeginDate, _beginTime) = IssueWire.FromWire(p.BeginDate);
+            (_model.EndDate, _endTime) = IssueWire.FromWire(p.EndDate);
+            _model.Diagnosis = p.Diagnosis;
+            _model.Outcome = p.Outcome;
+            _model.Occurrence = p.Occurrence;
+            _model.ReferredBy = p.ReferredBy;
+            _model.Comments = p.Comments;
+            _model.Verification = p.Verification;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void CloseStale() => MudDialog.Close(DialogResult.Ok(IssueDialogResult.OutOfDate()));
+
+    private async Task SubmitAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            // The same wall-clock time at offset zero, keeping any time of day the stored row had (see IssueWire for why).
+            var begin = IssueWire.ToWire(_model.BeginDate, _beginTime);
+            var end = IssueWire.ToWire(_model.EndDate, _endTime);
+
+            if (Existing is null)
+            {
+                await ClinicalCare.RecordProblemAsync(new RecordProblemRequest
+                {
+                    PatientUuid = PatientUuid,
+                    Title = _model.Title,
+                    BeginDate = begin,
+                    EndDate = end,
+                    Diagnosis = Blank(_model.Diagnosis),
+                    Outcome = _model.Outcome,
+                    Occurrence = _model.Occurrence,
+                    ReferredBy = Blank(_model.ReferredBy),
+                    Comments = Blank(_model.Comments),
+                    Verification = Blank(_model.Verification),
+                    ProviderId = PlaceholderProviderId
+                });
+            }
+            else
+            {
+                await ClinicalCare.UpdateProblemAsync(Existing.Uuid, Existing.ETag, new UpdateProblemRequest
+                {
+                    Title = _model.Title,
+                    BeginDate = begin,
+                    EndDate = end,
+                    Diagnosis = Blank(_model.Diagnosis),
+                    Outcome = _model.Outcome,
+                    Occurrence = _model.Occurrence,
+                    ReferredBy = Blank(_model.ReferredBy),
+                    Comments = Blank(_model.Comments),
+                    Verification = Blank(_model.Verification)
+                });
+            }
+
+            MudDialog.Close(DialogResult.Ok(IssueDialogResult.Saved(_model.Title!.Trim(), isNew: Existing is null)));
+        }
+        catch (ClinicalCareApiException ex)
+        {
+            _stale = ClinicalCareErrorFormatter.IsStale(ex);
+            _error = ClinicalCareErrorFormatter.Describe(ex, Existing is null
+                ? "Could not record this problem. Please check the details and try again."
+                : "Could not save this problem. Please check the details and try again.");
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Could not reach the clinical care service. Nothing was saved. Check your connection, then try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private sealed class Model
+    {
+        public string? Title { get; set; }
+
+        public DateTime? BeginDate { get; set; }
+
+        public DateTime? EndDate { get; set; }
+
+        public string? Diagnosis { get; set; }
+
+        public int Outcome { get; set; }
+
+        public int Occurrence { get; set; }
+
+        public string? ReferredBy { get; set; }
+
+        public string? Comments { get; set; }
+
+        public string? Verification { get; set; }
+    }
+}

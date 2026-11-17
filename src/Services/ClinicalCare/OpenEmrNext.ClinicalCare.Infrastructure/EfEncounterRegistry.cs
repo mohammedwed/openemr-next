@@ -18,15 +18,16 @@ namespace OpenEmrNext.ClinicalCare.Infrastructure;
 ///   <item><c>uuid_registry</c>: the row <c>UuidRegistry::createUuid</c> inserts for every uuid it hands out
 ///     (CC-6, decision D-CC-1).</item>
 ///   <item><c>clinical_care_outbox</c>: the <c>EncounterCreated</c> event, wrapped in its envelope.</item>
+///   <item><c>clinical_care_audit</c>: the audit row (SEC-9), through <see cref="IAuditLog"/> on this same transaction.</item>
 /// </list>
 /// Retry safety (OPS-9): the context retries transient failures, which re-runs the whole delegate. If a commit
 /// succeeded but its acknowledgement was lost, the re-run must not insert a second copy, so the first step looks
 /// the encounter up by its uuid and, if it is already there, stops. The model-visible id is assigned once, outside
 /// the delegate, after success.
 /// </remarks>
-public sealed class EfEncounterRegistry(ClinicalCareDbContext db) : IEncounterRegistry
+public sealed class EfEncounterRegistry(ClinicalCareDbContext db, IAuditLog auditLog) : IEncounterRegistry
 {
-    public async Task RegisterAsync(Encounter encounter, EncounterCreatedEvent @event, CancellationToken ct)
+    public async Task RegisterAsync(Encounter encounter, EncounterCreatedEvent @event, AuditEntry audit, CancellationToken ct)
     {
         var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(encounter.Uuid);
         var envelope = EventEnvelope.Serialize(
@@ -86,6 +87,9 @@ public sealed class EfEncounterRegistry(ClinicalCareDbContext db) : IEncounterRe
                 INSERT INTO clinical_care_outbox (event_type, payload, occurred_at)
                 VALUES ({EncounterCreatedEvent.EventType}, {envelope}, {@event.CreatedAtUtc})
                 """, ct);
+
+            // Last statement, same transaction: the encounter cannot exist without its audit row (SEC-9, ADR 0069 #3).
+            await auditLog.AppendAsync(audit, ct);
 
             await transaction.CommitAsync(ct);
             return rowId;

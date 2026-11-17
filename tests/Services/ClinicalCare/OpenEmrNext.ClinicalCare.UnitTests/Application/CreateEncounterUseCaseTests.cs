@@ -50,15 +50,29 @@ public class CreateEncounterUseCaseTests
         }
     }
 
+    private sealed class FakeAuditLog : IAuditLog
+    {
+        public List<AuditEntry> Entries { get; } = [];
+
+        public Task AppendAsync(AuditEntry entry, CancellationToken ct)
+        {
+            Entries.Add(entry);
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class FakeRegistry : IEncounterRegistry
     {
         public Encounter? Registered { get; private set; }
         public EncounterCreatedEvent? Event { get; private set; }
+        public AuditEntry? Audit { get; private set; }
+        public FakeAuditLog Log { get; } = new();
 
-        public Task RegisterAsync(Encounter encounter, EncounterCreatedEvent @event, CancellationToken ct)
+        public Task RegisterAsync(Encounter encounter, EncounterCreatedEvent @event, AuditEntry audit, CancellationToken ct)
         {
             Registered = encounter;
             Event = @event;
+            Audit = audit;
             return Task.CompletedTask;
         }
     }
@@ -69,7 +83,7 @@ public class CreateEncounterUseCaseTests
         var registry = new FakeRegistry();
         var patient = patientExists ? PatientReference.Create(PatientUuid, 42) : null;
         var useCase = new CreateEncounterUseCase(
-            new FakePatients(patient), new FakeCodeLists(), new FakeFacilities(), allocator, registry, new FixedClock(Now));
+            new FakePatients(patient), new FakeCodeLists(), new FakeFacilities(), allocator, registry, registry.Log, new FixedClock(Now));
         return (useCase, allocator, registry);
     }
 
@@ -102,6 +116,94 @@ public class CreateEncounterUseCaseTests
         Assert.Equal(42, @event.PatientPid);
         Assert.Equal("EMER", @event.ClassCode);
         Assert.Equal(Now.UtcDateTime, @event.CreatedAtUtc);
+    }
+
+    [Fact]
+    public async Task SEC_9_the_registered_audit_row_names_the_encounter_the_named_provider_and_the_origin()
+    {
+        var (useCase, _, registry) = Build();
+        var command = Command(providerId: 9) with { Origin = new RequestOrigin("trace-1", "192.0.2.1") };
+
+        var encounter = await useCase.ExecuteAsync(command, CancellationToken.None);
+
+        var audit = registry.Audit!;
+        Assert.Equal(AuditActions.EncounterCreate, audit.Action);
+        Assert.Equal(encounter.Uuid, audit.Subject);
+        Assert.Equal(AuditOutcome.Success, audit.Outcome);
+        Assert.Equal(Now.UtcDateTime, audit.AtUtc);
+        Assert.Equal("user:9", audit.Actor.Subject);
+        Assert.Equal(9, audit.Actor.UserId);
+        Assert.False(audit.Actor.Verified);   // the provider is caller-supplied until the gateway forwards a session (F-CC-1)
+        Assert.Equal("trace-1", audit.CorrelationId);
+        Assert.Equal("192.0.2.1", audit.SourceAddress);
+    }
+
+    [Fact]
+    public async Task SEC_9_a_command_with_no_origin_is_still_audited()
+    {
+        var (useCase, _, registry) = Build();
+
+        await useCase.ExecuteAsync(Command(), CancellationToken.None);
+
+        Assert.NotNull(registry.Audit);
+        Assert.Null(registry.Audit!.CorrelationId);
+        Assert.Null(registry.Audit.SourceAddress);
+    }
+
+    [Fact]
+    public async Task SEC_9_an_unknown_patient_is_audited_as_failed_against_the_patient_asked_about()
+    {
+        var (useCase, _, registry) = Build(patientExists: false);
+        var command = Command(providerId: 9) with { Origin = new RequestOrigin("trace-3", "192.0.2.3") };
+
+        await Assert.ThrowsAsync<PatientNotFoundException>(() => useCase.ExecuteAsync(command, CancellationToken.None));
+
+        Assert.Null(registry.Audit);   // nothing was registered
+        var row = Assert.Single(registry.Log.Entries);
+        Assert.Equal(AuditActions.EncounterCreate, row.Action);
+        Assert.Equal(AuditOutcome.Failed, row.Outcome);
+        Assert.Equal(PatientUuid, row.Subject);
+        Assert.Equal("user:9", row.Actor.Subject);
+        Assert.False(row.Actor.Verified);
+        Assert.Equal(Now.UtcDateTime, row.AtUtc);
+        Assert.Equal("trace-3", row.CorrelationId);
+        Assert.Equal("192.0.2.3", row.SourceAddress);
+    }
+
+    [Fact]
+    public async Task SEC_9_a_validation_failure_is_audited_as_failed_and_carries_no_field_values()
+    {
+        var (useCase, allocator, registry) = Build();
+
+        await Assert.ThrowsAsync<ClinicalCareValidationException>(
+            () => useCase.ExecuteAsync(Command(classCode: "NOPE"), CancellationToken.None));
+
+        var row = Assert.Single(registry.Log.Entries);
+        Assert.Equal(AuditOutcome.Failed, row.Outcome);
+        Assert.Null(row.Details);
+        Assert.Equal(0, allocator.Calls);   // a refusal takes no number from the shared counter
+        Assert.Null(registry.Audit);
+    }
+
+    [Fact]
+    public async Task SEC_9_the_empty_patient_uuid_is_audited_not_crashed_on()
+    {
+        var (useCase, _, registry) = Build(patientExists: false);
+
+        await Assert.ThrowsAsync<PatientNotFoundException>(
+            () => useCase.ExecuteAsync(Command() with { PatientUuid = Guid.Empty }, CancellationToken.None));
+
+        Assert.Equal(Guid.Empty, Assert.Single(registry.Log.Entries).Subject);
+    }
+
+    [Fact]
+    public async Task SEC_9_a_successful_create_writes_no_separate_failed_row()
+    {
+        var (useCase, _, registry) = Build();
+
+        await useCase.ExecuteAsync(Command(), CancellationToken.None);
+
+        Assert.Empty(registry.Log.Entries);   // the success row travels with the registry call, not the log
     }
 
     [Fact]

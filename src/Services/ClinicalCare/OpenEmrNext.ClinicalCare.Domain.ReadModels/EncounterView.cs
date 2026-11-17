@@ -19,6 +19,8 @@ namespace OpenEmrNext.ClinicalCare.Domain.ReadModels;
 /// <param name="PosCode">The place-of-service code, if any.</param>
 /// <param name="ProviderId">The provider id; <c>0</c> when legacy recorded none.</param>
 /// <param name="Sensitivity">The legacy sensitivity label. Returned, not enforced (finding F-CC-2).</param>
+/// <param name="CalendarCategoryId">Legacy's <c>pc_catid</c>, if the row has one: what kind of visit the calendar shows it as.</param>
+/// <param name="LastUpdate">When the row last changed, by any writer: the basis of the concurrency token (ADR 0068). <c>null</c> only for a row the database did not stamp.</param>
 public sealed record EncounterView(
     Guid Uuid,
     long? Number,
@@ -32,7 +34,9 @@ public sealed record EncounterView(
     string? FacilityName,
     int? PosCode,
     long ProviderId,
-    string? Sensitivity);
+    string? Sensitivity,
+    DateTime? LastUpdate = null,
+    int? CalendarCategoryId = null);
 
 /// <summary>One page of a patient's encounters, newest first, with the total so a caller can page.</summary>
 /// <param name="Items">The encounters on this page.</param>
