@@ -389,6 +389,7 @@ discrepancies.
 
 **Build (no identity needed):** M5e FHIR (read-only). M5d's API work and its WebApp screens (vitals correction, immunizations, SOAP notes, clinical notes, lookups; `20-webapp-clinical-screens.md`) are built, **but the screens are compile-checked only**.
 **Identity (M5b phase 1b) is done for sign-in and for Clinical Care** (ADR 0075): the gateway requires a session, Clinical Care acts as the verified user. Patient Management consumes it too (registration, document owner, directive reviewer). **Still open:** delete for problems and allergies (decision pending) and editing `sensitivity`; a bearer-token path for external FHIR clients (deliberately not built until there is a client to design it for).
+**WebApp tests (M5i, started Nov 17):** a bUnit project exists (24 tests, the three delete flows); the other screens have none yet.
 **Verification not yet done:** a browser check of every WebApp screen (including all the new M5d ones); a legacy-UI check that records written here display correctly in OpenEMR itself; shadow comparison of the update paths, vitals correction and immunizations (only creation was compared); a layered review of M5b to M5d.
 **New services, not started:** documents, pharmacy, labs, billing.
 **Then:** the post-M5 gate, and M6.

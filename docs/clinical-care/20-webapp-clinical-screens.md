@@ -25,7 +25,7 @@ All follow the existing panel and dialog conventions: a server-paged card that l
 
 | # | Limitation |
 |---|---|
-| L1 | **Not browser-verified, no automated UI tests.** Layout, the dialogs' behaviour and accessibility are checked by reading and compiling only. |
+| L1 | **Not browser-verified; automated UI tests cover delete only.** Layout and accessibility are checked by reading and compiling; the component tests (section 8) cover the three delete flows and nothing else yet. |
 | L2 | ~~The acting provider is the placeholder `1`~~ **Resolved (ADR 0075):** the dialogs send no provider; the signed-in user is the actor. |
 | L3 | A note's date and an immunization's dates go as wall-clock at offset zero: exact only when the API runs in UTC (decision 9). |
 | L4 | **Delete exists for vitals, SOAP notes and clinical notes** (section 7, ADR 0076), not for problems, allergies or immunizations (which have "entered in error"). |
@@ -35,3 +35,13 @@ All follow the existing panel and dialog conventions: a server-paged card that l
 ## 7. Delete (M5g)
 
 Each vitals row, SOAP note row and clinical note row has a **Delete** button (red text, named per row for screen readers). It asks first ("Delete these vitals?" and the like, saying the record is marked deleted, not removed, and that an administrator can restore it in OpenEMR), then calls the `DELETE` endpoint with the row's `ETag`. One helper, `Shared/RecordDeletion.cs`, words the outcomes: a **403** is "Only an administrator can delete records"; a **404** or **412** says the record was already gone or changed and reloads the list; a network failure says nothing was deleted. Deleting the last row of a later page steps back one page. The button is offered to everyone because the session does not carry rights (ADR 0076). Compile-checked only: not yet seen in a browser.
+
+## 8. Component tests (M5i)
+
+`tests/Services/WebApp/OpenEmrNext.WebApp.UnitTests` is the first automated test project for the WebApp. It uses bUnit (2.15) to render the **real** components, with MudBlazor's real services, dialog provider and snackbar provider, and replaces only the typed clinical care client with a substitute (NSubstitute) that the test scripts. No browser and no Docker; the whole project runs in about a second, and CI picks it up through the solution file.
+
+`RecordDeletionPanelTests` runs the same six scenarios against the vitals, SOAP and clinical note panels (24 tests): every row offers a Delete named for the record; nothing is sent until the user confirms, and "Keep it" sends nothing and does not reload; confirming sends the row's own `ETag` for the right encounter and record, shows "Deleted." and reloads the list; a 403 says only an administrator can delete and leaves the list alone; a 404 or 412 says the record is gone or changed, deleted nothing, and reloads; a network failure says nothing was deleted; the confirmation says the record is marked, not removed.
+
+**Mutation check:** with the 403 handling made to claim success, 3 tests fail (one per panel); with a wrong `ETag` sent from the SOAP panel, 4 fail. Both restored.
+
+**What this does not cover:** layout, styling, keyboard and screen-reader behaviour, the other dialogs and panels, and anything that needs a real browser or the live stack. The browser check is still outstanding.
