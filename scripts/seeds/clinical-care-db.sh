@@ -106,10 +106,13 @@ GRANT UPDATE (\`date\`, onset_date, reason, class_code, pc_catid, facility_id, f
 -- columns a problem uses, for reading and for inserting: it cannot read a medication's udi or a surgery's injury_* columns. SELECT includes type and
 -- modifydate (the ETag token, ADR 0068); INSERT includes type because every row this service writes names its own. Which ROWS it touches is a
 -- code rule (every statement filters on type), pinned by tests, because a grant cannot say it. UPDATE columns come with the update slice.
+-- Allergies (M5c slice 2) add three columns: reaction, severity_al and verification.
 -- (No backticks in these comments: this block is an unquoted heredoc, where a backtick runs a command.)
-GRANT SELECT (id, uuid, \`date\`, type, title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, activity, pid, \`user\`, modifydate)
+GRANT SELECT (id, uuid, \`date\`, type, title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, activity, pid, \`user\`, modifydate,
+  reaction, severity_al, verification)
   ON \`${DB_NAME}\`.lists TO '${CLINICAL_CARE_DB_USER}'@'%';
-GRANT INSERT (uuid, \`date\`, type, title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, activity, pid, \`user\`, groupname)
+GRANT INSERT (uuid, \`date\`, type, title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, activity, pid, \`user\`, groupname,
+  reaction, severity_al, verification)
   ON \`${DB_NAME}\`.lists TO '${CLINICAL_CARE_DB_USER}'@'%';
 -- The "this list has been addressed" marker the issue screen writes (legacy's summary reads it as listTouched). Tiny table, no clinical content.
 GRANT SELECT, INSERT ON \`${DB_NAME}\`.lists_touch TO '${CLINICAL_CARE_DB_USER}'@'%';

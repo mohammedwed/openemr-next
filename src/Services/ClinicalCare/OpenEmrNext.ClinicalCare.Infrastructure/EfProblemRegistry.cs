@@ -60,14 +60,8 @@ public sealed class EfProblemRegistry(ClinicalCareDbContext db, IAuditLog auditL
                 """, ct);
             var rowId = await db.Database.GetLastInsertIdAsync(ct);
 
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                INSERT INTO uuid_registry (uuid, table_name, table_id, table_vertical, couchdb, document_drive, mapped, created)
-                VALUES ({uuidBytes}, 'lists', 'id', '', '', 0, 0, NOW())
-                """, ct);
-
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"INSERT IGNORE INTO lists_touch (pid, type, `date`) VALUES ({problem.Patient.Pid}, {ProblemType}, NOW())", ct);
+            await IssueRows.RegisterUuidAsync(db, uuidBytes, ct);
+            await IssueRows.TouchAsync(db, problem.Patient.Pid, ProblemType, ct);
 
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
