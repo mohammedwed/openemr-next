@@ -2,6 +2,7 @@
 @using OpenEmrNext.WebApp.Shared
 @using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
 @inject IClinicalCareClient ClinicalCare
+@inject OpenEmrNext.WebApp.Shared.IdempotencyAttempt Attempt
 
 @* One dialog for recording a clinical note and for editing one: the fields are the same, and a correction replaces the whole set (a category you clear is removed). The type and category are chosen from
    the configured lists, which the dialog loads when it opens; without them a note cannot be saved, because its type must be one of them. A note whose type has since been retired is still shown and kept. It
@@ -144,6 +145,8 @@
 
             if (Existing is null)
             {
+                // A retried save is one request, not two: the attempt lives until a save succeeds (ADR 0077).
+                Attempt.BeginIfNone();
                 await ClinicalCare.RecordClinicalNoteAsync(EncounterUuid, new RecordClinicalNoteRequest
                 {
                     Type = _model.Type,

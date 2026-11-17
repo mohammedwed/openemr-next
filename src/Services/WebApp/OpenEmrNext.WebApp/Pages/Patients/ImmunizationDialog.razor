@@ -2,6 +2,7 @@
 @using OpenEmrNext.WebApp.Shared
 @using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
 @inject IClinicalCareClient ClinicalCare
+@inject OpenEmrNext.WebApp.Shared.IdempotencyAttempt Attempt
 
 @* One dialog for recording an immunization and for editing one: the fields are the same, and a correction replaces the whole set (a field you clear is removed). The coded fields are chosen from the
    configured lists, which the dialog loads when it opens (a record or a correction needs the vaccine list, so without it nothing can be saved). A value the record already holds that legacy no longer offers
@@ -275,6 +276,8 @@
 
             if (Existing is null)
             {
+                // A retried save is one request, not two: the attempt lives until a save succeeds (ADR 0077).
+                Attempt.BeginIfNone();
                 await ClinicalCare.RecordImmunizationAsync(new RecordImmunizationRequest
                 {
                     PatientUuid = PatientUuid,

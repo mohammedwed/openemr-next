@@ -466,3 +466,10 @@ Full record: `docs/clinical-care/20-webapp-clinical-screens.md`. **Compile-check
 - **The fix:** `AuthFacadeSessionStore` sweeps expired rows when a **new** session is created: up to 100 per sign-in, oldest first, keys read then deleted by key (so it works on both SQLite and MariaDB). No background job; a backlog is worked off over the next sign-ins. A session with no expiry is never swept; a live one is never touched; the existing "expired cookie is refused and removed" path is unchanged.
 - **Tests:** the session store had none. 5 new unit tests run the real store on a real in-memory SQLite database (an abandoned session is removed, a live and a no-expiry one are kept, one sign-in sweeps a bounded batch and the rest go on the next, renewing does not sweep, an expired cookie is still refused). AuthFacade unit 86, all green. Mutation check: removing the sweep call fails 2 tests; restored.
 - **No database change:** the table is unchanged.
+
+## Added — the WebApp sends idempotency keys (M5m)
+
+- **All eight creating dialogs** (encounter, vitals, SOAP note, clinical note, immunization, problem, allergy, link an issue) now take part. A dialog starts an *attempt* when its user first presses save and keeps it while that save is retried; `IdempotencyKeyHandler` on the Clinical Care client turns it into an `Idempotency-Key` made of the attempt id and a short hash of the request, and a successful save ends the attempt (ADR 0077 #10).
+- **What that means for a user:** a save whose answer was lost and is pressed again does not create a second record; a save edited before the retry is a new request, not an error; recording the same vitals twice on purpose is still two records.
+- **Tests:** 15 new tests (`IdempotencyKeyHandlerTests`, WebApp unit 39 in all), including one that drives the real generated client through the handler. Mutation check: not clearing the attempt, or ignoring the body in the key, fails 6; restored.
+- **Not verified:** the dialogs' own calls to the attempt are compile-checked only; no test renders a dialog, and nothing has been seen in a browser.
