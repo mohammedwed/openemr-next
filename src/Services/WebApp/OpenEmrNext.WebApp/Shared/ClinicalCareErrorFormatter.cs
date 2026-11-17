@@ -15,6 +15,11 @@ internal static class ClinicalCareErrorFormatter
     /// </summary>
     public static string Describe(ApiException ex, string fallback)
     {
+        if (IsStale(ex))
+        {
+            return "This record was changed by someone else after you opened it, possibly in the legacy screens. Nothing was saved.";
+        }
+
         if (ex.StatusCode == 503)
         {
             return "The clinical care service is temporarily unavailable. Nothing was saved. Try again in a moment.";
@@ -27,4 +32,10 @@ internal static class ClinicalCareErrorFormatter
 
         return ex is ApiException<ProblemDetails> { Result.Detail: { Length: > 0 } detail } ? detail : fallback;
     }
+
+    /// <summary>
+    /// Whether an update was refused because the record changed after it was read (412). The caller's copy is out of date: it must reload and apply the change again,
+    /// not retry as it is (ADR 0068).
+    /// </summary>
+    public static bool IsStale(ApiException ex) => ex.StatusCode == 412;
 }

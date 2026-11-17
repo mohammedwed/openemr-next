@@ -261,3 +261,18 @@ Full record: `docs/clinical-care/11-link-issue-to-encounter-slice.md` (rules IE-
 - **Found by planning the WebApp edit flow:** until now no generated client could have sent `If-Match` at all.
 - **Tests, all green (integration 492):** the body `eTag` equals the header on a `GET` and is present on every list item for all three resources, and the OpenAPI document declares the header
   and the 412 and 428 responses on every `PUT`. OpenAPI snapshot regenerated; the whole solution builds.
+
+## Added — M5c slice 5: WebApp Problems and Allergies tabs, and linking on the encounter page
+
+Full record: ADR 0071.
+
+- **Two new tabs on the patient page, Problems and Allergies:** a server-paged list each, a **Record** dialog, an **Edit** dialog, and one-click **Resolve / Reopen** (problems) and **End / Reopen**
+  (allergies), all as updates made with the version the row was listed with. A refusal for staleness shows a clear message and reloads; a dialog whose record went stale offers only "Close and reload".
+- **The encounter page gains "Problems and allergies addressed":** the linked issues, a **Link a problem or allergy** dialog (the patient's own, minus those already linked, with a resolved-at-this-visit tick),
+  and **Unlink**, which asks first and says the issue itself is untouched.
+- **Dates:** a calendar date is sent as the same wall-clock time at offset zero, keeping any time of day the row had (`IssueWire`), so one click on Resolve cannot shift a begin date when the browser and
+  server zones differ. Exact when the API runs in UTC; recorded under pending decision 9, which it narrows and does not close.
+- **Code lists are fixed lists** in `CodeLabels`, as the encounter classes are; the API still rejects an unconfigured code with its message. The provider id is the existing placeholder, for creates only.
+- **Not exercised in a browser, and the WebApp still has no automated tests** (pending decision 7): it builds with no warnings, and the API it calls is covered by its own suites. The check needs a re-seeded
+  database, rebuilt images and a signed-in user, and is outstanding.
+- **Corrected while writing it:** a code comment cited pending decision 10 (lookups) for the time-zone gap, which is decision 9.

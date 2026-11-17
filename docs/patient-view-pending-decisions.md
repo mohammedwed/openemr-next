@@ -101,6 +101,11 @@ encounter list shows the server's digits rather than the ones typed. Invisible w
 
 **Cost:** the first is an API contract change plus a client regeneration; the second is a UI change only.
 
+**Update (M5c):** problems and allergies have **more** date-only fields than encounters (begin and end), and their quick Resolve, End and Reopen buttons re-send a row's begin date on every use, so
+sending the browser's offset would have shifted dates silently from a single click. The new screens therefore send a date as **the same wall-clock time at offset zero** and read it back as
+wall-clock (`IssueWire`), which keeps any time of day a legacy row already had. That is exact when the API runs in UTC (the container default) and **still wrong when it does not**; it narrows the gap,
+it does not close it. The encounter screens are unchanged. The first option above, a zone-less date on the contract, is the real fix and would let `IssueWire` be deleted.
+
 ## 10. Lookups for the encounter form
 
 **Blocked:** creating an encounter takes a class code, a calendar category id, a facility id and a provider id, and nothing returns the valid

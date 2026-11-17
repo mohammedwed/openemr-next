@@ -77,6 +77,9 @@
                 </dl>
             </MudPaper>
 
+            @* What the visit addressed sits above the vitals: it is clinical context for them, and a short list. *@
+            <EncounterIssuesPanel @key="encounter.Uuid" EncounterUuid="encounter.Uuid" PatientUuid="PatientUuid" />
+
             <EncounterVitalsPanel @key="encounter.Uuid" EncounterUuid="encounter.Uuid" />
             break;
     }

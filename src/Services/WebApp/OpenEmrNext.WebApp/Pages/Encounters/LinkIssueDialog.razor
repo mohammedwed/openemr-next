@@ -1,0 +1,157 @@
+@using OpenEmrNext.ClinicalCare.Client
+@using OpenEmrNext.WebApp.Shared
+@using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
+@inject IClinicalCareClient ClinicalCare
+
+@* Chooses one of the patient's own problems or allergies to link to this encounter. The choices are read when the dialog opens, minus what is already linked. Linking is
+   idempotent and a link is never edited (ADR 0070), so there is nothing to go stale here: a second link to the same issue simply finds the first. *@
+<MudDialog>
+    <DialogContent>
+        @if (_error is { } error)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4" role="alert">@error</MudAlert>
+        }
+
+        @if (_loading)
+        {
+            <div role="status" aria-label="Loading problems and allergies" aria-busy="true">
+                <MudSkeleton Height="40px" Class="mb-2" />
+                <MudSkeleton Height="40px" />
+            </div>
+        }
+        else if (_loadFailed)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true">
+                Could not load this patient's problems and allergies.
+                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="LoadAsync">Try again</MudButton>
+            </MudAlert>
+        }
+        else if (_choices.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                @(_alreadyLinked > 0
+                    ? "Everything recorded for this patient is already linked to this encounter."
+                    : "This patient has no problems or allergies recorded yet. Record one from the patient's Problems or Allergies tab, then link it here.")
+            </MudText>
+        }
+        else
+        {
+            <MudStack Spacing="4">
+                <MudSelect T="Choice" @bind-Value="_selected" Label="Problem or allergy" Required="true" Variant="Variant.Outlined" ToStringFunc="@(c => c?.Label ?? "")">
+                    @foreach (var choice in _choices)
+                    {
+                        <MudSelectItem Value="@choice">@choice.Label</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudCheckBox T="bool" @bind-Value="_resolved" Label="It was resolved during this visit" />
+                @if (_truncated)
+                {
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Showing the most recent 100 of each. Older ones can be linked from their own record.</MudText>
+                }
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="@(_saving || _selected is null)">Link</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private const int PageSize = 100;
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public Guid PatientUuid { get; set; }
+    [Parameter, EditorRequired] public Guid EncounterUuid { get; set; }
+
+    /// <summary>The issues already linked to this encounter, which the dialog does not offer again.</summary>
+    [Parameter] public IReadOnlySet<Guid> AlreadyLinked { get; set; } = new HashSet<Guid>();
+
+    private readonly List<Choice> _choices = [];
+    private Choice? _selected;
+    private bool _resolved;
+    private bool _loading = true;
+    private bool _loadFailed;
+    private bool _truncated;
+    private bool _saving;
+    private int _alreadyLinked;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loadFailed = false;
+        try
+        {
+            var problems = await ClinicalCare.ListProblemsAsync(PatientUuid, PageSize, 0);
+            var allergies = await ClinicalCare.ListAllergiesAsync(PatientUuid, PageSize, 0);
+
+            _choices.Clear();
+            _alreadyLinked = 0;
+            foreach (var p in problems.Items)
+            {
+                Add(p.Uuid, $"Problem: {p.Title}{(p.EndDate is null ? "" : " (resolved)")}");
+            }
+
+            foreach (var a in allergies.Items)
+            {
+                Add(a.Uuid, $"Allergy: {a.Title}{(a.EndDate is null ? "" : " (ended)")}");
+            }
+
+            _truncated = problems.Total > PageSize || allergies.Total > PageSize;
+        }
+        catch (Exception ex) when (ex is ClinicalCareApiException or HttpRequestException)
+        {
+            _loadFailed = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+
+        void Add(Guid issueUuid, string label)
+        {
+            if (AlreadyLinked.Contains(issueUuid))
+            {
+                _alreadyLinked++;
+                return;
+            }
+
+            _choices.Add(new Choice(issueUuid, label));
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        if (_selected is null)
+        {
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            var linked = await ClinicalCare.LinkIssueToEncounterAsync(EncounterUuid, _selected.IssueUuid, new LinkIssueRequest { Resolved = _resolved });
+            MudDialog.Close(DialogResult.Ok(linked));
+        }
+        catch (ClinicalCareApiException ex)
+        {
+            _error = ClinicalCareErrorFormatter.Describe(ex, "Could not link this. Please try again.");
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Could not reach the clinical care service. Nothing was saved. Check your connection, then try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private sealed record Choice(Guid IssueUuid, string Label);
+}
