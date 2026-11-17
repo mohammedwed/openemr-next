@@ -332,8 +332,28 @@ Research: `docs/clinical-care/07-problems-and-allergies-research.md`; ADR 0070 (
 Fills the remaining Clinical Care functionality that needs no new service and no verified identity. Slices, each researched, built and tested in turn:
 
 1. **Correct vitals** (**done Nov 17**; suites green: unit 533, architecture 53, integration 545; `13-correct-vitals-slice.md`).
-2. **Immunizations** (**done Nov 17**; suites green: unit 616, architecture 59, integration 623; `15-record-immunization-slice.md`, ADR 0072). 3. Clinical notes and SOAP forms (the `forms` registry pattern vitals use). 4. Lookup endpoints (facilities, classes, categories, providers) and the WebApp fields they replace.
+2. **Immunizations** (**done Nov 17**; suites green: unit 616, architecture 59, integration 623; `15-record-immunization-slice.md`, ADR 0072).
+3. **SOAP notes** (research and ADR 0073 done Nov 17, `16-soap-notes-research.md`; build in progress): addressed by form id within the encounter, versioned by content. 3b. **Clinical notes** (`form_clinical_notes`: grouped notes, type and category lists,
+   linked documents and results, soft delete by `activity`), its own slice.
+4. Lookup endpoints (facilities, classes, categories, providers) and the WebApp fields they replace.
 - **Out of scope until identity and the permission port exist:** delete and editing `sensitivity`.
+
+### M5e: FHIR for Clinical Care (not started)
+
+Clinical Care has no FHIR surface; only Patient Management does (`Patient`, Firely SDK with US Core validation, ADR 0052). Legacy exposes read-only FHIR for these resources, which are the parity targets:
+
+| Resource | From | Legacy FHIR |
+|---|---|---|
+| `Encounter` | encounters | `GET /fhir/Encounter` |
+| `Condition` | problems | `GET /fhir/Condition` |
+| `AllergyIntolerance` | allergies | `GET /fhir/AllergyIntolerance` |
+| `Observation` (vital signs) | vitals | `GET /fhir/Observation` |
+| `Immunization` | immunizations | `GET /fhir/Immunization` |
+
+- **Read-only first** (search by patient, read by id), mapped with the Firely SDK as Patient Management does, validated against US Core, with a `/fhir/...` gateway route to Clinical Care. Writes stay on the JSON API.
+- **Needs an ADR first** (scope creep rule): resource identity (problems, allergies and immunizations have uuids; vitals and SOAP notes map differently), one `meta.lastUpdated` per source (a stamp, a content version, or none), and how the FHIR `ETag` relates to the JSON one.
+- **Depends on** the gateway fix in M5b phase 1b: a clinical FHIR read must not be reachable without sign-in.
+
 
 ### M5 frontend: WebApp encounter pages (built Nov 17, ADR 0067)
 
@@ -354,14 +374,23 @@ M5 proved the slice pattern but both aggregates are create-only. M5b closes that
   ADR 0068 (conditional updates on owned columns), ADR 0069 (own append-only audit table), both Proposed.
 - **Phase 1a (done Nov 17):** `IAuditLog` port, `clinical_care_audit` table and grants, adapter, audited creates and audited refusals (built Nov 17; Clinical Care suites green: unit 236, architecture 31, integration 192); `ETag` on single-record reads built (suites green: unit 256, architecture 31, integration 196). `If-Match` (412, 428) and the update and delete events arrive with the endpoints that use them (phases 2 and 3). Phase 1a is otherwise done.
 - **Phase 1b:** gateway validates the session and forwards a verified actor; fixes F-CC-1, the placeholder provider and the open patient API.
-- **Phase 2 (done Nov 17; suites green: unit 300, architecture 33, integration 253):** update an encounter (`PUT`, `If-Match`, 412 and 428), `docs/clinical-care/06-update-encounter-slice.md`. **Phase 3a:** correct vitals. **Phase 3b:** permission port, then soft delete.
-- **Phase 4:** lookup endpoints and WebApp edit flows. **Phase 5:** shadow comparison of update, concurrency test, layered review.
+- **Phase 2 (done Nov 17; suites green: unit 300, architecture 33, integration 253):** update an encounter (`PUT`, `If-Match`, 412 and 428), `docs/clinical-care/06-update-encounter-slice.md`. **Phase 3a:** correct vitals (**done Nov 17**, M5d slice 1). **Phase 3b:** permission port, then soft delete.
+- **Phase 4:** lookup endpoints (now M5d slice 4) and WebApp edit flows. **Phase 5:** shadow comparison of update, concurrency test, layered review.
 - **Out of scope for good:** whole-encounter hard delete (`deleter.php` reaches billing). **Deferred:** idempotency keys (F-CC-8),
   sensitive-read audit, amendments with history.
 
 **Exit criteria (M5):** An encounter is created for a registered patient and vitals
 are recorded, end to end. The shadow comparison shows no unexplained
 discrepancies.
+
+### What remains before the post-M5 gate (as of Nov 17)
+
+**Build (no identity needed):** M5d slices 3 (SOAP), 3b (clinical notes) and 4 (lookups); WebApp screens for correcting vitals and for immunizations (the API is ahead of the UI); M5e FHIR (read-only).
+**Needs the identity work (M5b phase 1b):** the gateway validating the session and forwarding a verified actor. It fixes the **open finding that the Clinical Care and patient APIs are reachable without sign-in**, replaces the caller-named `providerId`,
+and makes the audit actor real (every correction is `unknown` today). Then the permission port, soft delete and editing `sensitivity`. This is the largest open item.
+**Verification not yet done:** a browser check of every WebApp screen; a legacy-UI check that records written here display correctly in OpenEMR itself; shadow comparison of the update paths, vitals correction and immunizations (only creation was compared); a layered review of M5b to M5d.
+**New services, not started:** documents, pharmacy, labs, billing.
+**Then:** the post-M5 gate, and M6.
 
 ### M6: Portfolio polish (not started)
 
