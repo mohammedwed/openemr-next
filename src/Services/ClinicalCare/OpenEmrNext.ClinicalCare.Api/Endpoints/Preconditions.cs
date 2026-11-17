@@ -77,6 +77,16 @@ internal static class Preconditions
         return currentVersion is { } version ? new ETagResult(problem, version.ToETag()) : problem;
     }
 
+    /// <summary>412 for a record whose current version is already an <c>ETag</c> (a deletion, which reports it as the adapter read it under its lock).</summary>
+    public static IResult Failed(string? currentETag)
+    {
+        var problem = Results.Problem(
+            title: "The record has changed.",
+            detail: "It was changed after you read it, possibly in the legacy screens. Read it again and decide whether it should still be deleted.",
+            statusCode: StatusCodes.Status412PreconditionFailed);
+        return currentETag is null ? problem : new ETagResult(problem, currentETag);
+    }
+
     private sealed class ETagResult(IResult inner, string etag) : IResult
     {
         public Task ExecuteAsync(HttpContext httpContext)

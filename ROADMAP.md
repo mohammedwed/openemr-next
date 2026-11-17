@@ -336,7 +336,8 @@ Fills the remaining Clinical Care functionality that needs no new service and no
 3. **SOAP notes** (**done Nov 17**; suites green: unit 650, architecture 63, integration 671; `17-soap-notes-slice.md`, ADR 0073): addressed by form id within the encounter, versioned by content. 3b. **Clinical notes** (**done Nov 17**; suites green: unit 685, architecture 69, integration 760; `19-clinical-notes-slice.md`, ADR 0074): own parent form per note, its id allocated under a database lock; linked documents and results not covered.
 4. **Lookups** (**API done Nov 17**; suites green: unit 650, architecture 63, integration 692; `18-lookups-slice.md`): classes, facilities and calendar categories. **Wired into the WebApp's `CreateEncounterDialog`** with a fallback to the old fields; providers wait for identity. The gateway routes for `/api/v1/immunizations` and `/api/v1/lookups` had been missing and were added, with a guard test.
 5. **Providers lookup** (**M5f, done Nov 17; suites green: unit 688, architecture 69, integration 805**; `18-lookups-slice.md` section 5): the picker for naming a provider other than yourself. Widens Clinical Care's `users` grant by `fname`, `lname`, `authorized` (user's decision).
-- **Out of scope until the permission port exists:** delete and editing `sensitivity`.
+6. **Permission port and delete** (**M5g, API done Nov 17**; `21-permissions-and-delete.md`, ADR 0076): `IAccessControl` reads legacy's own `gacl_*` rules (admin/super), and `DELETE` on vitals, SOAP notes and clinical notes flags them as legacy does (`forms.deleted`, note `activity`), conditional on `If-Match`. **Not covered:** problems and allergies (waiting on a user decision: legacy hard-deletes them and its screens do not hide an inactive one), WebApp delete buttons.
+- **Out of scope:** editing `sensitivity` (still needs its own permission decision).
 
 ### M5e: FHIR for Clinical Care (not started)
 
@@ -386,7 +387,7 @@ discrepancies.
 ### What remains before the post-M5 gate (as of Nov 17)
 
 **Build (no identity needed):** M5e FHIR (read-only). M5d's API work and its WebApp screens (vitals correction, immunizations, SOAP notes, clinical notes, lookups; `20-webapp-clinical-screens.md`) are built, **but the screens are compile-checked only**.
-**Identity (M5b phase 1b) is done for sign-in and for Clinical Care** (ADR 0075): the gateway requires a session, Clinical Care acts as the verified user. Patient Management consumes it too (registration, document owner, directive reviewer). **Still open:** the permission port, soft delete and editing `sensitivity`; a bearer-token path for external FHIR clients (deliberately not built until there is a client to design it for).
+**Identity (M5b phase 1b) is done for sign-in and for Clinical Care** (ADR 0075): the gateway requires a session, Clinical Care acts as the verified user. Patient Management consumes it too (registration, document owner, directive reviewer). **Still open:** delete for problems and allergies (decision pending) and editing `sensitivity`; a bearer-token path for external FHIR clients (deliberately not built until there is a client to design it for).
 **Verification not yet done:** a browser check of every WebApp screen (including all the new M5d ones); a legacy-UI check that records written here display correctly in OpenEMR itself; shadow comparison of the update paths, vitals correction and immunizations (only creation was compared); a layered review of M5b to M5d.
 **New services, not started:** documents, pharmacy, labs, billing.
 **Then:** the post-M5 gate, and M6.

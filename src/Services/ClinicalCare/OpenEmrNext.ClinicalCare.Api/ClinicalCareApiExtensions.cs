@@ -88,6 +88,9 @@ public static class ClinicalCareApiExtensions
 
         // Lookups (M5d slice 4).
         builder.Services.AddScoped<IEncounterLookups, EfEncounterLookups>();
+        builder.Services.AddScoped<IAccessControl, EfAccessControl>();
+        builder.Services.AddScoped<IRecordDeleter, EfRecordDeleter>();
+        builder.Services.AddScoped<DeleteRecordUseCase>();
         builder.Services.AddScoped<EncounterLookupsUseCase>();
 
         // SOAP notes (M5d slice 3, ADR 0073).

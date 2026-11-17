@@ -128,6 +128,8 @@ GRANT SELECT, INSERT ON \`${DB_NAME}\`.lists_touch TO '${CLINICAL_CARE_DB_USER}'
 
 -- The legacy 'newpatient' registry row every encounter needs (CC-7). Insert-only for the same reason.
 GRANT SELECT, INSERT ON \`${DB_NAME}\`.forms TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- Deleting vitals or a SOAP note is legacy's own flag on the registry row (ADR 0076): the one column, so no other part of a forms row can be changed. The service never sets it back.
+GRANT UPDATE (deleted) ON \`${DB_NAME}\`.forms TO '${CLINICAL_CARE_DB_USER}'@'%';
 
 -- A set of vital signs (slice 2): inserted and read back, never updated or deleted (CV-10). form_vitals has no
 -- encounter column; its link to an encounter is the forms row granted above.
@@ -150,7 +152,7 @@ GRANT UPDATE (administered_date, immunization_id, cvx_code, manufacturer, lot_nu
 -- not groupname, authorized or activity (activity 0 is how legacy retires a note, so that is a delete and waits for the permission port), not the parent form id, not note_related_to,
 -- not external_id. last_updated is not listed: the database sets it. No DELETE. The parent form is registered in forms, granted above.
 GRANT SELECT, INSERT ON \`${DB_NAME}\`.form_clinical_notes TO '${CLINICAL_CARE_DB_USER}'@'%';
-GRANT UPDATE (\`date\`, code, codetext, description, clinical_notes_type, clinical_notes_category) ON \`${DB_NAME}\`.form_clinical_notes TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT UPDATE (\`date\`, code, codetext, description, clinical_notes_type, clinical_notes_category, activity) ON \`${DB_NAME}\`.form_clinical_notes TO '${CLINICAL_CARE_DB_USER}'@'%';
 
 -- SOAP notes (M5d slice 3, ADR 0073): recorded and read back, and corrected on the four text sections only. Not who wrote it or when (user, groupname, date), not the patient (pid),
 -- not authorized or activity: legacy's own REST update rewrites date and pid, this service does not. A note is linked to its encounter by the forms row granted above. No DELETE.
@@ -180,6 +182,18 @@ GRANT SELECT (pc_catid, pc_catname, pc_cattype, pc_active, pc_seq, pc_constant_i
 -- provider. users also holds credential and contact columns this service must never see (password, email, npi, federaldrugid and the rest), so the grant is on these seven columns only.
 GRANT SELECT (id, username, uuid, active, fname, lname, authorized) ON \`${DB_NAME}\`.users TO '${CLINICAL_CARE_DB_USER}'@'%';
 GRANT SELECT (name, \`user\`) ON \`${DB_NAME}\`.\`groups\` TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- Legacy's access control, read so that deleting a record can ask the question legacy asks (ADR 0076): does this user hold admin/super? Only the columns the single
+-- decision query reads, on the nine tables it joins; nothing is writable, and the rule notes, section names and user display names stay unreadable.
+GRANT SELECT (id, allow, enabled) ON \`${DB_NAME}\`.gacl_acl TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT SELECT (acl_id, section_value, value) ON \`${DB_NAME}\`.gacl_aco_map TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT SELECT (acl_id, section_value, value) ON \`${DB_NAME}\`.gacl_aro_map TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT SELECT (acl_id) ON \`${DB_NAME}\`.gacl_axo_map TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT SELECT (acl_id, group_id) ON \`${DB_NAME}\`.gacl_aro_groups_map TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT SELECT (acl_id) ON \`${DB_NAME}\`.gacl_axo_groups_map TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT SELECT (id, section_value, value) ON \`${DB_NAME}\`.gacl_aro TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT SELECT (group_id, aro_id) ON \`${DB_NAME}\`.gacl_groups_aro_map TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT SELECT (id, lft, rgt) ON \`${DB_NAME}\`.gacl_aro_groups TO '${CLINICAL_CARE_DB_USER}'@'%';
 
 -- No grant on patient_data. The interim stand-in that read it was removed when events arrived (ADR 0064 #5, ADR 0066):
 -- Clinical Care now learns about patients only from PatientRegistered and its own reference table.

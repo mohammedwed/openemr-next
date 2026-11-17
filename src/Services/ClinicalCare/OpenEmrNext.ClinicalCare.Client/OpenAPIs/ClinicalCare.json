@@ -611,6 +611,50 @@
             "InternalGateway": []
           }
         ]
+      },
+      "delete": {
+        "tags": [
+          "Vitals"
+        ],
+        "summary": "Delete a set of vital signs (flag it deleted; needs legacy's admin/super right), conditional on the ETag the caller read",
+        "operationId": "DeleteVitals",
+        "parameters": [
+          {
+            "name": "encounterUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "vitalsUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
       }
     },
     "/api/v1/problems": {
@@ -1462,80 +1506,13 @@
             "InternalGateway": []
           }
         ]
-      }
-    },
-    "/api/v1/encounters/{encounterUuid}/clinical-notes": {
-      "post": {
-        "tags": [
-          "ClinicalNotes"
-        ],
-        "summary": "Record a clinical note on an encounter",
-        "operationId": "RecordClinicalNote",
-        "parameters": [
-          {
-            "name": "encounterUuid",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RecordClinicalNoteRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClinicalNoteRecordedResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "InternalGateway": []
-          }
-        ]
       },
-      "get": {
+      "delete": {
         "tags": [
-          "ClinicalNotes"
+          "SOAP notes"
         ],
-        "summary": "List an encounter's clinical notes, newest first, one bounded page at a time",
-        "operationId": "ListClinicalNotes",
+        "summary": "Delete a SOAP note (flag it deleted; needs legacy's admin/super right), conditional on the ETag the caller read",
+        "operationId": "DeleteSoapNote",
         "parameters": [
           {
             "name": "encounterUuid",
@@ -1547,60 +1524,26 @@
             }
           },
           {
-            "name": "limit",
-            "in": "query",
+            "name": "noteId",
+            "in": "path",
+            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
-              "format": "int32"
+              "type": "integer",
+              "format": "int64"
             }
           },
           {
-            "name": "offset",
-            "in": "query",
+            "name": "If-Match",
+            "in": "header",
             "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
-              "format": "int32"
+              "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClinicalNoteListResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
+            "description": "OK"
           }
         },
         "security": [
@@ -1611,6 +1554,50 @@
       }
     },
     "/api/v1/encounters/{encounterUuid}/clinical-notes/{noteUuid}": {
+      "delete": {
+        "tags": [
+          "Clinical notes"
+        ],
+        "summary": "Delete a clinical note (mark it inactive; needs legacy's admin/super right), conditional on the ETag the caller read",
+        "operationId": "DeleteClinicalNote",
+        "parameters": [
+          {
+            "name": "encounterUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "noteUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      },
       "put": {
         "tags": [
           "ClinicalNotes"
@@ -1745,6 +1732,152 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ClinicalNoteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
+    },
+    "/api/v1/encounters/{encounterUuid}/clinical-notes": {
+      "post": {
+        "tags": [
+          "ClinicalNotes"
+        ],
+        "summary": "Record a clinical note on an encounter",
+        "operationId": "RecordClinicalNote",
+        "parameters": [
+          {
+            "name": "encounterUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordClinicalNoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicalNoteRecordedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "ClinicalNotes"
+        ],
+        "summary": "List an encounter's clinical notes, newest first, one bounded page at a time",
+        "operationId": "ListClinicalNotes",
+        "parameters": [
+          {
+            "name": "encounterUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicalNoteListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
                 }
               }
             }
@@ -5633,6 +5766,12 @@
     },
     {
       "name": "SoapNotes"
+    },
+    {
+      "name": "SOAP notes"
+    },
+    {
+      "name": "Clinical notes"
     },
     {
       "name": "ClinicalNotes"

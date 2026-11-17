@@ -47,7 +47,9 @@ public sealed class ClinicalCareContainerFixture : IAsyncLifetime
          // Clinical notes (M5d slice 3b): grouped under a parent form registered in forms.
          "form_clinical_notes",
          // Visit categories (M5d slice 4): the lookup reads a few columns of legacy's calendar categories.
-         "openemr_postcalendar_categories"];
+         "openemr_postcalendar_categories",
+         // Legacy's access control (M5g, ADR 0076): the nine tables the permission check reads.
+         "gacl_acl", "gacl_aco_map", "gacl_aro_map", "gacl_axo_map", "gacl_aro_groups_map", "gacl_axo_groups_map", "gacl_aro", "gacl_groups_aro_map", "gacl_aro_groups"];
 
     /// <summary>The uuid of the seeded user (id 7, <c>dr_who</c>) the test client acts as: what the gateway would forward once it had verified their session (ADR 0075).</summary>
     public static readonly Guid TestUserUuid = Guid.Parse("7e57c0de-0000-4000-8000-000000000007");
@@ -114,7 +116,7 @@ public sealed class ClinicalCareContainerFixture : IAsyncLifetime
         await using var root = new MySqlConnection(RootConnectionString);
         await root.OpenAsync();
         foreach (var table in new[]
-                 { "form_encounter", "form_vitals", "forms", "uuid_registry", "clinical_care_outbox", "clinical_care_audit", "lists", "lists_touch", "issue_encounter", "immunizations", "form_soap", "form_clinical_notes", "openemr_postcalendar_categories", "clinical_care_patient_ref", "clinical_care_processed_events", "patient_data", "users", "groups", "facility", "list_options", "sequences" })
+                 { "form_encounter", "form_vitals", "forms", "uuid_registry", "clinical_care_outbox", "clinical_care_audit", "lists", "lists_touch", "issue_encounter", "immunizations", "form_soap", "form_clinical_notes", "openemr_postcalendar_categories", "clinical_care_patient_ref", "clinical_care_processed_events", "gacl_acl", "gacl_aco_map", "gacl_aro_map", "gacl_axo_map", "gacl_aro_groups_map", "gacl_axo_groups_map", "gacl_aro", "gacl_groups_aro_map", "gacl_aro_groups", "patient_data", "users", "groups", "facility", "list_options", "sequences" })
             await ExecuteAsync(root, $"DELETE FROM `{table}`");
 
         // Reference rows: ids and values chosen to match the real snapshot (AMB is the default class; list order is `seq`).
