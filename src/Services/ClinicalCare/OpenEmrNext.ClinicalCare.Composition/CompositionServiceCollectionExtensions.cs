@@ -30,6 +30,11 @@ public static class CompositionServiceCollectionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddOptions<RetentionOptions>()
+            .Bind(configuration.GetSection(RetentionOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         return services;
     }
 }

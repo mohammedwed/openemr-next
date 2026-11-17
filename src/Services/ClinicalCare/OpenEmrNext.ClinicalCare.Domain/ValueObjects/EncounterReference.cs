@@ -40,4 +40,21 @@ public sealed record EncounterReference
 
         return new EncounterReference(uuid, number!.Value, PatientReference.Create(patientUuid!.Value, patientPid!.Value));
     }
+
+    /// <summary>
+    /// The same check as <see cref="Create"/>, for a caller that wants "can this encounter take vitals?" as an answer, not an
+    /// exception: reading the vitals of a half-filled legacy encounter is not an error, it simply has none (DOM-9, tolerant reads).
+    /// </summary>
+    /// <returns>The reference, or <c>null</c> when the encounter has no number or no known patient.</returns>
+    public static EncounterReference? TryCreate(Guid uuid, long? number, Guid? patientUuid, long? patientPid)
+    {
+        try
+        {
+            return Create(uuid, number, patientUuid, patientPid);
+        }
+        catch (VitalsValidationException)
+        {
+            return null;
+        }
+    }
 }

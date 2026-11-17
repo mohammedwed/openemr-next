@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using OpenEmrNext.ClinicalCare.Api.Authentication;
 using OpenEmrNext.ClinicalCare.Api.Contracts.Requests;
 using OpenEmrNext.ClinicalCare.Application;
+using OpenEmrNext.ClinicalCare.Application.Ports;
 using OpenEmrNext.ClinicalCare.Domain.ValueObjects;
 
 namespace OpenEmrNext.ClinicalCare.Api.Endpoints;
@@ -64,9 +65,16 @@ public static class InternalEventEndpoints
             await patientRegistered.ExecuteAsync(
                 new PatientRegisteredMessage(request.EventId, payload.Uuid, payload.Pid, payload.RegisteredAtUtc), ct);
         }
-        catch (EncounterValidationException ex)
+        catch (ClinicalCareValidationException ex)
         {
             return ValidationProblems.Many(ex.Errors);
+        }
+        catch (PatientReferenceConflictException ex)
+        {
+            // 422, not 500 and not 400: the event is well formed but contradicts what is held, and no retry of these bytes can
+            // succeed. The relay treats 422 as a rejection of the event itself and dead-letters it at once (review finding R-9).
+            return Results.Problem(
+                title: "The event conflicts with a patient already held.", detail: ex.Message, statusCode: StatusCodes.Status422UnprocessableEntity);
         }
 
         // Recorded and already-processed are the same answer to the sender: it is done, stop retrying (EVT-3).

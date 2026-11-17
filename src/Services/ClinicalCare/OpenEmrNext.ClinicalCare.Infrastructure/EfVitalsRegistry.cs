@@ -42,22 +42,21 @@ public sealed class EfVitalsRegistry(ClinicalCareDbContext db) : IVitalsRegistry
             if (existing.Count > 0)
                 return existing[0];
 
-            // user and groupname are the provider's username and group, as the session would supply (CV-9); an
-            // unknown provider leaves the username NULL (F-CC-6). authorized is the 0/1 flag legacy's form
-            // controller writes ($_SESSION['userauthorized']), not the provider id (F-CC-10).
+            // user and groupname are the provider's username and group, as the session would supply (CV-9, LegacyActor); an
+            // unknown provider leaves the username NULL (F-CC-6). authorized is the 0/1 flag legacy's form controller writes
+            // ($_SESSION['userauthorized']), not the provider id (F-CC-10).
+            var actor = await LegacyActor.ResolveAsync(db, vitals.ProviderId, ct);
+
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO form_vitals
                     (uuid, date, pid, `user`, groupname, authorized, activity, bps, bpd, weight, height, temperature,
                      temp_method, pulse, respiration, note, BMI, BMI_status, waist_circ, head_circ, oxygen_saturation)
-                SELECT {uuidBytes}, {vitals.RecordedAt}, {patientPid}, u.username,
-                       COALESCE((SELECT g.name FROM `groups` g WHERE g.user = u.username LIMIT 1), 'Default'),
-                       1, 1, {systolic}, {diastolic}, {vitals.WeightPounds ?? 0m}, {vitals.HeightInches ?? 0m},
-                       {vitals.TemperatureFahrenheit ?? 0m}, {vitals.TemperatureMethod}, {vitals.Pulse ?? 0},
-                       {vitals.Respiration ?? 0}, {vitals.Note}, {vitals.Bmi ?? 0m}, {vitals.BmiStatus},
-                       {vitals.WaistInches ?? 0m}, {vitals.HeadInches ?? 0m}, {vitals.OxygenSaturation ?? 0m}
-                FROM (SELECT {vitals.ProviderId} AS id) p
-                LEFT JOIN users u ON u.id = p.id
+                VALUES ({uuidBytes}, {vitals.RecordedAt}, {patientPid}, {actor.Username}, {actor.GroupName},
+                        1, 1, {systolic}, {diastolic}, {vitals.WeightPounds ?? 0m}, {vitals.HeightInches ?? 0m},
+                        {vitals.TemperatureFahrenheit ?? 0m}, {vitals.TemperatureMethod}, {vitals.Pulse ?? 0},
+                        {vitals.Respiration ?? 0}, {vitals.Note}, {vitals.Bmi ?? 0m}, {vitals.BmiStatus},
+                        {vitals.WaistInches ?? 0m}, {vitals.HeadInches ?? 0m}, {vitals.OxygenSaturation ?? 0m})
                 """, ct);
             var rowId = await db.Database.GetLastInsertIdAsync(ct);
 
@@ -65,11 +64,8 @@ public sealed class EfVitalsRegistry(ClinicalCareDbContext db) : IVitalsRegistry
                 $"""
                 INSERT INTO forms
                     (date, encounter, form_name, form_id, pid, `user`, groupname, authorized, deleted, formdir)
-                SELECT {vitals.RecordedAt}, {number}, 'Vitals', {rowId}, {patientPid}, u.username,
-                       COALESCE((SELECT g.name FROM `groups` g WHERE g.user = u.username LIMIT 1), 'Default'),
-                       1, 0, 'vitals'
-                FROM (SELECT {vitals.ProviderId} AS id) p
-                LEFT JOIN users u ON u.id = p.id
+                VALUES ({vitals.RecordedAt}, {number}, 'Vitals', {rowId}, {patientPid}, {actor.Username}, {actor.GroupName},
+                        1, 0, 'vitals')
                 """, ct);
 
             await db.Database.ExecuteSqlInterpolatedAsync(

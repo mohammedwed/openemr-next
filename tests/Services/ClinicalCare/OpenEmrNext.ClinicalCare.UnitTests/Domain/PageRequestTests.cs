@@ -28,7 +28,7 @@ public class PageRequestTests
     [InlineData(10_000)]
     public void A_limit_outside_1_to_100_is_rejected(int limit)
     {
-        var ex = Assert.Throws<EncounterValidationException>(() => PageRequest.Create(limit, 0));
+        var ex = Assert.Throws<ClinicalCareValidationException>(() => PageRequest.Create(limit, 0));
 
         Assert.Contains("Limit must be between 1 and 100.", ex.Errors);
     }
@@ -36,7 +36,7 @@ public class PageRequestTests
     [Fact]
     public void A_negative_offset_is_rejected_and_both_errors_are_reported_together()
     {
-        var ex = Assert.Throws<EncounterValidationException>(() => PageRequest.Create(0, -1));
+        var ex = Assert.Throws<ClinicalCareValidationException>(() => PageRequest.Create(0, -1));
 
         Assert.Equal(2, ex.Errors.Count);
     }

@@ -66,7 +66,7 @@ public static class EncounterEndpoints
                 page.Items.Select(EncounterResponse.From).ToList(), page.Total,
                 limit ?? PageRequest.DefaultLimit, offset ?? 0));
         }
-        catch (EncounterValidationException ex)
+        catch (ClinicalCareValidationException ex)
         {
             return ValidationProblems.Many(ex.Errors);
         }
@@ -84,15 +84,15 @@ public static class EncounterEndpoints
         {
             var encounter = await useCase.ExecuteAsync(
                 new CreateEncounterCommand(
-                    request.PatientUuid, request.ClassCode, request.CalendarCategoryId, request.Date, request.Reason,
-                    request.FacilityId, request.PosCode, request.ProviderId, request.OnsetDate, request.Sensitivity),
+                    request.PatientUuid, request.ClassCode, request.CalendarCategoryId, ClientTime.ToServerLocal(request.Date), request.Reason,
+                    request.FacilityId, request.PosCode, request.ProviderId, ClientTime.ToServerLocal(request.OnsetDate), request.Sensitivity),
                 ct);
 
             return Results.Created(
                 $"/api/v1/encounters/{encounter.Uuid}",
                 new EncounterCreatedResponse(encounter.Uuid, encounter.Number, encounter.Patient.Uuid));
         }
-        catch (EncounterValidationException ex)
+        catch (ClinicalCareValidationException ex)
         {
             return ValidationProblems.Many(ex.Errors);
         }

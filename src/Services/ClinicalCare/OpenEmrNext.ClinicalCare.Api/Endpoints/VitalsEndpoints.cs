@@ -97,7 +97,7 @@ public static class VitalsEndpoints
                 page.Items.Select(v => VitalsResponse.From(v, system)).ToList(), page.Total,
                 limit ?? PageRequest.DefaultLimit, offset ?? 0));
         }
-        catch (EncounterValidationException ex)
+        catch (ClinicalCareValidationException ex)
         {
             return ValidationProblems.Many(ex.Errors);
         }

@@ -17,7 +17,7 @@ public sealed record PatientReference
         Pid = pid;
     }
 
-    /// <exception cref="EncounterValidationException">The uuid is empty or the pid is not positive.</exception>
+    /// <exception cref="ClinicalCareValidationException">The uuid is empty or the pid is not positive.</exception>
     public static PatientReference Create(Guid uuid, long pid)
     {
         var errors = new List<string>();
@@ -29,7 +29,7 @@ public sealed record PatientReference
             errors.Add("The patient reference must have a positive pid.");
 
         if (errors.Count > 0)
-            throw new EncounterValidationException(errors);
+            throw new ClinicalCareValidationException(errors);
 
         return new PatientReference(uuid, pid);
     }

@@ -50,6 +50,18 @@ public static class ClinicalCareApiExtensions
         builder.Services.AddScoped<GetEncounterUseCase>();
         builder.Services.AddScoped<ListPatientEncountersUseCase>();
 
+        // Retention of this service's own bookkeeping (finding R-10).
+        builder.Services.AddScoped<IRetentionStore, EfRetentionStore>();
+        builder.Services.AddScoped(provider =>
+        {
+            var retention = provider.GetRequiredService<IOptions<RetentionOptions>>().Value;
+            return new PurgeExpiredRecordsUseCase(
+                provider.GetRequiredService<IRetentionStore>(),
+                new RetentionCutoffs(retention.ProcessedEventDays, retention.PublishedOutboxDays, retention.UnpublishedOutboxDays),
+                retention.BatchSize);
+        });
+        builder.Services.AddHostedService<RetentionHostedService>();
+
         // Vitals (slice 2).
         builder.Services.AddSingleton<IVitalsIdentityAllocator, GuidVitalsIdentityAllocator>();
         builder.Services.AddScoped<IVitalsRegistry, EfVitalsRegistry>();

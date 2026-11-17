@@ -8,7 +8,7 @@ namespace OpenEmrNext.ClinicalCare.Application;
 public sealed class ListPatientEncountersUseCase(IPatientDirectory patients, IEncounterReader reader)
 {
     /// <exception cref="PatientNotFoundException">No patient has this uuid.</exception>
-    /// <exception cref="EncounterValidationException">The limit or offset is out of bounds.</exception>
+    /// <exception cref="ClinicalCareValidationException">The limit or offset is out of bounds.</exception>
     public async Task<EncounterPage> ExecuteAsync(Guid patientUuid, int? limit, int? offset, CancellationToken ct)
     {
         // Bounds first: a caller asking for 10,000 rows should be told so without a database round trip.

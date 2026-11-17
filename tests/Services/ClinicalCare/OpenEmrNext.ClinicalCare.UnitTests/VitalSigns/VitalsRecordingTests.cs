@@ -283,4 +283,33 @@ public class VitalsRecordingTests
         Assert.Equal(98.13m, Create(new VitalsInput(OxygenSaturation: 98.125m)).OxygenSaturation);   // half away from zero, as the column rounds
         Assert.Equal(100m, Create(new VitalsInput(OxygenSaturation: 99.996m)).OxygenSaturation);
     }
+
+    [Fact]
+    public void R_14_TryCreate_gives_the_same_reference_Create_does_for_a_good_encounter()
+    {
+        var uuid = Guid.NewGuid();
+        var patient = Guid.NewGuid();
+
+        var reference = EncounterReference.TryCreate(uuid, 1001, patient, 42);
+
+        Assert.NotNull(reference);
+        Assert.Equal(uuid, reference.Uuid);
+        Assert.Equal(1001, reference.Number);
+        Assert.Equal(patient, reference.Patient.Uuid);
+    }
+
+    [Theory]
+    [InlineData(null, "b1a9c5f0-0000-4000-8000-0000000000aa", 42L)]
+    [InlineData(0L, "b1a9c5f0-0000-4000-8000-0000000000aa", 42L)]
+    [InlineData(1001L, null, 42L)]
+    [InlineData(1001L, "00000000-0000-0000-0000-000000000000", 42L)]
+    [InlineData(1001L, "b1a9c5f0-0000-4000-8000-0000000000aa", null)]
+    [InlineData(1001L, "b1a9c5f0-0000-4000-8000-0000000000aa", 0L)]
+    public void R_14_TryCreate_answers_null_for_an_encounter_that_cannot_take_vitals_where_Create_throws(long? number, string? patient, long? pid)
+    {
+        var patientUuid = patient is null ? (Guid?)null : Guid.Parse(patient);
+
+        Assert.Null(EncounterReference.TryCreate(Guid.NewGuid(), number, patientUuid, pid));
+        Assert.Throws<VitalsValidationException>(() => EncounterReference.Create(Guid.NewGuid(), number, patientUuid, pid));
+    }
 }

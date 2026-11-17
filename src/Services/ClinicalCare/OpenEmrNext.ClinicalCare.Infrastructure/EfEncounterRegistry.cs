@@ -57,11 +57,10 @@ public sealed class EfEncounterRegistry(ClinicalCareDbContext db) : IEncounterRe
                 """, ct);
             var rowId = await db.Database.GetLastInsertIdAsync(ct);
 
-            // Legacy's addForm: who did it comes from the session (username and group). Here the provider id is
-            // all there is, so both are looked up from it. A provider that does not exist leaves them NULL; that
-            // is a tracked finding (F-CC-6), not something this adapter invents a value for. The group is the
-            // user's `groups` entry, falling back to the literal 'Default' legacy itself writes in one path
-            // (CdaTemplateImportDispose.php:791); not verified against a signed-in session (slice doc section 8).
+            // Legacy's addForm: who did it comes from the session (username and group). Here the provider id is all there is, so
+            // both are looked up from it (LegacyActor); a provider that does not exist leaves the username NULL (finding F-CC-6).
+            var actor = await LegacyActor.ResolveAsync(db, encounter.ProviderId, ct);
+
             //
             // `authorized` is written as 1, not the provider id legacy's insertEncounter passes. The column is a
             // tinyint(4) and legacy runs with sql_mode = '' so it silently truncates an id above 127 to 127; this
@@ -71,13 +70,9 @@ public sealed class EfEncounterRegistry(ClinicalCareDbContext db) : IEncounterRe
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO forms
-                    (date, encounter, form_name, form_id, pid, user, groupname, authorized, deleted, formdir)
-                SELECT {encounter.Date}, {encounter.Number}, 'New Patient Encounter', {rowId}, {encounter.Patient.Pid},
-                       u.username,
-                       COALESCE((SELECT g.name FROM `groups` g WHERE g.user = u.username LIMIT 1), 'Default'),
-                       1, 0, 'newpatient'
-                FROM (SELECT {encounter.ProviderId} AS id) p
-                LEFT JOIN users u ON u.id = p.id
+                    (date, encounter, form_name, form_id, pid, `user`, groupname, authorized, deleted, formdir)
+                VALUES ({encounter.Date}, {encounter.Number}, 'New Patient Encounter', {rowId}, {encounter.Patient.Pid},
+                        {actor.Username}, {actor.GroupName}, 1, 0, 'newpatient')
                 """, ct);
 
             await db.Database.ExecuteSqlInterpolatedAsync(

@@ -26,6 +26,7 @@
     <ProjectReference Include="..\..\..\..\src\Services\ClinicalCare\OpenEmrNext.ClinicalCare.Domain.ReadModels\OpenEmrNext.ClinicalCare.Domain.ReadModels.csproj" />
     <ProjectReference Include="..\..\..\..\src\Services\ClinicalCare\OpenEmrNext.ClinicalCare.Application\OpenEmrNext.ClinicalCare.Application.csproj" />
     <ProjectReference Include="..\..\..\..\src\Services\ClinicalCare\OpenEmrNext.ClinicalCare.Application.Ports\OpenEmrNext.ClinicalCare.Application.Ports.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Services\ClinicalCare\OpenEmrNext.ClinicalCare.Composition\OpenEmrNext.ClinicalCare.Composition.csproj" />
     <ProjectReference Include="..\..\..\..\src\Services\ClinicalCare\OpenEmrNext.ClinicalCare.Infrastructure\OpenEmrNext.ClinicalCare.Infrastructure.csproj" />
   </ItemGroup>
 

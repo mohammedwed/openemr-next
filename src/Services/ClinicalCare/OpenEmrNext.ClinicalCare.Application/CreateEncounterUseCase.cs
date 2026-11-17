@@ -18,7 +18,7 @@ public sealed class CreateEncounterUseCase(
     TimeProvider clock)
 {
     /// <exception cref="PatientNotFoundException">No patient has the requested uuid (CC-1). Nothing is persisted.</exception>
-    /// <exception cref="EncounterValidationException">One or more fields fail validation. Nothing is persisted and no number is allocated.</exception>
+    /// <exception cref="ClinicalCareValidationException">One or more fields fail validation. Nothing is persisted and no number is allocated.</exception>
     public async Task<Encounter> ExecuteAsync(CreateEncounterCommand command, CancellationToken ct)
     {
         // CC-1: a missing patient is a 404, decided before any field is judged.

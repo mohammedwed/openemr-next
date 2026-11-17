@@ -15,11 +15,11 @@ public sealed class ConsumePatientRegisteredUseCase(IPatientReferenceStore store
     /// <summary>The earliest registration time believed (the same floor as encounter dates).</summary>
     private static readonly DateTime EarliestPlausible = new(1900, 1, 1);
 
-    /// <exception cref="EncounterValidationException">The message names no usable patient (empty uuid or non-positive pid).</exception>
+    /// <exception cref="ClinicalCareValidationException">The message names no usable patient (empty uuid or non-positive pid).</exception>
     public Task<EventRecordingResult> ExecuteAsync(PatientRegisteredMessage message, CancellationToken ct)
     {
         if (message.EventId == Guid.Empty)
-            throw new EncounterValidationException(["The event has no eventId, so it cannot be processed safely twice."]);
+            throw new ClinicalCareValidationException(["The event has no eventId, so it cannot be processed safely twice."]);
 
         // The same factory every other path uses: one owner of "what is a valid patient reference" (DOM-2).
         var patient = PatientReference.Create(message.PatientUuid, message.PatientPid);

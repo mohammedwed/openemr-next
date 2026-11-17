@@ -64,7 +64,7 @@ public class EncounterReadUseCaseTests
     {
         var reader = new FakeReader();
 
-        await Assert.ThrowsAsync<EncounterValidationException>(() =>
+        await Assert.ThrowsAsync<ClinicalCareValidationException>(() =>
             new ListPatientEncountersUseCase(new FakePatients(true), reader).ExecuteAsync(PatientUuid, 10_000, null, CancellationToken.None));
 
         Assert.Equal(0, reader.ListCalls);

@@ -136,8 +136,14 @@ public class VitalsRegistryTests(ClinicalCareContainerFixture fixture) : IAsyncL
         Assert.Equal(vitals.Uuid, payload.GetProperty("vitalsUuid").GetGuid());
         Assert.Equal(1001, payload.GetProperty("encounterNumber").GetInt64());
         Assert.Contains("weight", payload.GetProperty("measurementsTaken").EnumerateArray().Select(e => e.GetString()));
-        Assert.DoesNotContain("154", json);   // no weight value
-        Assert.DoesNotContain("calm", json);  // no note text
+
+        // No clinical VALUE in the payload. Asserted on the payload alone and on the full stored weight (154.323584), never on a
+        // short digit run in the whole envelope: the event id, trace id and timestamps are random and can contain "154" by chance,
+        // which made this test fail intermittently.
+        var payloadText = payload.GetRawText();
+        Assert.DoesNotContain("154.323584", payloadText);
+        Assert.DoesNotContain("calm", payloadText);
+        Assert.DoesNotContain("weight\":", payloadText);   // names which measurements were taken, as a list, not as keyed values
     }
 
     [Fact]

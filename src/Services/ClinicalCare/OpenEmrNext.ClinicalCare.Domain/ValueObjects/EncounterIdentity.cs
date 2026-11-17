@@ -18,7 +18,7 @@ public sealed record EncounterIdentity
         Number = number;
     }
 
-    /// <exception cref="EncounterValidationException">The uuid is empty or the number is not positive.</exception>
+    /// <exception cref="ClinicalCareValidationException">The uuid is empty or the number is not positive.</exception>
     public static EncounterIdentity Create(Guid uuid, long number)
     {
         var errors = new List<string>();
@@ -30,7 +30,7 @@ public sealed record EncounterIdentity
             errors.Add("The encounter identity must have a positive encounter number.");
 
         if (errors.Count > 0)
-            throw new EncounterValidationException(errors);
+            throw new ClinicalCareValidationException(errors);
 
         return new EncounterIdentity(uuid, number);
     }

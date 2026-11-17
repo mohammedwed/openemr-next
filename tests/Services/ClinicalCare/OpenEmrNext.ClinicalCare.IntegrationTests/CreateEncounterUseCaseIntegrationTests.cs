@@ -56,7 +56,7 @@ public class CreateEncounterUseCaseIntegrationTests(ClinicalCareContainerFixture
     {
         await using var db = fixture.CreateDbContext();
 
-        await Assert.ThrowsAsync<EncounterValidationException>(() => Build(db).ExecuteAsync(Command(category: 0), CancellationToken.None));
+        await Assert.ThrowsAsync<ClinicalCareValidationException>(() => Build(db).ExecuteAsync(Command(category: 0), CancellationToken.None));
 
         Assert.Equal(1000L, await fixture.RootScalarAsync<long>("SELECT id FROM sequences"));
         Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM form_encounter"));
@@ -67,7 +67,7 @@ public class CreateEncounterUseCaseIntegrationTests(ClinicalCareContainerFixture
     {
         await using var db = fixture.CreateDbContext();
 
-        var ex = await Assert.ThrowsAsync<EncounterValidationException>(() => Build(db).ExecuteAsync(Command(facilityId: 99), CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<ClinicalCareValidationException>(() => Build(db).ExecuteAsync(Command(facilityId: 99), CancellationToken.None));
 
         Assert.Contains("Facility 99 does not exist.", ex.Errors);
         Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM form_encounter"));
