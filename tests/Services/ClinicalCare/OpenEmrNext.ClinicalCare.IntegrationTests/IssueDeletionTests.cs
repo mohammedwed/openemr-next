@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using OpenEmrNext.ClinicalCare.Api.Contracts.Requests;
 using OpenEmrNext.ClinicalCare.Api.Contracts.Responses;
+using OpenEmrNext.ClinicalCare.Application.Ports;
 
 namespace OpenEmrNext.ClinicalCare.IntegrationTests;
 
@@ -233,6 +234,35 @@ public class IssueDeletionTests(ClinicalCareContainerFixture fixture) : IAsyncLi
         Assert.Equal(HttpStatusCode.NotFound, viaProblems.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, viaAllergies.StatusCode);
         Assert.Equal(1L, await Count("lists", $"type = '{otherType}'"));
+    }
+
+    [Theory]
+    [InlineData(DeletableIssue.Problem, "allergy")]
+    [InlineData(DeletableIssue.Allergy, "medical_problem")]
+    [InlineData(DeletableIssue.Problem, "medication")]
+    [InlineData(DeletableIssue.Allergy, "surgery")]
+    public async Task The_adapter_itself_refuses_a_row_of_another_type_so_the_table_wide_delete_grant_is_held_by_the_code_and_not_only_by_the_use_case(DeletableIssue kind, string otherType)
+    {
+        // The HTTP route reads the issue by type first and answers 404, so it never reaches the adapter with a foreign row. The adapter is the last line of defence behind a grant that covers the whole table
+        // (ADR 0080), so it is asked directly here, with a uuid that exists in `lists` under a different type.
+        var uuid = Guid.NewGuid();
+        await fixture.RootExecuteAsync(
+            $"INSERT INTO lists (uuid, `date`, type, title, pid, activity) VALUES (UNHEX('{uuid:N}'), NOW(), '{otherType}', 'Not ours', {EncounterTestData.PatientPid}, 1)");
+        var stamp = await fixture.RootScalarAsync<DateTime>($"SELECT modifydate FROM lists WHERE uuid = UNHEX('{uuid:N}')");
+        var offered = OpenEmrNext.ClinicalCare.Domain.ValueObjects.ConcurrencyToken.From(stamp).ToETag();   // even the right version must not matter
+        await using var db = fixture.CreateDbContext();
+
+        var outcome = await new OpenEmrNext.ClinicalCare.Infrastructure.EfIssueDeleter(db, new OpenEmrNext.ClinicalCare.Infrastructure.EfAuditLog(db)).DeleteAsync(
+            new OpenEmrNext.ClinicalCare.Application.Ports.IssueDeletionRequest(
+                kind, uuid, [offered],
+                new OpenEmrNext.ClinicalCare.Application.Ports.IssueDeletedEvent(kind, uuid, EncounterTestData.PatientUuid, EncounterTestData.PatientPid, DateTime.UtcNow),
+                new OpenEmrNext.ClinicalCare.Application.Ports.AuditEntry(
+                    DateTime.UtcNow, new OpenEmrNext.ClinicalCare.Application.Ports.AuditActor("user:7", 7, true), "problem.delete", uuid, OpenEmrNext.ClinicalCare.Application.Ports.AuditOutcome.Success)),
+            CancellationToken.None);
+
+        Assert.Equal(OpenEmrNext.ClinicalCare.Application.Ports.DeletionStatus.NotFound, outcome.Status);
+        Assert.Equal(1L, await Count("lists", $"type = '{otherType}'"));
+        Assert.Equal(0L, await Count("clinical_care_audit", "action LIKE '%.delete' AND outcome = 'success'"));   // nothing was audited as deleted
     }
 
     [Fact]

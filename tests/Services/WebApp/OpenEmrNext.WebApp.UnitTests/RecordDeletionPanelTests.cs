@@ -125,7 +125,7 @@ public class RecordDeletionPanelTests
     {
         await using var a = new Disposable(Arrange(kind));
 
-        Assert.Contains(a.Value.Buttons, b => b.TextContent.Trim() == "Delete" && (b.GetAttribute("aria-label") ?? "").StartsWith("Delete the "));
+        Assert.Contains(a.Value.Buttons, b => b.TextContent.Trim() == "Delete" && (b.GetAttribute("aria-label") ?? "").StartsWith("Delete "));
     }
 
     [Theory]

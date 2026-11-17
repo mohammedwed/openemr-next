@@ -33,10 +33,11 @@ Decisions are in ADR 0080; this is the working record.
 | L3 | `uuid_registry` and `lists_touch` rows are left behind. | As legacy leaves them; a uuid is never reused. |
 | L4 | The panels' Delete buttons are covered by component tests only; nothing has been seen in a browser. | The browser check is outstanding. |
 
-## 4. Tests (written and built; **not yet run**)
+## 4. Tests (the new ones run and green; the full suites not run on this change)
 
 | Layer | What it pins |
 |---|---|
 | Integration, `IssueDeletionTests` (against the real DDL, as the production principal) | A superuser removes the issue **and its links** and it is gone; one audit row and one event, no clinical text, the patient named; a non-admin is refused (403) and nothing changes; **permission before lookup** (403 for a record that does not exist); no or `*` `If-Match` is 428; a stale version is 412 with the current `ETag`; deleting twice is 404 with one event; **six simultaneous deletes succeed once**; a problem is not reachable through the allergy route and the reverse; **a medication, a surgery and a device are never deleted even with their uuid known**; siblings and their links are untouched; a right removed in legacy stops the next deletion; 401 without secret or user |
+| Integration, `The_adapter_itself_refuses...` (4) | The adapter, called directly with a uuid that exists under another type, returns not-found and deletes nothing, even with the right version. **Needed because the use case's reader already 404s first, so the HTTP tests never reach this filter**; with the filter removed all 4 fail |
 | Integration, grants | `DELETE FROM lists` is now allowed (and `lists_touch` still is not), with the reason written in the test |
 | Component (bUnit) | The two panels run the same six delete scenarios as the form panels, plus a confirmation that says it cannot be restored |
