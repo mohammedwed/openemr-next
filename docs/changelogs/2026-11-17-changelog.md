@@ -82,3 +82,16 @@ Decisions and limits: [ADR 0067](../architecture/0067-webapp-covers-encounters-a
 - **Verification:** `dotnet build` of the WebApp, 0 warnings, 0 errors. **Not yet run in a browser** (needs an OpenEMR login and would write to the
   dev database), and the WebApp still has no automated tests (item 7). Nothing in this change touches the API, the OpenAPI snapshot or the gateway.
 
+## Researched — M5b phase 0: update, delete and audit for Clinical Care
+
+Full record: `docs/clinical-care/05-update-and-audit-research.md`. No code; branch `feat/m5b-update-and-audit`.
+
+- **21 legacy files write `form_encounter`** (encounter form and REST, calendar, HL7, billing, fee sheet, layout forms, merge, delete). "Single
+  writer" is false, so updates are conditional on the row's stamp and name only the columns they own (ADR 0068, Proposed).
+- **The token already exists:** `last_update` and `last_updated` are `ON UPDATE CURRENT_TIMESTAMP`, kept by the database for every writer. Whole-second
+  precision; the one-second residual race is documented.
+- **Legacy delete needs `admin/super`**, and a sensitive encounter needs the `sensitivities` ACL. A verified actor is not enough, so delete now
+  waits for a permission port. Whole-encounter hard delete (`deleter.php`) is excluded for good because it reaches billing.
+- **Legacy vitals edits are in place** with no history and no encounter check; the correction does the same, and the audit row records field names.
+- **Audit (ADR 0069, Proposed):** a dedicated `clinical_care_audit` table, INSERT and SELECT only, written in the business transaction.
+- **ROADMAP:** M5b added; the plan gained a permission port and moved vitals correction ahead of delete.

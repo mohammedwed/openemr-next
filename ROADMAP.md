@@ -45,6 +45,7 @@ a compatibility constraint.
 | M3 | Gateway and token validation | In progress | Nov 13 |
 | M4 | Patient Management service | In progress | Nov 14 (registration, duplicate detection, insurance, advance directives, and the FHIR Patient API all done; the FHIR API now uses the real Firely .NET SDK with US Core validation, ADR 0052; insurance swap is a multi-entity aggregate, ADR 0053; only patient merge remains, deferred to M5+, ADR 0051; WebApp frontend for the patient list, patient view, and registration merged Nov 16, PR #73) |
 | M5 | Clinical Care service | In progress | Nov 16 (slices 1 Create Encounter, 2 Record Vitals and 3 relay + `PatientRegistered` consumption built, tested and verified on the running stack; legacy's own `EncounterService` and `VitalsService` read the rows; the `patient_data` stand-in is removed; shadow comparison against legacy creation done: 142 columns identical, 2 differ by documented rule; layered review done 2026-11-17 (`docs/clinical-care/04-layered-review.md`): 7 defects found and fixed; remaining: browser check of the legacy UI (needs a login); WebApp screens for encounters and vitals built Nov 17, ADR 0067, not yet checked in a browser) |
+| M5b | Clinical Care: update, delete, audit, lookups | In progress | Nov 17 (phase 0 research and ADRs 0068, 0069 written; no code yet) |
 | M6 | Portfolio polish | Not started | — |
 
 **Done beyond the original plan:** a privilege boundary that limits the
@@ -326,7 +327,21 @@ All through the gateway and the generated ClinicalCare client, in the same style
   date-only fields can shift a day when browser and server zones differ (`docs/patient-view-pending-decisions.md`, items 1, 9, 10).
 - **Verification:** builds with no warnings. **Not yet run in a browser**; no automated webapp tests (item 7).
 
-**Exit criteria:** An encounter is created for a registered patient and vitals
+### M5b: Clinical Care update, delete, audit and lookups (in progress, branch `feat/m5b-update-and-audit`)
+
+M5 proved the slice pattern but both aggregates are create-only. M5b closes that. Research: `docs/clinical-care/05-update-and-audit-research.md`.
+
+- **Phase 0 (done Nov 17):** writer inventory from the running 8.0.0 container (21 files write `form_encounter`), the concurrency token
+  (`last_update` / `last_updated`, `ON UPDATE CURRENT_TIMESTAMP`, whole-second), the editable column set, legacy delete behaviour.
+  ADR 0068 (conditional updates on owned columns), ADR 0069 (own append-only audit table), both Proposed.
+- **Phase 1a:** `IAuditLog` port, `clinical_care_audit` table and grants, `ETag` / `If-Match` (412, 428), update and delete events.
+- **Phase 1b:** gateway validates the session and forwards a verified actor; fixes F-CC-1, the placeholder provider and the open patient API.
+- **Phase 2:** update an encounter (`PUT`). **Phase 3a:** correct vitals. **Phase 3b:** permission port, then soft delete.
+- **Phase 4:** lookup endpoints and WebApp edit flows. **Phase 5:** shadow comparison of update, concurrency test, layered review.
+- **Out of scope for good:** whole-encounter hard delete (`deleter.php` reaches billing). **Deferred:** idempotency keys (F-CC-8),
+  sensitive-read audit, amendments with history.
+
+**Exit criteria (M5):** An encounter is created for a registered patient and vitals
 are recorded, end to end. The shadow comparison shows no unexplained
 discrepancies.
 
