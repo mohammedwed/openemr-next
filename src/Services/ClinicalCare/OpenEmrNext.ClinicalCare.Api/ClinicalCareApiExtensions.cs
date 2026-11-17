@@ -61,6 +61,17 @@ public static class ClinicalCareApiExtensions
         builder.Services.AddScoped<IProblemUpdater, EfProblemUpdater>();
         builder.Services.AddScoped<UpdateProblemUseCase>();
 
+        // Immunizations (M5d slice 2, ADR 0072).
+        builder.Services.AddScoped<IImmunizationCodeLists, EfImmunizationCodeLists>();
+        builder.Services.AddSingleton<IImmunizationIdentityAllocator, GuidImmunizationIdentityAllocator>();
+        builder.Services.AddScoped<IImmunizationRegistry, EfImmunizationRegistry>();
+        builder.Services.AddScoped<IImmunizationReader, EfImmunizationReader>();
+        builder.Services.AddScoped<IImmunizationUpdater, EfImmunizationUpdater>();
+        builder.Services.AddScoped<RecordImmunizationUseCase>();
+        builder.Services.AddScoped<CorrectImmunizationUseCase>();
+        builder.Services.AddScoped<GetImmunizationUseCase>();
+        builder.Services.AddScoped<ListPatientImmunizationsUseCase>();
+
         // Allergies (M5c slice 2, ADR 0070).
         builder.Services.AddScoped<IAllergyCodeLists, EfAllergyCodeLists>();
         builder.Services.AddSingleton<IAllergyIdentityAllocator, GuidAllergyIdentityAllocator>();

@@ -58,7 +58,7 @@ with the one the caller read, so a legacy edit landing between the read and the 
 | IM-3 | Each coded field, if given, is a configured code, compared exactly, and fits its column. |
 | IM-4 | Text fields fit their columns; the two `text` fields are limited in **bytes**. |
 | IM-5 | An amount, if given, is greater than 0 and at most 100,000, rounded to four places, with a unit when an amount is given. |
-| IM-6 | The expiration, education and VIS dates, if given, are real dates in the 1900 to 100 years range; the expiration is not before the administered date. |
+| IM-6 | The expiration, education and VIS dates, if given, are real dates in a plausible range (education and VIS: 1900 up to a day from now; expiration: 1900 up to fifty years ahead). **An expiration date before the administered date is deliberately NOT refused:** administering an expired vaccine is a real and reportable event, and rejecting the record would hide it. |
 | IM-7 | An encounter, if given, must exist and be the same patient's; its number is what is stored. |
 | IM-8 | `enteredInError` is part of the set and can be set and cleared. |
 

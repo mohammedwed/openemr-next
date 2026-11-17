@@ -42,6 +42,8 @@ public static class AuditActions
     public const string AllergyRecord = "allergy.record";
     public const string ProblemUpdate = "problem.update";
     public const string AllergyUpdate = "allergy.update";
+    public const string ImmunizationRecord = "immunization.record";
+    public const string ImmunizationCorrect = "immunization.correct";
     public const string EncounterIssueLink = "encounter.issue.link";
     public const string EncounterIssueUnlink = "encounter.issue.unlink";
 }

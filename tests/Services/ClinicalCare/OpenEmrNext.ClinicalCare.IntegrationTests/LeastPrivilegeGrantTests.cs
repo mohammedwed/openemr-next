@@ -36,6 +36,14 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("DELETE FROM forms")]
     [InlineData("DELETE FROM uuid_registry")]
     [InlineData("DELETE FROM sequences")]
+    [InlineData("DELETE FROM immunizations")]
+    [InlineData("UPDATE immunizations SET patient_id = 1")]
+    [InlineData("UPDATE immunizations SET uuid = NULL")]
+    [InlineData("UPDATE immunizations SET create_date = NOW()")]
+    [InlineData("UPDATE immunizations SET created_by = 1")]
+    [InlineData("UPDATE immunizations SET updated_by = 1")]
+    [InlineData("UPDATE immunizations SET external_id = 'x'")]
+    [InlineData("UPDATE immunizations SET note = 'x', patient_id = 1")]
     [InlineData("UPDATE form_vitals SET `user` = 'x'")]
     [InlineData("UPDATE form_vitals SET groupname = 'x'")]
     [InlineData("UPDATE form_vitals SET `date` = NOW()")]
@@ -165,6 +173,41 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("TRUNCATE TABLE issue_encounter")]
     public async Task The_production_principal_cannot_change_or_remove_issues_beyond_inserting_a_problems_columns(string sql) =>
         await AssertDeniedAsync(sql);
+
+    [Theory]
+    [InlineData("administered_date")]
+    [InlineData("immunization_id")]
+    [InlineData("cvx_code")]
+    [InlineData("manufacturer")]
+    [InlineData("lot_number")]
+    [InlineData("administered_by_id")]
+    [InlineData("administered_by")]
+    [InlineData("education_date")]
+    [InlineData("vis_date")]
+    [InlineData("note")]
+    [InlineData("amount_administered")]
+    [InlineData("amount_administered_unit")]
+    [InlineData("expiration_date")]
+    [InlineData("route")]
+    [InlineData("administration_site")]
+    [InlineData("added_erroneously")]
+    [InlineData("completion_status")]
+    [InlineData("information_source")]
+    [InlineData("refusal_reason")]
+    [InlineData("ordering_provider")]
+    [InlineData("reason_code")]
+    [InlineData("reason_description")]
+    [InlineData("encounter_id")]
+    [InlineData("update_date")]
+    public async Task The_production_principal_may_update_exactly_the_immunization_columns_it_owns(string column)
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // Setting a column to itself is enough to exercise the privilege check; no row is needed. The column name is one of this theory's own constants.
+#pragma warning disable EF1002
+        await db.Database.ExecuteSqlRawAsync($"UPDATE immunizations SET `{column}` = `{column}`");
+#pragma warning restore EF1002
+    }
 
     [Theory]
     [InlineData("weight")]

@@ -137,6 +137,15 @@ GRANT SELECT, INSERT ON \`${DB_NAME}\`.form_vitals TO '${CLINICAL_CARE_DB_USER}'
 GRANT UPDATE (weight, height, temperature, temp_method, bps, bpd, pulse, respiration, oxygen_saturation, waist_circ, head_circ, BMI, BMI_status, note)
   ON \`${DB_NAME}\`.form_vitals TO '${CLINICAL_CARE_DB_USER}'@'%';
 
+-- Immunizations (M5d slice 2, ADR 0072): recorded and read back, and corrected on exactly the columns the service owns plus update_date, which has no default and
+-- no ON UPDATE so this service sets it. Not who recorded it or when (create_date, created_by, updated_by), not the patient, not the uuid, not external_id. No DELETE:
+-- an entry made in error is marked, not removed (the permission port gates real deletes).
+GRANT SELECT, INSERT ON \`${DB_NAME}\`.immunizations TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT UPDATE (administered_date, immunization_id, cvx_code, manufacturer, lot_number, administered_by_id, administered_by, education_date, vis_date, note,
+              amount_administered, amount_administered_unit, expiration_date, route, administration_site, added_erroneously, completion_status,
+              information_source, refusal_reason, ordering_provider, reason_code, reason_description, encounter_id, update_date)
+  ON \`${DB_NAME}\`.immunizations TO '${CLINICAL_CARE_DB_USER}'@'%';
+
 -- Legacy records every uuid it hands out here (CC-6). This service only ever adds its own; never reads or edits.
 GRANT INSERT ON \`${DB_NAME}\`.uuid_registry TO '${CLINICAL_CARE_DB_USER}'@'%';
 

@@ -15,6 +15,7 @@ public static class ClinicalCareEndpoints
         v1.MapEncounterEndpoints();
         v1.MapVitalsEndpoints();
         v1.MapProblemEndpoints();
+        v1.MapImmunizationEndpoints();
         v1.MapAllergyEndpoints();
         v1.MapEncounterIssueEndpoints();
 

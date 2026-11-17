@@ -1,6 +1,7 @@
 using System.Reflection;
 using OpenEmrNext.ClinicalCare.Domain;
 using OpenEmrNext.ClinicalCare.Domain.Allergies;
+using OpenEmrNext.ClinicalCare.Domain.Immunizations;
 using OpenEmrNext.ClinicalCare.Domain.IssueLinks;
 using OpenEmrNext.ClinicalCare.Domain.Problems;
 using OpenEmrNext.ClinicalCare.Domain.ReadModels;
@@ -37,6 +38,9 @@ public class InvariantEnforcementTests
         [typeof(VitalsIdentity)],
         [typeof(EncounterReference)],
         [typeof(Problem)],
+        [typeof(Immunization)],
+        [typeof(ImmunizationFacts)],
+        [typeof(ImmunizationIdentity)],
         [typeof(ProblemRecording)],
         [typeof(ProblemIdentity)],
         [typeof(Allergy)],

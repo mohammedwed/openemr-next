@@ -18,8 +18,8 @@ stubs, so the screen is the writer that matters, and it overwrites whatever is t
 2. **The write verifies the version under a row lock.** In one transaction: `SELECT ... FOR UPDATE` the row, rebuild its view with the same mapping the reader uses, hash it, and compare with the version the caller read. Equal: write, with the
    event and the audit row. Different: roll back and report a conflict carrying the current version. The use case also checks the version on a plain read first, for a clean 412 without taking a lock.
    There is no per-column `WHERE` comparison: it would have to compare a 4-byte `float` and several nullable columns exactly, and one lock-and-verify is simpler and checkable.
-3. **The hash covers a canonical text of the view,** with invariant formats and unit-separator framing, and rounded values (an amount to four places, dates as ticks), so the same row always gives the same version, and
-   two different rows never share a canonical text by accident of concatenation.
+3. **The hash covers a canonical text of the view,** with invariant formats, **length-prefixed parts** and a distinct marker for an absent part, and rounded values (an amount to four places, dates as ticks), so the same row always gives
+   the same version, and two different rows never share a canonical text by accident of concatenation (`"ab","c"` versus `"a","bc"`, or a missing value versus an empty string).
 4. **We maintain `update_date` ourselves** (set to now on a correction, and on a record) so legacy's FHIR reader, which exposes it as the resource's last-updated time, sees a real value. It is **not** the token.
 5. **`added_erroneously` ("entered in error") is an editable field,** the non-destructive way to void a mistaken entry. There is no delete here: legacy's delete is a hard delete needing `admin/super`, and waits for the permission port.
 6. **Everything else follows the established pattern:** one transaction for the row, its `uuid_registry` row, the outbox row and the audit row (a failing audit rolls it back); refusals audited; an unknown actor on corrections; the order of checks is
@@ -28,6 +28,6 @@ stubs, so the screen is the writer that matters, and it overwrites whatever is t
 ## Consequences
 
 - **This is a different mechanism from every other update in the service,** and it is documented as such. The cost is a lock per correction; the table is small per patient and corrections are rare.
-- **The version is only as complete as the owned set:** if a later slice adds an owned column, the canonical text must include it (an architecture-level test pins that every owned field is in the hash, so it cannot be forgotten).
+- **The version is only as complete as the owned set:** if a later slice adds an owned column, the canonical text must include it (a unit test lists every property of the view and fails if one is neither in the hash nor deliberately outside it, so it cannot be forgotten).
 - **Legacy's `REPLACE` still wins silently** if it runs after us, and it also resets columns we do not own. That asymmetry is inherent to coexistence and is stated, not hidden.
 - If legacy ever adds a maintained stamp to this table, this ADR can be superseded and the token swapped without changing the API: the `ETag` is opaque.

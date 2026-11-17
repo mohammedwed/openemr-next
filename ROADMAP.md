@@ -332,7 +332,7 @@ Research: `docs/clinical-care/07-problems-and-allergies-research.md`; ADR 0070 (
 Fills the remaining Clinical Care functionality that needs no new service and no verified identity. Slices, each researched, built and tested in turn:
 
 1. **Correct vitals** (**done Nov 17**; suites green: unit 533, architecture 53, integration 545; `13-correct-vitals-slice.md`).
-2. Immunizations (their own legacy table). 3. Clinical notes and SOAP forms (the `forms` registry pattern vitals use). 4. Lookup endpoints (facilities, classes, categories, providers) and the WebApp fields they replace.
+2. **Immunizations** (**done Nov 17**; suites green: unit 616, architecture 59, integration 623; `15-record-immunization-slice.md`, ADR 0072). 3. Clinical notes and SOAP forms (the `forms` registry pattern vitals use). 4. Lookup endpoints (facilities, classes, categories, providers) and the WebApp fields they replace.
 - **Out of scope until identity and the permission port exist:** delete and editing `sensitivity`.
 
 ### M5 frontend: WebApp encounter pages (built Nov 17, ADR 0067)

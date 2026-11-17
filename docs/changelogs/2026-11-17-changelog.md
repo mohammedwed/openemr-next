@@ -307,3 +307,17 @@ Full record: `docs/clinical-care/13-correct-vitals-slice.md` (rules CV-15 to CV-
 - **No history, and the editor is unknown,** as for the other updates: the audit row names the measurements that changed, never values.
 - **Contract:** `VitalsResponse` gains an `eTag` (also on every list item) and the operation declares `If-Match`, 412 and 428; OpenAPI snapshot regenerated.
 - **Tests, all green (unit 533, architecture 53, integration 545).** The solution builds with no new warnings.
+
+## Added — M5d slice 2: immunizations (`/api/v1/immunizations`)
+
+Full record: `docs/clinical-care/15-record-immunization-slice.md` (rules IM-1 to IM-16, limitations L1 to L7), research `14-immunizations-research.md`, decision `docs/architecture/0072-...`.
+
+- **Record, read, list and correct,** the first API that can write legacy's `immunizations` table (legacy's REST and FHIR surface is read-only and its service's write methods are stubs, so the rules are all new). Entered-in-error is a field of the
+  correction, legacy's non-destructive void; there is no delete.
+- **Versioned by content, not by a stamp** (ADR 0072): the table's `update_date` has no default and no `ON UPDATE`, and the issue screen saves with `REPLACE INTO`, which moves nothing. The `ETag` is a hash of the owned columns (`"c-..."`, a different shape from a
+  stamp's), verified under a row lock inside the write transaction, so even a legacy edit landing between the read and the write is a 412. A test fires six concurrent corrections on one version and demands exactly one winner.
+- **An expired vaccine is accepted:** giving one is a reportable event, and refusing the record would hide it.
+- **Bytes, not characters,** for the two `text` columns; the float `amount_administered` is read and written at four places; a linked encounter must be the same patient's.
+- **Grants:** `SELECT, INSERT` plus `UPDATE` on exactly the 24 owned columns (including `update_date`, which this service now sets); no `DELETE`; the patient, uuid, creation and creator columns and `external_id` cannot be written.
+- **Contract:** new routes, `ImmunizationResponse.eTag`, `If-Match`/412/428 on the PUT; OpenAPI snapshot regenerated.
+- **Tests, all green (unit 616, architecture 59, integration 623).** The solution builds with only the 7 pre-existing warnings.

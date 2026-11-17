@@ -15,3 +15,17 @@ public sealed class VitalsNotFoundException(Guid vitalsUuid) : Exception($"No vi
 {
     public Guid VitalsUuid { get; } = vitalsUuid;
 }
+
+public sealed class ImmunizationNotFoundException(Guid immunizationUuid) : Exception($"No immunization with uuid {immunizationUuid} exists.")
+{
+    public Guid ImmunizationUuid { get; } = immunizationUuid;
+}
+
+/// <summary>The immunization changed after the caller read it (ADR 0072): maps to 412, carrying the current content version so the caller can reload.</summary>
+public sealed class ImmunizationConflictException(Guid immunizationUuid, OpenEmrNext.ClinicalCare.Domain.ValueObjects.ContentVersion? currentVersion)
+    : Exception($"{immunizationUuid} changed after it was read.")
+{
+    public Guid ImmunizationUuid { get; } = immunizationUuid;
+
+    public OpenEmrNext.ClinicalCare.Domain.ValueObjects.ContentVersion? CurrentVersion { get; } = currentVersion;
+}
