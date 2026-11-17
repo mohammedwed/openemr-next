@@ -95,3 +95,14 @@ Full record: `docs/clinical-care/05-update-and-audit-research.md`. No code; bran
 - **Legacy vitals edits are in place** with no history and no encounter check; the correction does the same, and the audit row records field names.
 - **Audit (ADR 0069, Proposed):** a dedicated `clinical_care_audit` table, INSERT and SELECT only, written in the business transaction.
 - **ROADMAP:** M5b added; the plan gained a permission port and moved vitals correction ahead of delete.
+
+## Added — M5b phase 1a, increment 1: the audit port, table and adapter
+
+- **`IAuditLog` and `AuditEntry`** (Application.Ports): an append-only port with no read, update or delete. An entry holds identifiers and
+  changed-field *names*; header-sourced text is cut to its column rather than failing a write.
+- **`clinical_care_audit`** table and an **`INSERT, SELECT`-only grant** in `scripts/seeds/clinical-care-db.sh` (ADR 0069). The service user cannot
+  edit, delete, truncate or drop an audit row.
+- **`EfAuditLog`** inserts on the registry's own `DbContext`, so inside a registry transaction the row commits or rolls back with the change.
+  Registered in DI; **not yet called** by any use case (next increments: creates, then update).
+- **Tests:** `AuditEntryTests` (unit) and `AuditLogTests` (integration: round trip, rollback and commit, no edit or delete, column widths pinned
+  against the seed script). Both green.

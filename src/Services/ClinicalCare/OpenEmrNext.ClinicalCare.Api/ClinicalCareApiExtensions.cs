@@ -44,6 +44,7 @@ public static class ClinicalCareApiExtensions
         builder.Services.AddScoped<IEncounterCodeLists, EfEncounterCodeLists>();
         builder.Services.AddScoped<IFacilityDirectory, EfFacilityDirectory>();
         builder.Services.AddScoped<IEncounterIdentityAllocator, EfEncounterIdentityAllocator>();
+        builder.Services.AddScoped<IAuditLog, EfAuditLog>();
         builder.Services.AddScoped<IEncounterRegistry, EfEncounterRegistry>();
         builder.Services.AddScoped<CreateEncounterUseCase>();
         builder.Services.AddScoped<IEncounterReader, EfEncounterReader>();

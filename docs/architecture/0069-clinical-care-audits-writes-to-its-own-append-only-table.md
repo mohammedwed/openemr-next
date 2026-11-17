@@ -14,10 +14,12 @@ grant on a table with other writers.
 
 ## Decision
 
-1. **A dedicated table, `clinical_care_audit`,** in the shared database, created by the seed script. Columns: `id`, `at` (UTC), `actor`
-   (verified subject), `actor_id` (users.id), `action` (`encounter.create`, `encounter.update`, `vitals.record`, `vitals.correct`,
-   `encounter.delete`, `vitals.delete`), `subject` (the record's uuid), `outcome` (success, denied, failed), `correlation_id`,
-   `source_address`, `details` (changed field **names**, never values).
+1. **A dedicated table, `clinical_care_audit`,** in the shared database, created by the seed script. Columns: `id`, `at` (UTC,
+   `DATETIME(6)`), `actor` (the caller's subject, 100), `actor_id` (users.id, nullable), `actor_verified` (0 or 1), `action` (a business
+   verb, 50: `encounter.create`, `encounter.update`, `vitals.record`, `vitals.correct`, `encounter.delete`, `vitals.delete`), `subject`
+   (the record's uuid as `CHAR(36)`), `outcome` (`success`, `denied` or `failed`), `correlation_id` (100), `source_address` (45),
+   `details` (a JSON array of changed field **names**, never values, 1000). Text that comes from request headers is cut to its column,
+   not rejected: a long header must not fail a clinical write.
 2. **Append-only by grant:** the service user gets `INSERT` and `SELECT` on it, never `UPDATE` or `DELETE`.
 3. **Same transaction.** The audit insert is part of the registry's unit of work; a change cannot commit without its row. It sits behind an
    `IAuditLog` port (DOM-7) so a different store can replace it.

@@ -49,6 +49,25 @@ CREATE TABLE IF NOT EXISTS \`${DB_NAME}\`.\`clinical_care_outbox\` (
   published_at DATETIME DEFAULT NULL
 );
 
+-- The audit trail (SEC-9, ADR 0069): who did what to which record, field names only, never values. Append-only: the service
+-- user is granted INSERT and SELECT below and nothing else. Subject is the record's uuid as text so the table reads without a
+-- converter. Widths here must match AuditEntry's limits (the unit test pins them).
+CREATE TABLE IF NOT EXISTS \`${DB_NAME}\`.\`clinical_care_audit\` (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  at DATETIME(6) NOT NULL,
+  actor VARCHAR(100) NOT NULL,
+  actor_id BIGINT DEFAULT NULL,
+  actor_verified TINYINT(1) NOT NULL DEFAULT 0,
+  action VARCHAR(50) NOT NULL,
+  subject CHAR(36) NOT NULL,
+  outcome VARCHAR(10) NOT NULL,
+  correlation_id VARCHAR(100) DEFAULT NULL,
+  source_address VARCHAR(45) DEFAULT NULL,
+  details VARCHAR(1000) DEFAULT NULL,
+  KEY ix_clinical_care_audit_subject (subject, at),
+  KEY ix_clinical_care_audit_at (at)
+);
+
 -- The patients Clinical Care has been told about: a reference (uuid, pid) and nothing else, never demographics (design set
 -- R7, decision D4). Filled by PatientRegistered events (ADR 0066) and by the one-time backfill below. pid is unique because
 -- legacy tables still join on it; a different uuid claiming a held pid is a real conflict and must fail loudly.
@@ -111,6 +130,9 @@ GRANT SELECT (name, \`user\`) ON \`${DB_NAME}\`.\`groups\` TO '${CLINICAL_CARE_D
 -- This service's own outbox: fully owned, so the relay can mark rows published and purge them (EVT-7).
 GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.clinical_care_outbox TO '${CLINICAL_CARE_DB_USER}'@'%';
 
+-- The audit trail is append-only by privilege: no UPDATE, no DELETE, and the retention job never touches it (ADR 0069 #2, #7).
+GRANT INSERT, SELECT ON \`${DB_NAME}\`.clinical_care_audit TO '${CLINICAL_CARE_DB_USER}'@'%';
+
 -- Its own patient reference and its own record of processed events: fully owned.
 GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.clinical_care_patient_ref TO '${CLINICAL_CARE_DB_USER}'@'%';
 GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.clinical_care_processed_events TO '${CLINICAL_CARE_DB_USER}'@'%';
@@ -124,4 +146,4 @@ INSERT IGNORE INTO \`${DB_NAME}\`.clinical_care_patient_ref (patient_uuid, pid, 
 FLUSH PRIVILEGES;
 SQL
 
-echo "clinical_care_outbox table and user '${CLINICAL_CARE_DB_USER}' ready."
+echo "clinical_care_outbox and clinical_care_audit tables and user '${CLINICAL_CARE_DB_USER}' ready."

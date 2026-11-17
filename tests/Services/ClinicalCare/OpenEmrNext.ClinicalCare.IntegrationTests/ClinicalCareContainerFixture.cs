@@ -101,7 +101,7 @@ public sealed class ClinicalCareContainerFixture : IAsyncLifetime
         await using var root = new MySqlConnection(RootConnectionString);
         await root.OpenAsync();
         foreach (var table in new[]
-                 { "form_encounter", "form_vitals", "forms", "uuid_registry", "clinical_care_outbox", "clinical_care_patient_ref", "clinical_care_processed_events", "patient_data", "users", "groups", "facility", "list_options", "sequences" })
+                 { "form_encounter", "form_vitals", "forms", "uuid_registry", "clinical_care_outbox", "clinical_care_audit", "clinical_care_patient_ref", "clinical_care_processed_events", "patient_data", "users", "groups", "facility", "list_options", "sequences" })
             await ExecuteAsync(root, $"DELETE FROM `{table}`");
 
         // Reference rows: ids and values chosen to match the real snapshot (AMB is the default class; list order is `seq`).
