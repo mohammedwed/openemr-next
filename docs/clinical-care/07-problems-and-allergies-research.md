@@ -57,7 +57,7 @@ The UI list marks a problem **resolved** by `enddate` (a muted row), not by `act
 | Type | Owned (editable) | Notes |
 |---|---|---|
 | **Problem** (`medical_problem`) | `title`, `begdate`, `enddate`, `diagnosis`, `outcome`, `occurrence`, `referredby`, `comments` | `occurrence` and `outcome` take the list codes; `diagnosis` is `SYSTEM:code;SYSTEM:code` text. `classification` is **not owned**: it is an injury classification for other issue types and has no code list in `list_options` |
-| **Allergy** (`allergy`) | `title`, `begdate`, `enddate`, `diagnosis`, `reaction`, `severity_al`, `verification`, `outcome`, `comments` | `reaction`, `severity_al`, `verification` take the list codes |
+| **Allergy** (`allergy`) | `title`, `begdate`, `enddate`, `diagnosis`, `reaction`, `severity_al`, `verification`, `comments` | `reaction`, `severity_al`, `verification` take string codes from `reaction`, `severity_ccda`, `allergyintolerance-verification`. `outcome` was listed here and is **not** carried (slice 2 doc, L4). A **problem** also has a `verification` (list `condition-verification`) that slice 1 did not carry |
 
 **Never written by this service:** `id`, `uuid` (set once, at insert), `pid`, `type` (fixed per aggregate), `user`/`groupname` after insert, `modifydate`
 (the database sets it), and every column a different type owns (`erx_*`, `external_*`, `udi*`, `injury_*`, `reinjury_id`, `destination`, `returndate`,

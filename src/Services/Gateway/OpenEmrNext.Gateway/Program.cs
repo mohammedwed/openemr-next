@@ -56,7 +56,7 @@ string[] patientManagementRoutePatterns = ["/api/v1/patients/{**catch-all}", "/f
 // /api/v1/patients/{uuid}/encounters, because everything under /api/v1/patients/ already belongs to
 // PatientManagement and one prefix must belong to one service (ADR 0064). More specific than AuthFacade's
 // bare /api/{**catch-all}, so the same route-precedence reasoning applies.
-string[] clinicalCareRoutePatterns = ["/api/v1/encounters/{**catch-all}", "/api/v1/problems/{**catch-all}"];
+string[] clinicalCareRoutePatterns = ["/api/v1/encounters/{**catch-all}", "/api/v1/problems/{**catch-all}", "/api/v1/allergies/{**catch-all}"];
 
 var routes = authFacadeRoutePatterns
     .Select((pattern, index) => new RouteConfig

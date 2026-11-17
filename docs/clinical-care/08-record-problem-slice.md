@@ -55,7 +55,8 @@ are touched is PB-16, a rule in the code that the tests attack from several side
 | L3 | **The actor is the provider the caller named,** flagged unverified. | No verified identity until Phase 1b |
 | L4 | **No update, no resolve, no delete yet.** | Slice 3 (resolving is an update) and the permission port |
 | L5 | **`diagnosis` codes are shape-checked only,** not looked up in a code system. | Q7: a terminology service is a later decision |
-| L6 | **Allergies, medications, surgeries, dental issues and health concerns are not offered.** | Allergies are slice 2; the rest have no owner yet |
+| L6 | **Allergies, medications, surgeries, dental issues and health concerns are not offered.** | Allergies are slice 2 (`09-record-allergy-slice.md`); the rest have no owner yet |
+| L7 | **A problem's `verification` (list `condition-verification`) is not carried.** | Found while building slice 2; it comes with problem update (slice 3) |
 
 ## 5. Not built here, with the precondition (KD-8)
 

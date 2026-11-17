@@ -199,3 +199,20 @@ Full record: `docs/clinical-care/08-record-problem-slice.md` (rules PB-1 to PB-2
   run `lists` and `modifydate` as commands. The comments no longer contain any, and the script says why. (The grants themselves were escaped correctly.)
 - **Tests, all green (unit 362, architecture 39, integration 330):** domain and use-case unit tests, adapter and grant integration tests, and
   `ProblemEndpointTests` through HTTP. The test fixture now creates `lists`, `lists_touch`, `lists_medication` and `issue_encounter` from the snapshot's own DDL.
+
+## Added — M5c slice 2: record, get and list allergies
+
+Full record: `docs/clinical-care/09-record-allergy-slice.md` (rules AL-1 to AL-14, limitations L1 to L6).
+
+- **Three endpoints:** `POST /api/v1/allergies`, `GET /api/v1/allergies/{uuid}` (with an `ETag` from `lists.modifydate`) and `GET /api/v1/allergies?patientUuid=`
+  (bounded and paged). The gateway routes `/api/v1/allergies` to Clinical Care.
+- **What differs from a problem:** the begin date is optional; the coded fields are strings (`reaction`, `severity_al`, `verification`) checked exactly against
+  three configured lists, with a clean 400 for a configured code longer than its column; `reaction` and `verification` are NOT NULL columns, so an absent one is
+  stored as legacy's `''` and reads back as none. A problem's verification list is not the allergy one, and a test proves it.
+- **The shared-table rule runs both ways:** a problem's uuid is a 404 as an allergy and an allergy's is a 404 as a problem; lists exclude the other type.
+- **Shared code, not copied code:** title, date, diagnosis, comment and provider rules moved into `IssueFieldRules`, and the `uuid_registry` and `lists_touch`
+  writes into `IssueRows`, so problems and allergies cannot drift apart. The refactor changed no problem behaviour (362 existing unit tests unchanged).
+- **Grants:** `SELECT` and `INSERT` gain `reaction`, `severity_al` and `verification`; still no `UPDATE` or `DELETE`.
+- **Found while building it:** a problem also carries a `verification` (list `condition-verification`) that slice 1 did not; recorded as limitation L7 and
+  scheduled with problem update. The research doc's allergy `outcome` is dropped (L4).
+- **Tests, all green (unit 407, architecture 45, integration 374).** OpenAPI snapshot regenerated; the whole solution builds with no new warnings.

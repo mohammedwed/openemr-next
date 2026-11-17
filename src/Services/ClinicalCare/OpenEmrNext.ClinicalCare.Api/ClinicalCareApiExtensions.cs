@@ -58,6 +58,15 @@ public static class ClinicalCareApiExtensions
         builder.Services.AddScoped<RecordProblemUseCase>();
         builder.Services.AddScoped<GetProblemUseCase>();
         builder.Services.AddScoped<ListPatientProblemsUseCase>();
+
+        // Allergies (M5c slice 2, ADR 0070).
+        builder.Services.AddScoped<IAllergyCodeLists, EfAllergyCodeLists>();
+        builder.Services.AddSingleton<IAllergyIdentityAllocator, GuidAllergyIdentityAllocator>();
+        builder.Services.AddScoped<IAllergyRegistry, EfAllergyRegistry>();
+        builder.Services.AddScoped<IAllergyReader, EfAllergyReader>();
+        builder.Services.AddScoped<RecordAllergyUseCase>();
+        builder.Services.AddScoped<GetAllergyUseCase>();
+        builder.Services.AddScoped<ListPatientAllergiesUseCase>();
         builder.Services.AddScoped<IEncounterReader, EfEncounterReader>();
         builder.Services.AddScoped<GetEncounterUseCase>();
         builder.Services.AddScoped<ListPatientEncountersUseCase>();
