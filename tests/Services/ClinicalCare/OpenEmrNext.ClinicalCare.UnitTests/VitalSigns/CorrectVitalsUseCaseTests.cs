@@ -42,6 +42,11 @@ public class CorrectVitalsUseCaseTests
         }
 
         public Task<VitalsPage> ListForEncounterAsync(EncounterReference encounter, PageRequest page, CancellationToken ct) => throw new NotSupportedException();
+
+        // The patient-level reads (the FHIR Observation, ADR 0079) are not what this test is about.
+        public Task<PatientVitals?> FindAnywhereAsync(Guid vitalsUuid, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<PatientVitals>> ListForPatientAsync(PatientReference patient, int max, CancellationToken ct) => throw new NotSupportedException();
     }
 
     private sealed class FakeUpdater(FakeVitals reader) : IVitalsUpdater

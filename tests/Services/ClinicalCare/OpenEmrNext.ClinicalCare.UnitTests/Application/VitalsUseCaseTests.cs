@@ -76,6 +76,11 @@ public class VitalsUseCaseTests
             Calls++;
             return Task.FromResult(new VitalsPage([], 0));
         }
+
+        // The patient-level reads (the FHIR Observation, ADR 0079) are not what this test is about.
+        public Task<PatientVitals?> FindAnywhereAsync(Guid vitalsUuid, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<PatientVitals>> ListForPatientAsync(PatientReference patient, int max, CancellationToken ct) => throw new NotSupportedException();
     }
 
     private static EncounterView Encounter(long? number = 1001, Guid? patientUuid = null, long? pid = 42) =>
