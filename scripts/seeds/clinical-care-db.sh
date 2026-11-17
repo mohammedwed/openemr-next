@@ -176,8 +176,9 @@ GRANT SELECT (id, name, pos_code, inactive, service_location) ON \`${DB_NAME}\`.
 GRANT SELECT (pc_catid, pc_catname, pc_cattype, pc_active, pc_seq, pc_constant_id) ON \`${DB_NAME}\`.openemr_postcalendar_categories TO '${CLINICAL_CARE_DB_USER}'@'%';
 
 -- The acting user (ADR 0075): the gateway forwards the OpenEMR user uuid it verified, and this resolves it to the id and username legacy's columns record, and refuses an inactive account.
--- The username and group also go on the legacy forms row (CC-7). users also holds credential and contact columns this service must never see, so the grant is on id, username, uuid and active only.
-GRANT SELECT (id, username, uuid, active) ON \`${DB_NAME}\`.users TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- The username and group also go on the legacy forms row (CC-7). The providers lookup (M5f) adds the first and last name and legacy's authorized flag, which is what legacy itself uses to decide who can be a
+-- provider. users also holds credential and contact columns this service must never see (password, email, npi, federaldrugid and the rest), so the grant is on these seven columns only.
+GRANT SELECT (id, username, uuid, active, fname, lname, authorized) ON \`${DB_NAME}\`.users TO '${CLINICAL_CARE_DB_USER}'@'%';
 GRANT SELECT (name, \`user\`) ON \`${DB_NAME}\`.\`groups\` TO '${CLINICAL_CARE_DB_USER}'@'%';
 
 -- No grant on patient_data. The interim stand-in that read it was removed when events arrived (ADR 0064 #5, ADR 0066):

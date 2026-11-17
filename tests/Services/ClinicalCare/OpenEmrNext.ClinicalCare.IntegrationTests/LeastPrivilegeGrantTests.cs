@@ -85,15 +85,20 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("UPDATE users SET active = 0")]
     [InlineData("UPDATE users SET uuid = NULL")]
     [InlineData("UPDATE users SET username = 'x'")]
+    [InlineData("UPDATE users SET fname = 'x'")]
+    [InlineData("UPDATE users SET authorized = 0")]
     [InlineData("DROP TABLE form_encounter")]
     public async Task The_production_principal_cannot_change_what_it_does_not_own(string sql) =>
         await AssertDeniedAsync(sql);
 
     [Theory]
     [InlineData("SELECT password FROM users")]
-    [InlineData("SELECT fname FROM users")]
     [InlineData("SELECT email FROM users")]
-    [InlineData("SELECT authorized FROM users")]
+    [InlineData("SELECT mname FROM users")]
+    [InlineData("SELECT phone FROM users")]
+    [InlineData("SELECT title FROM users")]
+    [InlineData("SELECT specialty FROM users")]
+    [InlineData("SELECT fname, password FROM users")]
     [InlineData("SELECT npi FROM users")]
     [InlineData("SELECT federaldrugid FROM users")]
     [InlineData("SELECT * FROM users")]
@@ -216,12 +221,13 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
         await AssertDeniedAsync(sql);
 
     [Fact]
-    public async Task The_production_principal_can_read_exactly_the_user_columns_that_identify_and_name_the_acting_user()
+    public async Task The_production_principal_can_read_exactly_the_user_columns_that_identify_the_acting_user_and_name_a_provider()
     {
         await using var db = fixture.CreateDbContext();
 
-        // The forwarded uuid resolves to an id and username, and an inactive account is refused (ADR 0075): four columns, none of the credential or contact ones.
-        await db.Database.ExecuteSqlRawAsync("SELECT id, username, uuid, active FROM users LIMIT 1");
+        // The forwarded uuid resolves to an id and username, and an inactive account is refused (ADR 0075); the providers lookup (M5f) adds the name and legacy's authorized flag.
+        // Seven columns, none of the credential or contact ones.
+        await db.Database.ExecuteSqlRawAsync("SELECT id, username, uuid, active, fname, lname, authorized FROM users LIMIT 1");
     }
 
     [Fact]

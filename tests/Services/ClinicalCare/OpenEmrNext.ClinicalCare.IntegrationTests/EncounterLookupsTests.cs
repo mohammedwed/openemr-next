@@ -33,6 +33,18 @@ public class EncounterLookupsTests(ClinicalCareContainerFixture fixture) : IAsyn
                 (14, NULL, 'No Constant', 0, 1, 30)
             """);
         await fixture.RootExecuteAsync("INSERT INTO facility (id, name, pos_code, inactive, service_location) VALUES (5, 'Closed Annex', 21, 1, 1), (6, 'Alpha Lab', 81, 0, 0)");
+        await fixture.RootExecuteAsync(
+            """
+            INSERT INTO users (id, username, fname, lname, authorized, active) VALUES
+                (20, 'zed', 'Zed', 'Zimmer', 1, 1),
+                (21, 'ann', 'Ann', 'Adams', 1, 1),
+                (22, 'abe', 'Abe', 'Adams', 1, 1),
+                (23, 'left', 'Lee', 'Left', 1, 0),
+                (24, 'clerk', 'Cora', 'Clerk', 0, 1),
+                (25, 'noname', NULL, NULL, 1, 1),
+                (26, '', 'Blank', 'Login', 1, 1),
+                (27, 'solo', 'Solo', NULL, 1, 1)
+            """);
         await fixture.SeedPatientAsync(EncounterTestData.PatientUuid, EncounterTestData.PatientPid);
         _factory = ApiFactory.Create(fixture);
         _client = _factory.ClientWithSecret();
@@ -65,6 +77,33 @@ public class EncounterLookupsTests(ClinicalCareContainerFixture fixture) : IAsyn
         Assert.Equal([81, 11, (int?)null], facilities!.Select(f => f.PosCode));
         // Legacy's schema defaults service_location to 1, so only the facility seeded with 0 is not one.
         Assert.Equal([false, true, true], facilities!.Select(f => f.IsServiceLocation));
+    }
+
+    [Fact]
+    public async Task Providers_are_the_active_authorized_users_by_last_name_then_first_with_a_name_to_show()
+    {
+        var providers = await _client.GetFromJsonAsync<List<ProviderLookupResponse>>("/api/v1/lookups/providers");
+
+        // By last name then first name then id, with a missing name sorting first (as MariaDB orders NULL): the user with no name (shown by username), the one with only a first name, then Adams Abe,
+        // Adams Ann and Zimmer Zed. Left out: the inactive user, the one legacy has not authorized, and the one with no username (not a usable account). The seeded dr_who (not authorized) is not offered.
+        Assert.Equal(["noname", "Solo", "Abe Adams", "Ann Adams", "Zed Zimmer"], providers!.Select(p => p.DisplayName));
+        Assert.Equal([25L, 27L, 22L, 21L, 20L], providers!.Select(p => p.Id));
+    }
+
+    [Fact]
+    public async Task A_provider_from_the_lookup_is_accepted_as_an_encounters_provider()
+    {
+        var providers = await _client.GetFromJsonAsync<List<ProviderLookupResponse>>("/api/v1/lookups/providers");
+        var chosen = providers!.First(p => p.DisplayName == "Zed Zimmer");
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/v1/encounters",
+            new CreateEncounterRequest(EncounterTestData.PatientUuid, "AMB", 5, null, "visit", 3, null, chosen.Id, null, null));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = await response.Content.ReadFromJsonAsync<EncounterCreatedResponse>();
+        var stored = await _client.GetFromJsonAsync<EncounterResponse>($"/api/v1/encounters/{created!.Uuid}");
+        Assert.Equal(chosen.Id, stored!.ProviderId);   // not the signed-in user (7): the one the caller chose from the list
     }
 
     [Fact]
@@ -132,14 +171,18 @@ public class EncounterLookupsTests(ClinicalCareContainerFixture fixture) : IAsyn
     {
         using var anonymous = _factory.CreateClient();
 
-        foreach (var path in new[] { "encounter-classes", "facilities", "calendar-categories", "immunization-options" })
+        foreach (var path in new[] { "encounter-classes", "facilities", "calendar-categories", "providers", "immunization-options" })
             Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/v1/lookups/{path}")).StatusCode);
     }
 
     [Fact]
-    public async Task Providers_are_not_offered_because_they_are_staff_names_and_come_from_the_session_once_identity_exists()
+    public async Task The_providers_lookup_offers_a_name_and_an_id_and_nothing_else_about_the_user()
     {
-        Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync("/api/v1/lookups/providers")).StatusCode);
+        var json = await _client.GetStringAsync("/api/v1/lookups/providers");
+
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        foreach (var provider in doc.RootElement.EnumerateArray())
+            Assert.Equal(["displayName", "id"], provider.EnumerateObject().Select(p => p.Name).Order());
     }
 
     [Fact]

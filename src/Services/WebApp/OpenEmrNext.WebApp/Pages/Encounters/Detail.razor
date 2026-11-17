@@ -68,8 +68,8 @@
                     <dd>@(string.IsNullOrWhiteSpace(encounter.FacilityName) ? "—" : encounter.FacilityName)</dd>
                     <dt>Place of service</dt>
                     <dd>@(encounter.PosCode?.ToString() ?? "—")</dd>
-                    <dt>Provider ID</dt>
-                    <dd>@encounter.ProviderId</dd>
+                    <dt>Provider</dt>
+                    <dd>@(_providerName ?? $"User {encounter.ProviderId}")</dd>
                     <dt>Onset date</dt>
                     <dd>@Formatting.DateText(encounter.OnsetDate)</dd>
                     <dt>Sensitivity</dt>
@@ -100,6 +100,7 @@
     private State _state = State.Loading;
     private EncounterResponse? _encounter;
     private string? _patientName;
+    private string? _providerName;
     private (Guid Patient, Guid Encounter)? _loaded;
 
     private string LoginUrl => $"/oidc/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}";
@@ -143,6 +144,7 @@
         var requestedEncounter = Uuid;
         _encounter = null;
         _patientName = null;
+        _providerName = null;
         _state = State.Loading;
 
         try
@@ -157,7 +159,9 @@
             // a failure there never fails the page.
             var patientTask = TryGetPatientNameAsync(requestedPatient);
             var encounter = await ClinicalCare.GetEncounterAsync(requestedEncounter);
+            var providerTask = TryGetProviderNameAsync(encounter.ProviderId);
             var patientName = await patientTask;
+            var providerName = await providerTask;
 
             if (requestedPatient != PatientUuid || requestedEncounter != Uuid)
             {
@@ -173,6 +177,7 @@
 
             _encounter = encounter;
             _patientName = patientName;
+            _providerName = providerName;
             _state = State.Ready;
             PatientPage.PatientName = patientName ?? "Patient";
             PatientPage.EncounterLabel = EncounterLabel(encounter);
@@ -188,6 +193,20 @@
         catch (Exception ex) when (ex is ClinicalCareApiException or HttpRequestException)
         {
             _state = State.Error;
+        }
+    }
+
+    /// <summary>The provider's name for the details list. Like the patient's name it is a convenience: when the list cannot be read, or the user is not on it (inactive, or not authorized), the page shows "User n".</summary>
+    private async Task<string?> TryGetProviderNameAsync(long providerId)
+    {
+        try
+        {
+            var providers = await ClinicalCare.ListProvidersAsync();
+            return providers.FirstOrDefault(p => p.Id == providerId)?.DisplayName;
+        }
+        catch (Exception ex) when (ex is ClinicalCareApiException or HttpRequestException)
+        {
+            return null;
         }
     }
 

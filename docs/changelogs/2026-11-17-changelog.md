@@ -416,3 +416,10 @@ Full record: `docs/clinical-care/20-webapp-clinical-screens.md`. **Compile-check
 - **Why the tests missed it:** the in-process gateway tests used a fake AuthFacade, and I wrote the fake with the same wrong guess as the code, so they agreed with each other and not with the real service. The live-stack tests only cover requests with no session, which needs no real field name. The browser check I had flagged as outstanding is exactly what would have caught it.
 - **Fix:** the gateway reads `subject`, named by one constant. The fake uses that constant, and two new contract tests read AuthFacade's published OpenAPI snapshot and assert that `MeResponse` has that property and does not have `sub`. Reintroducing the bug fails both.
 - **Lesson recorded:** a fake of another service must be derived from that service's published contract, not from the author's memory of it. The gateway proxy tests are now 28 and pass; the gateway is rebuilt and restarted.
+
+## Added — providers lookup (M5f)
+
+- **`GET /api/v1/lookups/providers`** lists the active, authorized users by name, for naming a provider other than yourself on an encounter. It is routed through the gateway like the other lookups and needs a signed-in session. Details and decisions PV-1 to PV-6: `docs/clinical-care/18-lookups-slice.md` section 5.
+- **Clinical Care's grant on `users` widens from four columns to seven** (`fname`, `lname`, `authorized` added), as decided by the user. Credential and contact columns stay unreadable, and the grant tests were rewritten to pin the exact set.
+- **WebApp:** the create-encounter dialog gets a Provider select (default "Me (signed-in user)"), and the encounter page shows the provider's name instead of a number.
+- **Tests:** Clinical Care unit 688, architecture 69, integration 805, all green; the build has no warnings. The OpenAPI snapshot is regenerated. The live Docker stack has not been rebuilt for this yet.

@@ -25,12 +25,29 @@ Creating or updating an encounter takes a class code, a calendar category id and
 | L1 | Creating an encounter still accepts **any** category id of 1 or more: it is not validated against the category table (as before). A lookup narrows what the UI offers, not what the API accepts. | Existing behaviour; validating needs a decision on legacy categories of other types |
 | L2 | **The WebApp falls back** to the fixed class list and plain id fields when any lookup cannot be loaded, with a warning, so an outage of a convenience cannot stop an encounter being recorded. With the lookups, the class defaults to legacy's default, the category to the first configured one, and the facility to the only one when there is exactly one (as legacy does). | Deliberate |
 | L4 | **The gateway had no route for these (or for immunizations).** `/api/v1/immunizations` and `/api/v1/lookups` were served by Clinical Care but 404 through the gateway, and nothing caught it because the gateway's tests run only against a live stack. Fixed, with `GatewayRoutesTests` in the Clinical Care suite comparing every API prefix in the OpenAPI document with the gateway's route list (it fails without the fix). | Found while wiring the WebApp |
-| L3 | No providers list (LK-5). | Needs identity |
+| L3 | ~~No providers list (LK-5).~~ **Resolved in M5f**: `GET /api/v1/lookups/providers` (section 5). | Identity is enforced (ADR 0075) |
 
 ## 4. Tests
 
 | Layer | What it pins |
 |---|---|
-| Integration (HTTP, real MariaDB) | Classes in `seq` order with the default marked; facilities active-only by name with POS and service-location flag; categories exclude `no_show`, provider and clinic events, therapy groups and inactive ones, in sequence order; empty configuration gives empty lists; empty names read as empty; **the 500-row bound**; **what the lookups offer is accepted by creating an encounter**; 401 without the gateway secret; no providers route |
+| Integration (HTTP, real MariaDB) | Classes in `seq` order with the default marked; facilities active-only by name with POS and service-location flag; categories exclude `no_show`, provider and clinic events, therapy groups and inactive ones, in sequence order; empty configuration gives empty lists; empty names read as empty; **the 500-row bound**; **what the lookups offer is accepted by creating an encounter**; 401 without the gateway secret; no providers route (replaced in M5f by the providers tests in section 5) |
 | Integration (grants) | The facility's address, phone and tax columns and the categories' colour, description and recurrence columns are unreadable; neither table is writable |
 | OpenAPI | All three are documented as GET-only |
+
+## 5. Providers (M5f, Nov 17)
+
+`GET /api/v1/lookups/providers` returns `[{ "id": 7, "displayName": "Ann Adams" }]`: the users legacy treats as providers, for choosing someone **other than the signed-in user** as an encounter's provider. The acting provider still comes from the session (ADR 0075); a caller who names none is recorded as themselves, and the WebApp's create-encounter dialog offers "Me (signed-in user)" first.
+
+| # | Decision | Reason |
+|---|---|---|
+| PV-1 | A provider is a `users` row with `active = 1`, `authorized = 1` and a non-empty `username`. | These are the conditions legacy's own provider lists use; without `authorized` the list would offer every account, including administrators and service logins. |
+| PV-2 | Ordered by last name, then first name, then id, bounded at 500 rows (API-6). A missing name sorts first (MariaDB's NULL order). | Stable and deterministic; a misconfigured install cannot make it unbounded. |
+| PV-3 | `displayName` is "First Last"; with only one of the two it is that one, with neither it is the username. | A caller always has something to show. |
+| PV-4 | The response carries the id and display name **only**: no username, npi, email, phone or any other column. A test lists the property names. | The least that makes a picker work. |
+| PV-5 | **The database grant on `users` widens from four columns to seven**: `id, username, uuid, active` plus `fname, lname, authorized`. Decided by the user on Nov 17 over two alternatives (username-only with no grant change, or no lookup). The grant tests that pinned `fname` and `authorized` as unreadable now pin exactly the seven and still deny `password`, `email`, `mname`, `phone`, `title`, `specialty`, `npi`, `federaldrugid`, `SELECT *` and every write, including to `fname` and `authorized`. | Staff names are what a picker has to show; credentials and contact details stay unreadable. |
+| PV-6 | The encounter detail page shows the provider's **name** where it showed "Provider ID". When the list cannot be read, or the user is not on it (inactive or not authorized), it shows "User n". | A name is for people; the lookup is a convenience and must not fail the page. |
+
+**Not changed:** creating an encounter still accepts any provider id that exists (as before); the lookup narrows what the UI offers, as with the other lookups (L1). Patient Management does not need this list.
+
+**Tests (suites green: unit 688, architecture 69, integration 805):** integration: the right users in the right order with the right display names, the id from the list is accepted when creating an encounter, the response has only `id` and `displayName`, 401 without the secret; grants: exactly the seven columns readable, the hidden ones still denied, no write to the new ones.

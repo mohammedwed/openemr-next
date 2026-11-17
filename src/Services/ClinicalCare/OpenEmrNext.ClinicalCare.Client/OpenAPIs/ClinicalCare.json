@@ -1854,6 +1854,35 @@
         ]
       }
     },
+    "/api/v1/lookups/providers": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "summary": "List the active providers (users legacy marks authorized), by name",
+        "operationId": "ListProviders",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderLookupResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
+    },
     "/api/v1/lookups/immunization-options": {
       "get": {
         "tags": [
@@ -4260,6 +4289,26 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "ProviderLookupResponse": {
+        "required": [
+          "id",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "displayName": {
+            "type": "string"
           }
         }
       },
