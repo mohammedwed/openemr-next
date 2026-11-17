@@ -102,6 +102,18 @@ GRANT SELECT, INSERT ON \`${DB_NAME}\`.form_encounter TO '${CLINICAL_CARE_DB_USE
 GRANT UPDATE (\`date\`, onset_date, reason, class_code, pc_catid, facility_id, facility, pos_code, provider_id)
   ON \`${DB_NAME}\`.form_encounter TO '${CLINICAL_CARE_DB_USER}'@'%';
 
+-- Problems (M5c, ADR 0070). The lists table holds every issue type (problems, allergies, medications, surgeries, ...), so this service is granted only the
+-- columns a problem uses, for reading and for inserting: it cannot read a medication's udi or a surgery's injury_* columns. SELECT includes type and
+-- modifydate (the ETag token, ADR 0068); INSERT includes type because every row this service writes names its own. Which ROWS it touches is a
+-- code rule (every statement filters on type), pinned by tests, because a grant cannot say it. UPDATE columns come with the update slice.
+-- (No backticks in these comments: this block is an unquoted heredoc, where a backtick runs a command.)
+GRANT SELECT (id, uuid, \`date\`, type, title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, activity, pid, \`user\`, modifydate)
+  ON \`${DB_NAME}\`.lists TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT INSERT (uuid, \`date\`, type, title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, activity, pid, \`user\`, groupname)
+  ON \`${DB_NAME}\`.lists TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- The "this list has been addressed" marker the issue screen writes (legacy's summary reads it as listTouched). Tiny table, no clinical content.
+GRANT SELECT, INSERT ON \`${DB_NAME}\`.lists_touch TO '${CLINICAL_CARE_DB_USER}'@'%';
+
 -- The legacy 'newpatient' registry row every encounter needs (CC-7). Insert-only for the same reason.
 GRANT SELECT, INSERT ON \`${DB_NAME}\`.forms TO '${CLINICAL_CARE_DB_USER}'@'%';
 

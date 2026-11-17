@@ -37,7 +37,9 @@ public sealed class ClinicalCareContainerFixture : IAsyncLifetime
 
     /// <summary>The legacy tables this service reads or writes, created from the snapshot's own DDL.</summary>
     private static readonly string[] LegacyTables =
-        ["patient_data", "users", "groups", "facility", "list_options", "form_encounter", "form_vitals", "forms", "uuid_registry", "sequences"];
+        ["patient_data", "users", "groups", "facility", "list_options", "form_encounter", "form_vitals", "forms", "uuid_registry", "sequences",
+         // The issue tables (M5c): lists is shared by every issue type, and the last two exist so the grant tests can prove they are unreadable.
+         "lists", "lists_touch", "lists_medication", "issue_encounter"];
 
     public string Hostname => _container.Hostname;
     public ushort Port => _container.GetMappedPublicPort(3306);
@@ -101,7 +103,7 @@ public sealed class ClinicalCareContainerFixture : IAsyncLifetime
         await using var root = new MySqlConnection(RootConnectionString);
         await root.OpenAsync();
         foreach (var table in new[]
-                 { "form_encounter", "form_vitals", "forms", "uuid_registry", "clinical_care_outbox", "clinical_care_audit", "clinical_care_patient_ref", "clinical_care_processed_events", "patient_data", "users", "groups", "facility", "list_options", "sequences" })
+                 { "form_encounter", "form_vitals", "forms", "uuid_registry", "clinical_care_outbox", "clinical_care_audit", "lists", "lists_touch", "clinical_care_patient_ref", "clinical_care_processed_events", "patient_data", "users", "groups", "facility", "list_options", "sequences" })
             await ExecuteAsync(root, $"DELETE FROM `{table}`");
 
         // Reference rows: ids and values chosen to match the real snapshot (AMB is the default class; list order is `seq`).

@@ -91,6 +91,70 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
 #pragma warning restore EF1002
     }
 
+    [Theory]
+    [InlineData("SELECT id, uuid, `date`, type, title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, activity, pid, `user`, modifydate FROM lists")]
+    [InlineData("SELECT pid, type, `date` FROM lists_touch")]
+    public async Task The_production_principal_can_read_the_issue_columns_a_problem_uses(string sql)
+    {
+        await using var db = fixture.CreateDbContext();
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        await db.Database.OpenConnectionAsync();
+        command.CommandText = sql;
+
+        await command.ExecuteScalarAsync();   // must not throw
+    }
+
+    [Theory]
+    [InlineData("SELECT udi FROM lists")]
+    [InlineData("SELECT udi_data FROM lists")]
+    [InlineData("SELECT injury_part FROM lists")]
+    [InlineData("SELECT injury_type FROM lists")]
+    [InlineData("SELECT reinjury_id FROM lists")]
+    [InlineData("SELECT destination FROM lists")]
+    [InlineData("SELECT external_id FROM lists")]
+    [InlineData("SELECT erx_source FROM lists")]
+    [InlineData("SELECT * FROM lists")]
+    [InlineData("SELECT * FROM lists_medication")]
+    [InlineData("SELECT * FROM issue_encounter")]
+    public async Task The_production_principal_cannot_read_issue_columns_or_tables_a_problem_has_no_need_for(string sql)
+    {
+        await using var db = fixture.CreateDbContext();
+
+        var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
+        {
+            await using var command = db.Database.GetDbConnection().CreateCommand();
+            await db.Database.OpenConnectionAsync();
+            command.CommandText = sql;
+            await command.ExecuteScalarAsync();
+        });
+
+        Assert.Contains("denied", ex.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("UPDATE lists SET title = 'changed'")]
+    [InlineData("UPDATE lists SET enddate = NOW()")]
+    [InlineData("DELETE FROM lists")]
+    [InlineData("DELETE FROM lists_touch WHERE pid = 1")]
+    [InlineData("UPDATE lists_touch SET `date` = NOW()")]
+    [InlineData("INSERT INTO lists (uuid, type, udi) VALUES (NULL, 'medical_problem', 'x')")]
+    [InlineData("INSERT INTO lists (uuid, type, reaction) VALUES (NULL, 'allergy', 'x')")]
+    [InlineData("INSERT INTO lists (uuid, type, injury_part) VALUES (NULL, 'medical_problem', 'x')")]
+    [InlineData("INSERT INTO lists_medication (list_id) VALUES (1)")]
+    [InlineData("INSERT INTO issue_encounter (pid, list_id, encounter) VALUES (1, 1, 1)")]
+    public async Task The_production_principal_cannot_change_or_remove_issues_beyond_inserting_a_problems_columns(string sql) =>
+        await AssertDeniedAsync(sql);
+
+    [Fact]
+    public async Task The_production_principal_can_insert_exactly_the_columns_a_problem_uses()
+    {
+        await using var db = fixture.CreateDbContext();
+
+        await db.Database.ExecuteSqlRawAsync(
+            "INSERT INTO lists (uuid, `date`, type, title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, activity, pid, `user`, groupname) " +
+            "VALUES (NULL, NOW(), 'medical_problem', 't', NOW(), NULL, NULL, 0, 0, NULL, NULL, 1, 1, NULL, 'Default')");
+    }
+
     [Fact]
     public async Task The_production_principal_owns_its_outbox_completely()
     {
