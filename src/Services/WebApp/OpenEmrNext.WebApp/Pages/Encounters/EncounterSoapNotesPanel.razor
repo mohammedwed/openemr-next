@@ -8,7 +8,7 @@
 
 @* One card for an encounter's SOAP notes (M5d). Like the vitals panel it loads its own pages (the API is server-paged, API-6). A failed first load shows an error with "Try again"; a failed page change keeps the
    last page on screen with a warning, so a note is never replaced by an empty screen. An edit is based on the version the row was listed with: if someone changed the note in the meantime the save is
-   refused and the list reloads. A note has no delete here (it needs the permission port). *@
+   refused and the list reloads. Delete is offered to everyone and refused by the service unless legacy gives the user admin/super (ADR 0076). *@
 <PatientSectionCard Title="SOAP notes"
     HasData="_items is not null" Error="_error" OnRetry="LoadAsync"
     ErrorMessage="Could not load SOAP notes. The clinical care service may be unavailable."
@@ -48,6 +48,8 @@
                 <MudTd>
                     <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="@(() => OpenEditAsync(note))"
                         aria-label="@($"Edit the SOAP note written {Formatting.DateTimeText(note.Date)}")">Edit</MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteAsync(note))"
+                        aria-label="@($"Delete the SOAP note written {Formatting.DateTimeText(note.Date)}")">Delete</MudButton>
                 </MudTd>
             </RowTemplate>
             <NoRecordsContent>
@@ -130,6 +132,19 @@
         if (!string.IsNullOrWhiteSpace(note.Objective)) yield return ("Objective", note.Objective);
         if (!string.IsNullOrWhiteSpace(note.Assessment)) yield return ("Assessment", note.Assessment);
         if (!string.IsNullOrWhiteSpace(note.Plan)) yield return ("Plan", note.Plan);
+    }
+
+    private async Task DeleteAsync(SoapNoteResponse note)
+    {
+        var reload = await RecordDeletion.ConfirmAndDeleteAsync(
+            DialogService, Snackbar, "Delete this SOAP note?",
+            "The note is marked deleted and no longer shown here or in OpenEMR. It is not removed from the database, and an administrator can restore it in OpenEMR.",
+            () => ClinicalCare.DeleteSoapNoteAsync(EncounterUuid, note.Id, note.ETag));
+        if (reload)
+        {
+            // Deleting the last note on a later page leaves that page empty, so step back one.
+            await LoadAsync(_page > 1 && _items?.Count == 1 ? _page - 1 : _page);
+        }
     }
 
     private Task OpenRecordAsync() => ShowAsync("Record SOAP note", null);

@@ -89,6 +89,8 @@
                     @* Named per row: a column of identical "Correct" buttons is not distinguishable to a screen reader. *@
                     <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="@(() => OpenCorrectAsync(vitals))"
                         aria-label="@($"Correct the vitals recorded {Formatting.DateTimeText(vitals.RecordedAt)}")">Correct</MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteAsync(vitals))"
+                        aria-label="@($"Delete the vitals recorded {Formatting.DateTimeText(vitals.RecordedAt)}")">Delete</MudButton>
                 </MudTd>
             </RowTemplate>
             <NoRecordsContent>
@@ -203,6 +205,19 @@
         }
 
         return lines;
+    }
+
+    private async Task DeleteAsync(VitalsResponse vitals)
+    {
+        var reload = await RecordDeletion.ConfirmAndDeleteAsync(
+            DialogService, Snackbar, "Delete these vitals?",
+            "The vitals are marked deleted and no longer shown here or in OpenEMR. They are not removed from the database, and an administrator can restore them in OpenEMR.",
+            () => ClinicalCare.DeleteVitalsAsync(EncounterUuid, vitals.Uuid, vitals.ETag));
+        if (reload)
+        {
+            // Deleting the last set on a later page leaves that page empty, so step back one.
+            await LoadAsync(_page > 1 && _items?.Count == 1 ? _page - 1 : _page, _metric);
+        }
     }
 
     private async Task OpenCorrectAsync(VitalsResponse vitals)
