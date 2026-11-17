@@ -26,6 +26,7 @@ public sealed class Problem
     public int Occurrence { get; }
     public string? ReferredBy { get; }
     public string? Comments { get; }
+    public string? Verification { get; }
     public long ProviderId { get; }
 
     /// <summary>When the problem was recorded (<c>lists.date</c>): the clock's now, not the date the problem began (ADR 0070 #5).</summary>
@@ -43,6 +44,7 @@ public sealed class Problem
         Occurrence = recording.Occurrence;
         ReferredBy = recording.ReferredBy;
         Comments = recording.Comments;
+        Verification = recording.Verification;
         ProviderId = recording.ProviderId;
         RecordedAt = recordedAt;
     }

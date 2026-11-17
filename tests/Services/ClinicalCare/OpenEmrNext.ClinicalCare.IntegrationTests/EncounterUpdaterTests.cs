@@ -54,7 +54,7 @@ public class EncounterUpdaterTests(ClinicalCareContainerFixture fixture) : IAsyn
             new AuditEntry(Now, AuditActor.Unknown, AuditActions.EncounterUpdate, id, AuditOutcome.Success, "corr-u", "10.9.9.9", changed));
     }
 
-    private async Task<EncounterUpdateOutcome> UpdateAsync(EncounterUpdateRequest request)
+    private async Task<UpdateOutcome> UpdateAsync(EncounterUpdateRequest request)
     {
         await using var db = fixture.CreateDbContext();
         return await new EfEncounterUpdater(db, new EfAuditLog(db)).UpdateAsync(request, CancellationToken.None);
@@ -67,7 +67,7 @@ public class EncounterUpdaterTests(ClinicalCareContainerFixture fixture) : IAsyn
     {
         var outcome = await UpdateAsync(Request());
 
-        Assert.Equal(EncounterUpdateStatus.Updated, outcome.Status);
+        Assert.Equal(UpdateStatus.Updated, outcome.Status);
         Assert.Equal("EMER", await Col<string>("class_code"));
         Assert.Equal(9L, await Col<long>("pc_catid"));
         Assert.Equal("Chest pain", await Col<string>("reason"));
@@ -139,7 +139,7 @@ public class EncounterUpdaterTests(ClinicalCareContainerFixture fixture) : IAsyn
 
         var outcome = await UpdateAsync(Request(expected: older));
 
-        Assert.Equal(EncounterUpdateStatus.Conflict, outcome.Status);
+        Assert.Equal(UpdateStatus.Conflict, outcome.Status);
         Assert.Equal(Stamp, outcome.Stamp);
         Assert.Equal("Cough", await Col<string>("reason"));
         Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_outbox"));
@@ -154,7 +154,7 @@ public class EncounterUpdaterTests(ClinicalCareContainerFixture fixture) : IAsyn
 
         var outcome = await UpdateAsync(Request());
 
-        Assert.Equal(EncounterUpdateStatus.Conflict, outcome.Status);
+        Assert.Equal(UpdateStatus.Conflict, outcome.Status);
         Assert.NotEqual(Stamp, outcome.Stamp);
         Assert.Equal("edited in the legacy screen", await Col<string>("reason"));   // the other writer's change survives
         Assert.Equal("AMB", await Col<string>("class_code"));
@@ -165,7 +165,7 @@ public class EncounterUpdaterTests(ClinicalCareContainerFixture fixture) : IAsyn
     {
         var outcome = await UpdateAsync(Request(uuid: Guid.NewGuid()));
 
-        Assert.Equal(EncounterUpdateStatus.NotFound, outcome.Status);
+        Assert.Equal(UpdateStatus.NotFound, outcome.Status);
         Assert.Null(outcome.Stamp);
     }
 
@@ -177,7 +177,7 @@ public class EncounterUpdaterTests(ClinicalCareContainerFixture fixture) : IAsyn
 
         var outcome = await UpdateAsync(Request());
 
-        Assert.Equal(EncounterUpdateStatus.NotFound, outcome.Status);
+        Assert.Equal(UpdateStatus.NotFound, outcome.Status);
         Assert.Equal("Cough", await Col<string>("reason"));
     }
 
@@ -190,7 +190,7 @@ public class EncounterUpdaterTests(ClinicalCareContainerFixture fixture) : IAsyn
 
         var outcome = await UpdateAsync(Request(change: same));
 
-        Assert.Equal(EncounterUpdateStatus.Updated, outcome.Status);
+        Assert.Equal(UpdateStatus.Updated, outcome.Status);
     }
 
     [Fact]

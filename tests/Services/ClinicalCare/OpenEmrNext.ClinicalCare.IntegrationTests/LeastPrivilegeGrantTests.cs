@@ -132,8 +132,18 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     }
 
     [Theory]
-    [InlineData("UPDATE lists SET title = 'changed'")]
-    [InlineData("UPDATE lists SET enddate = NOW()")]
+    [InlineData("UPDATE lists SET type = 'medication'")]
+    [InlineData("UPDATE lists SET uuid = NULL")]
+    [InlineData("UPDATE lists SET pid = 1")]
+    [InlineData("UPDATE lists SET `date` = NOW()")]
+    [InlineData("UPDATE lists SET `user` = 'x'")]
+    [InlineData("UPDATE lists SET groupname = 'x'")]
+    [InlineData("UPDATE lists SET activity = 0")]
+    [InlineData("UPDATE lists SET modifydate = NOW()")]
+    [InlineData("UPDATE lists SET udi = 'x'")]
+    [InlineData("UPDATE lists SET injury_part = 'x'")]
+    [InlineData("UPDATE lists SET list_option_id = 'x'")]
+    [InlineData("UPDATE lists SET title = 'changed', udi = 'x'")]
     [InlineData("DELETE FROM lists")]
     [InlineData("DELETE FROM lists_touch WHERE pid = 1")]
     [InlineData("UPDATE lists_touch SET `date` = NOW()")]
@@ -145,6 +155,29 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("INSERT INTO issue_encounter (pid, list_id, encounter) VALUES (1, 1, 1)")]
     public async Task The_production_principal_cannot_change_or_remove_issues_beyond_inserting_a_problems_columns(string sql) =>
         await AssertDeniedAsync(sql);
+
+    [Theory]
+    [InlineData("title")]
+    [InlineData("begdate")]
+    [InlineData("enddate")]
+    [InlineData("diagnosis")]
+    [InlineData("outcome")]
+    [InlineData("occurrence")]
+    [InlineData("referredby")]
+    [InlineData("comments")]
+    [InlineData("verification")]
+    [InlineData("reaction")]
+    [InlineData("severity_al")]
+    public async Task The_production_principal_may_update_exactly_the_issue_columns_a_problem_or_an_allergy_owns(string column)
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // Setting a column to itself is enough to exercise the privilege check; no row is needed. The column name is one of this theory's own constants, never
+        // input, which is why the interpolation (EF1002) is safe here.
+#pragma warning disable EF1002
+        await db.Database.ExecuteSqlRawAsync($"UPDATE lists SET `{column}` = `{column}`");
+#pragma warning restore EF1002
+    }
 
     [Fact]
     public async Task The_production_principal_can_insert_exactly_the_columns_a_problem_or_an_allergy_uses()

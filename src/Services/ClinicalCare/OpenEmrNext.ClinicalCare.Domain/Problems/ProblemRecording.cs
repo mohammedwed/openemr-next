@@ -16,8 +16,8 @@ public sealed record ProblemRecording
     public const int MaxCommentsLength = IssueFieldRules.MaxCommentsLength;
     public const long MaxProviderId = IssueFieldRules.MaxProviderId;
 
-    /// <summary><c>lists.referredby</c> is varchar(255).</summary>
-    public const int MaxReferredByLength = 255;
+    public const int MaxVerificationLength = ProblemFieldRules.MaxVerificationLength;
+    public const int MaxReferredByLength = ProblemFieldRules.MaxReferredByLength;
 
     public static readonly DateTime MinDate = IssueFieldRules.MinDate;
     public static readonly TimeSpan MaxFutureOffset = IssueFieldRules.MaxFutureOffset;
@@ -31,11 +31,12 @@ public sealed record ProblemRecording
     public int Occurrence { get; }
     public string? ReferredBy { get; }
     public string? Comments { get; }
+    public string? Verification { get; }
     public long ProviderId { get; }
 
     private ProblemRecording(
         PatientReference patient, string title, DateTime beginDate, DateTime? endDate, string? diagnosis, int outcome, int occurrence,
-        string? referredBy, string? comments, long providerId)
+        string? referredBy, string? comments, string? verification, long providerId)
     {
         Patient = patient;
         Title = title;
@@ -46,6 +47,7 @@ public sealed record ProblemRecording
         Occurrence = occurrence;
         ReferredBy = referredBy;
         Comments = comments;
+        Verification = verification;
         ProviderId = providerId;
     }
 
@@ -59,37 +61,23 @@ public sealed record ProblemRecording
     /// <param name="providerId">The acting provider; caller-supplied until identity forwarding exists (F-CC-1).</param>
     /// <param name="now">The current instant, from the clock (DOM-8).</param>
     /// <param name="codes">The configured code lists, read beforehand by the use case.</param>
+    /// <param name="verification">A <c>condition-verification</c> code, or blank for none (PB-21).</param>
     /// <exception cref="ClinicalCareValidationException">One or more fields fail validation.</exception>
     public static ProblemRecording Create(
         PatientReference patient, string? title, DateTime? beginDate, DateTime? endDate, string? diagnosis, int outcome, int occurrence,
-        string? referredBy, string? comments, long providerId, DateTime now, IssueCodeData codes)
+        string? referredBy, string? comments, long providerId, DateTime now, IssueCodeData codes, string? verification = null)
     {
         var errors = new List<string>();
 
-        // PB-1 to PB-4, PB-8, PB-9: the rules a problem shares with an allergy (IssueFieldRules).
-        var trimmedTitle = IssueFieldRules.Title(title, errors);
-        IssueFieldRules.Dates(beginDate, endDate, beginRequired: true, now, errors);
-        var trimmedDiagnosis = IssueFieldRules.Diagnosis(diagnosis, errors);
-
-        // PB-5, PB-6: a code must be one the site has configured; 0 ("unassigned" or "unknown") is always allowed, as the column's own default.
-        if (outcome != 0 && !codes.Outcomes.Contains(outcome))
-            errors.Add($"Outcome {outcome} is not a known outcome.");
-        if (occurrence != 0 && !codes.Occurrences.Contains(occurrence))
-            errors.Add($"Occurrence {occurrence} is not a known occurrence.");
-
-        // PB-7
-        if (referredBy is { Length: > MaxReferredByLength })
-            errors.Add($"Referred by must be at most {MaxReferredByLength} characters.");
-
-        IssueFieldRules.Comments(comments, errors);
+        // PB-1 to PB-8 and PB-21: the rules a problem's facts obey, shared with ProblemChange (ProblemFieldRules); PB-9 is about who acts.
+        var fields = ProblemFieldRules.Validate(title, beginDate, endDate, diagnosis, outcome, occurrence, referredBy, comments, verification, now, codes, errors);
         IssueFieldRules.Provider(providerId, errors);
 
         if (errors.Count > 0)
             throw new ClinicalCareValidationException(errors);
 
         return new ProblemRecording(
-            patient, trimmedTitle!, IssueFieldRules.WholeSeconds(beginDate!.Value), endDate is { } e ? IssueFieldRules.WholeSeconds(e) : null, trimmedDiagnosis, outcome,
-            occurrence, string.IsNullOrWhiteSpace(referredBy) ? null : referredBy.Trim(), string.IsNullOrWhiteSpace(comments) ? null : comments,
-            providerId);
+            patient, fields.Title!, IssueFieldRules.WholeSeconds(beginDate!.Value), endDate is { } e ? IssueFieldRules.WholeSeconds(e) : null, fields.Diagnosis, outcome,
+            occurrence, fields.ReferredBy, fields.Comments, fields.Verification, providerId);
     }
 }

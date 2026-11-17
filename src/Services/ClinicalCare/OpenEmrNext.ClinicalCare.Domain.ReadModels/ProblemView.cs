@@ -17,6 +17,7 @@ namespace OpenEmrNext.ClinicalCare.Domain.ReadModels;
 /// <param name="Comments">Free-text comments.</param>
 /// <param name="RecordedAt">When the row was created (<c>lists.date</c>).</param>
 /// <param name="RecordedBy">The username legacy recorded as having made it, if any.</param>
+/// <param name="Verification">The <c>condition-verification</c> code, or <c>null</c> when none (legacy stores an empty string).</param>
 /// <param name="LastModified">When the row last changed, by any writer: the basis of the concurrency token (ADR 0068, ADR 0070 #4).</param>
 public sealed record ProblemView(
     Guid Uuid,
@@ -32,7 +33,8 @@ public sealed record ProblemView(
     string? Comments,
     DateTime? RecordedAt,
     string? RecordedBy,
-    DateTime? LastModified);
+    DateTime? LastModified,
+    string? Verification = null);
 
 /// <summary>One page of a patient's problems, newest first, with the total so a caller can page.</summary>
 /// <param name="Items">The problems on this page.</param>

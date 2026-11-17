@@ -64,4 +64,24 @@ public class IssueCodeListsTests(ClinicalCareContainerFixture fixture) : IAsyncL
         Assert.Empty(codes.Outcomes);
         Assert.Empty(codes.Occurrences);
     }
+
+    [Fact]
+    public async Task The_condition_verification_list_is_read_as_exact_strings_and_never_mixes_with_the_allergy_one()
+    {
+        await AddAsync("condition-verification", "unconfirmed");
+        await AddAsync("condition-verification", "Confirmed");
+        await AddAsync("allergyintolerance-verification", "differential");
+
+        var codes = await ReadAsync();
+
+        Assert.Equal(["Confirmed", "unconfirmed"], codes.Verifications.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task With_no_condition_verification_list_configured_the_set_is_empty()
+    {
+        var codes = await ReadAsync();
+
+        Assert.Empty(codes.Verifications);
+    }
 }

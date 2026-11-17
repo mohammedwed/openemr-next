@@ -48,14 +48,17 @@ public sealed class EfProblemRegistry(ClinicalCareDbContext db, IAuditLog auditL
             // Who did it, as legacy records it: a username and a group. Looked up from the provider id the caller named (F-CC-1).
             var actor = await LegacyActor.ResolveAsync(db, problem.ProviderId, ct);
 
+            // lists.verification is NOT NULL DEFAULT '': an absent one is written as the empty string legacy's own column default holds.
+            var verification = problem.Verification ?? "";
+
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO lists
-                    (uuid, `date`, type, title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments,
+                    (uuid, `date`, type, title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, verification,
                      activity, pid, `user`, groupname)
                 VALUES
                     ({uuidBytes}, {problem.RecordedAt}, {ProblemType}, {problem.Title}, {problem.BeginDate}, {problem.EndDate},
-                     {problem.Diagnosis}, {problem.Outcome}, {problem.Occurrence}, {problem.ReferredBy}, {problem.Comments},
+                     {problem.Diagnosis}, {problem.Outcome}, {problem.Occurrence}, {problem.ReferredBy}, {problem.Comments}, {verification},
                      1, {problem.Patient.Pid}, {actor.Username}, {actor.GroupName})
                 """, ct);
             var rowId = await db.Database.GetLastInsertIdAsync(ct);

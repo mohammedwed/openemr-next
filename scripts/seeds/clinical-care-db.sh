@@ -114,6 +114,11 @@ GRANT SELECT (id, uuid, \`date\`, type, title, begdate, enddate, diagnosis, outc
 GRANT INSERT (uuid, \`date\`, type, title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, activity, pid, \`user\`, groupname,
   reaction, severity_al, verification)
   ON \`${DB_NAME}\`.lists TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- Updating an issue (M5c slice 3, ADR 0068): UPDATE on exactly the columns a problem or an allergy owns, and nothing else. No identity (id, uuid, pid, type),
+-- no date, user or groupname (who recorded it and when), no activity, none of the other issue types' columns. modifydate is not listed: the database sets it.
+-- Which ROWS an update may touch is the type filter in every statement, not this grant.
+GRANT UPDATE (title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, verification, reaction, severity_al)
+  ON \`${DB_NAME}\`.lists TO '${CLINICAL_CARE_DB_USER}'@'%';
 -- The "this list has been addressed" marker the issue screen writes (legacy's summary reads it as listTouched). Tiny table, no clinical content.
 GRANT SELECT, INSERT ON \`${DB_NAME}\`.lists_touch TO '${CLINICAL_CARE_DB_USER}'@'%';
 

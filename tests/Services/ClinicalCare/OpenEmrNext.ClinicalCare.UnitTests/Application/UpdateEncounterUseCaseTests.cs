@@ -52,14 +52,14 @@ public class UpdateEncounterUseCaseTests
 
     private sealed class FakeUpdater(FakeReader reader) : IEncounterUpdater
     {
-        public EncounterUpdateOutcome Outcome { get; set; } = new(EncounterUpdateStatus.Updated, new DateTime(2026, 11, 17, 9, 30, 0));
+        public UpdateOutcome Outcome { get; set; } = new(UpdateStatus.Updated, new DateTime(2026, 11, 17, 9, 30, 0));
         public EncounterUpdateRequest? Request { get; private set; }
 
-        public Task<EncounterUpdateOutcome> UpdateAsync(EncounterUpdateRequest request, CancellationToken ct)
+        public Task<UpdateOutcome> UpdateAsync(EncounterUpdateRequest request, CancellationToken ct)
         {
             Request = request;
             // What a real adapter would have done to the row, so the use case's re-read sees the new state.
-            if (Outcome.Status == EncounterUpdateStatus.Updated && reader.View is { } v)
+            if (Outcome.Status == UpdateStatus.Updated && reader.View is { } v)
             {
                 var c = request.Change;
                 reader.View = v with
@@ -247,7 +247,7 @@ public class UpdateEncounterUseCaseTests
     {
         var (useCase, _, updater, log) = Build(Stored());
         var winner = new DateTime(2026, 11, 17, 9, 29, 59);
-        updater.Outcome = new EncounterUpdateOutcome(EncounterUpdateStatus.Conflict, winner);
+        updater.Outcome = new UpdateOutcome(UpdateStatus.Conflict, winner);
 
         var ex = await Assert.ThrowsAsync<ConcurrencyConflictException>(() => useCase.ExecuteAsync(Command(reason: "x"), CancellationToken.None));
 
@@ -259,7 +259,7 @@ public class UpdateEncounterUseCaseTests
     public async Task An_encounter_deleted_while_the_update_ran_is_not_found()
     {
         var (useCase, _, updater, _) = Build(Stored());
-        updater.Outcome = new EncounterUpdateOutcome(EncounterUpdateStatus.NotFound, null);
+        updater.Outcome = new UpdateOutcome(UpdateStatus.NotFound, null);
 
         await Assert.ThrowsAsync<EncounterNotFoundException>(() => useCase.ExecuteAsync(Command(reason: "x"), CancellationToken.None));
     }

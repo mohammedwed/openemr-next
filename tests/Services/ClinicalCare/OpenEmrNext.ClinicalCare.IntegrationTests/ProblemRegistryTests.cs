@@ -54,6 +54,19 @@ public class ProblemRegistryTests(ClinicalCareContainerFixture fixture) : IAsync
     }
 
     [Fact]
+    public async Task PB_21_a_problems_verification_is_stored_and_an_absent_one_is_the_empty_string_the_not_null_column_holds()
+    {
+        await RegisterAsync(ProblemTestData.NewProblem(verification: "unconfirmed"));
+        Assert.Equal("unconfirmed", await Col<string>("verification"));
+        await fixture.RootExecuteAsync("DELETE FROM lists");
+        await fixture.RootExecuteAsync("DELETE FROM uuid_registry");
+
+        await RegisterAsync(ProblemTestData.NewProblem(verification: null));
+
+        Assert.Equal("", await Col<string>("verification"));
+    }
+
+    [Fact]
     public async Task ADR_0070_the_date_column_is_when_it_was_recorded_not_the_legacy_issue_screens_month_in_minutes_value()
     {
         var problem = ProblemTestData.NewProblem(begin: new DateTime(2019, 3, 4));

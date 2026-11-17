@@ -7,4 +7,12 @@ namespace OpenEmrNext.ClinicalCare.Domain.ValueObjects;
 /// </summary>
 /// <param name="Outcomes">Valid <c>lists.outcome</c> codes (list <c>outcome</c>: 0 Unassigned, 1 Resolved, 2 Improved, ...).</param>
 /// <param name="Occurrences">Valid <c>lists.occurrence</c> codes (list <c>occurrence</c>: 0 Unknown, 1 First, 4 Chronic/Recurrent, ...).</param>
-public sealed record IssueCodeData(IReadOnlySet<int> Outcomes, IReadOnlySet<int> Occurrences);
+/// <param name="ConditionVerifications">Valid <c>lists.verification</c> codes for a problem (list <c>condition-verification</c>), compared exactly. <c>null</c> means none are configured.</param>
+public sealed record IssueCodeData(
+    IReadOnlySet<int> Outcomes, IReadOnlySet<int> Occurrences, IReadOnlySet<string>? ConditionVerifications = null)
+{
+    /// <summary>The configured problem verification codes; empty when none are.</summary>
+    public IReadOnlySet<string> Verifications => ConditionVerifications ?? EmptyVerifications;
+
+    private static readonly IReadOnlySet<string> EmptyVerifications = new HashSet<string>();
+}

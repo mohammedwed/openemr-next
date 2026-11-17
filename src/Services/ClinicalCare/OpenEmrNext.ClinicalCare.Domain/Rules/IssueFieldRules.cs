@@ -93,6 +93,31 @@ internal static partial class IssueFieldRules
         return trimmed;
     }
 
+    /// <summary>
+    /// A string code (<c>reaction</c>, <c>severity_al</c>, <c>verification</c>): compared exactly with the configured option ids (as <c>option_id</c> values are), and
+    /// no longer than the column that stores it. The width check guards the column, not the list: a site can configure an option id longer than its column, and that
+    /// must be a clean message, not a database error (review findings R-1 to R-7). Blank means none.
+    /// </summary>
+    public static string? StringCode(string? value, string label, IReadOnlySet<string> allowed, int maxLength, List<string> errors)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        if (!allowed.Contains(value))
+        {
+            errors.Add($"{label} '{value}' is not a known {label.ToLowerInvariant()}.");
+            return null;
+        }
+
+        if (value.Length > maxLength)
+        {
+            errors.Add($"{label} '{value}' is longer than the {maxLength} characters a record can hold.");
+            return null;
+        }
+
+        return value;
+    }
+
     public static void Comments(string? comments, List<string> errors)
     {
         if (comments is { Length: > MaxCommentsLength })

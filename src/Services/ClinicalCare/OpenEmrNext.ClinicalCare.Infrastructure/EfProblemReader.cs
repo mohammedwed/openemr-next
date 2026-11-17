@@ -25,7 +25,7 @@ public sealed class EfProblemReader(ClinicalCareDbContext db) : IProblemReader
                 SELECT l.uuid AS Uuid, pr.patient_uuid AS PatientUuid, l.pid AS Pid, l.title AS Title, l.begdate AS BeginDate,
                        l.enddate AS EndDate, l.diagnosis AS Diagnosis, l.outcome AS Outcome, l.occurrence AS Occurrence,
                        l.referredby AS ReferredBy, l.comments AS Comments, l.`date` AS RecordedAt, l.`user` AS RecordedBy,
-                       l.modifydate AS LastModified
+                       l.modifydate AS LastModified, l.verification AS Verification
                 FROM lists l
                 LEFT JOIN clinical_care_patient_ref pr ON pr.pid = l.pid
                 WHERE l.uuid = {uuidBytes} AND l.type = {EfProblemRegistry.ProblemType}
@@ -46,7 +46,7 @@ public sealed class EfProblemReader(ClinicalCareDbContext db) : IProblemReader
                 SELECT l.uuid AS Uuid, pr.patient_uuid AS PatientUuid, l.pid AS Pid, l.title AS Title, l.begdate AS BeginDate,
                        l.enddate AS EndDate, l.diagnosis AS Diagnosis, l.outcome AS Outcome, l.occurrence AS Occurrence,
                        l.referredby AS ReferredBy, l.comments AS Comments, l.`date` AS RecordedAt, l.`user` AS RecordedBy,
-                       l.modifydate AS LastModified
+                       l.modifydate AS LastModified, l.verification AS Verification
                 FROM lists l
                 LEFT JOIN clinical_care_patient_ref pr ON pr.pid = l.pid
                 WHERE l.pid = {pid} AND l.type = {EfProblemRegistry.ProblemType} AND l.uuid IS NOT NULL
@@ -80,7 +80,8 @@ public sealed class EfProblemReader(ClinicalCareDbContext db) : IProblemReader
         string.IsNullOrEmpty(row.Comments) ? null : row.Comments,
         row.RecordedAt,
         string.IsNullOrEmpty(row.RecordedBy) ? null : row.RecordedBy,
-        row.LastModified);
+        row.LastModified,
+        string.IsNullOrWhiteSpace(row.Verification) ? null : row.Verification);
 
     // Every column is nullable or defaulted here on purpose: this is the shape legacy might hold, not the shape this service writes.
     private sealed class ProblemRow
@@ -99,5 +100,6 @@ public sealed class EfProblemReader(ClinicalCareDbContext db) : IProblemReader
         public DateTime? RecordedAt { get; set; }
         public string? RecordedBy { get; set; }
         public DateTime? LastModified { get; set; }
+        public string? Verification { get; set; }
     }
 }

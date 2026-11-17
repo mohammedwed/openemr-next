@@ -25,7 +25,7 @@ namespace OpenEmrNext.ClinicalCare.Infrastructure;
 /// </remarks>
 public sealed class EfEncounterUpdater(ClinicalCareDbContext db, IAuditLog auditLog) : IEncounterUpdater
 {
-    public async Task<EncounterUpdateOutcome> UpdateAsync(EncounterUpdateRequest request, CancellationToken ct)
+    public async Task<UpdateOutcome> UpdateAsync(EncounterUpdateRequest request, CancellationToken ct)
     {
         var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(request.EncounterUuid);
         var change = request.Change;
@@ -66,8 +66,8 @@ public sealed class EfEncounterUpdater(ClinicalCareDbContext db, IAuditLog audit
                     .ToListAsync(ct);
 
                 return current.Count == 0
-                    ? new EncounterUpdateOutcome(EncounterUpdateStatus.NotFound, null)
-                    : new EncounterUpdateOutcome(EncounterUpdateStatus.Conflict, current[0]);
+                    ? new UpdateOutcome(UpdateStatus.NotFound, null)
+                    : new UpdateOutcome(UpdateStatus.Conflict, current[0]);
             }
 
             var stamp = (await db.Database
@@ -84,7 +84,7 @@ public sealed class EfEncounterUpdater(ClinicalCareDbContext db, IAuditLog audit
             await auditLog.AppendAsync(request.Audit, ct);
 
             await transaction.CommitAsync(ct);
-            return new EncounterUpdateOutcome(EncounterUpdateStatus.Updated, stamp);
+            return new UpdateOutcome(UpdateStatus.Updated, stamp);
         });
     }
 }

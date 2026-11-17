@@ -42,6 +42,8 @@ public static class AuditActions
     public const string VitalsDelete = "vitals.delete";
     public const string ProblemRecord = "problem.record";
     public const string AllergyRecord = "allergy.record";
+    public const string ProblemUpdate = "problem.update";
+    public const string AllergyUpdate = "allergy.update";
 }
 
 /// <summary>

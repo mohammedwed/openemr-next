@@ -77,9 +77,9 @@ public sealed class UpdateEncounterUseCase(
         return outcome.Status switch
         {
             // The record is read again so the caller gets exactly what is stored, including its new stamp.
-            EncounterUpdateStatus.Updated => new EncounterUpdateResult(
+            UpdateStatus.Updated => new EncounterUpdateResult(
                 await encounters.FindAsync(command.EncounterUuid, ct) ?? throw new EncounterNotFoundException(command.EncounterUuid), changed),
-            EncounterUpdateStatus.Conflict => throw new ConcurrencyConflictException(command.EncounterUuid, outcome.Stamp),
+            UpdateStatus.Conflict => throw new ConcurrencyConflictException(command.EncounterUuid, outcome.Stamp),
             _ => throw new EncounterNotFoundException(command.EncounterUuid)
         };
     }

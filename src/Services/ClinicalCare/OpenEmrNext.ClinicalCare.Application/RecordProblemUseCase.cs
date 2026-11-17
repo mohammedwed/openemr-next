@@ -16,7 +16,8 @@ public sealed record RecordProblemCommand(
     string? ReferredBy,
     string? Comments,
     long ProviderId,
-    RequestOrigin? Origin = null);
+    RequestOrigin? Origin = null,
+    string? Verification = null);
 
 /// <summary>
 /// Records a problem on a registered patient's list (M5c slice 1). Thin by design (ARC-4): resolve what the rules need through ports, let the domain
@@ -64,7 +65,7 @@ public sealed class RecordProblemUseCase(
 
         var recording = ProblemRecording.Create(
             patient, command.Title, command.BeginDate, command.EndDate, command.Diagnosis, command.Outcome, command.Occurrence,
-            command.ReferredBy, command.Comments, command.ProviderId, nowLocal, codes);
+            command.ReferredBy, command.Comments, command.ProviderId, nowLocal, codes, command.Verification);
 
         var problem = Problem.Record(recording, identities.Allocate(), nowLocal);
 

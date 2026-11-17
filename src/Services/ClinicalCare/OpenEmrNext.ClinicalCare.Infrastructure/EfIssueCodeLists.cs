@@ -14,6 +14,7 @@ public sealed class EfIssueCodeLists(ClinicalCareDbContext db) : IIssueCodeLists
 {
     public const string OutcomeList = "outcome";
     public const string OccurrenceList = "occurrence";
+    public const string ConditionVerificationList = "condition-verification";
 
     public async Task<IssueCodeData> GetCodesAsync(CancellationToken ct)
     {
@@ -22,11 +23,13 @@ public sealed class EfIssueCodeLists(ClinicalCareDbContext db) : IIssueCodeLists
                 $"""
                 SELECT list_id AS ListId, option_id AS OptionId
                 FROM list_options
-                WHERE list_id IN ({OutcomeList}, {OccurrenceList})
+                WHERE list_id IN ({OutcomeList}, {OccurrenceList}, {ConditionVerificationList})
                 """)
             .ToListAsync(ct);
 
-        return new IssueCodeData(CodesOf(rows, OutcomeList), CodesOf(rows, OccurrenceList));
+        return new IssueCodeData(
+            CodesOf(rows, OutcomeList), CodesOf(rows, OccurrenceList),
+            rows.Where(r => r.ListId == ConditionVerificationList && !string.IsNullOrEmpty(r.OptionId)).Select(r => r.OptionId!).ToHashSet(StringComparer.Ordinal));
     }
 
     private static HashSet<int> CodesOf(List<ListRow> rows, string list) =>

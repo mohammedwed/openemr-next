@@ -11,7 +11,8 @@ namespace OpenEmrNext.ClinicalCare.Domain.Allergies;
 public sealed record AllergyRecording
 {
     /// <summary>The column widths of the three coded fields: <c>reaction</c> varchar(255), <c>severity_al</c> varchar(50), <c>verification</c> varchar(36).</summary>
-    public const int MaxReactionLength = 255, MaxSeverityLength = 50, MaxVerificationLength = 36;
+    public const int MaxReactionLength = AllergyFieldRules.MaxReactionLength, MaxSeverityLength = AllergyFieldRules.MaxSeverityLength,
+        MaxVerificationLength = AllergyFieldRules.MaxVerificationLength;
 
     public PatientReference Patient { get; }
     public string Title { get; }
@@ -58,48 +59,15 @@ public sealed record AllergyRecording
     {
         var errors = new List<string>();
 
-        // AL-1 to AL-3, AL-8, AL-9
-        var trimmedTitle = IssueFieldRules.Title(title, errors);
-        IssueFieldRules.Dates(beginDate, endDate, beginRequired: false, now, errors);
-        var trimmedDiagnosis = IssueFieldRules.Diagnosis(diagnosis, errors);
-
-        // AL-4 to AL-6: a code must be one the site has configured and one its column can hold; blank means none.
-        var resolvedReaction = Code(reaction, "Reaction", codes.Reactions, MaxReactionLength, errors);
-        var resolvedSeverity = Code(severity, "Severity", codes.Severities, MaxSeverityLength, errors);
-        var resolvedVerification = Code(verification, "Verification", codes.Verifications, MaxVerificationLength, errors);
-
-        IssueFieldRules.Comments(comments, errors);
+        // AL-1 to AL-7 and AL-9: the rules an allergy's facts obey, shared with AllergyChange (AllergyFieldRules); AL-8 is about who acts.
+        var fields = AllergyFieldRules.Validate(title, beginDate, endDate, diagnosis, reaction, severity, verification, comments, now, codes, errors);
         IssueFieldRules.Provider(providerId, errors);
 
         if (errors.Count > 0)
             throw new ClinicalCareValidationException(errors);
 
         return new AllergyRecording(
-            patient, trimmedTitle!, beginDate is { } b ? IssueFieldRules.WholeSeconds(b) : null, endDate is { } e ? IssueFieldRules.WholeSeconds(e) : null,
-            trimmedDiagnosis, resolvedReaction, resolvedSeverity, resolvedVerification, string.IsNullOrWhiteSpace(comments) ? null : comments, providerId);
-    }
-
-    /// <summary>
-    /// A code is compared exactly with the configured option ids (as <c>option_id</c> values are). The width check guards the column, not the list: a site can
-    /// configure an option id longer than the column that stores it, and that must be a clean message, not a database error (review findings R-1 to R-7).
-    /// </summary>
-    private static string? Code(string? value, string label, IReadOnlySet<string> allowed, int maxLength, List<string> errors)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
-
-        if (!allowed.Contains(value))
-        {
-            errors.Add($"{label} '{value}' is not a known {label.ToLowerInvariant()}.");
-            return null;
-        }
-
-        if (value.Length > maxLength)
-        {
-            errors.Add($"{label} '{value}' is longer than the {maxLength} characters a record can hold.");
-            return null;
-        }
-
-        return value;
+            patient, fields.Title!, beginDate is { } b ? IssueFieldRules.WholeSeconds(b) : null, endDate is { } e ? IssueFieldRules.WholeSeconds(e) : null,
+            fields.Diagnosis, fields.Reaction, fields.Severity, fields.Verification, fields.Comments, providerId);
     }
 }
