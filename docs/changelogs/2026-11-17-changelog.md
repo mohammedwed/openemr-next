@@ -234,3 +234,20 @@ Full record: `docs/clinical-care/10-update-problem-and-allergy-slice.md` (rules 
 - **Shared, not copied:** `UpdateStatus` and `UpdateOutcome` are now generic across encounters, problems and allergies; the field rules live once per aggregate and serve both the
   record and the change. The refactors changed no behaviour (the existing suites passed unchanged first).
 - **Tests, all green (unit 473, architecture 45, integration 443).** OpenAPI snapshot regenerated; the whole solution builds with 0 warnings.
+
+## Added — M5c slice 4: link problems and allergies to an encounter
+
+Full record: `docs/clinical-care/11-link-issue-to-encounter-slice.md` (rules IE-1 to IE-13, limitations L1 to L5).
+
+- **Three endpoints under the encounter:** `PUT /api/v1/encounters/{encounterUuid}/issues/{issueUuid}` (201 new, 200 already there), `DELETE` on the same path (204 either way) and
+  `GET /api/v1/encounters/{encounterUuid}/issues` (paged). The gateway already routes the prefix.
+- **Stricter than legacy where legacy is unsafe:** legacy's `linkIssueToEncounter` trusts the patient id it is given and never checks the issue is that patient's; here an issue of
+  another patient is a 400 (rule IE-3). The reader also refuses to show such a link if legacy made one.
+- **Idempotent, as legacy's is, and never updated:** a second `PUT` returns the stored link (and its stored `resolved` flag) and writes, emits and audits nothing. Changing the flag is an
+  unlink and a link.
+- **Only problems and allergies can be linked:** a medication's, surgery's or any other type's uuid is a 404 (ADR 0070). Orphaned links (legacy's REST delete leaves them) are left out of lists.
+- **Unlink removes the link row only,** with an event and an audit row in the same transaction. It deliberately does **not** delete the link's `uuid_registry` row as legacy does, because that
+  would need `DELETE` on a table shared by every uuid in the system; a stale registry row is harmless.
+- **The actor columns of a new link are null** and the audit actor is unknown, rather than a guessed user id written into a clinical table; fixed when identity forwarding exists.
+- **Grants:** `SELECT, INSERT, DELETE` on `issue_encounter`; no `UPDATE`; still no `DELETE` on `uuid_registry`.
+- **Tests, all green (unit 494, architecture 49, integration 483).** OpenAPI snapshot regenerated; the whole solution builds with no new warnings.

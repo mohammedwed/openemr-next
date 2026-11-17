@@ -1029,6 +1029,226 @@
           }
         ]
       }
+    },
+    "/api/v1/encounters/{encounterUuid}/issues/{issueUuid}": {
+      "put": {
+        "tags": [
+          "Encounter issues"
+        ],
+        "summary": "Link a problem or an allergy to an encounter that addressed it (idempotent)",
+        "operationId": "LinkIssueToEncounter",
+        "parameters": [
+          {
+            "name": "encounterUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "issueUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LinkIssueRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncounterIssueLinkResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncounterIssueLinkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Encounter issues"
+        ],
+        "summary": "Remove the link between an encounter and an issue (the issue and the encounter are untouched; idempotent)",
+        "operationId": "UnlinkIssueFromEncounter",
+        "parameters": [
+          {
+            "name": "encounterUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "issueUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
+    },
+    "/api/v1/encounters/{encounterUuid}/issues": {
+      "get": {
+        "tags": [
+          "Encounter issues"
+        ],
+        "summary": "List the problems and allergies linked to an encounter, one bounded page at a time",
+        "operationId": "ListEncounterIssues",
+        "parameters": [
+          {
+            "name": "encounterUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncounterIssueListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -1316,6 +1536,119 @@
           }
         }
       },
+      "EncounterIssueLinkResponse": {
+        "required": [
+          "linkUuid",
+          "encounterUuid",
+          "issueUuid",
+          "resolved"
+        ],
+        "type": "object",
+        "properties": {
+          "linkUuid": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "encounterUuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issueUuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resolved": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EncounterIssueListResponse": {
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EncounterIssueResponse"
+            }
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "offset": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "EncounterIssueResponse": {
+        "required": [
+          "linkUuid",
+          "issueUuid",
+          "kind",
+          "title",
+          "resolved",
+          "linkedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "linkUuid": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "issueUuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "resolved": {
+            "type": "boolean"
+          },
+          "linkedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
       "EncounterListResponse": {
         "required": [
           "items",
@@ -1519,6 +1852,15 @@
                 "type": "string"
               }
             }
+          }
+        }
+      },
+      "LinkIssueRequest": {
+        "type": "object",
+        "properties": {
+          "resolved": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -2608,6 +2950,9 @@
     },
     {
       "name": "Allergies"
+    },
+    {
+      "name": "Encounter issues"
     }
   ]
 }

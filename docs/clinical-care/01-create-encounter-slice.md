@@ -123,7 +123,7 @@ chosen here (KD-7).
 |---|---|---|
 | Update an encounter | **Built in M5b** (`06-update-encounter-slice.md`) | Writer inventory, concurrency token and audit are in place (`05-update-and-audit-research.md`, ADR 0068, ADR 0069) |
 | `encounter_type` lookup (code and description) | Deferred | A code-list port; low risk, next slice |
-| Link issues to the encounter | Deferred | Problem list context exists (`issue_encounter`) |
+| Link issues to the encounter | **Built in M5c** (`11-link-issue-to-encounter-slice.md`) | The problem and allergy contexts now exist |
 | `parent_encounter_id`, billing and collection columns | Excluded here | Billing context (R8) |
 | Soft delete | Deferred | Update path and audit first |
 | `sensitivity` enforcement | Deferred, see F-CC-2 | Authorization policy port (SEC-5) |

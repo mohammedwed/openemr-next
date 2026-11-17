@@ -16,6 +16,7 @@ public static class ClinicalCareEndpoints
         v1.MapVitalsEndpoints();
         v1.MapProblemEndpoints();
         v1.MapAllergyEndpoints();
+        v1.MapEncounterIssueEndpoints();
 
         // Event delivery: a separate path, a separate scheme, never routed by the gateway (ADR 0066).
         app.MapInternalEventEndpoints();
