@@ -117,5 +117,5 @@ the first two through `IEncounterCodeLists` and `IFacilityDirectory`), and, once
 
 **Cost:** API endpoints with tests, an OpenAPI snapshot and client regeneration, then selects in `CreateEncounterDialog`.
 
-**Update (M5d slice 4):** the three read endpoints (classes, facilities, calendar categories) are built and tested (`docs/clinical-care/18-lookups-slice.md`). **Still open:** wiring the selects into `CreateEncounterDialog`, and providers, which wait for identity forwarding.
+**Update (M5d slice 4):** the three read endpoints (classes, facilities, calendar categories) are built and tested (`docs/clinical-care/18-lookups-slice.md`). The selects are wired into `CreateEncounterDialog`, with a fallback to the old fields if a lookup cannot be loaded. **Still open:** providers, which wait for identity forwarding.
 

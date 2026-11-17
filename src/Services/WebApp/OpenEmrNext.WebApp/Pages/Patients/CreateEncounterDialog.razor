@@ -11,14 +11,20 @@
         {
             <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mb-4" role="alert">@error</MudAlert>
         }
+        @if (_lookupsFailed)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mb-4" role="alert">
+                The lists of classes, categories and facilities could not be loaded, so they are shown as plain fields. You can still create the encounter.
+            </MudAlert>
+        }
         <MudForm @ref="_form" Model="_model">
             <MudStack Spacing="4">
                 <MudSelect T="string" @bind-Value="_model.ClassCode" Label="Class" Required="true" RequiredError="Choose a class."
                     Variant="Variant.Outlined">
-                    @* Not named "code": "@code" is Razor's own directive. *@
-                    @foreach (var classCode in CodeLabels.EncounterClassCodes)
+                    @* Not named "code": "@code" is Razor's own directive. The configured classes when they loaded, the legacy defaults when not. *@
+                    @foreach (var option in _classes)
                     {
-                        <MudSelectItem Value="@classCode">@CodeLabels.Of(classCode)</MudSelectItem>
+                        <MudSelectItem Value="@option.Code">@option.Title</MudSelectItem>
                     }
                 </MudSelect>
 
@@ -42,14 +48,40 @@
                     <MudItem xs="12" sm="6">
                         @* Validation messages, not Min/Max: a numeric field with bounds silently rewrites a typed value to
                            the nearest bound, so a typo would be saved as something the user never entered. *@
-                        <MudNumericField T="int" @bind-Value="_model.CalendarCategoryId" Label="Calendar category id" Required="true"
-                            Validation="_validateCategory"
-                            Variant="Variant.Outlined" HelperText="Legacy calendar category (pc_catid)." />
+                        @if (_categories.Count > 0)
+                        {
+                            <MudSelect T="int" @bind-Value="_model.CalendarCategoryId" Label="Visit category" Required="true" RequiredError="Choose a category."
+                                Variant="Variant.Outlined">
+                                @foreach (var category in _categories)
+                                {
+                                    <MudSelectItem Value="@category.Id">@category.Name</MudSelectItem>
+                                }
+                            </MudSelect>
+                        }
+                        else
+                        {
+                            <MudNumericField T="int" @bind-Value="_model.CalendarCategoryId" Label="Calendar category id" Required="true"
+                                Validation="_validateCategory"
+                                Variant="Variant.Outlined" HelperText="Legacy calendar category (pc_catid)." />
+                        }
                     </MudItem>
                     <MudItem xs="12" sm="6">
-                        <MudNumericField T="int" @bind-Value="_model.FacilityId" Label="Facility id"
-                            Validation="_validateFacility"
-                            Variant="Variant.Outlined" HelperText="0 for none. Any other id must exist." />
+                        @if (_facilities.Count > 0)
+                        {
+                            <MudSelect T="int" @bind-Value="_model.FacilityId" Label="Facility" Variant="Variant.Outlined">
+                                <MudSelectItem Value="0">None</MudSelectItem>
+                                @foreach (var facility in _facilities)
+                                {
+                                    <MudSelectItem Value="@facility.Id">@facility.Name</MudSelectItem>
+                                }
+                            </MudSelect>
+                        }
+                        else
+                        {
+                            <MudNumericField T="int" @bind-Value="_model.FacilityId" Label="Facility id"
+                                Validation="_validateFacility"
+                                Variant="Variant.Outlined" HelperText="0 for none. Any other id must exist." />
+                        }
                     </MudItem>
                 </MudGrid>
 
@@ -100,12 +132,57 @@
     private readonly Model _model = new();
     private bool _saving;
     private string? _error;
+    private bool _lookupsFailed;
 
-    protected override void OnInitialized()
+    // What the lookups returned. The class list starts as the legacy defaults, so the dialog is usable (and the select is never empty) even before, or without, the lookup.
+    private IReadOnlyList<(string Code, string Title)> _classes = CodeLabels.EncounterClassCodes.Select(c => (c, CodeLabels.Of(c))).ToList();
+    private IReadOnlyList<CalendarCategoryLookupResponse> _categories = [];
+    private IReadOnlyList<FacilityLookupResponse> _facilities = [];
+
+    protected override async Task OnInitializedAsync()
     {
         var now = DateTime.Now;
         _model.Date = now.Date;
         _model.Time = new TimeSpan(now.Hour, now.Minute, 0);
+
+        await LoadLookupsAsync();
+    }
+
+    /// <summary>
+    /// The lists the service has configured (M5d slice 4). All three are read together; if any fails the dialog falls back to what it had before (the fixed class list and plain id fields) rather than
+    /// refusing to open, because an outage of a convenience must not stop an encounter being recorded.
+    /// </summary>
+    private async Task LoadLookupsAsync()
+    {
+        try
+        {
+            var classes = await ClinicalCare.ListEncounterClassesAsync();
+            var categories = await ClinicalCare.ListCalendarCategoriesAsync();
+            var facilities = await ClinicalCare.ListFacilitiesAsync();
+
+            if (classes.Count > 0)
+            {
+                _classes = classes.Select(c => (c.Code, c.Title)).ToList();
+                _model.ClassCode = (classes.FirstOrDefault(c => c.IsDefault) ?? classes.First()).Code;
+            }
+
+            _categories = categories.ToList();
+            if (_categories.Count > 0 && _categories.All(c => c.Id != _model.CalendarCategoryId))
+            {
+                _model.CalendarCategoryId = _categories[0].Id;
+            }
+
+            _facilities = facilities.ToList();
+            // Legacy preselects the facility when there is only one to choose.
+            if (_facilities.Count == 1)
+            {
+                _model.FacilityId = _facilities[0].Id;
+            }
+        }
+        catch (Exception ex) when (ex is ClinicalCareApiException or HttpRequestException)
+        {
+            _lookupsFailed = true;
+        }
     }
 
     private void Cancel() => MudDialog.Cancel();
@@ -164,8 +241,8 @@
 
         public string? Reason { get; set; }
 
-        // 5 is the category the slice's own tests and smoke runs use; there is no lookup endpoint to read the
-        // real list from yet, so it is a plain field.
+        // 5 is the category the slice's own tests and smoke runs use. It is only the starting value of the plain field shown when the
+        // lookups cannot be loaded; with them, the first configured category replaces it unless it is one of them.
         public int CalendarCategoryId { get; set; } = 5;
 
         public int FacilityId { get; set; }

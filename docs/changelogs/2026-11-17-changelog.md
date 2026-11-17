@@ -346,3 +346,10 @@ Full record: `docs/clinical-care/18-lookups-slice.md` (rules LK-1 to LK-6, limit
 - **Grants:** `SELECT` on `inactive` and `service_location` of `facility`, and on six columns of `openemr_postcalendar_categories`; nothing else about either table is readable and neither is writable.
 - **Not yet done:** the WebApp still shows its fixed class list and numeric category and facility fields.
 - **Tests, all green (unit 650, architecture 63, integration 692).** The solution builds with only the 7 pre-existing warnings.
+
+## Changed — M5d: lookups wired into the WebApp, and the gateway now routes immunizations and lookups
+
+- **Create-encounter dialog:** class, visit category and facility are now selects filled from the lookups (class defaults to legacy's default, category to the first configured one, facility to the only one when there is exactly one). If a lookup cannot be loaded the
+  dialog warns and falls back to the previous fixed class list and plain id fields. Not browser-verified.
+- **Bug fixed: the gateway had no route for `/api/v1/immunizations` or `/api/v1/lookups`.** Both were served by Clinical Care and built with passing tests, but 404ed for every browser, because the gateway lists each prefix it forwards and its own tests run only against a live stack. Both routes added.
+- **Guard:** `GatewayRoutesTests` (Clinical Care suite) compares every API prefix in the OpenAPI document with the gateway's route list, so a new route group cannot be built and left unreachable. Verified to fail without the fix.

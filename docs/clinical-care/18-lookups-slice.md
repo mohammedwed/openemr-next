@@ -1,7 +1,7 @@
 # Clinical Care M5d slice 4: encounter lookups
 
 - **Milestone:** ROADMAP M5d, slice 4. **Closes the API half of** decision 10 in [patient-view-pending-decisions.md](../patient-view-pending-decisions.md) (lookups for the encounter form).
-- **Endpoints:** `GET /api/v1/lookups/encounter-classes`, `GET /api/v1/lookups/facilities`, `GET /api/v1/lookups/calendar-categories`. **Status:** API built; suites green (section 4). The WebApp still shows its fixed list and numeric fields; wiring the selects is the remaining half.
+- **Endpoints:** `GET /api/v1/lookups/encounter-classes`, `GET /api/v1/lookups/facilities`, `GET /api/v1/lookups/calendar-categories`. **Status:** built and wired into the WebApp's create-encounter dialog; suites green (section 4). Not browser-verified (needs a signed-in user).
 
 ## 1. What it does
 
@@ -23,7 +23,8 @@ Creating or updating an encounter takes a class code, a calendar category id and
 | # | Limitation | Why accepted |
 |---|---|---|
 | L1 | Creating an encounter still accepts **any** category id of 1 or more: it is not validated against the category table (as before). A lookup narrows what the UI offers, not what the API accepts. | Existing behaviour; validating needs a decision on legacy categories of other types |
-| L2 | The WebApp is not yet wired to the lookups. | Next step: regenerate the client and replace the three fields in `CreateEncounterDialog` |
+| L2 | **The WebApp falls back** to the fixed class list and plain id fields when any lookup cannot be loaded, with a warning, so an outage of a convenience cannot stop an encounter being recorded. With the lookups, the class defaults to legacy's default, the category to the first configured one, and the facility to the only one when there is exactly one (as legacy does). | Deliberate |
+| L4 | **The gateway had no route for these (or for immunizations).** `/api/v1/immunizations` and `/api/v1/lookups` were served by Clinical Care but 404 through the gateway, and nothing caught it because the gateway's tests run only against a live stack. Fixed, with `GatewayRoutesTests` in the Clinical Care suite comparing every API prefix in the OpenAPI document with the gateway's route list (it fails without the fix). | Found while wiring the WebApp |
 | L3 | No providers list (LK-5). | Needs identity |
 
 ## 4. Tests
