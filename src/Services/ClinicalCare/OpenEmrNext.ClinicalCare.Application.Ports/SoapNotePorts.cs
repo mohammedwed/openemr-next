@@ -4,9 +4,13 @@ using OpenEmrNext.ClinicalCare.Domain.ValueObjects;
 
 namespace OpenEmrNext.ClinicalCare.Application.Ports;
 
-/// <summary>The outbox payload for <c>SoapNoteRecorded</c>: identifiers and the names of the sections written, never their text (EVT-5). <paramref name="NoteId"/> is <c>0</c> until the registry assigns it.</summary>
+/// <summary>
+/// The outbox payload for <c>SoapNoteRecorded</c>: identifiers and the names of the sections written, never their text (EVT-5). <paramref name="NoteId"/> is <c>0</c> until the registry assigns it.
+/// <paramref name="AttemptId"/> names one attempt to record this note: a note has no identity before it is inserted, so the registry gives the attempt one, writes it into this event in the same transaction as the
+/// note, and finds it again if the transaction is run twice (ADR 0077). It is <c>default</c> until the registry sets it.
+/// </summary>
 public sealed record SoapNoteRecordedEvent(
-    long NoteId, Guid EncounterUuid, long EncounterNumber, Guid PatientUuid, long PatientPid, IReadOnlyList<string> SectionsWritten, DateTime RecordedAtUtc)
+    long NoteId, Guid EncounterUuid, long EncounterNumber, Guid PatientUuid, long PatientPid, IReadOnlyList<string> SectionsWritten, DateTime RecordedAtUtc, Guid AttemptId = default)
 {
     public const string EventType = "SoapNoteRecorded";
 }

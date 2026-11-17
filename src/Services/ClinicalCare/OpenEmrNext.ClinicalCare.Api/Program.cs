@@ -13,6 +13,7 @@ app.UseAuthorization();
 
 // A verified user on every /api/v1 route (ADR 0075), checked before any body is read.
 app.UseVerifiedUser();
+app.UseIdempotency();
 
 app.MapClinicalCareEndpoints();
 

@@ -81,3 +81,4 @@ old one's status is updated to point to it.
 | [0074](0074-clinical-notes-get-their-own-parent-form-allocated-under-a-database-lock.md) | Clinical notes get their own parent form, its id allocated under a database lock | Accepted | 2026-11-17 |
 | [0075](0075-the-gateway-validates-the-session-and-forwards-the-verified-user.md) | The gateway validates the session and forwards the verified user to Clinical Care and Patient Management | Accepted | 2026-11-17 |
 | [0076](0076-deleting-records-needs-legacys-admin-super-right-and-is-a-flag-not-a-removal.md) | Deleting vitals, SOAP notes and clinical notes needs legacy's admin/super right, and is a flag, not a removal | Accepted | 2026-11-17 |
+| [0077](0077-creating-requests-accept-an-idempotency-key-and-soap-notes-guard-their-own-retries.md) | Creating requests accept an Idempotency-Key, and a SOAP note guards its own retry | Accepted | 2026-11-17 |

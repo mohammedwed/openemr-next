@@ -9,8 +9,10 @@ namespace OpenEmrNext.ClinicalCare.Infrastructure;
 /// row), plus the acting provider's username and group which that path leaves empty, the outbox row and the audit row. A note has no uuid, so no <c>uuid_registry</c> row exists.
 /// </summary>
 /// <remarks>
-/// <b>No retry guard.</b> Other registries find an earlier committed attempt by uuid. A note has no identity before its insert, so a transaction retried after a lost commit acknowledgement could write a second note.
-/// That needs a transient fault at the exact instant of the commit reply, and is stated as a limitation (docs/clinical-care/17-soap-notes-slice.md, L2); idempotency keys are deferred (F-CC-8).
+/// <b>Retry guard (ADR 0077).</b> Other registries find an earlier committed attempt by uuid. A note has no identity before its insert, so the attempt is given one: a fresh id, written into the
+/// <c>SoapNoteRecorded</c> event in the same transaction as the note. If the execution strategy runs the transaction again (a transient fault, possibly at the instant of the commit reply, after the commit had
+/// happened), the second run first looks for an event carrying this attempt's id and, if it is there, returns that note instead of writing another. The lookup runs only on a re-run, never on the first attempt,
+/// so the usual path pays nothing for it.
 /// </remarks>
 public sealed class EfSoapNoteRegistry(ClinicalCareDbContext db, IAuditLog auditLog) : ISoapNoteRegistry
 {
@@ -20,9 +22,27 @@ public sealed class EfSoapNoteRegistry(ClinicalCareDbContext db, IAuditLog audit
         var pid = note.Encounter.Patient.Pid;
         var number = note.Encounter.Number;
 
+        var attemptId = Guid.NewGuid();
+        var runs = 0;
+
         var strategy = db.Database.CreateExecutionStrategy();
         var id = await strategy.ExecuteAsync(async () =>
         {
+            if (runs++ > 0)
+            {
+                // A re-run: the earlier one may have committed before its acknowledgement was lost. If it did, its event carries this attempt's id.
+                var earlier = await db.Database
+                    .SqlQuery<long>(
+                        $"""
+                        SELECT CAST(JSON_VALUE(payload, '$.payload.noteId') AS SIGNED) AS Value FROM clinical_care_outbox
+                        WHERE event_type = {SoapNoteRecordedEvent.EventType} AND JSON_VALUE(payload, '$.payload.attemptId') = {attemptId.ToString()}
+                        LIMIT 1
+                        """)
+                    .ToListAsync(ct);
+                if (earlier.Count == 1)
+                    return earlier[0];
+            }
+
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
             var actor = await LegacyActor.ResolveAsync(db, note.ProviderId, ct);
@@ -42,7 +62,7 @@ public sealed class EfSoapNoteRegistry(ClinicalCareDbContext db, IAuditLog audit
                 """, ct);
 
             var audit = auditFor(rowId);
-            var recorded = @event with { NoteId = rowId };
+            var recorded = @event with { NoteId = rowId, AttemptId = attemptId };
             var envelope = EventEnvelope.Serialize(
                 SoapNoteRecordedEvent.EventType, recorded.RecordedAtUtc, $"soap:{rowId}", actor: audit.Actor.Subject, recorded);
             await db.Database.ExecuteSqlInterpolatedAsync(
