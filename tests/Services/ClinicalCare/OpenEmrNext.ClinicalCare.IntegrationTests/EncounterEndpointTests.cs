@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using OpenEmrNext.ClinicalCare.Api.Contracts.Requests;
 using OpenEmrNext.ClinicalCare.Api.Contracts.Responses;
+using OpenEmrNext.ClinicalCare.Domain.ValueObjects;
 
 namespace OpenEmrNext.ClinicalCare.IntegrationTests;
 
@@ -204,6 +205,33 @@ public class EncounterEndpointTests(ClinicalCareContainerFixture fixture) : IAsy
         Assert.Equal("AMB", body.ClassCode);
         Assert.Equal("Main Clinic", body.FacilityName);
         Assert.Equal("Cough", body.Reason);
+    }
+
+    [Fact]
+    public async Task GET_encounter_returns_a_strong_etag_that_is_the_rows_stamp_and_changes_when_another_writer_edits_it()
+    {
+        var created = await (await _client.PostAsJsonAsync("/api/v1/encounters", Valid())).Content.ReadFromJsonAsync<EncounterCreatedResponse>();
+        await fixture.RootExecuteAsync("UPDATE form_encounter SET last_update = '2026-01-02 03:04:05'");
+
+        var first = await _client.GetAsync($"/api/v1/encounters/{created!.Uuid}");
+        var again = await _client.GetAsync($"/api/v1/encounters/{created.Uuid}");
+        await fixture.RootExecuteAsync("UPDATE form_encounter SET reason = 'edited in the legacy screen'");   // not setting last_update: the database does
+        var afterLegacyEdit = await _client.GetAsync($"/api/v1/encounters/{created.Uuid}");
+
+        var expected = ConcurrencyToken.From(new DateTime(2026, 1, 2, 3, 4, 5)).ToETag();
+        Assert.Equal(expected, first.Headers.ETag?.ToString());
+        Assert.False(first.Headers.ETag!.IsWeak);
+        Assert.Equal(expected, again.Headers.ETag?.ToString());           // unchanged row, unchanged tag
+        Assert.NotEqual(expected, afterLegacyEdit.Headers.ETag?.ToString());
+    }
+
+    [Fact]
+    public async Task A_404_carries_no_etag()
+    {
+        var response = await _client.GetAsync($"/api/v1/encounters/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Null(response.Headers.ETag);
     }
 
     [Fact]

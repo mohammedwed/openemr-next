@@ -131,3 +131,16 @@ Full record: `docs/clinical-care/05-update-and-audit-research.md`. No code; bran
 - **Tests, all green (unit 236, architecture 31, integration 192):** unit tests for both use cases (unknown record, validation failure, empty uuid, no
   separate row on success, no number taken by a refusal); integration tests against the real database and through the HTTP endpoints.
 - **Phase 1a remaining:** `ETag` / `If-Match` (412, 428) and the update and delete event types.
+
+## Added — M5b phase 1a, increment 4: the concurrency token and `ETag` on reads
+
+- **`ConcurrencyToken`** (Domain): the row's last-update stamp as a **strong `ETag`** (tick count in hex, quoted), plus a strict `If-Match` parser. It rejects
+  weak tags, `*`, garbage, and any tick count that is not a whole second we could have issued, so a sloppy header can never make a stale write succeed.
+  Sub-second parts are dropped because the column cannot hold them.
+- **`EncounterView.LastUpdate` and `VitalsView.LastUpdated`** (optional, so existing constructions are unchanged), selected by both readers. No grant
+  change: the service already holds table-level `SELECT`.
+- **`GET /encounters/{uuid}` and `GET .../vitals/{uuid}` return an `ETag`** (single-record reads only; lists and 404s carry none). It changes when *any*
+  writer changes the row, which the tests prove by editing the row directly as root the way a legacy screen does.
+- **Plan change:** `If-Match` handling, 428 and 412 are built **with the first write endpoint (Phase 2)**, where they can be pinned through real HTTP,
+  rather than as unused code now. The update and delete event types move into the phases that emit them (2 and 3) for the same reason.
+- **Tests, all green (unit 256, architecture 31, integration 196):** `ConcurrencyTokenTests` (unit), an encounter-reader test, and `ETag` tests for both GET endpoints.

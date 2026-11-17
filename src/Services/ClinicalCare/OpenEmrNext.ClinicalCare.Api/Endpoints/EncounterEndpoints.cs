@@ -48,7 +48,7 @@ public static class EncounterEndpoints
             ? Results.Problem(
                 title: "Encounter not found.", detail: $"No encounter with uuid {uuid} exists.",
                 statusCode: StatusCodes.Status404NotFound)
-            : Results.Ok(EncounterResponse.From(view));
+            : Preconditions.Ok(EncounterResponse.From(view), view.LastUpdate);
     }
 
     private static async Task<IResult> ListEncounters(

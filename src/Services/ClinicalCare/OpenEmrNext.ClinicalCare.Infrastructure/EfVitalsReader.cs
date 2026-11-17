@@ -35,7 +35,8 @@ public sealed class EfVitalsReader(ClinicalCareDbContext db) : IVitalsReader
                 SELECT v.id AS Id, v.uuid AS Uuid, v.date AS Date, v.`user` AS RecordedBy, v.bps AS Bps, v.bpd AS Bpd,
                        v.weight AS Weight, v.height AS Height, v.temperature AS Temperature, v.temp_method AS TempMethod,
                        v.pulse AS Pulse, v.respiration AS Respiration, v.oxygen_saturation AS OxygenSaturation,
-                       v.waist_circ AS Waist, v.head_circ AS Head, v.BMI AS Bmi, v.BMI_status AS BmiStatus, v.note AS Note
+                       v.waist_circ AS Waist, v.head_circ AS Head, v.BMI AS Bmi, v.BMI_status AS BmiStatus, v.note AS Note,
+                       v.last_updated AS LastUpdated
                 FROM form_vitals v
                 WHERE v.uuid = {uuidBytes}
                   AND EXISTS (SELECT 1 FROM forms f WHERE f.form_id = v.id AND f.formdir = 'vitals' AND f.deleted = 0
@@ -57,7 +58,8 @@ public sealed class EfVitalsReader(ClinicalCareDbContext db) : IVitalsReader
                 SELECT v.id AS Id, v.uuid AS Uuid, v.date AS Date, v.`user` AS RecordedBy, v.bps AS Bps, v.bpd AS Bpd,
                        v.weight AS Weight, v.height AS Height, v.temperature AS Temperature, v.temp_method AS TempMethod,
                        v.pulse AS Pulse, v.respiration AS Respiration, v.oxygen_saturation AS OxygenSaturation,
-                       v.waist_circ AS Waist, v.head_circ AS Head, v.BMI AS Bmi, v.BMI_status AS BmiStatus, v.note AS Note
+                       v.waist_circ AS Waist, v.head_circ AS Head, v.BMI AS Bmi, v.BMI_status AS BmiStatus, v.note AS Note,
+                       v.last_updated AS LastUpdated
                 FROM form_vitals v
                 WHERE v.uuid IS NOT NULL
                   AND EXISTS (SELECT 1 FROM forms f WHERE f.form_id = v.id AND f.formdir = 'vitals' AND f.deleted = 0
@@ -102,7 +104,8 @@ public sealed class EfVitalsReader(ClinicalCareDbContext db) : IVitalsReader
         Present(row.Head),
         Present(row.Bmi),
         string.IsNullOrEmpty(row.BmiStatus) ? null : row.BmiStatus,
-        string.IsNullOrEmpty(row.Note) ? null : row.Note);
+        string.IsNullOrEmpty(row.Note) ? null : row.Note,
+        row.LastUpdated);
 
     /// <summary>CV-12: a stored zero is "not recorded".</summary>
     private static decimal? Present(decimal? stored) => stored is null or 0m ? null : stored;
@@ -134,5 +137,6 @@ public sealed class EfVitalsReader(ClinicalCareDbContext db) : IVitalsReader
         public decimal? Bmi { get; set; }
         public string? BmiStatus { get; set; }
         public string? Note { get; set; }
+        public DateTime? LastUpdated { get; set; }
     }
 }

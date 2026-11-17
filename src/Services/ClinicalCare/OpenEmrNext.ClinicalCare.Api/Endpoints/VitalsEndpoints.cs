@@ -120,7 +120,7 @@ public static class VitalsEndpoints
 
             return view is null
                 ? NotFound("Vitals not found.", $"Encounter {encounterUuid} has no vitals with uuid {vitalsUuid}.")
-                : Results.Ok(VitalsResponse.From(view, system));
+                : Preconditions.Ok(VitalsResponse.From(view, system), view.LastUpdated);
         }
         catch (EncounterNotFoundException ex)
         {

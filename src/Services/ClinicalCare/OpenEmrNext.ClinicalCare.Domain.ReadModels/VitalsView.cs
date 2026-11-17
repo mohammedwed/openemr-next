@@ -23,6 +23,7 @@ namespace OpenEmrNext.ClinicalCare.Domain.ReadModels;
 /// <param name="Bmi">Body mass index as stored, kg/m².</param>
 /// <param name="BmiStatus">The stored BMI category label.</param>
 /// <param name="Note">A free-text note.</param>
+/// <param name="LastUpdated">When the row last changed, by any writer: the basis of the concurrency token (ADR 0068).</param>
 public sealed record VitalsView(
     Guid Uuid,
     DateTime? RecordedAt,
@@ -40,7 +41,8 @@ public sealed record VitalsView(
     decimal? HeadInches,
     decimal? Bmi,
     string? BmiStatus,
-    string? Note);
+    string? Note,
+    DateTime? LastUpdated = null);
 
 /// <summary>One page of an encounter's vitals, newest first, with the total so a caller can page.</summary>
 public sealed record VitalsPage(IReadOnlyList<VitalsView> Items, int Total);

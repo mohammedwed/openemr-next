@@ -35,7 +35,8 @@ public sealed class EfEncounterReader(ClinicalCareDbContext db) : IEncounterRead
                 SELECT fe.id AS Id, fe.uuid AS Uuid, fe.encounter AS Number, fe.pid AS Pid, pd.patient_uuid AS PatientUuid,
                        fe.class_code AS ClassCode, fe.date AS Date, fe.onset_date AS OnsetDate, fe.reason AS Reason,
                        fe.facility_id AS FacilityId, fe.facility AS FacilityName, CAST(fe.pos_code AS SIGNED) AS PosCode,
-                       fe.provider_id AS ProviderId, fe.sensitivity AS Sensitivity
+                       fe.provider_id AS ProviderId, fe.sensitivity AS Sensitivity,
+                       fe.last_update AS LastUpdate
                 FROM form_encounter fe
                 LEFT JOIN clinical_care_patient_ref pd ON pd.pid = fe.pid
                 WHERE fe.uuid = {uuidBytes}
@@ -57,7 +58,8 @@ public sealed class EfEncounterReader(ClinicalCareDbContext db) : IEncounterRead
                 SELECT fe.id AS Id, fe.uuid AS Uuid, fe.encounter AS Number, fe.pid AS Pid, pd.patient_uuid AS PatientUuid,
                        fe.class_code AS ClassCode, fe.date AS Date, fe.onset_date AS OnsetDate, fe.reason AS Reason,
                        fe.facility_id AS FacilityId, fe.facility AS FacilityName, CAST(fe.pos_code AS SIGNED) AS PosCode,
-                       fe.provider_id AS ProviderId, fe.sensitivity AS Sensitivity
+                       fe.provider_id AS ProviderId, fe.sensitivity AS Sensitivity,
+                       fe.last_update AS LastUpdate
                 FROM form_encounter fe
                 LEFT JOIN clinical_care_patient_ref pd ON pd.pid = fe.pid
                 WHERE fe.pid = {pid} AND fe.uuid IS NOT NULL
@@ -99,7 +101,8 @@ public sealed class EfEncounterReader(ClinicalCareDbContext db) : IEncounterRead
         row.FacilityName,
         row.PosCode is { } pos ? (int)pos : null,
         row.ProviderId ?? 0,
-        row.Sensitivity);
+        row.Sensitivity,
+        row.LastUpdate);
 
     // Every column is nullable or defaulted here on purpose: this is the shape legacy might hold, not the shape
     // this service writes. A zero-date datetime reads back as NULL through the connector's default handling.
@@ -119,5 +122,6 @@ public sealed class EfEncounterReader(ClinicalCareDbContext db) : IEncounterRead
         public long? PosCode { get; set; }
         public long? ProviderId { get; set; }
         public string? Sensitivity { get; set; }
+        public DateTime? LastUpdate { get; set; }
     }
 }
