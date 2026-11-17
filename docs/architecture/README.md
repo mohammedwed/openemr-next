@@ -72,5 +72,5 @@ old one's status is updated to point to it.
 | [0065](0065-vitals-are-stored-in-us-units-and-the-api-takes-explicit-units.md) | Vitals are stored in US units, and the API takes and returns explicit units | Accepted | 2026-11-16 |
 | [0066](0066-patient-registered-reaches-clinical-care-through-an-outbox-relay-over-http.md) | PatientRegistered reaches Clinical Care through an outbox relay over HTTP, with a secret of its own | Accepted | 2026-11-16 |
 | [0067](0067-webapp-covers-encounters-and-vitals.md) | WebApp's frontend extends to encounters and vitals | Accepted | 2026-11-17 |
-| [0068](0068-clinical-care-updates-are-conditional-on-last-update-and-touch-only-owned-columns.md) | Clinical Care updates are conditional on the row's last-update stamp and touch only the columns they own | Proposed | 2026-11-17 |
+| [0068](0068-clinical-care-updates-are-conditional-on-last-update-and-touch-only-owned-columns.md) | Clinical Care updates are conditional on the row's last-update stamp and touch only the columns they own | Accepted | 2026-11-17 |
 | [0069](0069-clinical-care-audits-writes-to-its-own-append-only-table.md) | Clinical Care audits its writes in its own append-only table | Proposed | 2026-11-17 |

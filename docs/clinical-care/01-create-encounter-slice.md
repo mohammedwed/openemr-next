@@ -121,7 +121,7 @@ chosen here (KD-7).
 
 | Item | Status | Precondition to build |
 |---|---|---|
-| Update an encounter | Deferred | Per-column writer inventory (LEG-8), concurrency token (LEG-10), audit (SEC-9) |
+| Update an encounter | **Built in M5b** (`06-update-encounter-slice.md`) | Writer inventory, concurrency token and audit are in place (`05-update-and-audit-research.md`, ADR 0068, ADR 0069) |
 | `encounter_type` lookup (code and description) | Deferred | A code-list port; low risk, next slice |
 | Link issues to the encounter | Deferred | Problem list context exists (`issue_encounter`) |
 | `parent_encounter_id`, billing and collection columns | Excluded here | Billing context (R8) |

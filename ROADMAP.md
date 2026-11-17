@@ -336,7 +336,7 @@ M5 proved the slice pattern but both aggregates are create-only. M5b closes that
   ADR 0068 (conditional updates on owned columns), ADR 0069 (own append-only audit table), both Proposed.
 - **Phase 1a (done Nov 17):** `IAuditLog` port, `clinical_care_audit` table and grants, adapter, audited creates and audited refusals (built Nov 17; Clinical Care suites green: unit 236, architecture 31, integration 192); `ETag` on single-record reads built (suites green: unit 256, architecture 31, integration 196). `If-Match` (412, 428) and the update and delete events arrive with the endpoints that use them (phases 2 and 3). Phase 1a is otherwise done.
 - **Phase 1b:** gateway validates the session and forwards a verified actor; fixes F-CC-1, the placeholder provider and the open patient API.
-- **Phase 2:** update an encounter (`PUT`). **Phase 3a:** correct vitals. **Phase 3b:** permission port, then soft delete.
+- **Phase 2 (done Nov 17; suites green: unit 300, architecture 33, integration 253):** update an encounter (`PUT`, `If-Match`, 412 and 428), `docs/clinical-care/06-update-encounter-slice.md`. **Phase 3a:** correct vitals. **Phase 3b:** permission port, then soft delete.
 - **Phase 4:** lookup endpoints and WebApp edit flows. **Phase 5:** shadow comparison of update, concurrency test, layered review.
 - **Out of scope for good:** whole-encounter hard delete (`deleter.php` reaches billing). **Deferred:** idempotency keys (F-CC-8),
   sensitive-read audit, amendments with history.

@@ -144,3 +144,24 @@ Full record: `docs/clinical-care/05-update-and-audit-research.md`. No code; bran
 - **Plan change:** `If-Match` handling, 428 and 412 are built **with the first write endpoint (Phase 2)**, where they can be pinned through real HTTP,
   rather than as unused code now. The update and delete event types move into the phases that emit them (2 and 3) for the same reason.
 - **Tests, all green (unit 256, architecture 31, integration 196):** `ConcurrencyTokenTests` (unit), an encounter-reader test, and `ETag` tests for both GET endpoints.
+
+## Added — M5b phase 2: update an encounter (`PUT /api/v1/encounters/{uuid}`)
+
+Full record: `docs/clinical-care/06-update-encounter-slice.md` (rules CC-18 to CC-31, limitations L1 to L6). ADR 0068 is now Accepted.
+
+- **The first function beyond create:** replace an encounter's editable set (class, calendar category, date, onset date, reason, facility, place of
+  service, provider), conditional on the `ETag` the caller read. 200 with the new `ETag`; **428** without `If-Match`; **412** (carrying the current
+  `ETag`) when the record changed, including when a legacy screen or billing action changed it; 400, 401 and 404 as elsewhere.
+- **Only owned columns are written.** The database user gets `UPDATE` on exactly nine columns of `form_encounter`; billing, identity, `sensitivity`
+  and every unowned column are untouched and cannot be touched (tests assert both the grant and the data).
+- **The check happens twice, on purpose:** the use case compares the stamp for a clean 412, and the `UPDATE ... WHERE last_update = ?` closes the race
+  a legacy edit would otherwise win. One transaction holds the update, the `EncounterUpdated` event and the `encounter.update` audit row; a failing
+  audit insert rolls the update back.
+- **No-op updates write nothing** (no event, no audit row). Dates are compared at whole-second precision.
+- **Shared rules:** the field rules moved into `EncounterFieldRules`, used by both `EncounterCreation` and the new `EncounterChange`, so a create and an
+  update cannot disagree about what is valid. `EncounterResponse` gains `calendarCategoryId`.
+- **The actor of an update is recorded as unknown** (verified = 0), by design: the request's `providerId` is whose encounter it is, not who edited it,
+  and `form_encounter` has no `user` column. Phase 1b supplies the verified actor.
+- **Contract:** the OpenAPI snapshot was regenerated (`generate-clinicalcare-openapi.sh`); the generated client and the whole solution build with no new warnings.
+- **Tests, all green on the first run (unit 300, architecture 33, integration 253):** domain (`EncounterChangeTests`), application (`EncounterChangeSetTests`,
+  `UpdateEncounterUseCaseTests`), adapter (`EncounterUpdaterTests`), HTTP (`EncounterUpdateEndpointTests`), and revised grant tests.

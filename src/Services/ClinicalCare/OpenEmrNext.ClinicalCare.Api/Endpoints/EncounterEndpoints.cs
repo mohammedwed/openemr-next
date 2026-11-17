@@ -21,6 +21,16 @@ public static class EncounterEndpoints
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        app.MapPut("/encounters/{uuid:guid}", UpdateEncounter)
+            .WithName("UpdateEncounter")
+            .WithTags("Encounters")
+            .WithSummary("Replace an encounter's editable fields, conditional on the ETag the caller read")
+            .Produces<EncounterResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesProblem(StatusCodes.Status428PreconditionRequired);
+
         app.MapGet("/encounters/{uuid:guid}", GetEncounter)
             .WithName("GetEncounter")
             .WithTags("Encounters")
@@ -37,6 +47,39 @@ public static class EncounterEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         return app;
+    }
+
+    private static async Task<IResult> UpdateEncounter(
+        Guid uuid, UpdateEncounterRequest request, UpdateEncounterUseCase useCase, HttpContext http, CancellationToken ct)
+    {
+        // Before anything else: an update must say which version it is based on (ADR 0068 #3).
+        if (!Preconditions.TryRead(http.Request, out var offered))
+            return Preconditions.Required();
+
+        try
+        {
+            var result = await useCase.ExecuteAsync(
+                new UpdateEncounterCommand(
+                    uuid, offered, request.ClassCode, request.CalendarCategoryId, ClientTime.ToServerLocal(request.Date), ClientTime.ToServerLocal(request.OnsetDate),
+                    request.Reason, request.FacilityId, request.PosCode, request.ProviderId, RequestOrigins.From(http)),
+                ct);
+
+            // The new ETag, so the caller can keep editing without another read.
+            return Preconditions.Ok(EncounterResponse.From(result.Encounter), result.Encounter.LastUpdate);
+        }
+        catch (ClinicalCareValidationException ex)
+        {
+            return ValidationProblems.Many(ex.Errors);
+        }
+        catch (EncounterNotFoundException ex)
+        {
+            return Results.Problem(
+                title: "Encounter not found.", detail: ex.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+        catch (ConcurrencyConflictException ex)
+        {
+            return Preconditions.Failed(ex.CurrentStamp);
+        }
     }
 
     private static async Task<IResult> GetEncounter(Guid uuid, GetEncounterUseCase useCase, CancellationToken ct)

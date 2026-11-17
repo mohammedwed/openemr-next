@@ -1,6 +1,6 @@
 # 0068. Clinical Care updates are conditional on the row's last-update stamp and touch only the columns they own
 
-- **Status:** Proposed
+- **Status:** Accepted (built with the encounter update, `docs/clinical-care/06-update-encounter-slice.md`)
 - **Date:** 2026-11-17
 - **Builds on:** [0064](0064-clinical-care-shares-the-legacy-database-and-coexists-with-legacy-encounter-writers.md), [0065](0065-vitals-are-stored-in-us-units-and-the-api-takes-explicit-units.md)
 - **Research:** `docs/clinical-care/05-update-and-audit-research.md`
@@ -37,5 +37,8 @@ ignored by legacy and so would detect nothing.
   coexistence and is stated in the slice doc, not hidden.
 - **Residual race:** two writes in the same second as the client's read are undetected (whole-second stamp). Accepted; documented.
 - **Billing activity causes conflicts** (it bumps the stamp). The right direction; the UI explains it and offers a reload.
+- **Order of checks (as built):** a malformed body is a 400 at the binding boundary; then 428, 404 and 412; then domain-rule 400s last. A caller that is
+  out of date is told so whatever domain rule its request breaks.
+- **A lost commit acknowledgement** is reported as 412 on retry, never as a second write (slice doc, limitation L2).
 - **Pinned by tests:** a conditional-update test against the real database where a second connection (standing in for legacy) changes the
   row between read and write, and a test that the statement names no column outside the owned set.
