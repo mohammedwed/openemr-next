@@ -22,7 +22,14 @@ public enum AuditOutcome
 /// <param name="Subject">The caller's stable identity (a user uuid once verified, <c>user:{providerId}</c> before).</param>
 /// <param name="UserId">The legacy <c>users.id</c>, when known.</param>
 /// <param name="Verified">Whether the subject came from a validated session.</param>
-public sealed record AuditActor(string Subject, long? UserId, bool Verified);
+public sealed record AuditActor(string Subject, long? UserId, bool Verified)
+{
+    /// <summary>
+    /// Nobody is known. Used by an action whose request names no acting user (an update: the encounter's <c>providerId</c> is a field being
+    /// set, not who is setting it) until the gateway forwards a validated session (ADR 0069 #5). The row says so rather than guess.
+    /// </summary>
+    public static readonly AuditActor Unknown = new("unknown", null, Verified: false);
+}
 
 /// <summary>The business verbs an audit row can carry (SEC-9: a verb, not a URL).</summary>
 public static class AuditActions

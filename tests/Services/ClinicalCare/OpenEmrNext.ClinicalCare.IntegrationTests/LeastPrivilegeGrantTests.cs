@@ -22,7 +22,15 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     }
 
     [Theory]
-    [InlineData("UPDATE form_encounter SET reason = 'changed'")]
+    [InlineData("UPDATE form_encounter SET billing_note = 'changed'")]
+    [InlineData("UPDATE form_encounter SET sensitivity = 'high'")]
+    [InlineData("UPDATE form_encounter SET pid = 1")]
+    [InlineData("UPDATE form_encounter SET encounter = 1")]
+    [InlineData("UPDATE form_encounter SET uuid = NULL")]
+    [InlineData("UPDATE form_encounter SET in_collection = 1")]
+    [InlineData("UPDATE form_encounter SET last_level_billed = 1")]
+    [InlineData("UPDATE form_encounter SET last_update = NOW()")]
+    [InlineData("UPDATE form_encounter SET reason = 'changed', billing_note = 'x'")]
     [InlineData("DELETE FROM form_encounter")]
     [InlineData("UPDATE forms SET deleted = 1")]
     [InlineData("DELETE FROM forms")]
@@ -60,6 +68,27 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
         });
 
         Assert.Contains("denied", ex.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("date")]
+    [InlineData("onset_date")]
+    [InlineData("reason")]
+    [InlineData("class_code")]
+    [InlineData("pc_catid")]
+    [InlineData("facility_id")]
+    [InlineData("facility")]
+    [InlineData("pos_code")]
+    [InlineData("provider_id")]
+    public async Task The_production_principal_may_update_exactly_the_encounter_columns_it_owns(string column)
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // Setting a column to itself is enough to exercise the privilege check; no row is needed. The column name is one of this
+        // theory's own constants, never input, which is why the interpolation (EF1002) is safe here.
+#pragma warning disable EF1002
+        await db.Database.ExecuteSqlRawAsync($"UPDATE form_encounter SET `{column}` = `{column}`");
+#pragma warning restore EF1002
     }
 
     [Fact]

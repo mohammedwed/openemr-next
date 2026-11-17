@@ -24,6 +24,7 @@ public class InvariantEnforcementTests
     [
         [typeof(Encounter)],
         [typeof(EncounterCreation)],
+        [typeof(EncounterChange)],
         [typeof(EncounterIdentity)],
         [typeof(PatientReference)],
         [typeof(PageRequest)],

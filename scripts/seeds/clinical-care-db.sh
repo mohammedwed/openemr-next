@@ -94,9 +94,13 @@ ALTER USER '${CLINICAL_CARE_DB_USER}'@'%' IDENTIFIED BY $(sql_quote "$CLINICAL_C
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM '${CLINICAL_CARE_DB_USER}'@'%';
 
 -- The encounter itself: this service inserts new rows and reads them back (including the uuid lookup that
--- makes a retried insert safe). No UPDATE or DELETE: slice 1 never changes or removes an encounter, and the
--- other legacy writers still own those paths (ADR 0064 #2).
+-- makes a retried insert safe). No DELETE, and UPDATE only on the named columns below: the other legacy writers
+-- still own every other column and the delete paths (ADR 0064 #2, ADR 0068).
 GRANT SELECT, INSERT ON \`${DB_NAME}\`.form_encounter TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- An encounter edit (M5b, ADR 0068) may change exactly the columns this service owns and nothing else: no billing or collection column,
+-- no identity (id, uuid, pid, encounter), no sensitivity (needs the sensitivities ACL, F-CC-2). last_update is not listed: the database sets it.
+GRANT UPDATE (\`date\`, onset_date, reason, class_code, pc_catid, facility_id, facility, pos_code, provider_id)
+  ON \`${DB_NAME}\`.form_encounter TO '${CLINICAL_CARE_DB_USER}'@'%';
 
 -- The legacy 'newpatient' registry row every encounter needs (CC-7). Insert-only for the same reason.
 GRANT SELECT, INSERT ON \`${DB_NAME}\`.forms TO '${CLINICAL_CARE_DB_USER}'@'%';
