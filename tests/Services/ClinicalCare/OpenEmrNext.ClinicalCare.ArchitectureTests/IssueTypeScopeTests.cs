@@ -63,12 +63,14 @@ public class IssueTypeScopeTests
         const string unscoped = "SELECT id FROM lists WHERE uuid = {u}";
         const string otherTable = "INSERT IGNORE INTO lists_touch (pid, type) VALUES (1, 'x')";
 
-        Assert.True(TouchesLists.IsMatch(scoped) && NamesType.IsMatch(scoped));
-        Assert.True(TouchesLists.IsMatch(unscoped) && !NamesType.IsMatch(unscoped));
-        Assert.False(TouchesLists.IsMatch(otherTable));
-        Assert.False(TouchesLists.IsMatch("SELECT * FROM lists_medication"));
-        Assert.True(TouchesLists.IsMatch("UPDATE lists\n SET title = {x}\n WHERE uuid = {u}"));
-        Assert.True(TouchesLists.IsMatch("JOIN lists l ON l.id = ie.list_id"));
+        Assert.Matches(TouchesLists, scoped);
+        Assert.Matches(NamesType, scoped);
+        Assert.Matches(TouchesLists, unscoped);
+        Assert.DoesNotMatch(NamesType, unscoped);
+        Assert.DoesNotMatch(TouchesLists, otherTable);
+        Assert.DoesNotMatch(TouchesLists, "SELECT * FROM lists_medication");
+        Assert.Matches(TouchesLists, "UPDATE lists\n SET title = {x}\n WHERE uuid = {u}");
+        Assert.Matches(TouchesLists, "JOIN lists l ON l.id = ie.list_id");
     }
 
     private static string Squash(string sql) => Regex.Replace(sql, @"\s+", " ").Trim();
