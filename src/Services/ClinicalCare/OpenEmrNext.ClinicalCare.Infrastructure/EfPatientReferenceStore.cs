@@ -31,12 +31,26 @@ public sealed class EfPatientReferenceStore(ClinicalCareDbContext db) : IPatient
             if (inserted == 0)
                 return EventRecordingResult.AlreadyProcessed;
 
-            // A patient already known (the backfill got there first, or a different event named them) is left alone. A
-            // different uuid claiming a pid already held is a real conflict and is allowed to fail loudly on the unique key.
-            var known = await db.Database
-                .SqlQuery<long>($"SELECT COUNT(*) AS Value FROM clinical_care_patient_ref WHERE patient_uuid = {uuidBytes}")
-                .SingleAsync(ct);
-            if (known == 0)
+            // Conflicts are detected here, by name, not left to the unique key: a database exception is a 500, and a 500 tells the
+            // relay to retry an event that can never succeed (review finding R-9). Throwing inside the transaction rolls back the
+            // processed-event row too, so a corrected redelivery is still applied.
+            var heldUnderThisUuid = (await db.Database
+                .SqlQuery<long>($"SELECT pid AS Value FROM clinical_care_patient_ref WHERE patient_uuid = {uuidBytes}")
+                .ToListAsync(ct)).Select(p => (long?)p).FirstOrDefault();
+            var uuidHoldingThisPid = (await db.Database
+                .SqlQuery<byte[]>($"SELECT patient_uuid AS Value FROM clinical_care_patient_ref WHERE pid = {pid}")
+                .ToListAsync(ct)).FirstOrDefault();
+
+            if (uuidHoldingThisPid is not null && Rfc4122GuidConverter.FromRfc4122Bytes(uuidHoldingThisPid) != patient.Uuid)
+                throw new PatientReferenceConflictException(
+                    $"Pid {pid} is already held by a different patient; patient {patient.Uuid} cannot also have it.");
+
+            if (heldUnderThisUuid is { } existingPid && existingPid != pid)
+                throw new PatientReferenceConflictException(
+                    $"Patient {patient.Uuid} is already known with pid {existingPid}; the event says {pid}.");
+
+            // A patient already known with the same pid (the backfill got there first, or a different event named them) is left alone.
+            if (heldUnderThisUuid is null)
             {
                 await db.Database.ExecuteSqlInterpolatedAsync(
                     $"INSERT INTO clinical_care_patient_ref (patient_uuid, pid, registered_at, source) VALUES ({uuidBytes}, {pid}, {registeredAtUtc}, 'event')", ct);

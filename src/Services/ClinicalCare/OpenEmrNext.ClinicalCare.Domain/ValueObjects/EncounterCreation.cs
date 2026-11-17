@@ -77,7 +77,7 @@ public sealed record EncounterCreation
     /// <param name="providerId">The acting provider; caller-supplied until identity forwarding exists (CC-10, F-CC-1).</param>
     /// <param name="now">The current instant, from the clock (DOM-8).</param>
     /// <param name="reference">Class list and facility read beforehand by the use case.</param>
-    /// <exception cref="EncounterValidationException">One or more fields fail validation.</exception>
+    /// <exception cref="ClinicalCareValidationException">One or more fields fail validation.</exception>
     public static EncounterCreation Create(
         PatientReference patient, string? classCode, int calendarCategoryId, DateTime? date, string? reason,
         int facilityId, int? posCode, long providerId, DateTime? onsetDate, string? sensitivity,
@@ -140,7 +140,7 @@ public sealed record EncounterCreation
             errors.Add($"PosCode must be between 1 and {MaxPosCode}.");
 
         if (errors.Count > 0)
-            throw new EncounterValidationException(errors);
+            throw new ClinicalCareValidationException(errors);
 
         // CC-4: the UI path stamps a full timestamp (save.php:55-63).
         return new EncounterCreation(

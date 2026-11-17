@@ -54,7 +54,7 @@ public class EncounterTests
     [InlineData("b1a9c5f0-0000-4000-8000-000000000001", 0)]
     public void An_identity_needs_a_uuid_and_a_positive_number(string uuid, long number)
     {
-        Assert.Throws<EncounterValidationException>(() => EncounterIdentity.Create(Guid.Parse(uuid), number));
+        Assert.Throws<ClinicalCareValidationException>(() => EncounterIdentity.Create(Guid.Parse(uuid), number));
     }
 
     [Theory]
@@ -62,6 +62,6 @@ public class EncounterTests
     [InlineData("b1a9c5f0-0000-4000-8000-000000000001", 0)]
     public void A_patient_reference_needs_a_uuid_and_a_positive_pid(string uuid, long pid)
     {
-        Assert.Throws<EncounterValidationException>(() => PatientReference.Create(Guid.Parse(uuid), pid));
+        Assert.Throws<ClinicalCareValidationException>(() => PatientReference.Create(Guid.Parse(uuid), pid));
     }
 }

@@ -64,16 +64,41 @@ public class PatientReferenceStoreTests(ClinicalCareContainerFixture fixture) : 
     }
 
     [Fact]
-    public async Task A_different_patient_claiming_a_held_pid_fails_and_leaves_no_event_marked_processed()
+    public async Task R_9_a_different_patient_claiming_a_held_pid_is_a_typed_conflict_and_leaves_no_event_marked_processed()
     {
         await RecordAsync(Guid.NewGuid(), Uuid1, 42);
         var conflicting = Guid.NewGuid();
 
-        await Assert.ThrowsAnyAsync<Exception>(() => RecordAsync(conflicting, Uuid2, 42));
+        var ex = await Assert.ThrowsAsync<PatientReferenceConflictException>(() => RecordAsync(conflicting, Uuid2, 42));
 
+        Assert.Contains("42", ex.Message);
         // The failed event is NOT recorded as processed, so a redelivery after the conflict is resolved will be applied.
         Assert.Equal(0L, await fixture.RootScalarAsync<long>($"SELECT COUNT(*) FROM clinical_care_processed_events WHERE event_id = '{conflicting}'"));
         Assert.Equal(1L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_patient_ref"));
+    }
+
+    [Fact]
+    public async Task R_9_the_same_patient_arriving_with_a_different_pid_is_also_a_conflict_not_silently_accepted()
+    {
+        await RecordAsync(Guid.NewGuid(), Uuid1, 42);
+        var conflicting = Guid.NewGuid();
+
+        var ex = await Assert.ThrowsAsync<PatientReferenceConflictException>(() => RecordAsync(conflicting, Uuid1, 77));
+
+        Assert.Contains("42", ex.Message);
+        Assert.Contains("77", ex.Message);
+        Assert.Equal(42L, await fixture.RootScalarAsync<long>("SELECT pid FROM clinical_care_patient_ref"));   // untouched
+        Assert.Equal(0L, await fixture.RootScalarAsync<long>($"SELECT COUNT(*) FROM clinical_care_processed_events WHERE event_id = '{conflicting}'"));
+    }
+
+    [Fact]
+    public async Task R_9_a_conflicting_event_that_was_already_processed_is_still_a_harmless_redelivery()
+    {
+        var eventId = Guid.NewGuid();
+        await RecordAsync(eventId, Uuid1, 42);
+
+        // The idempotency check comes first: a repeat of an event we already applied is a no-op, whatever the table now says.
+        Assert.Equal(EventRecordingResult.AlreadyProcessed, await RecordAsync(eventId, Uuid1, 42));
     }
 
     [Fact]

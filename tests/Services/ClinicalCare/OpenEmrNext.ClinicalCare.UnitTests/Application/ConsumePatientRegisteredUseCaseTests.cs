@@ -57,7 +57,7 @@ public class ConsumePatientRegisteredUseCaseTests
     {
         var store = new FakeStore(EventRecordingResult.Recorded);
 
-        await Assert.ThrowsAsync<EncounterValidationException>(() => new ConsumePatientRegisteredUseCase(store, TimeProvider.System)
+        await Assert.ThrowsAsync<ClinicalCareValidationException>(() => new ConsumePatientRegisteredUseCase(store, TimeProvider.System)
             .ExecuteAsync(new PatientRegisteredMessage(Guid.Parse(eventId), Guid.Parse(patient), pid, null), CancellationToken.None));
 
         Assert.Equal(0, store.Calls);

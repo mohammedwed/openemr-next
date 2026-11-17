@@ -120,7 +120,7 @@ public class CreateEncounterUseCaseTests
     {
         var (useCase, allocator, registry) = Build();
 
-        await Assert.ThrowsAsync<EncounterValidationException>(() =>
+        await Assert.ThrowsAsync<ClinicalCareValidationException>(() =>
             useCase.ExecuteAsync(Command(category: 0), CancellationToken.None));
 
         Assert.Equal(0, allocator.Calls);
@@ -163,7 +163,7 @@ public class CreateEncounterUseCaseTests
     {
         var (useCase, _, _) = Build();
 
-        var ex = await Assert.ThrowsAsync<EncounterValidationException>(() =>
+        var ex = await Assert.ThrowsAsync<ClinicalCareValidationException>(() =>
             useCase.ExecuteAsync(Command(facilityId: 77), CancellationToken.None));
 
         Assert.Contains("Facility 77 does not exist.", ex.Errors);

@@ -33,6 +33,7 @@ internal static class ApiFactory
                 };
                 if (secret is not null)
                     values.Add(new("InternalGateway:Secret", secret));
+                values.Add(new("Retention:Enabled", "false"));   // a background purge must not race a test
                 if (eventsSecret is not null)
                     values.Add(new("InternalEvents:Secret", eventsSecret));
                 config.AddInMemoryCollection(values);

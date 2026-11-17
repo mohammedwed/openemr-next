@@ -176,4 +176,20 @@ public class EventDeliveryEndpointTests(ClinicalCareContainerFixture fixture) : 
 
         Assert.DoesNotContain("/internal/events", document);
     }
+
+    [Fact]
+    public async Task R_9_an_event_that_contradicts_a_held_patient_is_a_422_the_relay_will_dead_letter_not_a_500_it_would_retry()
+    {
+        await fixture.SeedPatientAsync(Guid.Parse("a0a0a0a0-0000-4000-8000-000000000001"), 42);
+        using var producer = Client();
+        var conflicting = Guid.NewGuid();
+
+        // A different patient (PatientUuid) claiming pid 42, which is already held.
+        var response = await producer.PostAsync("/internal/events", Envelope(conflicting, pid: 42));
+
+        Assert.Equal((HttpStatusCode)422, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(0L, await fixture.RootScalarAsync<long>($"SELECT COUNT(*) FROM clinical_care_processed_events WHERE event_id = '{conflicting}'"));
+        Assert.Equal(1L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_patient_ref"));
+    }
 }

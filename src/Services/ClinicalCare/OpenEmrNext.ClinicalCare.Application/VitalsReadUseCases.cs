@@ -15,19 +15,9 @@ public sealed class GetVitalsUseCase(IEncounterReader encounters, IVitalsReader 
         var view = await encounters.FindAsync(encounterUuid, ct) ?? throw new EncounterNotFoundException(encounterUuid);
 
         // A half-filled legacy encounter (no number or patient) cannot have vitals linked to it, so it has none.
-        return TryReference(view) is { } encounter ? await reader.FindAsync(encounter, vitalsUuid, ct) : null;
-    }
-
-    internal static EncounterReference? TryReference(EncounterView view)
-    {
-        try
-        {
-            return EncounterReference.Create(view.Uuid, view.Number, view.PatientUuid, view.PatientPid);
-        }
-        catch (VitalsValidationException)
-        {
-            return null;
-        }
+        return EncounterReference.TryCreate(view.Uuid, view.Number, view.PatientUuid, view.PatientPid) is { } encounter
+            ? await reader.FindAsync(encounter, vitalsUuid, ct)
+            : null;
     }
 }
 
@@ -35,14 +25,14 @@ public sealed class GetVitalsUseCase(IEncounterReader encounters, IVitalsReader 
 public sealed class ListEncounterVitalsUseCase(IEncounterReader encounters, IVitalsReader reader)
 {
     /// <exception cref="EncounterNotFoundException">No such encounter.</exception>
-    /// <exception cref="EncounterValidationException">The limit or offset is out of bounds.</exception>
+    /// <exception cref="ClinicalCareValidationException">The limit or offset is out of bounds.</exception>
     public async Task<VitalsPage> ExecuteAsync(Guid encounterUuid, int? limit, int? offset, CancellationToken ct)
     {
         var page = PageRequest.Create(limit, offset);
 
         var view = await encounters.FindAsync(encounterUuid, ct) ?? throw new EncounterNotFoundException(encounterUuid);
 
-        return GetVitalsUseCase.TryReference(view) is { } encounter
+        return EncounterReference.TryCreate(view.Uuid, view.Number, view.PatientUuid, view.PatientPid) is { } encounter
             ? await reader.ListForEncounterAsync(encounter, page, ct)
             : new VitalsPage([], 0);
     }

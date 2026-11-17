@@ -23,7 +23,7 @@ public sealed record PageRequest
         Offset = offset;
     }
 
-    /// <exception cref="EncounterValidationException">The limit is outside 1 to <see cref="MaxLimit"/> or the offset is negative.</exception>
+    /// <exception cref="ClinicalCareValidationException">The limit is outside 1 to <see cref="MaxLimit"/> or the offset is negative.</exception>
     public static PageRequest Create(int? limit, int? offset)
     {
         var errors = new List<string>();
@@ -35,7 +35,7 @@ public sealed record PageRequest
             errors.Add("Offset cannot be negative.");
 
         if (errors.Count > 0)
-            throw new EncounterValidationException(errors);
+            throw new ClinicalCareValidationException(errors);
 
         return new PageRequest(limit ?? DefaultLimit, offset ?? 0);
     }

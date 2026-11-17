@@ -28,7 +28,8 @@ public class OpenApiDocumentTests : IDisposable
                 new("ClinicalCareDb:User", "openapi-test-placeholder"),
                 new("ClinicalCareDb:Password", "openapi-test-placeholder"),
                 new("InternalGateway:Secret", "test-secret"),
-                new("InternalEvents:Secret", "test-events-secret")
+                new("InternalEvents:Secret", "test-events-secret"),
+                new("Retention:Enabled", "false")
             ]));
         });
         _client = _factory.CreateClient();

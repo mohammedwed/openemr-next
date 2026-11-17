@@ -2,7 +2,7 @@
 
 - **Date:** 2026-11-17. **Scope:** the Clinical Care service as merged in PR #77 (slices 1 to 3), and the PatientManagement relay and grant changes that shipped with it.
 - **Method:** the playbook's six dimensions (`docs/microservice-playbook/08-quality-and-testing.md` section 4, MIG-12), each with **grounded evidence**: code read, tests run, probes executed against the merged code. A score is a conversation starter; the findings are the product.
-- **Outcome in one line:** the review found **seven defects, all fixed and pinned by tests**: six of one kind (input the domain accepted but legacy's storage could not hold, which was a 500 or silent garbage: R-1 to R-5, R-7) and one tooling failure (R-6). **Seven further findings are tracked** (R-8 to R-14) and **three things were reviewed and deliberately left as they are**.
+- **Outcome in one line:** the review found **seven defects, all fixed and pinned by tests**: six of one kind (input the domain accepted but legacy's storage could not hold, which was a 500 or silent garbage: R-1 to R-5, R-7) and one tooling failure (R-6). **Seven further findings were tracked** (R-8 to R-14). **Six have since been fixed** (R-9 to R-14); only **R-8** is open, because fixing it changes a contract and needs a decision and **three things were reviewed and deliberately left as they are**.
 
 ## 1. How the defects were found
 
@@ -35,19 +35,19 @@ A ninth (a missing-events-secret startup test) found no defect, only a gap in co
 | R-6 | `generate-clinicalcare-openapi.sh` had **been broken since slice 3**: it did not supply the newly required `InternalEvents:Secret`, so the API refused to start (fail-fast working, tooling not updated). Nobody noticed because the hidden events endpoint does not change the snapshot. | M | **Fixed**; the drift guard then did exactly its job when the provider bound changed the contract |
 | R-7 | Encounter and onset dates were unbounded; year 1 or 9999 was stored in a clinical record. | M | **Fixed**: 1900-01-01 to one year ahead (new rule CC-17) |
 | R-8 | The relay sends `PatientRegistered` **including first and last name** over plain HTTP between containers. The consumer ignores the names. The event is a public contract written before any consumer existed. | M | **Tracked**: either TLS on the internal hop, or a `schemaVersion` 2 payload without names (EVT-5). Not decided here: it changes a contract. |
-| R-9 | A genuine data conflict at the consumer (a different uuid claiming a held pid) is a **500**, which the relay treats as transient, so it blocks every later event for about 10 minutes (5, 10, 20, 40, 80, 160, 300 s) before dead-lettering. | M | **Tracked**: map the unique-key conflict to a permanent status (409) so it dead-letters at once |
-| R-10 | Clinical Care writes `EncounterCreated` and `VitalsRecorded` to `clinical_care_outbox`, but **nothing relays or purges them**. They accumulate. Harmless until a second consumer exists. | L | **Tracked** with F-PM-3 (retention) |
-| R-11 | A `date` sent with a `Z` or an offset is stored as its clock digits with the zone ignored (the field is documented as server-local time). | L | **Tracked**; document or reject offsets |
-| R-12 | The same `INSERT ... SELECT` that resolves a provider's username and group appears three times (encounter forms row, vitals row, vitals forms row), as does the `'Default'` group literal. | L | **Tracked** (SOLID); see section 4 |
-| R-13 | `EncounterValidationException` is thrown for things that are not encounters (`PatientReference`, `PageRequest`, the consumer). | L | **Tracked**: rename (`ClinicalCareValidationException`) in a mechanical change |
-| R-14 | `GetVitalsUseCase.TryReference` is an `internal static` helper called by a sibling use case; it belongs on `EncounterReference`. | L | **Tracked** |
+| R-9 | A genuine data conflict at the consumer (a different uuid claiming a held pid) is a **500**, which the relay treats as transient, so it blocks every later event for about 10 minutes (5, 10, 20, 40, 80, 160, 300 s) before dead-lettering. | M | **Fixed 2026-11-17**: detected by name inside the transaction and answered **422**, which the relay already treats as permanent, so it dead-letters at once. The reverse case (the same uuid arriving with a different pid), which the old code silently accepted, is now a conflict too |
+| R-10 | Clinical Care writes `EncounterCreated` and `VitalsRecorded` to `clinical_care_outbox`, but **nothing relays or purges them**. They accumulate. Harmless until a second consumer exists. `clinical_care_processed_events` also grew without bound. | L | **Fixed 2026-11-17**: a retention job (`Retention` options, documented in `docs/configuration.md`) removes processed event ids after 30 days, delivered outbox rows after 30 and **never-delivered** rows after 365 (long on purpose: nothing consumes them yet, and each is derivable from its encounter or vitals row). It deletes only this service's own tables, in short batches, by the database's clock. Relaying Clinical Care's outbox waits for a first consumer. PatientManagement's own purge stays open as F-PM-3 |
+| R-11 | A `date` sent with a `Z` or an offset is stored as its clock digits with the zone ignored (the field is documented as server-local time). | L | **Fixed 2026-11-17**: a date **with** a zone is an instant and is converted to the server's local time at the API edge (`ClientTime`); one **without** is already local, as documented. Only the `Z` case was actually wrong (the JSON parser already converts an explicit offset); the tests are proved to fail without the fix under a non-UTC zone |
+| R-12 | The same `INSERT ... SELECT` that resolves a provider's username and group appears three times (encounter forms row, vitals row, vitals forms row), as does the `'Default'` group literal. | L | **Fixed 2026-11-17**: one `LegacyActor.ResolveAsync` and one `DefaultGroup` constant; the inserts take plain values. The existing assertions (user, group, NULL for an unknown provider) are the regression net, and a test was added for a provider in a **non-default** group, which nothing covered |
+| R-13 | `EncounterValidationException` is thrown for things that are not encounters (`PatientReference`, `PageRequest`, the consumer). | L | **Fixed 2026-11-17**: renamed `ClinicalCareValidationException` (48 occurrences, compiler-checked). `VitalsValidationException` stays: vitals are a separate area with their own rules. The type's comment now says why |
+| R-14 | `GetVitalsUseCase.TryReference` is an `internal static` helper called by a sibling use case; it belongs on `EncounterReference`. | L | **Fixed 2026-11-17**: `EncounterReference.TryCreate`, with tests for every way an encounter cannot take vitals |
 
 ## 3. The six dimensions
 
 ### 3.1 Clean architecture
 - **Evidence:** 31 architecture tests (inward-only layering, invariants). Read the references of every project; read the imports of the Application and Domain layers.
 - **Clean:** `Domain` references nothing of ours; `Application` sees only ports; `Infrastructure` never references `Application` or `Api`; `Composition` references neither `Api` nor ASP.NET; the Api contracts are separate from the domain; wire unit spellings (`kg`, `degC`) live in one file (`UnitWire`).
-- **Tracked:** R-13, R-14. A namespace cycle between `Domain.ValueObjects` and `Domain.VitalSigns` (`EncounterReference` throws the vitals exception): same assembly, no layer broken, cosmetic.
+- **Tracked, since fixed:** R-13, R-14. A namespace cycle between `Domain.ValueObjects` and `Domain.VitalSigns` (`EncounterReference` throws the vitals exception): same assembly, no layer broken, cosmetic.
 - **Reviewed, left as is:** the domain's error messages say `lb or kg`, `degF or degC`. That is the wire vocabulary, which DOM-14 says to keep out of the domain, but these strings *are* the API's error contract and the text clients read. Moving them would duplicate every message in the edge for no gain.
 
 ### 3.2 Documentation
@@ -70,14 +70,14 @@ A ninth (a missing-events-secret startup test) found no defect, only a gap in co
 
 ### 3.5 SOLID / design
 - **Evidence:** scripted scan for symbols referenced only at their definition: none dead (the seven hits are extension-method classes). Read for duplicated orchestration.
-- **Tracked:** R-12 (the user and group lookup, three copies), and the encounter and vitals registries share a retry-by-uuid shape. Worth a shared helper when a third writer appears; not worth one now.
+- **Tracked, since fixed:** R-12 (the user and group lookup, three copies). The encounter and vitals registries still share a retry-by-uuid *shape*; that is left as is until a third writer appears, because a helper for two is a worse abstraction than two readable methods.
 - **Reviewed, left as is:** the two event-envelope implementations (PatientManagement builds one in its Application layer, Clinical Care builds one in Infrastructure). Design-set decision D4 says not to share types until a second context needs the same one; the shape is pinned by tests on both sides.
 
 ### 3.6 Resilience / fail-fast
 - **Evidence:** fault tests (a registry that throws; a failure part-way through a transaction; a consumer that is down), a startup test for each required secret, and the live outage drill.
 - **Clean:** every explicit transaction runs inside an execution strategy; retries are safe because each write is idempotent by uuid or by event id; a relay pass failing does not stop the host or lose a row (leases expire); a consumer outage backs off and recovers with no manual step; missing configuration fails startup, now tested for both secrets.
 - **Fixed:** R-3, R-4 (a 500 means "retry me", so a request that can never succeed must be a 400); R-6 (tooling had not caught up with a new required setting).
-- **Tracked:** R-9, R-10.
+- **Tracked, since fixed:** R-9, R-10.
 
 ## 4. Reviewed and left as is
 1. The wire vocabulary in domain error messages (3.1).

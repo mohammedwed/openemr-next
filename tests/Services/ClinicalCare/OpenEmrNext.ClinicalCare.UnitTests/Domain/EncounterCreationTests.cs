@@ -49,7 +49,7 @@ public class EncounterCreationTests
     [InlineData(-3)]
     public void CC_2_a_calendar_category_is_required_and_positive(int category)
     {
-        var ex = Assert.Throws<EncounterValidationException>(() => Create(calendarCategoryId: category));
+        var ex = Assert.Throws<ClinicalCareValidationException>(() => Create(calendarCategoryId: category));
 
         Assert.Contains("A calendar category is required.", ex.Errors);
     }
@@ -57,7 +57,7 @@ public class EncounterCreationTests
     [Fact]
     public void CC_3_an_unknown_class_code_is_rejected()
     {
-        var ex = Assert.Throws<EncounterValidationException>(() => Create(classCode: "XYZ"));
+        var ex = Assert.Throws<ClinicalCareValidationException>(() => Create(classCode: "XYZ"));
 
         Assert.Contains("Class 'XYZ' is not a known encounter class.", ex.Errors);
     }
@@ -65,7 +65,7 @@ public class EncounterCreationTests
     [Fact]
     public void CC_3_class_codes_compare_exactly_not_case_insensitively()
     {
-        Assert.Throws<EncounterValidationException>(() => Create(classCode: "amb"));
+        Assert.Throws<ClinicalCareValidationException>(() => Create(classCode: "amb"));
     }
 
     [Theory]
@@ -90,7 +90,7 @@ public class EncounterCreationTests
     {
         var empty = new EncounterReferenceData([], null);
 
-        var ex = Assert.Throws<EncounterValidationException>(() => Create(classCode: null, reference: empty));
+        var ex = Assert.Throws<ClinicalCareValidationException>(() => Create(classCode: null, reference: empty));
 
         Assert.Single(ex.Errors);
     }
@@ -137,7 +137,7 @@ public class EncounterCreationTests
     [InlineData(99)]
     public void CC_8_an_unknown_facility_is_rejected(int facilityId)
     {
-        var ex = Assert.Throws<EncounterValidationException>(() => Create(facilityId: facilityId));
+        var ex = Assert.Throws<ClinicalCareValidationException>(() => Create(facilityId: facilityId));
 
         Assert.Contains("Facility 99 does not exist.", ex.Errors);
     }
@@ -146,13 +146,13 @@ public class EncounterCreationTests
     public void CC_8_a_facility_that_does_not_match_the_requested_id_is_rejected()
     {
         // The use case looked up facility 3, but the request named 4: never accept someone else's row.
-        Assert.Throws<EncounterValidationException>(() => Create(facilityId: 4, reference: Reference(MainClinic)));
+        Assert.Throws<ClinicalCareValidationException>(() => Create(facilityId: 4, reference: Reference(MainClinic)));
     }
 
     [Fact]
     public void CC_8_a_negative_facility_id_is_rejected()
     {
-        var ex = Assert.Throws<EncounterValidationException>(() => Create(facilityId: -1));
+        var ex = Assert.Throws<ClinicalCareValidationException>(() => Create(facilityId: -1));
 
         Assert.Contains("FacilityId cannot be negative.", ex.Errors);
     }
@@ -162,7 +162,7 @@ public class EncounterCreationTests
     [InlineData(-1)]
     public void CC_10_the_acting_provider_must_be_identifiable(long providerId)
     {
-        var ex = Assert.Throws<EncounterValidationException>(() => Create(providerId: providerId));
+        var ex = Assert.Throws<ClinicalCareValidationException>(() => Create(providerId: providerId));
 
         Assert.Contains("ProviderId must identify the acting provider.", ex.Errors);
     }
@@ -171,7 +171,7 @@ public class EncounterCreationTests
     public void CC_12_a_reason_over_the_bound_is_rejected_and_one_at_the_bound_is_accepted()
     {
         Assert.Equal(EncounterCreation.MaxReasonLength, Create(reason: new string('r', EncounterCreation.MaxReasonLength)).Reason!.Length);
-        Assert.Throws<EncounterValidationException>(() => Create(reason: new string('r', EncounterCreation.MaxReasonLength + 1)));
+        Assert.Throws<ClinicalCareValidationException>(() => Create(reason: new string('r', EncounterCreation.MaxReasonLength + 1)));
     }
 
     [Theory]
@@ -180,7 +180,7 @@ public class EncounterCreationTests
     [InlineData(200)]
     public void CC_13_a_pos_code_outside_1_to_99_is_rejected(int pos)
     {
-        var ex = Assert.Throws<EncounterValidationException>(() => Create(posCode: pos));
+        var ex = Assert.Throws<ClinicalCareValidationException>(() => Create(posCode: pos));
 
         Assert.Contains($"PosCode must be between 1 and {EncounterCreation.MaxPosCode}.", ex.Errors);
     }
@@ -189,13 +189,13 @@ public class EncounterCreationTests
     public void CC_14_a_sensitivity_over_30_characters_is_rejected()
     {
         Assert.Equal(30, Create(sensitivity: new string('s', 30)).Sensitivity!.Length);
-        Assert.Throws<EncounterValidationException>(() => Create(sensitivity: new string('s', 31)));
+        Assert.Throws<ClinicalCareValidationException>(() => Create(sensitivity: new string('s', 31)));
     }
 
     [Fact]
     public void Every_violation_is_reported_at_once_not_just_the_first()
     {
-        var ex = Assert.Throws<EncounterValidationException>(() =>
+        var ex = Assert.Throws<ClinicalCareValidationException>(() =>
             Create(classCode: "XYZ", calendarCategoryId: 0, providerId: 0, facilityId: 99, posCode: 500));
 
         Assert.Equal(5, ex.Errors.Count);
@@ -211,9 +211,9 @@ public class EncounterCreationTests
         var date = DateTime.Parse(text);
 
         Assert.Contains("Date must be between 1900-01-01 and one year from now.",
-            Assert.Throws<EncounterValidationException>(() => Create(date: date)).Errors);
+            Assert.Throws<ClinicalCareValidationException>(() => Create(date: date)).Errors);
         Assert.Contains("Onset date must be between 1900-01-01 and one year from now.",
-            Assert.Throws<EncounterValidationException>(() => Create(onsetDate: date)).Errors);
+            Assert.Throws<ClinicalCareValidationException>(() => Create(onsetDate: date)).Errors);
     }
 
     [Theory]
@@ -234,7 +234,7 @@ public class EncounterCreationTests
     public void R_1_a_provider_id_that_does_not_fit_the_int_column_is_rejected(long providerId)
     {
         Assert.Contains("ProviderId must identify the acting provider.",
-            Assert.Throws<EncounterValidationException>(() => Create(providerId: providerId)).Errors);
+            Assert.Throws<ClinicalCareValidationException>(() => Create(providerId: providerId)).Errors);
     }
 
     [Fact]

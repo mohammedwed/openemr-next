@@ -163,7 +163,7 @@ public class VitalsUseCaseTests
     {
         var reader = new FakeReader();
 
-        await Assert.ThrowsAsync<EncounterValidationException>(() =>
+        await Assert.ThrowsAsync<ClinicalCareValidationException>(() =>
             new ListEncounterVitalsUseCase(new FakeEncounters(Encounter()), reader).ExecuteAsync(EncounterUuid, 10_000, null, CancellationToken.None));
 
         Assert.Equal(0, reader.Calls);
