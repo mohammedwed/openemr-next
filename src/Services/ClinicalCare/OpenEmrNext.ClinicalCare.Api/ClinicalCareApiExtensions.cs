@@ -49,6 +49,15 @@ public static class ClinicalCareApiExtensions
         builder.Services.AddScoped<CreateEncounterUseCase>();
         builder.Services.AddScoped<IEncounterUpdater, EfEncounterUpdater>();
         builder.Services.AddScoped<UpdateEncounterUseCase>();
+
+        // Problems (M5c slice 1, ADR 0070).
+        builder.Services.AddScoped<IIssueCodeLists, EfIssueCodeLists>();
+        builder.Services.AddSingleton<IProblemIdentityAllocator, GuidProblemIdentityAllocator>();
+        builder.Services.AddScoped<IProblemRegistry, EfProblemRegistry>();
+        builder.Services.AddScoped<IProblemReader, EfProblemReader>();
+        builder.Services.AddScoped<RecordProblemUseCase>();
+        builder.Services.AddScoped<GetProblemUseCase>();
+        builder.Services.AddScoped<ListPatientProblemsUseCase>();
         builder.Services.AddScoped<IEncounterReader, EfEncounterReader>();
         builder.Services.AddScoped<GetEncounterUseCase>();
         builder.Services.AddScoped<ListPatientEncountersUseCase>();

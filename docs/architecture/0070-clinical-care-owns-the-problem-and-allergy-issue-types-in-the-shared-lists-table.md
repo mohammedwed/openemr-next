@@ -1,6 +1,6 @@
 # 0070. Clinical Care owns the problem and allergy issue types in the shared `lists` table
 
-- **Status:** Proposed
+- **Status:** Accepted (built with the problem slice, `docs/clinical-care/08-record-problem-slice.md`)
 - **Date:** 2026-11-17
 - **Builds on:** [0064](0064-clinical-care-shares-the-legacy-database-and-coexists-with-legacy-encounter-writers.md), [0068](0068-clinical-care-updates-are-conditional-on-last-update-and-touch-only-owned-columns.md), [0069](0069-clinical-care-audits-writes-to-its-own-append-only-table.md)
 - **Research:** `docs/clinical-care/07-problems-and-allergies-research.md`
@@ -23,8 +23,9 @@ Condition and AllergyIntolerance are Clinical Care aggregates and medications be
 4. **The concurrency token is `lists.modifydate`** (ADR 0068, unchanged model): an `ETag` on reads, `If-Match` on writes, a conditional `UPDATE` on owned
    columns only, 428 and 412. A resolved problem is an update (`enddate`, `outcome`), so this slice has no delete.
 5. **Create follows the REST path where the two legacy paths disagree:** the uuid is assigned and registered at insert, and `date` is `NOW()` (the issue
-   screen's `date("Y-m-d H:m:s")` writes the month into the minutes). The issue screen's `lists_touch` row is also written, so the UI stops prompting
-   that nothing is recorded.
+   screen's `date("Y-m-d H:m:s")` writes the month into the minutes). The issue screen's `lists_touch` row is also written: legacy's patient summary reads
+   it (`getListTouch`) as the `listTouched` flag of the allergy, problem and medication cards, meaning "this list has been addressed" (an explicit
+   "nothing" included).
 6. **A row with no uuid is not addressable** and is left out of lists (the encounter precedent, CC-16). This service does not backfill uuids on read.
 7. **Audit and events as in ADR 0069:** every write has an audit row in its own transaction; events name fields, never values.
 8. **Delete is not built here.** It waits for the permission port (legacy needs `admin/super` for the UI delete). Legacy's hard delete is never offered.
@@ -35,4 +36,6 @@ Condition and AllergyIntolerance are Clinical Care aggregates and medications be
   context edit another's data. The tests make that failure loud.
 - The `H:m:s` date bug is **not** reproduced. Rows created here sort correctly; rows created by the issue screen keep the wrong minutes.
 - The `uuid`-less window is accepted: a problem created in the issue screen is invisible here until legacy assigns it a uuid.
+- **The grants are column-level** because the table is shared: `SELECT` and `INSERT` on only the columns a problem uses (slice doc, section 3). A
+  later allergy slice adds its three columns (`reaction`, `severity_al`, `verification`) the same way.
 - Medications, surgeries, dental issues and devices remain unowned; Pharmacy will have to adopt `medication` and respect the same `type` rule.

@@ -177,3 +177,25 @@ Full record: `docs/clinical-care/07-problems-and-allergies-research.md`. No code
 - **The concurrency token already exists:** `lists.modifydate` is `ON UPDATE CURRENT_TIMESTAMP`, the same model as encounters.
 - **Resolving a problem is an update** (`enddate`, `outcome`): the UI marks resolved by `enddate`, not `activity`. So the slice needs no delete.
 - **Plan:** six slices (problems, allergies, update, encounter link, WebApp, verification); the M5b audit, concurrency and `ETag` machinery is reused.
+
+## Added — M5c slice 1: record, get and list problems
+
+Full record: `docs/clinical-care/08-record-problem-slice.md` (rules PB-1 to PB-20, limitations L1 to L6). ADR 0070 is now Accepted.
+
+- **Three endpoints:** `POST /api/v1/problems`, `GET /api/v1/problems/{uuid}` (with an `ETag` from `lists.modifydate`) and `GET /api/v1/problems?patientUuid=`
+  (bounded and paged). The gateway routes `/api/v1/problems` to Clinical Care.
+- **A problem is a `lists` row of `type = 'medical_problem'`.** Because that table is shared with allergies, medications and surgeries, **every statement
+  filters on `type`**, and the tests prove it from several sides: another type's exact uuid is a 404, and lists exclude other types, other patients and
+  rows with no uuid.
+- **Column-level grants:** `SELECT` on the 16 columns a problem uses and `INSERT` on 15, plus `SELECT, INSERT` on `lists_touch`. The service cannot read a
+  medication's `udi` or write a surgery's `injury_*`; there is no `UPDATE` or `DELETE`.
+- **Where legacy's two write paths disagree, the REST path wins:** the uuid is assigned and registered at insert, and `date` is `NOW()` (the issue screen's
+  `H:m:s` writes the month into the minutes). The issue screen's `lists_touch` row is also written.
+- **One transaction** holds the row, the `uuid_registry` and `lists_touch` rows, the `ProblemRecorded` event (ids only, no clinical content) and the audit
+  row; a failing audit insert rolls the problem back, and a retry after a lost acknowledgement writes nothing twice.
+- **Refusals are audited** (`failed`, naming the patient asked about), as for encounters.
+- **Contract:** OpenAPI snapshot regenerated; the generated client and the whole solution build with no new warnings.
+- **A seed-script bug the tests caught:** the new grants' SQL *comments* contained backticks, and that part of the script is an unquoted heredoc, so bash tried to
+  run `lists` and `modifydate` as commands. The comments no longer contain any, and the script says why. (The grants themselves were escaped correctly.)
+- **Tests, all green (unit 362, architecture 39, integration 330):** domain and use-case unit tests, adapter and grant integration tests, and
+  `ProblemEndpointTests` through HTTP. The test fixture now creates `lists`, `lists_touch`, `lists_medication` and `issue_encounter` from the snapshot's own DDL.

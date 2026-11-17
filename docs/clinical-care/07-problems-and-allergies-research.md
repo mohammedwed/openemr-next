@@ -56,7 +56,7 @@ The UI list marks a problem **resolved** by `enddate` (a muted row), not by `act
 
 | Type | Owned (editable) | Notes |
 |---|---|---|
-| **Problem** (`medical_problem`) | `title`, `begdate`, `enddate`, `diagnosis`, `outcome`, `occurrence`, `classification`, `referredby`, `comments` | `occurrence` and `outcome` take the list codes; `diagnosis` is `SYSTEM:code;SYSTEM:code` text |
+| **Problem** (`medical_problem`) | `title`, `begdate`, `enddate`, `diagnosis`, `outcome`, `occurrence`, `referredby`, `comments` | `occurrence` and `outcome` take the list codes; `diagnosis` is `SYSTEM:code;SYSTEM:code` text. `classification` is **not owned**: it is an injury classification for other issue types and has no code list in `list_options` |
 | **Allergy** (`allergy`) | `title`, `begdate`, `enddate`, `diagnosis`, `reaction`, `severity_al`, `verification`, `outcome`, `comments` | `reaction`, `severity_al`, `verification` take the list codes |
 
 **Never written by this service:** `id`, `uuid` (set once, at insert), `pid`, `type` (fixed per aggregate), `user`/`groupname` after insert, `modifydate`
@@ -85,7 +85,7 @@ surgery or a medication that happens to share a uuid or id.
 | Q1 | Which issue types does Clinical Care own? | **`medical_problem` and `allergy` only.** `health_concern` and the rest stay with legacy until a context owns them |
 | Q2 | How are rows with no `uuid` handled? | **Not addressable and left out of lists** (CC-16). No backfill write on read. Revisit if the shadow comparison shows UI rows that stay invisible for long |
 | Q3 | `date` at insert: the UI's buggy `H:m:s` or `NOW()`? | **`NOW()`** |
-| Q4 | Write `lists_touch` on create, as the UI does? | **Yes**, one conditional insert (it marks the list as reviewed, so the UI stops prompting "nothing recorded") |
+| Q4 | Write `lists_touch` on create, as the UI does? | **Yes**, one `INSERT IGNORE` (`(pid, type)` is the primary key). Legacy's summary reads it as `listTouched` for the allergy, problem and medication cards: the list "has been addressed" |
 | Q5 | Delete? | **None in this slice.** Resolve through update. Soft delete after the permission port |
 | Q6 | Link an issue to an encounter (`issue_encounter`)? | **A separate later slice** (the slice 1 doc deferred it until this context existed) |
 | Q7 | Validate `diagnosis` codes? | **Shape only** (`SYSTEM:code` pairs, at most 255 characters); no code-system lookup |
