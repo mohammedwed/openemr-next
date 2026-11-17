@@ -119,6 +119,10 @@ GRANT INSERT (uuid, \`date\`, type, title, begdate, enddate, diagnosis, outcome,
 -- Which ROWS an update may touch is the type filter in every statement, not this grant.
 GRANT UPDATE (title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, verification, reaction, severity_al)
   ON \`${DB_NAME}\`.lists TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- Linking an issue to an encounter (M5c slice 4): legacy's issue_encounter row. SELECT and INSERT to read and make links, DELETE to remove a link (legacy's encounter
+-- screen does so on every save). It is a table of ids and a resolved flag with no clinical text. The link's uuid_registry row is not deleted on unlink (that would need
+-- DELETE on a table shared by every uuid in the system); a stale registry row is harmless because a uuid is never reused.
+GRANT SELECT, INSERT, DELETE ON \`${DB_NAME}\`.issue_encounter TO '${CLINICAL_CARE_DB_USER}'@'%';
 -- The "this list has been addressed" marker the issue screen writes (legacy's summary reads it as listTouched). Tiny table, no clinical content.
 GRANT SELECT, INSERT ON \`${DB_NAME}\`.lists_touch TO '${CLINICAL_CARE_DB_USER}'@'%';
 

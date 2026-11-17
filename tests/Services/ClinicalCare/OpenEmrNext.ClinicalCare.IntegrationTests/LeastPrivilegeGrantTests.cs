@@ -115,7 +115,6 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("SELECT erx_source FROM lists")]
     [InlineData("SELECT * FROM lists")]
     [InlineData("SELECT * FROM lists_medication")]
-    [InlineData("SELECT * FROM issue_encounter")]
     public async Task The_production_principal_cannot_read_issue_columns_or_tables_a_problem_has_no_need_for(string sql)
     {
         await using var db = fixture.CreateDbContext();
@@ -152,7 +151,10 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("INSERT INTO lists (uuid, type, subtype) VALUES (NULL, 'allergy', 'x')")]
     [InlineData("INSERT INTO lists (uuid, type, injury_part) VALUES (NULL, 'medical_problem', 'x')")]
     [InlineData("INSERT INTO lists_medication (list_id) VALUES (1)")]
-    [InlineData("INSERT INTO issue_encounter (pid, list_id, encounter) VALUES (1, 1, 1)")]
+    [InlineData("UPDATE issue_encounter SET resolved = 1")]
+    [InlineData("UPDATE issue_encounter SET created_by = 1")]
+    [InlineData("DELETE FROM uuid_registry WHERE table_name = 'issue_encounter'")]
+    [InlineData("TRUNCATE TABLE issue_encounter")]
     public async Task The_production_principal_cannot_change_or_remove_issues_beyond_inserting_a_problems_columns(string sql) =>
         await AssertDeniedAsync(sql);
 
@@ -177,6 +179,18 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
 #pragma warning disable EF1002
         await db.Database.ExecuteSqlRawAsync($"UPDATE lists SET `{column}` = `{column}`");
 #pragma warning restore EF1002
+    }
+
+    [Fact]
+    public async Task The_production_principal_can_read_make_and_remove_issue_links_but_not_edit_them()
+    {
+        await using var db = fixture.CreateDbContext();
+
+        await db.Database.ExecuteSqlRawAsync("INSERT INTO issue_encounter (uuid, pid, list_id, encounter, resolved, created_by, updated_by) VALUES (NULL, 1, 1, 1, 0, NULL, NULL)");
+        var count = await db.Database.SqlQueryRaw<long>("SELECT COUNT(*) AS Value FROM issue_encounter").SingleAsync();
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM issue_encounter WHERE pid = 1");
+
+        Assert.Equal(1L, count);
     }
 
     [Fact]

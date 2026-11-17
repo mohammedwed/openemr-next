@@ -14,3 +14,9 @@ public sealed class AllergyNotFoundException(Guid allergyUuid) : Exception($"No 
 {
     public Guid AllergyUuid { get; } = allergyUuid;
 }
+
+/// <summary>The issue to link or unlink does not exist, or its uuid belongs to a row that is not a problem or an allergy (ADR 0070 #2). Maps to 404 (DOM-17).</summary>
+public sealed class IssueNotFoundException(Guid issueUuid) : Exception($"No problem or allergy with uuid {issueUuid} exists.")
+{
+    public Guid IssueUuid { get; } = issueUuid;
+}

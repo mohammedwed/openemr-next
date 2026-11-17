@@ -1,6 +1,7 @@
 using System.Reflection;
 using OpenEmrNext.ClinicalCare.Domain;
 using OpenEmrNext.ClinicalCare.Domain.Allergies;
+using OpenEmrNext.ClinicalCare.Domain.IssueLinks;
 using OpenEmrNext.ClinicalCare.Domain.Problems;
 using OpenEmrNext.ClinicalCare.Domain.ReadModels;
 using OpenEmrNext.ClinicalCare.Domain.ValueObjects;
@@ -39,7 +40,9 @@ public class InvariantEnforcementTests
         [typeof(ProblemIdentity)],
         [typeof(Allergy)],
         [typeof(AllergyRecording)],
-        [typeof(AllergyIdentity)]
+        [typeof(AllergyIdentity)],
+        [typeof(EncounterIssueLink)],
+        [typeof(EncounterIssueLinkIdentity)]
     ];
 
     [Theory]
