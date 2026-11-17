@@ -51,6 +51,7 @@ public sealed class EfEncounterReader(ClinicalCareDbContext db) : IEncounterRead
     public async Task<EncounterPage> ListForPatientAsync(PatientReference patient, PageRequest page, CancellationToken ct)
     {
         var pid = patient.Pid;
+        var (from, until) = (page.Updated?.From, page.Updated?.Until);
 
         var rows = await db.Database
             .SqlQuery<EncounterRow>(
@@ -65,6 +66,7 @@ public sealed class EfEncounterReader(ClinicalCareDbContext db) : IEncounterRead
                 WHERE fe.pid = {pid} AND fe.uuid IS NOT NULL
                   AND NOT EXISTS (SELECT 1 FROM forms f WHERE f.encounter = fe.encounter AND f.pid = fe.pid
                                   AND f.formdir = 'newpatient' AND f.deleted <> 0)
+                  AND ({from} IS NULL OR fe.last_update >= {from}) AND ({until} IS NULL OR fe.last_update < {until})
                 ORDER BY fe.date DESC, fe.id DESC
                 LIMIT {page.Limit} OFFSET {page.Offset}
                 """)
@@ -82,6 +84,7 @@ public sealed class EfEncounterReader(ClinicalCareDbContext db) : IEncounterRead
                 WHERE fe.pid = {pid} AND fe.uuid IS NOT NULL
                   AND NOT EXISTS (SELECT 1 FROM forms f WHERE f.encounter = fe.encounter AND f.pid = fe.pid
                                   AND f.formdir = 'newpatient' AND f.deleted <> 0)
+                  AND ({from} IS NULL OR fe.last_update >= {from}) AND ({until} IS NULL OR fe.last_update < {until})
                 """)
             .SingleAsync(ct);
 
