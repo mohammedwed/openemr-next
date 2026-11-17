@@ -43,3 +43,8 @@ public sealed class SoapNoteConflictException(long noteId, OpenEmrNext.ClinicalC
 
     public OpenEmrNext.ClinicalCare.Domain.ValueObjects.ContentVersion? CurrentVersion { get; } = currentVersion;
 }
+
+public sealed class ClinicalNoteNotFoundException(Guid noteUuid) : Exception($"No clinical note with uuid {noteUuid} exists in this encounter.")
+{
+    public Guid NoteUuid { get; } = noteUuid;
+}

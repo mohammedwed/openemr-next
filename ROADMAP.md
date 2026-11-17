@@ -327,14 +327,13 @@ Research: `docs/clinical-care/07-problems-and-allergies-research.md`; ADR 0070 (
 - **Reuses** the M5b machinery unchanged: `modifydate` as the `ETag` token, `If-Match` (428, 412), the append-only audit and the outbox.
 - **Out of scope:** delete (waits for the permission port), medications, surgeries, dental issues, devices and health concerns (other owners).
 
-### M5d: finish Clinical Care (in progress, branch `feat/m5d-clinical-care-completion`)
+### M5d: finish Clinical Care (done Nov 17, branch `feat/m5d-clinical-care-completion`; not yet merged)
 
 Fills the remaining Clinical Care functionality that needs no new service and no verified identity. Slices, each researched, built and tested in turn:
 
 1. **Correct vitals** (**done Nov 17**; suites green: unit 533, architecture 53, integration 545; `13-correct-vitals-slice.md`).
 2. **Immunizations** (**done Nov 17**; suites green: unit 616, architecture 59, integration 623; `15-record-immunization-slice.md`, ADR 0072).
-3. **SOAP notes** (**done Nov 17**; suites green: unit 650, architecture 63, integration 671; `17-soap-notes-slice.md`, ADR 0073): addressed by form id within the encounter, versioned by content. 3b. **Clinical notes** (`form_clinical_notes`: grouped notes, type and category lists,
-   linked documents and results, soft delete by `activity`), its own slice.
+3. **SOAP notes** (**done Nov 17**; suites green: unit 650, architecture 63, integration 671; `17-soap-notes-slice.md`, ADR 0073): addressed by form id within the encounter, versioned by content. 3b. **Clinical notes** (**done Nov 17**; suites green: unit 685, architecture 69, integration 760; `19-clinical-notes-slice.md`, ADR 0074): own parent form per note, its id allocated under a database lock; linked documents and results not covered.
 4. **Lookups** (**API done Nov 17**; suites green: unit 650, architecture 63, integration 692; `18-lookups-slice.md`): classes, facilities and calendar categories. **Wired into the WebApp's `CreateEncounterDialog`** with a fallback to the old fields; providers wait for identity. The gateway routes for `/api/v1/immunizations` and `/api/v1/lookups` had been missing and were added, with a guard test.
 - **Out of scope until identity and the permission port exist:** delete and editing `sensitivity`.
 
@@ -385,7 +384,7 @@ discrepancies.
 
 ### What remains before the post-M5 gate (as of Nov 17)
 
-**Build (no identity needed):** M5d slices 3 (SOAP), 3b (clinical notes) and 4 (lookups); WebApp screens for correcting vitals and for immunizations (the API is ahead of the UI); M5e FHIR (read-only).
+**Build (no identity needed):** WebApp screens for correcting vitals and for immunizations, SOAP notes and clinical notes (the API is ahead of the UI); M5e FHIR (read-only). M5d's API work is done.
 **Needs the identity work (M5b phase 1b):** the gateway validating the session and forwarding a verified actor. It fixes the **open finding that the Clinical Care and patient APIs are reachable without sign-in**, replaces the caller-named `providerId`,
 and makes the audit actor real (every correction is `unknown` today). Then the permission port, soft delete and editing `sensitivity`. This is the largest open item.
 **Verification not yet done:** a browser check of every WebApp screen; a legacy-UI check that records written here display correctly in OpenEMR itself; shadow comparison of the update paths, vitals correction and immunizations (only creation was compared); a layered review of M5b to M5d.

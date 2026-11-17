@@ -146,6 +146,12 @@ GRANT UPDATE (administered_date, immunization_id, cvx_code, manufacturer, lot_nu
               information_source, refusal_reason, ordering_provider, reason_code, reason_description, encounter_id, update_date)
   ON \`${DB_NAME}\`.immunizations TO '${CLINICAL_CARE_DB_USER}'@'%';
 
+-- Clinical notes (M5d slice 3b, ADR 0074): recorded and read back, and corrected on exactly the columns the service owns. Not who wrote it (user is set on insert only, as legacy does),
+-- not groupname, authorized or activity (activity 0 is how legacy retires a note, so that is a delete and waits for the permission port), not the parent form id, not note_related_to,
+-- not external_id. last_updated is not listed: the database sets it. No DELETE. The parent form is registered in forms, granted above.
+GRANT SELECT, INSERT ON \`${DB_NAME}\`.form_clinical_notes TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT UPDATE (\`date\`, code, codetext, description, clinical_notes_type, clinical_notes_category) ON \`${DB_NAME}\`.form_clinical_notes TO '${CLINICAL_CARE_DB_USER}'@'%';
+
 -- SOAP notes (M5d slice 3, ADR 0073): recorded and read back, and corrected on the four text sections only. Not who wrote it or when (user, groupname, date), not the patient (pid),
 -- not authorized or activity: legacy's own REST update rewrites date and pid, this service does not. A note is linked to its encounter by the forms row granted above. No DELETE.
 GRANT SELECT, INSERT ON \`${DB_NAME}\`.form_soap TO '${CLINICAL_CARE_DB_USER}'@'%';
@@ -159,8 +165,8 @@ GRANT INSERT ON \`${DB_NAME}\`.uuid_registry TO '${CLINICAL_CARE_DB_USER}'@'%';
 -- of a SET expression (learned the hard way in ADR 0050's grant for the same table).
 GRANT SELECT, UPDATE ON \`${DB_NAME}\`.sequences TO '${CLINICAL_CARE_DB_USER}'@'%';
 
--- Encounter classes (_ActEncounterCode): only the columns the class lookup reads.
-GRANT SELECT (list_id, option_id, title, seq, is_default) ON \`${DB_NAME}\`.list_options TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- Configured option lists: encounter classes (_ActEncounterCode) and clinical note types and categories. Only the columns the lookups read; notes holds a note type's LOINC code, activity whether it is still offered.
+GRANT SELECT (list_id, option_id, title, seq, is_default, notes, activity) ON \`${DB_NAME}\`.list_options TO '${CLINICAL_CARE_DB_USER}'@'%';
 
 -- Facility name and default place-of-service code, copied onto the encounter (CC-8), and whether it is inactive or a service location, for the facility lookup (M5d slice 4).
 -- Nothing else about a facility: no address, phone or tax columns.

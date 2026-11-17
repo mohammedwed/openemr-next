@@ -1464,6 +1464,309 @@
         ]
       }
     },
+    "/api/v1/encounters/{encounterUuid}/clinical-notes": {
+      "post": {
+        "tags": [
+          "ClinicalNotes"
+        ],
+        "summary": "Record a clinical note on an encounter",
+        "operationId": "RecordClinicalNote",
+        "parameters": [
+          {
+            "name": "encounterUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordClinicalNoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicalNoteRecordedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "ClinicalNotes"
+        ],
+        "summary": "List an encounter's clinical notes, newest first, one bounded page at a time",
+        "operationId": "ListClinicalNotes",
+        "parameters": [
+          {
+            "name": "encounterUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicalNoteListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
+    },
+    "/api/v1/encounters/{encounterUuid}/clinical-notes/{noteUuid}": {
+      "put": {
+        "tags": [
+          "ClinicalNotes"
+        ],
+        "summary": "Replace a clinical note's editable fields, conditional on the ETag the caller read",
+        "operationId": "CorrectClinicalNote",
+        "parameters": [
+          {
+            "name": "encounterUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "noteUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectClinicalNoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicalNoteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Precondition Required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "ClinicalNotes"
+        ],
+        "summary": "Get one clinical note of an encounter, with an ETag",
+        "operationId": "GetClinicalNote",
+        "parameters": [
+          {
+            "name": "encounterUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "noteUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicalNoteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
+    },
     "/api/v1/lookups/encounter-classes": {
       "get": {
         "tags": [
@@ -1538,6 +1841,64 @@
                   "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/CalendarCategoryLookupResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
+    },
+    "/api/v1/lookups/clinical-note-types": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "summary": "List the active clinical note types, in legacy's order",
+        "operationId": "ListClinicalNoteTypes",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClinicalNoteTypeLookupResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
+    },
+    "/api/v1/lookups/clinical-note-categories": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "summary": "List the active clinical note categories, in legacy's order",
+        "operationId": "ListClinicalNoteCategories",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClinicalNoteCategoryLookupResponse"
                   }
                 }
               }
@@ -2231,6 +2592,202 @@
           },
           "name": {
             "type": "string"
+          }
+        }
+      },
+      "ClinicalNoteCategoryLookupResponse": {
+        "required": [
+          "id",
+          "title"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "ClinicalNoteListResponse": {
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClinicalNoteResponse"
+            }
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "offset": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "ClinicalNoteRecordedResponse": {
+        "required": [
+          "uuid",
+          "encounterUuid"
+        ],
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "encounterUuid": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ClinicalNoteResponse": {
+        "required": [
+          "uuid",
+          "date",
+          "type",
+          "category",
+          "description",
+          "code",
+          "codeText",
+          "recordedBy"
+        ],
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "category": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "codeText": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "recordedBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "eTag": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ClinicalNoteTypeLookupResponse": {
+        "required": [
+          "id",
+          "title",
+          "code"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "CorrectClinicalNoteRequest": {
+        "required": [
+          "type",
+          "category",
+          "description",
+          "date"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "category": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "date": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -3729,6 +4286,53 @@
           }
         }
       },
+      "RecordClinicalNoteRequest": {
+        "required": [
+          "type",
+          "category",
+          "description",
+          "date",
+          "providerId"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "category": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "date": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "providerId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "RecordImmunizationRequest": {
         "required": [
           "patientUuid",
@@ -4869,6 +5473,9 @@
     },
     {
       "name": "SoapNotes"
+    },
+    {
+      "name": "ClinicalNotes"
     },
     {
       "name": "Lookups"

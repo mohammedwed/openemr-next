@@ -29,6 +29,18 @@ public static class LookupEndpoints
             .WithSummary("List the active visit categories, as legacy's visit form offers them")
             .Produces<List<CalendarCategoryLookupResponse>>();
 
+        app.MapGet("/lookups/clinical-note-types", async (ClinicalNoteLookupsUseCase useCase, CancellationToken ct) =>
+                Results.Ok((await useCase.TypesAsync(ct)).Select(t => new ClinicalNoteTypeLookupResponse(t.Id, t.Title, t.Code)).ToList()))
+            .WithName("ListClinicalNoteTypes").WithTags("Lookups")
+            .WithSummary("List the active clinical note types, in legacy's order")
+            .Produces<List<ClinicalNoteTypeLookupResponse>>();
+
+        app.MapGet("/lookups/clinical-note-categories", async (ClinicalNoteLookupsUseCase useCase, CancellationToken ct) =>
+                Results.Ok((await useCase.CategoriesAsync(ct)).Select(c => new ClinicalNoteCategoryLookupResponse(c.Id, c.Title)).ToList()))
+            .WithName("ListClinicalNoteCategories").WithTags("Lookups")
+            .WithSummary("List the active clinical note categories, in legacy's order")
+            .Produces<List<ClinicalNoteCategoryLookupResponse>>();
+
         return app;
     }
 }

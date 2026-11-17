@@ -36,6 +36,19 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("DELETE FROM forms")]
     [InlineData("DELETE FROM uuid_registry")]
     [InlineData("DELETE FROM sequences")]
+    [InlineData("DELETE FROM form_clinical_notes")]
+    [InlineData("UPDATE form_clinical_notes SET `user` = 'x'")]
+    [InlineData("UPDATE form_clinical_notes SET groupname = 'x'")]
+    [InlineData("UPDATE form_clinical_notes SET activity = 0")]
+    [InlineData("UPDATE form_clinical_notes SET authorized = 0")]
+    [InlineData("UPDATE form_clinical_notes SET pid = 1")]
+    [InlineData("UPDATE form_clinical_notes SET encounter = '1'")]
+    [InlineData("UPDATE form_clinical_notes SET form_id = 1")]
+    [InlineData("UPDATE form_clinical_notes SET uuid = NULL")]
+    [InlineData("UPDATE form_clinical_notes SET note_related_to = 'x'")]
+    [InlineData("UPDATE form_clinical_notes SET external_id = 'x'")]
+    [InlineData("UPDATE form_clinical_notes SET description = 'x', activity = 0")]
+    [InlineData("UPDATE list_options SET title = 'x'")]
     [InlineData("DELETE FROM form_soap")]
     [InlineData("UPDATE form_soap SET pid = 1")]
     [InlineData("INSERT INTO openemr_postcalendar_categories (pc_catname) VALUES ('x')")]
@@ -86,7 +99,10 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("SELECT pc_catcolor FROM openemr_postcalendar_categories")]
     [InlineData("SELECT pc_catdesc FROM openemr_postcalendar_categories")]
     [InlineData("SELECT pc_recurrspec FROM openemr_postcalendar_categories")]
-    [InlineData("SELECT notes FROM list_options")]
+    [InlineData("SELECT codes FROM list_options")]
+    [InlineData("SELECT toggle_setting_1 FROM list_options")]
+    [InlineData("SELECT mapping FROM list_options")]
+    [InlineData("SELECT * FROM list_options")]
     public async Task The_production_principal_cannot_read_columns_or_tables_it_has_no_need_for(string sql)
     {
         await using var db = fixture.CreateDbContext();
@@ -190,6 +206,32 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("TRUNCATE TABLE issue_encounter")]
     public async Task The_production_principal_cannot_change_or_remove_issues_beyond_inserting_a_problems_columns(string sql) =>
         await AssertDeniedAsync(sql);
+
+    [Fact]
+    public async Task The_production_principal_can_read_the_option_columns_the_lookups_use_including_a_note_types_loinc_code_and_whether_it_is_active()
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // Granted for the clinical note types (ADR 0074): notes holds the LOINC code legacy stores with the type, activity whether it is still offered.
+        await db.Database.ExecuteSqlRawAsync("SELECT list_id, option_id, title, seq, is_default, notes, activity FROM list_options LIMIT 1");
+    }
+
+    [Theory]
+    [InlineData("date")]
+    [InlineData("code")]
+    [InlineData("codetext")]
+    [InlineData("description")]
+    [InlineData("clinical_notes_type")]
+    [InlineData("clinical_notes_category")]
+    public async Task The_production_principal_may_update_exactly_the_clinical_note_columns_it_owns(string column)
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // The column name is one of this theory's own constants, never input, which is why the interpolation (EF1002) is safe here.
+#pragma warning disable EF1002
+        await db.Database.ExecuteSqlRawAsync($"UPDATE form_clinical_notes SET `{column}` = `{column}`");
+#pragma warning restore EF1002
+    }
 
     [Theory]
     [InlineData("subjective")]

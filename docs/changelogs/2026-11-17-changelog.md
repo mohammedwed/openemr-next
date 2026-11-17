@@ -353,3 +353,16 @@ Full record: `docs/clinical-care/18-lookups-slice.md` (rules LK-1 to LK-6, limit
   dialog warns and falls back to the previous fixed class list and plain id fields. Not browser-verified.
 - **Bug fixed: the gateway had no route for `/api/v1/immunizations` or `/api/v1/lookups`.** Both were served by Clinical Care and built with passing tests, but 404ed for every browser, because the gateway lists each prefix it forwards and its own tests run only against a live stack. Both routes added.
 - **Guard:** `GatewayRoutesTests` (Clinical Care suite) compares every API prefix in the OpenAPI document with the gateway's route list, so a new route group cannot be built and left unreachable. Verified to fail without the fix.
+
+## Added — M5d slice 3b: clinical notes (`/api/v1/encounters/{uuid}/clinical-notes`) — M5d is complete
+
+Full record: `docs/clinical-care/19-clinical-notes-slice.md` (rules CN-1 to CN-10, limitations L1 to L6), decision `docs/architecture/0074-...`.
+
+- **Record, read, list and correct** an encounter's clinical notes. Unlike SOAP, `form_clinical_notes` has a uuid and a real stamp, so identity and the `ETag` follow vitals; the new difficulty is that **one parent `forms` row groups several note rows** whose `form_id` legacy allocates as an unlocked `MAX+1`.
+- **Each note gets its own parent form, its id allocated under a database lock** (ADR 0074). A test with eight simultaneous writers found a real bug in the first version: the transaction's snapshot was fixed before the lock was acquired, so waiting writers still read the stale maximum and took the same id.
+  The lock is now taken on an explicitly held connection before the transaction begins. It serialises this service's writers; legacy's own writer takes no lock, so that race is narrowed, not closed.
+- **The code and label are derived from the type** (the LOINC code in the option's `notes`), so a note cannot carry a code that disagrees with its type. A note is reached only through its own encounter, matching both its own columns and its parent's `forms` row, and only while active; retiring a note (`activity = 0`) is a delete and is not offered.
+- **Two lookups:** `/lookups/clinical-note-types` (with each type's LOINC code) and `/lookups/clinical-note-categories`, the active options in legacy's order.
+- **Grants:** `SELECT, INSERT` plus `UPDATE` on exactly six columns of `form_clinical_notes`; `SELECT` on two more `list_options` columns (`notes`, `activity`). The existing test that pinned `list_options.notes` as unreadable was replaced deliberately, with the columns still denied listed instead.
+- **Not covered:** linked documents and results; `note_related_to` is not parsed (can be stale after a text correction).
+- **Tests, all green (unit 685, architecture 69, integration 760).** The solution builds with only the 7 pre-existing warnings.

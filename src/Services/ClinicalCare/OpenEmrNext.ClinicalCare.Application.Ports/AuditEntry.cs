@@ -44,6 +44,8 @@ public static class AuditActions
     public const string AllergyUpdate = "allergy.update";
     public const string ImmunizationRecord = "immunization.record";
     public const string ImmunizationCorrect = "immunization.correct";
+    public const string ClinicalNoteRecord = "clinical_note.record";
+    public const string ClinicalNoteCorrect = "clinical_note.correct";
     public const string SoapRecord = "soap.record";
     public const string SoapCorrect = "soap.correct";
     public const string EncounterIssueLink = "encounter.issue.link";
