@@ -48,6 +48,26 @@ public class EncounterIssueLinkTests
     public void IE_1_an_encounter_with_no_number_cannot_be_linked_to(long? number) =>
         Assert.Contains("The encounter has no encounter number, so an issue cannot be linked to it.", ErrorsOf(() => Create(number: number)));
 
+    [Theory]
+    [InlineData(2_147_483_648L)]     // the first number a signed 32-bit column cannot hold; sequences.id is an unsigned int, so numbers this high exist
+    [InlineData(4_294_967_295L)]
+    public void IE_1_an_encounter_number_the_link_column_cannot_hold_is_refused_not_clamped(long number) =>
+        Assert.Contains(
+            "The encounter's number is too large for a link to store (legacy's issue_encounter holds numbers up to 2147483647).",
+            ErrorsOf(() => Create(number: number)));
+
+    [Fact]
+    public void IE_1_the_largest_number_the_column_can_hold_is_accepted() =>
+        Assert.Equal(int.MaxValue, Create(number: int.MaxValue).EncounterNumber);
+
+    [Theory]
+    [InlineData(2_147_483_648L)]
+    [InlineData(long.MaxValue)]
+    public void IE_1_an_issue_row_id_the_link_column_cannot_hold_is_refused_not_clamped(long id) =>
+        Assert.Contains(
+            "The issue's row id is too large for a link to store (legacy's issue_encounter holds ids up to 2147483647).",
+            ErrorsOf(() => Create(issue: new IssueReference(Guid.NewGuid(), id, IssueKind.Problem, 42, "Asthma"))));
+
     [Fact]
     public void IE_2_an_encounter_whose_patient_is_unknown_cannot_be_linked_to()
     {

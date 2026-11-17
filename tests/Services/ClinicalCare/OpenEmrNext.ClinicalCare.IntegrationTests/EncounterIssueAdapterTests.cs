@@ -79,6 +79,22 @@ public class EncounterIssueRegistryTests(ClinicalCareContainerFixture fixture) :
     }
 
     [Fact]
+    public async Task R_15_this_is_why_the_link_does_not_use_insert_ignore_the_database_clamps_an_out_of_range_number_to_a_different_encounter()
+    {
+        // Pins the behaviour the adapter avoids. Under IGNORE a data error becomes a warning and the value is clamped; a plain INSERT is refused.
+        await fixture.RootExecuteAsync(
+            $"INSERT IGNORE INTO issue_encounter (uuid, pid, list_id, encounter, resolved) VALUES (NULL, 42, {_issueRowId}, 3000000000, 0)");
+        Assert.Equal(2_147_483_647L, await fixture.RootScalarAsync<long>("SELECT encounter FROM issue_encounter"));   // a link to the wrong encounter, silently
+        await fixture.RootExecuteAsync("DELETE FROM issue_encounter");
+
+        var plain = await Assert.ThrowsAnyAsync<Exception>(() => fixture.RootExecuteAsync(
+            $"INSERT INTO issue_encounter (uuid, pid, list_id, encounter, resolved) VALUES (NULL, 42, {_issueRowId}, 3000000000, 0)"));
+
+        Assert.Contains("out of range", plain.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0L, await Count("issue_encounter"));
+    }
+
+    [Fact]
     public async Task A_link_registers_its_uuid_writes_its_event_and_its_audit_row_in_one_commit()
     {
         var link = NewLink();

@@ -40,6 +40,7 @@ Condition and AllergyIntolerance are Clinical Care aggregates and medications be
   later allergy slice adds its three columns (`reaction`, `severity_al`, `verification`) the same way.
 - **Updates are conditional on `modifydate` and type-scoped** (slice 3, `10-update-problem-and-allergy-slice.md`): the `UPDATE` grant names the eleven owned columns, and a
   problem update can never reach an allergy or a medication by its uuid.
+- **The `type` rule is now structural:** an architecture test reads the SQL and fails the build if any statement on `lists` omits `type` (mutation-tested; `12-shadow-comparison-and-review.md`).
 - **Links to encounters follow the same ownership** (slice 4, `11-link-issue-to-encounter-slice.md`): only problems and allergies can be linked, a medication's uuid is a 404, and a link
   between two patients' records, which legacy allows, is refused.
 - Medications, surgeries, dental issues and devices remain unowned; Pharmacy will have to adopt `medication` and respect the same `type` rule.

@@ -104,7 +104,7 @@ public class AuditEntryTests
     [InlineData(AuditOutcome.Failed, "failed")]
     public void Outcomes_are_stored_as_lower_case_words(AuditOutcome outcome, string stored)
     {
-        var entry = new AuditEntry(At, Actor, AuditActions.VitalsCorrect, Subject, outcome);
+        var entry = new AuditEntry(At, Actor, AuditActions.VitalsRecord, Subject, outcome);
 
         Assert.Equal(stored, entry.OutcomeName);
     }

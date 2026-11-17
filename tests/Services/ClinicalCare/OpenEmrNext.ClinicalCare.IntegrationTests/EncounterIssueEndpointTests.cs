@@ -165,6 +165,23 @@ public class EncounterIssueEndpointTests(ClinicalCareContainerFixture fixture) :
     }
 
     [Fact]
+    public async Task R_15_PUT_for_an_encounter_whose_number_a_32_bit_link_column_cannot_hold_is_400_and_links_nothing_instead_of_linking_the_wrong_encounter()
+    {
+        // sequences.id is an unsigned int, so 3,000,000,000 is a real encounter number; issue_encounter.encounter is a signed int(11) and cannot name it.
+        var high = Guid.Parse("77777777-7777-4777-8777-777777777777");
+        await fixture.RootExecuteAsync(
+            $"INSERT INTO form_encounter (uuid, date, pid, encounter, reason, class_code, provider_id, pc_catid) VALUES (UNHEX('{high:N}'), NOW(), 42, 3000000000, 'high', 'AMB', 7, 5)");
+
+        var response = await _client.PutAsJsonAsync(Url(encounter: high), new LinkIssueRequest());
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(
+            "The encounter's number is too large for a link to store (legacy's issue_encounter holds numbers up to 2147483647).", await ErrorsOf(response));
+        Assert.Equal(0L, await Count("issue_encounter"));
+        Assert.Equal(1L, await Count("clinical_care_audit", "outcome = 'failed' AND action = 'encounter.issue.link'"));
+    }
+
+    [Fact]
     public async Task PUT_for_an_encounter_legacy_has_soft_deleted_is_404()
     {
         await fixture.RootExecuteAsync("UPDATE forms SET deleted = 1 WHERE formdir = 'newpatient'");

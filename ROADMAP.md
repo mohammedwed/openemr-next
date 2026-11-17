@@ -323,7 +323,7 @@ Both are rows of legacy's one `lists` table (a free-text `type`), so this slice 
 Research: `docs/clinical-care/07-problems-and-allergies-research.md`; ADR 0070 (Proposed).
 
 - **Slices:** 1 record, get and list problems (**done Nov 17**; suites green: unit 362, architecture 39, integration 330; `08-record-problem-slice.md`); 2 the same for allergies (**done Nov 17**; suites green: unit 407, architecture 45, integration 374; `09-record-allergy-slice.md`); 3 update (resolving a problem is an update) (**done Nov 17**; suites green: unit 473, architecture 45, integration 443; `10-update-problem-and-allergy-slice.md`); 4 link an issue to an
-  encounter (**done Nov 17**; suites green: unit 494, architecture 49, integration 483; `11-link-issue-to-encounter-slice.md`); 5 WebApp tabs (**built Nov 17**, ADR 0071, builds with no warnings, **not yet checked in a browser**); 6 shadow comparison, review and the legacy-UI check.
+  encounter (**done Nov 17**; suites green: unit 494, architecture 49, integration 483; `11-link-issue-to-encounter-slice.md`); 5 WebApp tabs (**built Nov 17**, ADR 0071, builds with no warnings, **not yet checked in a browser**); 6 shadow comparison and review (**done Nov 17**, `12-shadow-comparison-and-review.md`: 215 of 229 columns identical, the 14 that differ explained; one defect found and fixed). **Remaining: the legacy-UI check and a browser check of the new screens, both needing a signed-in user.**
 - **Reuses** the M5b machinery unchanged: `modifydate` as the `ETag` token, `If-Match` (428, 412), the append-only audit and the outbox.
 - **Out of scope:** delete (waits for the permission port), medications, surgeries, dental issues, devices and health concerns (other owners).
 

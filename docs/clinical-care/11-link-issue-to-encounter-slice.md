@@ -18,10 +18,10 @@ by its uuid: the link is a relation between two resources that already exist, no
 
 | Id | Rule | Legacy source | Parity | Where |
 |---|---|---|---|---|
-| IE-1 | An encounter must have a number to be linked to: the link row stores the encounter **number**, not its uuid. | `issue_encounter.encounter` | Parity | `EncounterIssueLink.Create` |
+| IE-1 | An encounter must have a number to be linked to: the link row stores the encounter **number**, not its uuid. **The number, and the issue's row id, must fit a signed 32-bit column**: encounter numbers go up to 4,294,967,295 (`sequences.id` is unsigned) but the link column stops at 2,147,483,647, and the database would clamp a larger one to a *different* encounter. It is refused with a 400 (review finding R-15). | `issue_encounter.encounter`, `list_id` | Parity, plus a guard legacy lacks | `EncounterIssueLink.Create` |
 | IE-2 | The encounter's patient must be known. | `issue_encounter.pid` | Parity | `EncounterIssueLink.Create` |
 | **IE-3** | **The issue and the encounter must be the same patient's.** | `linkIssueToEncounter` takes a patient id and trusts it | **Stricter than legacy, deliberately**: a clinical record naming another patient's problem is a safety defect | `EncounterIssueLink.Create` |
-| IE-4 | Linking is idempotent: an existing link for the same patient, issue and encounter is returned as it is, and **nothing is written, emitted or audited** for it. | `linkIssueToEncounter` ("already connected") | Parity | `EfEncounterIssueRegistry` |
+| IE-4 | Linking is idempotent: an existing link for the same patient, issue and encounter is returned as it is, and **nothing is written, emitted or audited** for it. The insert is `INSERT ... SELECT ... WHERE NOT EXISTS`, **not** `INSERT IGNORE`, which would hide data errors by clamping them (R-15). | `linkIssueToEncounter` ("already connected") | Parity | `EfEncounterIssueRegistry` |
 | IE-5 | A link is **never updated**, so the `resolved` flag of an existing link is not changed by a second `PUT`. To change it, unlink and link again. | legacy has no link update either | Parity | `LinkIssueToEncounterUseCase` |
 | IE-6 | Only problems and allergies can be linked. Any other type, including one a site added, is a 404, even by its exact uuid; an issue with no uuid is not addressable. | the encounter screen links any type | **(new)**, ADR 0070 #1 and #2 | `EfIssueDirectory` |
 | IE-7 | The new link row has `created_by` and `updated_by` **null**: the actor is unknown (ADR 0069 #5) and a guessed user id would be written into a clinical table. | the session's user id | **Deliberate deviation**; fixed when identity forwarding exists | `EfEncounterIssueRegistry` |
@@ -52,6 +52,7 @@ columns serves the join, and `INSERT` on `uuid_registry` serves the link's own u
 | L3 | Links to medications, surgeries and other types are invisible and cannot be made (IE-6). | Those types have no owner yet (ADR 0070) |
 | L4 | There is no "list the encounters an issue was addressed in". | A read need, not yet asked for; the data is the same table |
 | L5 | A link created by the legacy encounter screen for an issue with no uuid is not shown (IE-12). | As ADR 0070 #6 |
+| L6 | Two callers racing to make the very same link can collide on the unique key: one fails, or is retried after a deadlock and then finds the other's link. | Rare and loud, which is the right way round; `INSERT IGNORE` would hide it by hiding every other error (R-15) |
 
 ## 6. Tests
 

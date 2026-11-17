@@ -30,6 +30,14 @@ public sealed record EncounterIssueLinkIdentity
 /// </remarks>
 public sealed class EncounterIssueLink
 {
+    /// <summary>
+    /// <c>issue_encounter.encounter</c> and <c>issue_encounter.list_id</c> are signed <c>int(11)</c>, but the numbers they hold come from wider sources: an encounter number is
+    /// drawn from <c>sequences.id</c> (an <i>unsigned</i> int, up to 4,294,967,295) and stored in <c>form_encounter.encounter</c> (a bigint), and <c>lists.id</c> is a bigint. A
+    /// value above this is a real encounter or issue that a link cannot name. It must be refused: under <c>INSERT IGNORE</c> the database would clamp it to this maximum and write
+    /// a link to a <b>different</b> encounter (review finding R-15).
+    /// </summary>
+    public const long MaxStorableId = int.MaxValue;
+
     public long Id { get; private set; }
     public Guid Uuid { get; }
     public Guid EncounterUuid { get; }
@@ -68,6 +76,12 @@ public sealed class EncounterIssueLink
 
         if (encounterNumber is not > 0)
             errors.Add("The encounter has no encounter number, so an issue cannot be linked to it.");
+        else if (encounterNumber > MaxStorableId)
+            errors.Add($"The encounter's number is too large for a link to store (legacy's issue_encounter holds numbers up to {MaxStorableId}).");
+
+        // issue_encounter.list_id is the same signed 32-bit column, and lists.id is a bigint: a row id beyond it could not be stored.
+        if (issue.Id > MaxStorableId)
+            errors.Add($"The issue's row id is too large for a link to store (legacy's issue_encounter holds ids up to {MaxStorableId}).");
 
         if (patientUuid is null || patientUuid == Guid.Empty || patientPid is not > 0)
             errors.Add("The encounter's patient is unknown, so an issue cannot be linked to it.");

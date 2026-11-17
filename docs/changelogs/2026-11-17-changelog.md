@@ -276,3 +276,18 @@ Full record: ADR 0071.
 - **Not exercised in a browser, and the WebApp still has no automated tests** (pending decision 7): it builds with no warnings, and the API it calls is covered by its own suites. The check needs a re-seeded
   database, rebuilt images and a signed-in user, and is outstanding.
 - **Corrected while writing it:** a code comment cited pending decision 10 (lookups) for the time-zone gap, which is decision 9.
+
+## Reviewed and fixed — M5c shadow comparison and layered review
+
+Full record: `docs/clinical-care/12-shadow-comparison-and-review.md`.
+
+- **Shadow comparison on the live stack: 229 columns compared, 215 identical, 14 differ, every difference a documented rule.** Each scenario was run once by OpenEMR 8.0.0's own services and once through the API, for creates
+  (both of legacy's write paths for a problem), updates and links. Against the issue screen's own path, a problem is **32 of 32 identical**. The rows were cleaned up and the dev database left as found.
+- **Observed live, confirming the research:** the issue screen creates a row with **no uuid** (invisible to this API until backfilled) and stamps `date` with the month in the minutes (`10:22:17` became `10:11:17`).
+- **Defect found and fixed (R-15): a link could be written against the wrong encounter.** Encounter numbers reach 4,294,967,295 but `issue_encounter.encounter` is a signed 32-bit column, and `INSERT IGNORE` clamps instead of failing, so
+  a valid high-numbered encounter would have been silently linked as number 2,147,483,647. The domain now refuses what the column cannot hold (400), and the insert no longer uses `IGNORE`. Pinned at the domain, HTTP and
+  database levels, including a test that shows MariaDB doing the clamping.
+- **Structural guard added:** an architecture test reads the SQL and fails the build if any statement on `lists` omits the issue `type` (ADR 0070 #2). It was mutation-tested: removing one filter failed it.
+- **Dead code removed:** three audit-action constants nothing used.
+- **Still open (not fixed here):** the gateway still serves these routes without a sign-in (the CRITICAL finding, which they inherit); the new screens and the legacy-UI check are not yet verified in a browser.
+- **Tests, all green (unit 499, architecture 51, integration 494).**

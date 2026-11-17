@@ -10,8 +10,10 @@ namespace OpenEmrNext.ClinicalCare.Infrastructure;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Idempotent, as legacy's is.</b> The table is unique on <c>(pid, list_id, encounter)</c>, so the link is an <c>INSERT IGNORE</c>: zero rows inserted means the link already
-/// exists (or a concurrent caller just made it), and the stored one is returned with nothing else written, so no event and no audit row for a link that was not made.
+/// <b>Idempotent, as legacy's is.</b> The table is unique on <c>(pid, list_id, encounter)</c>, and the insert is guarded by <c>NOT EXISTS</c>: zero rows inserted means the link already
+/// exists, and the stored one is returned with nothing else written, so no event and no audit row for a link that was not made. Two callers racing to make the very same link can
+/// still collide on the unique key: one of them fails (or is retried after a deadlock and then finds the other's link). That is rare and loud, which is the right way round; the
+/// alternative, <c>INSERT IGNORE</c>, hides the race by hiding every other error as well (review finding R-15).
 /// The same reasoning makes a retry after a lost commit acknowledgement safe: it finds the link and reports it as existing, never writes a second one.
 /// </para>
 /// <para>
@@ -37,10 +39,14 @@ public sealed class EfEncounterIssueRegistry(ClinicalCareDbContext db, IAuditLog
         {
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
+            // Not INSERT IGNORE: IGNORE turns a data error into a warning and stores a clamped value (review finding R-15), so an out-of-range encounter number would have
+            // been linked to a different encounter instead of failing. NOT EXISTS makes the statement idempotent and leaves every real error an error.
             var inserted = await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
-                INSERT IGNORE INTO issue_encounter (uuid, pid, list_id, encounter, resolved, created_by, updated_by)
-                VALUES ({uuidBytes}, {pid}, {listId}, {number}, {resolved}, NULL, NULL)
+                INSERT INTO issue_encounter (uuid, pid, list_id, encounter, resolved, created_by, updated_by)
+                SELECT {uuidBytes}, {pid}, {listId}, {number}, {resolved}, NULL, NULL
+                FROM DUAL
+                WHERE NOT EXISTS (SELECT 1 FROM issue_encounter WHERE pid = {pid} AND list_id = {listId} AND encounter = {number})
                 """, ct);
 
             if (inserted == 0)
