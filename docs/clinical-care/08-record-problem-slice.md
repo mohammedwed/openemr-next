@@ -53,10 +53,10 @@ are touched is PB-16, a rule in the code that the tests attack from several side
 | L1 | **A problem created in the issue screen is invisible here until legacy gives it a uuid** (PB-17). | The issue screen assigns none; legacy backfills when any issue service is next constructed. Backfilling here would mean a write on a read |
 | L2 | **Rows created by the issue screen keep the wrong minutes** in `date` (PB-10). | That is legacy's bug; this service does not reproduce it, and does not repair rows it did not write |
 | L3 | **The actor is the provider the caller named,** flagged unverified. | No verified identity until Phase 1b |
-| L4 | **No update, no resolve, no delete yet.** | Slice 3 (resolving is an update) and the permission port |
+| L4 | **No delete yet.** (Update and resolve are built: `10-update-problem-and-allergy-slice.md`.) | Delete waits for the permission port |
 | L5 | **`diagnosis` codes are shape-checked only,** not looked up in a code system. | Q7: a terminology service is a later decision |
 | L6 | **Allergies, medications, surgeries, dental issues and health concerns are not offered.** | Allergies are slice 2 (`09-record-allergy-slice.md`); the rest have no owner yet |
-| L7 | **A problem's `verification` (list `condition-verification`) is not carried.** | Found while building slice 2; it comes with problem update (slice 3) |
+| L7 | ~~A problem's `verification` is not carried.~~ **Fixed in slice 3** (rule PB-21): it is recorded and updated. | Found while building slice 2 |
 
 ## 5. Not built here, with the precondition (KD-8)
 

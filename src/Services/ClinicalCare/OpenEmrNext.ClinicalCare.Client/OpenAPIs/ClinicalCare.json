@@ -633,6 +633,91 @@
       }
     },
     "/api/v1/problems/{uuid}": {
+      "put": {
+        "tags": [
+          "Problems"
+        ],
+        "summary": "Replace a problem's editable fields, conditional on the ETag the caller read (resolve it by sending an end date)",
+        "operationId": "UpdateProblem",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProblemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Precondition Required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      },
       "get": {
         "tags": [
           "Problems"
@@ -814,6 +899,91 @@
       }
     },
     "/api/v1/allergies/{uuid}": {
+      "put": {
+        "tags": [
+          "Allergies"
+        ],
+        "summary": "Replace an allergy's editable fields, conditional on the ETag the caller read (end it by sending an end date)",
+        "operationId": "UpdateAllergy",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAllergyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllergyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Precondition Required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      },
       "get": {
         "tags": [
           "Allergies"
@@ -1552,6 +1722,12 @@
               "null",
               "string"
             ]
+          },
+          "verification": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -1774,6 +1950,13 @@
               "string"
             ],
             "format": "int64"
+          },
+          "verification": {
+            "maxLength": 36,
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -1924,6 +2107,78 @@
           }
         }
       },
+      "UpdateAllergyRequest": {
+        "required": [
+          "title",
+          "beginDate",
+          "endDate",
+          "diagnosis",
+          "reaction",
+          "severity",
+          "verification",
+          "comments"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 255,
+            "minLength": 2,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "beginDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "diagnosis": {
+            "maxLength": 255,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reaction": {
+            "maxLength": 255,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "severity": {
+            "maxLength": 50,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "verification": {
+            "maxLength": 36,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "comments": {
+            "maxLength": 65535,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "UpdateEncounterRequest": {
         "required": [
           "classCode",
@@ -2004,6 +2259,92 @@
               "string"
             ],
             "format": "int64"
+          }
+        }
+      },
+      "UpdateProblemRequest": {
+        "required": [
+          "title",
+          "beginDate",
+          "endDate",
+          "diagnosis",
+          "outcome",
+          "occurrence",
+          "referredBy",
+          "comments",
+          "verification"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 255,
+            "minLength": 2,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "beginDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "diagnosis": {
+            "maxLength": 255,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "outcome": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "occurrence": {
+            "maximum": 2147483647,
+            "minimum": 0,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "referredBy": {
+            "maxLength": 255,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "comments": {
+            "maxLength": 65535,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "verification": {
+            "maxLength": 36,
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

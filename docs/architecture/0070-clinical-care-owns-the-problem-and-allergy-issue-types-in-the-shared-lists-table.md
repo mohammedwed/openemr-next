@@ -38,4 +38,6 @@ Condition and AllergyIntolerance are Clinical Care aggregates and medications be
 - The `uuid`-less window is accepted: a problem created in the issue screen is invisible here until legacy assigns it a uuid.
 - **The grants are column-level** because the table is shared: `SELECT` and `INSERT` on only the columns a problem uses (slice doc, section 3). A
   later allergy slice adds its three columns (`reaction`, `severity_al`, `verification`) the same way.
+- **Updates are conditional on `modifydate` and type-scoped** (slice 3, `10-update-problem-and-allergy-slice.md`): the `UPDATE` grant names the eleven owned columns, and a
+  problem update can never reach an allergy or a medication by its uuid.
 - Medications, surgeries, dental issues and devices remain unowned; Pharmacy will have to adopt `medication` and respect the same `type` rule.

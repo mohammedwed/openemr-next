@@ -20,6 +20,16 @@ public static class AllergyEndpoints
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        app.MapPut("/allergies/{uuid:guid}", UpdateAllergy)
+            .WithName("UpdateAllergy")
+            .WithTags("Allergies")
+            .WithSummary("Replace an allergy's editable fields, conditional on the ETag the caller read (end it by sending an end date)")
+            .Produces<AllergyResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesProblem(StatusCodes.Status428PreconditionRequired);
+
         app.MapGet("/allergies/{uuid:guid}", GetAllergy)
             .WithName("GetAllergy")
             .WithTags("Allergies")
@@ -59,6 +69,37 @@ public static class AllergyEndpoints
         catch (PatientNotFoundException ex)
         {
             return Results.Problem(title: "Patient not found.", detail: ex.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+    }
+
+    private static async Task<IResult> UpdateAllergy(
+        Guid uuid, UpdateAllergyRequest request, UpdateAllergyUseCase useCase, HttpContext http, CancellationToken ct)
+    {
+        // Before anything else: an update must say which version it is based on (ADR 0068 #3).
+        if (!Preconditions.TryRead(http.Request, out var offered))
+            return Preconditions.Required();
+
+        try
+        {
+            var result = await useCase.ExecuteAsync(
+                new UpdateAllergyCommand(
+                    uuid, offered, request.Title, ClientTime.ToServerLocal(request.BeginDate), ClientTime.ToServerLocal(request.EndDate), request.Diagnosis,
+                    request.Reaction, request.Severity, request.Verification, request.Comments, RequestOrigins.From(http)),
+                ct);
+
+            return Preconditions.Ok(AllergyResponse.From(result.Allergy), result.Allergy.LastModified);
+        }
+        catch (ClinicalCareValidationException ex)
+        {
+            return ValidationProblems.Many(ex.Errors);
+        }
+        catch (AllergyNotFoundException ex)
+        {
+            return Results.Problem(title: "Allergy not found.", detail: ex.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+        catch (ConcurrencyConflictException ex)
+        {
+            return Preconditions.Failed(ex.CurrentStamp);
         }
     }
 

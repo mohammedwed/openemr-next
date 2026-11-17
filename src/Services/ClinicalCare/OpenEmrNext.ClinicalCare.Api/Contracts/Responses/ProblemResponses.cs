@@ -23,6 +23,7 @@ public sealed record ProblemRecordedResponse(Guid Uuid, Guid PatientUuid);
 /// <param name="Comments">Free-text comments.</param>
 /// <param name="RecordedAt">When the problem was recorded (not when it began).</param>
 /// <param name="RecordedBy">The username legacy recorded as having recorded it, if any.</param>
+/// <param name="Verification">The <c>condition-verification</c> code, if recorded.</param>
 public sealed record ProblemResponse(
     Guid Uuid,
     Guid? PatientUuid,
@@ -36,11 +37,12 @@ public sealed record ProblemResponse(
     string? ReferredBy,
     string? Comments,
     DateTime? RecordedAt,
-    string? RecordedBy)
+    string? RecordedBy,
+    string? Verification = null)
 {
     public static ProblemResponse From(ProblemView view) => new(
         view.Uuid, view.PatientUuid, view.PatientPid, view.Title, view.BeginDate, view.EndDate, view.Diagnosis, view.Outcome, view.Occurrence,
-        view.ReferredBy, view.Comments, view.RecordedAt, view.RecordedBy);
+        view.ReferredBy, view.Comments, view.RecordedAt, view.RecordedBy, view.Verification);
 }
 
 /// <summary>One bounded page of a patient's problems, newest first, with the total so a caller can page.</summary>

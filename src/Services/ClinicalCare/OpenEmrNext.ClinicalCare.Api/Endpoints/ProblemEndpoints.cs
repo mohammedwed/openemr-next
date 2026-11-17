@@ -21,6 +21,16 @@ public static class ProblemEndpoints
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        app.MapPut("/problems/{uuid:guid}", UpdateProblem)
+            .WithName("UpdateProblem")
+            .WithTags("Problems")
+            .WithSummary("Replace a problem's editable fields, conditional on the ETag the caller read (resolve it by sending an end date)")
+            .Produces<ProblemResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesProblem(StatusCodes.Status428PreconditionRequired);
+
         app.MapGet("/problems/{uuid:guid}", GetProblem)
             .WithName("GetProblem")
             .WithTags("Problems")
@@ -48,7 +58,7 @@ public static class ProblemEndpoints
                 new RecordProblemCommand(
                     request.PatientUuid, request.Title, ClientTime.ToServerLocal(request.BeginDate), ClientTime.ToServerLocal(request.EndDate),
                     request.Diagnosis, request.Outcome, request.Occurrence, request.ReferredBy, request.Comments, request.ProviderId,
-                    RequestOrigins.From(http)),
+                    RequestOrigins.From(http), request.Verification),
                 ct);
 
             return Results.Created($"/api/v1/problems/{problem.Uuid}", new ProblemRecordedResponse(problem.Uuid, problem.Patient.Uuid));
@@ -60,6 +70,38 @@ public static class ProblemEndpoints
         catch (PatientNotFoundException ex)
         {
             return Results.Problem(title: "Patient not found.", detail: ex.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+    }
+
+    private static async Task<IResult> UpdateProblem(
+        Guid uuid, UpdateProblemRequest request, UpdateProblemUseCase useCase, HttpContext http, CancellationToken ct)
+    {
+        // Before anything else: an update must say which version it is based on (ADR 0068 #3).
+        if (!Preconditions.TryRead(http.Request, out var offered))
+            return Preconditions.Required();
+
+        try
+        {
+            var result = await useCase.ExecuteAsync(
+                new UpdateProblemCommand(
+                    uuid, offered, request.Title, ClientTime.ToServerLocal(request.BeginDate), ClientTime.ToServerLocal(request.EndDate), request.Diagnosis,
+                    request.Outcome, request.Occurrence, request.ReferredBy, request.Comments, request.Verification, RequestOrigins.From(http)),
+                ct);
+
+            // The new ETag, so the caller can keep editing without another read.
+            return Preconditions.Ok(ProblemResponse.From(result.Problem), result.Problem.LastModified);
+        }
+        catch (ClinicalCareValidationException ex)
+        {
+            return ValidationProblems.Many(ex.Errors);
+        }
+        catch (ProblemNotFoundException ex)
+        {
+            return Results.Problem(title: "Problem not found.", detail: ex.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+        catch (ConcurrencyConflictException ex)
+        {
+            return Preconditions.Failed(ex.CurrentStamp);
         }
     }
 

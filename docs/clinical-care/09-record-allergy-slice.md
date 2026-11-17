@@ -53,10 +53,10 @@ fields differ. The refactor changed no problem behaviour: all 362 existing unit 
 |---|---|---|
 | L1 | A uuid-less allergy created in the issue screen is invisible until legacy gives it a uuid (AL-13). | As problems (ADR 0070 #6) |
 | L2 | The actor is the provider the caller named, flagged unverified. | No verified identity until Phase 1b |
-| L3 | No update, resolve or delete yet. | Slice 3 (resolving is an update) and the permission port |
+| L3 | No delete yet. (Update and end are built: `10-update-problem-and-allergy-slice.md`.) | Delete waits for the permission port |
 | L4 | `outcome` is **not** an allergy field here (the research listed it). | Not verified to be used for allergies in the 8.0.0 screen; a narrower owned set is the safe direction |
 | L5 | The substance is free text: `list_option_id`, which links the title to the `allergy_issue_list` code list, is not written. | A terminology decision (Q7); a later slice can add it |
-| L6 | **Problems have a `verification` field too** (list `condition-verification`) that slice 1 did not carry. | Found while researching this slice; it comes with problem update (slice 3) |
+| L6 | ~~Problems have a `verification` field slice 1 did not carry.~~ **Fixed in slice 3** (rule PB-21). | Found while researching this slice |
 
 ## 6. Tests
 

@@ -216,3 +216,21 @@ Full record: `docs/clinical-care/09-record-allergy-slice.md` (rules AL-1 to AL-1
 - **Found while building it:** a problem also carries a `verification` (list `condition-verification`) that slice 1 did not; recorded as limitation L7 and
   scheduled with problem update. The research doc's allergy `outcome` is dropped (L4).
 - **Tests, all green (unit 407, architecture 45, integration 374).** OpenAPI snapshot regenerated; the whole solution builds with no new warnings.
+
+## Added — M5c slice 3: update a problem or an allergy (`PUT`), and problem verification
+
+Full record: `docs/clinical-care/10-update-problem-and-allergy-slice.md` (rules IU-1 to IU-12 and PB-21, limitations L1 to L6).
+
+- **`PUT /api/v1/problems/{uuid}` and `PUT /api/v1/allergies/{uuid}`** replace the editable set, conditional on the `ETag` the caller read (`lists.modifydate`). 200 with the new
+  `ETag`; 428 without a usable `If-Match`; 412 (with the current `ETag`) when the record changed, including by the legacy issue screen; 400, 401 and 404 as for encounters. The
+  order of checks is the encounter's.
+- **Resolving is an update:** send an end date (and usually outcome 1); reopening sends none. The issue screen marks a problem resolved by `enddate`, so no delete is needed to take
+  something off the active list.
+- **A problem update can never reach another issue type:** every statement carries the type, so an allergy's, a medication's or a surgery's uuid is a 404 on the wrong `PUT`, and the
+  tests prove it at the adapter and over HTTP. The database user gets `UPDATE` on exactly eleven columns of `lists`.
+- **Problem verification added** (rule PB-21, closing limitation L7 from slice 1): a problem records and updates a `verification` from the `condition-verification` list, which is
+  not the allergy list; the tests prove the two never mix.
+- **No-op updates write nothing**, as for encounters. The audit actor of an update is recorded as **unknown** by design.
+- **Shared, not copied:** `UpdateStatus` and `UpdateOutcome` are now generic across encounters, problems and allergies; the field rules live once per aggregate and serve both the
+  record and the change. The refactors changed no behaviour (the existing suites passed unchanged first).
+- **Tests, all green (unit 473, architecture 45, integration 443).** OpenAPI snapshot regenerated; the whole solution builds with 0 warnings.
