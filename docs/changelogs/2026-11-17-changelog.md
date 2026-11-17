@@ -335,3 +335,14 @@ Full record: `docs/clinical-care/17-soap-notes-slice.md` (rules SN-1 to SN-10, l
 - **Grants:** `SELECT, INSERT` on `form_soap` plus `UPDATE` on exactly the four sections; no `DELETE`; date, pid, user, group, authorized and activity cannot be written.
 - **Refactor:** the content-versioned update outcome is now one shared `ContentUpdateOutcome` (immunizations and SOAP).
 - **Tests, all green (unit 650, architecture 63, integration 671).** The solution builds with only the 7 pre-existing warnings.
+
+## Added — M5d slice 4: encounter lookups (`/api/v1/lookups/...`)
+
+Full record: `docs/clinical-care/18-lookups-slice.md` (rules LK-1 to LK-6, limitations L1 to L3). The API half of decision 10 in `patient-view-pending-decisions.md`.
+
+- **Three read-only lists:** `encounter-classes`, `facilities` and `calendar-categories`, so a caller can offer a choice instead of typing ids. Categories are the ones legacy's own visit form offers (active patient-visit categories, not no-show, in legacy's order); facilities are the
+  non-inactive ones. Every list is bounded at 500 rows, and what they offer is what creating an encounter accepts (a test does exactly that).
+- **No providers list on purpose:** staff names over an API reachable without sign-in would widen that open finding; the acting provider should come from the session once identity is forwarded.
+- **Grants:** `SELECT` on `inactive` and `service_location` of `facility`, and on six columns of `openemr_postcalendar_categories`; nothing else about either table is readable and neither is writable.
+- **Not yet done:** the WebApp still shows its fixed class list and numeric category and facility fields.
+- **Tests, all green (unit 650, architecture 63, integration 692).** The solution builds with only the 7 pre-existing warnings.

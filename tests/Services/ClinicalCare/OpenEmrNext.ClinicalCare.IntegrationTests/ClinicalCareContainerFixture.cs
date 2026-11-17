@@ -43,7 +43,9 @@ public sealed class ClinicalCareContainerFixture : IAsyncLifetime
          // Immunizations (M5d slice 2): its own table, shared with no other record type.
          "immunizations",
          // SOAP notes (M5d slice 3): linked to an encounter through the forms row, like vitals.
-         "form_soap"];
+         "form_soap",
+         // Visit categories (M5d slice 4): the lookup reads a few columns of legacy's calendar categories.
+         "openemr_postcalendar_categories"];
 
     public string Hostname => _container.Hostname;
     public ushort Port => _container.GetMappedPublicPort(3306);
@@ -107,7 +109,7 @@ public sealed class ClinicalCareContainerFixture : IAsyncLifetime
         await using var root = new MySqlConnection(RootConnectionString);
         await root.OpenAsync();
         foreach (var table in new[]
-                 { "form_encounter", "form_vitals", "forms", "uuid_registry", "clinical_care_outbox", "clinical_care_audit", "lists", "lists_touch", "issue_encounter", "immunizations", "form_soap", "clinical_care_patient_ref", "clinical_care_processed_events", "patient_data", "users", "groups", "facility", "list_options", "sequences" })
+                 { "form_encounter", "form_vitals", "forms", "uuid_registry", "clinical_care_outbox", "clinical_care_audit", "lists", "lists_touch", "issue_encounter", "immunizations", "form_soap", "openemr_postcalendar_categories", "clinical_care_patient_ref", "clinical_care_processed_events", "patient_data", "users", "groups", "facility", "list_options", "sequences" })
             await ExecuteAsync(root, $"DELETE FROM `{table}`");
 
         // Reference rows: ids and values chosen to match the real snapshot (AMB is the default class; list order is `seq`).

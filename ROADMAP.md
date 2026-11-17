@@ -335,7 +335,7 @@ Fills the remaining Clinical Care functionality that needs no new service and no
 2. **Immunizations** (**done Nov 17**; suites green: unit 616, architecture 59, integration 623; `15-record-immunization-slice.md`, ADR 0072).
 3. **SOAP notes** (**done Nov 17**; suites green: unit 650, architecture 63, integration 671; `17-soap-notes-slice.md`, ADR 0073): addressed by form id within the encounter, versioned by content. 3b. **Clinical notes** (`form_clinical_notes`: grouped notes, type and category lists,
    linked documents and results, soft delete by `activity`), its own slice.
-4. Lookup endpoints (facilities, classes, categories, providers) and the WebApp fields they replace.
+4. **Lookups** (**API done Nov 17**; suites green: unit 650, architecture 63, integration 692; `18-lookups-slice.md`): classes, facilities and calendar categories. **Still to do:** wire the selects into the WebApp's `CreateEncounterDialog`; providers wait for identity.
 - **Out of scope until identity and the permission port exist:** delete and editing `sensitivity`.
 
 ### M5e: FHIR for Clinical Care (not started)

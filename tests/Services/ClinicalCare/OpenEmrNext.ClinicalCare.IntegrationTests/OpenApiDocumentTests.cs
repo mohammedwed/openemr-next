@@ -106,6 +106,20 @@ public class OpenApiDocumentTests : IDisposable
     }
 
     [Theory]
+    [InlineData("/api/v1/lookups/encounter-classes")]
+    [InlineData("/api/v1/lookups/facilities")]
+    [InlineData("/api/v1/lookups/calendar-categories")]
+    public async Task The_lookups_are_documented_as_read_only_lists(string path)
+    {
+        using var document = await ReadDocumentAsync();
+
+        var item = document.RootElement.GetProperty("paths").GetProperty(path);
+
+        Assert.True(item.TryGetProperty("get", out _));
+        Assert.False(item.TryGetProperty("put", out _) || item.TryGetProperty("post", out _) || item.TryGetProperty("delete", out _));
+    }
+
+    [Theory]
     [InlineData("/api/v1/encounters/{uuid}")]
     [InlineData("/api/v1/problems/{uuid}")]
     [InlineData("/api/v1/allergies/{uuid}")]

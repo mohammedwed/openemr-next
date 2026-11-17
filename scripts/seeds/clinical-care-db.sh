@@ -162,8 +162,12 @@ GRANT SELECT, UPDATE ON \`${DB_NAME}\`.sequences TO '${CLINICAL_CARE_DB_USER}'@'
 -- Encounter classes (_ActEncounterCode): only the columns the class lookup reads.
 GRANT SELECT (list_id, option_id, title, seq, is_default) ON \`${DB_NAME}\`.list_options TO '${CLINICAL_CARE_DB_USER}'@'%';
 
--- Facility name and default place-of-service code, copied onto the encounter (CC-8). Nothing else about a facility.
-GRANT SELECT (id, name, pos_code) ON \`${DB_NAME}\`.facility TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- Facility name and default place-of-service code, copied onto the encounter (CC-8), and whether it is inactive or a service location, for the facility lookup (M5d slice 4).
+-- Nothing else about a facility: no address, phone or tax columns.
+GRANT SELECT (id, name, pos_code, inactive, service_location) ON \`${DB_NAME}\`.facility TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- The visit categories the lookup offers (M5d slice 4): only the columns legacy's own visit form filters and orders on, not the recurrence, colour or description columns.
+GRANT SELECT (pc_catid, pc_catname, pc_cattype, pc_active, pc_seq, pc_constant_id) ON \`${DB_NAME}\`.openemr_postcalendar_categories TO '${CLINICAL_CARE_DB_USER}'@'%';
 
 -- The acting provider's username and group, for the legacy forms row (CC-7). users also holds credential and
 -- contact columns this service must never see, so the grant is on id and username only.

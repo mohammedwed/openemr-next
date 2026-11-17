@@ -72,6 +72,10 @@ public static class ClinicalCareApiExtensions
         builder.Services.AddScoped<GetImmunizationUseCase>();
         builder.Services.AddScoped<ListPatientImmunizationsUseCase>();
 
+        // Lookups (M5d slice 4).
+        builder.Services.AddScoped<IEncounterLookups, EfEncounterLookups>();
+        builder.Services.AddScoped<EncounterLookupsUseCase>();
+
         // SOAP notes (M5d slice 3, ADR 0073).
         builder.Services.AddScoped<ISoapNoteRegistry, EfSoapNoteRegistry>();
         builder.Services.AddScoped<ISoapNoteReader, EfSoapNoteReader>();

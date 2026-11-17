@@ -1464,6 +1464,93 @@
         ]
       }
     },
+    "/api/v1/lookups/encounter-classes": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "summary": "List the encounter classes (legacy _ActEncounterCode), in legacy's order",
+        "operationId": "ListEncounterClasses",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EncounterClassLookupResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
+    },
+    "/api/v1/lookups/facilities": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "summary": "List the active facilities, by name",
+        "operationId": "ListFacilities",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FacilityLookupResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
+    },
+    "/api/v1/lookups/calendar-categories": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "summary": "List the active visit categories, as legacy's visit form offers them",
+        "operationId": "ListCalendarCategories",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CalendarCategoryLookupResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
+    },
     "/api/v1/allergies": {
       "post": {
         "tags": [
@@ -2127,6 +2214,26 @@
           }
         }
       },
+      "CalendarCategoryLookupResponse": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "CorrectImmunizationRequest": {
         "required": [
           "administeredDate",
@@ -2589,6 +2696,25 @@
           }
         }
       },
+      "EncounterClassLookupResponse": {
+        "required": [
+          "code",
+          "title",
+          "isDefault"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        }
+      },
       "EncounterCreatedResponse": {
         "required": [
           "uuid",
@@ -2890,6 +3016,40 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "FacilityLookupResponse": {
+        "required": [
+          "id",
+          "name",
+          "posCode",
+          "isServiceLocation"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "posCode": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "isServiceLocation": {
+            "type": "boolean"
           }
         }
       },
@@ -4709,6 +4869,9 @@
     },
     {
       "name": "SoapNotes"
+    },
+    {
+      "name": "Lookups"
     },
     {
       "name": "Allergies"

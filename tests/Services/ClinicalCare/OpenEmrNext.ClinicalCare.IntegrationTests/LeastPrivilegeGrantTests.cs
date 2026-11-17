@@ -38,6 +38,10 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("DELETE FROM sequences")]
     [InlineData("DELETE FROM form_soap")]
     [InlineData("UPDATE form_soap SET pid = 1")]
+    [InlineData("INSERT INTO openemr_postcalendar_categories (pc_catname) VALUES ('x')")]
+    [InlineData("UPDATE openemr_postcalendar_categories SET pc_active = 0")]
+    [InlineData("DELETE FROM openemr_postcalendar_categories")]
+    [InlineData("UPDATE facility SET inactive = 1")]
     [InlineData("UPDATE form_soap SET `date` = NOW()")]
     [InlineData("UPDATE form_soap SET `user` = 'x'")]
     [InlineData("UPDATE form_soap SET groupname = 'x'")]
@@ -77,6 +81,11 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("SELECT uuid FROM patient_data")]
     [InlineData("SELECT pid FROM patient_data")]
     [InlineData("SELECT phone FROM facility")]
+    [InlineData("SELECT street FROM facility")]
+    [InlineData("SELECT federal_ein FROM facility")]
+    [InlineData("SELECT pc_catcolor FROM openemr_postcalendar_categories")]
+    [InlineData("SELECT pc_catdesc FROM openemr_postcalendar_categories")]
+    [InlineData("SELECT pc_recurrspec FROM openemr_postcalendar_categories")]
     [InlineData("SELECT notes FROM list_options")]
     public async Task The_production_principal_cannot_read_columns_or_tables_it_has_no_need_for(string sql)
     {
