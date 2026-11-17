@@ -23,6 +23,10 @@ public static class ClinicalCareEndpoints
         v1.MapAllergyEndpoints();
         v1.MapEncounterIssueEndpoints();
 
+        // FHIR, read only (ADR 0079): a group of its own, behind the same authorization, so a resource added later cannot forget it.
+        var fhir = app.MapGroup("/fhir").RequireAuthorization();
+        fhir.MapFhirImmunizationEndpoints();
+
         // Event delivery: a separate path, a separate scheme, never routed by the gateway (ADR 0066).
         app.MapInternalEventEndpoints();
         return app;

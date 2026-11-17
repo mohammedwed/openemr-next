@@ -19,6 +19,29 @@ public sealed class EfUserDirectory(ClinicalCareDbContext db) : IUserDirectory
         return rows.Select(r => new UserRecord(r.Id, string.IsNullOrWhiteSpace(r.Username) ? null : r.Username, r.Active != 0)).FirstOrDefault();
     }
 
+    public async Task<IReadOnlyDictionary<long, Guid>> FindUuidsAsync(IReadOnlyCollection<long> userIds, CancellationToken ct)
+    {
+        var ids = userIds.Where(i => i > 0).Distinct().Take(500).ToList();
+        if (ids.Count == 0)
+            return new Dictionary<long, Guid>();
+
+        // One bound parameter per id (EF cannot bind a list to IN): the placeholders are built from the count, never from a value.
+        var placeholders = string.Join(',', ids.Select((_, i) => "{" + i + "}"));
+#pragma warning disable EF1003 // The text is built from a count of placeholders and nothing else; every id travels as a bound parameter.
+        var rows = await db.Database
+            .SqlQueryRaw<UuidRow>("SELECT id AS Id, uuid AS Uuid FROM users WHERE uuid IS NOT NULL AND id IN (" + placeholders + ")", ids.Cast<object>().ToArray())
+            .ToListAsync(ct);
+#pragma warning restore EF1003
+
+        return rows.ToDictionary(r => r.Id, r => Rfc4122GuidConverter.FromRfc4122Bytes(r.Uuid));
+    }
+
+    private sealed class UuidRow
+    {
+        public long Id { get; set; }
+        public byte[] Uuid { get; set; } = [];
+    }
+
     private sealed class UserRow
     {
         public long Id { get; set; }

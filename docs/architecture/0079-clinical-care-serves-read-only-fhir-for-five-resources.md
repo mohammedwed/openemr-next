@@ -38,6 +38,10 @@ The alternatives are named so the choice is visible. **Confirmed by the user on 
 - Immunizations carry no `lastUpdated`; clients that sync by `_lastUpdated` cannot use it for them.
 - The mapping code lives in Clinical Care's Api layer (as Patient Management's does), reading the existing read models, so the domain and its architecture rules are unchanged. Each resource is its own small, separately testable mapper.
 
-## Order of work, once accepted
+## Progress
+
+- **Immunization: built** (M5e slice 1, `docs/clinical-care/24-fhir-immunization.md`), with the shared plumbing: the result type, strict search, the Bundle builder, the user-id lookup and the gateway split of `/fhir`. Remaining: AllergyIntolerance, Condition, Encounter, Observation.
+
+## Order of work
 
 `Immunization` first (smallest: one table, one uuid, no stamp), then `AllergyIntolerance` and `Condition` (one table, two types), `Encounter`, and `Observation` last (the id and panel rules). Each lands with its mapper tests, a US Core conformance test, the search tests and the gateway route test.

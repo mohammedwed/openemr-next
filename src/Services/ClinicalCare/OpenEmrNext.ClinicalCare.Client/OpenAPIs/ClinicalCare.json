@@ -2592,6 +2592,89 @@
           }
         ]
       }
+    },
+    "/fhir/Immunization/{id}": {
+      "get": {
+        "tags": [
+          "FHIR"
+        ],
+        "summary": "Read an immunization as a FHIR R4 Immunization resource",
+        "operationId": "FhirReadImmunization",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
+    },
+    "/fhir/Immunization": {
+      "get": {
+        "tags": [
+          "FHIR"
+        ],
+        "summary": "Search one patient's immunizations (patient, _id, _count, _offset), as a FHIR searchset Bundle",
+        "operationId": "FhirSearchImmunizations",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -5784,6 +5867,9 @@
     },
     {
       "name": "Encounter issues"
+    },
+    {
+      "name": "FHIR"
     }
   ]
 }

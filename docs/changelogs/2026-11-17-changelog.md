@@ -466,3 +466,14 @@ Full record: `docs/clinical-care/20-webapp-clinical-screens.md`. **Compile-check
 - **The fix:** `AuthFacadeSessionStore` sweeps expired rows when a **new** session is created: up to 100 per sign-in, oldest first, keys read then deleted by key (so it works on both SQLite and MariaDB). No background job; a backlog is worked off over the next sign-ins. A session with no expiry is never swept; a live one is never touched; the existing "expired cookie is refused and removed" path is unchanged.
 - **Tests:** the session store had none. 5 new unit tests run the real store on a real in-memory SQLite database (an abandoned session is removed, a live and a no-expiry one are kept, one sign-in sweeps a bounded batch and the rest go on the next, renewing does not sweep, an expired cookie is still refused). AuthFacade unit 86, all green. Mutation check: removing the sweep call fails 2 tests; restored.
 - **No database change:** the table is unchanged.
+
+## Added — FHIR Immunization, the first clinical FHIR resource (M5e slice 1, ADR 0079)
+
+- **`GET /fhir/Immunization/{id}` and `GET /fhir/Immunization?patient=...`**: read-only FHIR R4, mapped with the Firely SDK as Patient Management's `Patient` is. Status follows legacy's rule (entered in error, then completed, else not-done, with the refusal reason); the CVX code is the vaccine code; people are `Practitioner/{uuid}` references with a display name; `meta.versionId` and a weak `ETag` carry the same token as the JSON API's; there is **no** `lastUpdated`, because the table has none.
+- **Search is strict, as decided:** `patient`, `_id`, `_count` (1 to 100) and `_offset` only; anything else, or a repeat, is a 400 `OperationOutcome` that names the parameter. A patient with nothing, or unknown, is an empty set. The Bundle has `total`, `self` and `next`.
+- **The gateway's `/fhir/**` is now split.** It all went to Patient Management; now `/fhir/Patient/**` does, and `/fhir/Immunization/**` goes to Clinical Care. Both need a signed-in session, and a test pins each path to the right service. Clinical Care's route test learned the `/fhir` prefix.
+- **Shared plumbing for the next four resources:** the result type, the search parser, the Bundle builder, `OperationOutcome`s, an id-to-uuid user lookup, and the verified-user middleware now covering `/fhir`.
+- **No database change.**
+- **Tests (run, green):** the 32 new `FhirImmunizationTests`, the route test and the OpenAPI tests (58 in that set), and the gateway proxy tests (32, 3 of them new). The full Clinical Care suites were not run on this change.
+- **Found by the US Core check:** an `education` entry needs a document type (`imm-1`) and the first mapping gave only dates; fixed ("Vaccine Information Statement" when there is a VIS date, "Patient education" otherwise).
+- **Mutation check:** accepting unsupported search parameters, and ignoring the entered-in-error flag, each fail tests (5 in all); restored.

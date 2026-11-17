@@ -51,7 +51,9 @@ string[] authFacadeRoutePatterns =
 // /api/v1/patients group) and /fhir (the FHIR Patient API, a top-level group of its own). Both more
 // specific than AuthFacade's bare /api/{**catch-all} above, so the same route-precedence reasoning
 // already stated for that one applies here too.
-string[] patientManagementRoutePatterns = ["/api/v1/patients/{**catch-all}", "/fhir/{**catch-all}"];
+// /fhir is shared by two services since ADR 0079: Patient Management serves Patient, Clinical Care serves the clinical resources, so the pattern is per resource type and not a catch-all
+// (a new FHIR resource must be routed here, and the Clinical Care suite's GatewayRoutesTests fails if it is not).
+string[] patientManagementRoutePatterns = ["/api/v1/patients/{**catch-all}", "/fhir/Patient/{**catch-all}"];
 
 // ClinicalCare's own path prefix: /api/v1/encounters. A flat prefix of its own rather than
 // /api/v1/patients/{uuid}/encounters, because everything under /api/v1/patients/ already belongs to
@@ -62,7 +64,8 @@ string[] patientManagementRoutePatterns = ["/api/v1/patients/{**catch-all}", "/f
 string[] clinicalCareRoutePatterns =
 [
     "/api/v1/encounters/{**catch-all}", "/api/v1/problems/{**catch-all}", "/api/v1/allergies/{**catch-all}",
-    "/api/v1/immunizations/{**catch-all}", "/api/v1/lookups/{**catch-all}"
+    "/api/v1/immunizations/{**catch-all}", "/api/v1/lookups/{**catch-all}",
+    "/fhir/Immunization/{**catch-all}"
 ];
 
 // The only routes that need a signed-in user (ADR 0075): the two services that hold clinical and patient data. AuthFacade's own routes are how a user signs in, and WebApp's are static files.
