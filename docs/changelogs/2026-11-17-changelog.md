@@ -251,3 +251,13 @@ Full record: `docs/clinical-care/11-link-issue-to-encounter-slice.md` (rules IE-
 - **The actor columns of a new link are null** and the audit actor is unknown, rather than a guessed user id written into a clinical table; fixed when identity forwarding exists.
 - **Grants:** `SELECT, INSERT, DELETE` on `issue_encounter`; no `UPDATE`; still no `DELETE` on `uuid_registry`.
 - **Tests, all green (unit 494, architecture 49, integration 483).** OpenAPI snapshot regenerated; the whole solution builds with no new warnings.
+
+## Changed — the update contract is now usable by a generated client (`If-Match` and `eTag`)
+
+- **`If-Match` is a declared header parameter on all three `PUT`s** (encounter, problem, allergy), bound by the handler rather than read from the raw request, so the OpenAPI document
+  and the typed client both know it. Behaviour is identical: missing, blank or `*` is still 428, an unreadable or weak tag still 412. The three operations also document 412 and 428.
+- **`eTag` in the body of `EncounterResponse`, `ProblemResponse` and `AllergyResponse`**, equal to the standard `ETag` header on a single read. A list response has no per-item header, so
+  without it a client could not update a row it had just listed without a second `GET` per row.
+- **Found by planning the WebApp edit flow:** until now no generated client could have sent `If-Match` at all.
+- **Tests, all green (integration 492):** the body `eTag` equals the header on a `GET` and is present on every list item for all three resources, and the OpenAPI document declares the header
+  and the 412 and 428 responses on every `PUT`. OpenAPI snapshot regenerated; the whole solution builds.

@@ -20,6 +20,7 @@ namespace OpenEmrNext.ClinicalCare.Api.Contracts.Responses;
 /// <param name="ProviderId">The provider id; <c>0</c> when none was recorded.</param>
 /// <param name="Sensitivity">The legacy sensitivity label. Returned but not yet enforced (finding F-CC-2).</param>
 /// <param name="CalendarCategoryId">Legacy's calendar category id (<c>pc_catid</c>), if the row has one.</param>
+/// <param name="ETag">The record's current version as a strong entity tag, the same value the <c>ETag</c> header carries. Send it back in <c>If-Match</c> to update the encounter. A list response has no per-item header, which is why it is also here.</param>
 public sealed record EncounterResponse(
     Guid Uuid,
     long? Number,
@@ -34,10 +35,11 @@ public sealed record EncounterResponse(
     int? PosCode,
     long ProviderId,
     string? Sensitivity,
-    int? CalendarCategoryId = null)
+    int? CalendarCategoryId = null,
+    string? ETag = null)
 {
     public static EncounterResponse From(EncounterView view) => new(
         view.Uuid, view.Number, view.PatientUuid, view.PatientPid, view.ClassCode, view.Date, view.OnsetDate,
         view.Reason, view.FacilityId, view.FacilityName, view.PosCode, view.ProviderId, view.Sensitivity,
-        view.CalendarCategoryId);
+        view.CalendarCategoryId, OpenEmrNext.ClinicalCare.Api.Endpoints.Preconditions.ETagOf(view.LastUpdate));
 }

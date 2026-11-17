@@ -206,6 +206,20 @@ public class AllergyEndpointTests(ClinicalCareContainerFixture fixture) : IAsync
     }
 
     [Fact]
+    public async Task The_body_etag_is_the_header_etag_on_a_get_and_every_list_item_carries_its_own()
+    {
+        var created = await RecordAsync();
+
+        var get = await _client.GetAsync($"/api/v1/allergies/{created.Uuid}");
+        var body = await get.Content.ReadFromJsonAsync<AllergyResponse>();
+        var list = await (await _client.GetAsync($"/api/v1/allergies?patientUuid={EncounterTestData.PatientUuid}")).Content.ReadFromJsonAsync<AllergyListResponse>();
+
+        Assert.False(string.IsNullOrEmpty(body!.ETag));
+        Assert.Equal(get.Headers.ETag?.ToString(), body.ETag);
+        Assert.Equal(body.ETag, Assert.Single(list!.Items).ETag);
+    }
+
+    [Fact]
     public async Task The_allergys_etag_changes_when_another_writer_edits_the_row()
     {
         var created = await RecordAsync();

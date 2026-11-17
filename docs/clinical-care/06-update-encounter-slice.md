@@ -1,7 +1,7 @@
 # Clinical Care M5b slice: update an encounter
 
 - **Milestone:** ROADMAP M5b, phase 2. **Decisions:** [ADR 0068](../architecture/0068-clinical-care-updates-are-conditional-on-last-update-and-touch-only-owned-columns.md) (the concurrency model), [ADR 0069](../architecture/0069-clinical-care-audits-writes-to-its-own-append-only-table.md) (audit). **Research:** [05](05-update-and-audit-research.md).
-- **Endpoint:** `PUT /api/v1/encounters/{uuid}` with `If-Match`. **Status:** built; tests in section 7.
+- **Endpoint:** `PUT /api/v1/encounters/{uuid}` with `If-Match` (a declared header parameter, so a generated client can send it; the current tag is also in the response body as `eTag`). **Status:** built; tests in section 7.
 
 ## 1. What it does
 

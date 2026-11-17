@@ -156,6 +156,13 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -648,6 +655,13 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -913,6 +927,13 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -1411,6 +1432,12 @@
               "null",
               "string"
             ]
+          },
+          "eTag": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -1805,6 +1832,12 @@
               "string"
             ],
             "format": "int32"
+          },
+          "eTag": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -2066,6 +2099,12 @@
             ]
           },
           "verification": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "eTag": {
             "type": [
               "null",
               "string"

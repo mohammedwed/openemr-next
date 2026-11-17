@@ -210,6 +210,20 @@ public class ProblemEndpointTests(ClinicalCareContainerFixture fixture) : IAsync
     }
 
     [Fact]
+    public async Task The_body_etag_is_the_header_etag_on_a_get_and_every_list_item_carries_its_own()
+    {
+        var created = await RecordAsync();
+
+        var get = await _client.GetAsync($"/api/v1/problems/{created.Uuid}");
+        var body = await get.Content.ReadFromJsonAsync<ProblemResponse>();
+        var list = await (await _client.GetAsync($"/api/v1/problems?patientUuid={EncounterTestData.PatientUuid}")).Content.ReadFromJsonAsync<ProblemListResponse>();
+
+        Assert.False(string.IsNullOrEmpty(body!.ETag));
+        Assert.Equal(get.Headers.ETag?.ToString(), body.ETag);
+        Assert.Equal(body.ETag, Assert.Single(list!.Items).ETag);
+    }
+
+    [Fact]
     public async Task The_problems_etag_changes_when_another_writer_edits_the_row()
     {
         var created = await RecordAsync();

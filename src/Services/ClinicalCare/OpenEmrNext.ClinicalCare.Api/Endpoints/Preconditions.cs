@@ -12,16 +12,18 @@ internal static class Preconditions
     /// <summary>A 200 carrying <paramref name="body"/> and, when the row has a stamp, its <c>ETag</c>.</summary>
     public static IResult Ok<T>(T body, DateTime? stamp) => WithETag(Results.Ok(body), stamp);
 
+    /// <summary>The strong <c>ETag</c> of a row stamp, or <c>null</c> when the row has none. The same value goes in the header and in a response's <c>eTag</c> property.</summary>
+    public static string? ETagOf(DateTime? stamp) => stamp is null ? null : ConcurrencyToken.From(stamp.Value).ToETag();
+
     /// <summary>
-    /// Reads the tags a write offered in <c>If-Match</c>. Returns <c>false</c> when there is nothing usable to compare against: the header is
+    /// Reads the tags a write offered in <c>If-Match</c> (bound as a declared header parameter, so the OpenAPI document and the generated client both know it). Returns <c>false</c> when there is nothing usable to compare against: the header is
     /// absent or blank, or it is <c>*</c>, which would switch the protection off ("any current version"). An unconditional update is never allowed
     /// (ADR 0068 #3), so the caller answers <see cref="Required"/>. Tags that are present but unreadable come back as an empty list: they cannot
     /// match anything, which is a 412 (the caller's version is not current), not a 428.
     /// </summary>
-    public static bool TryRead(HttpRequest request, out IReadOnlyList<ConcurrencyToken> offered)
+    public static bool TryRead(string? header, out IReadOnlyList<ConcurrencyToken> offered)
     {
         offered = [];
-        var header = request.Headers.IfMatch.ToString();
         if (string.IsNullOrWhiteSpace(header) || header.Trim() == "*")
             return false;
 

@@ -24,6 +24,7 @@ public sealed record ProblemRecordedResponse(Guid Uuid, Guid PatientUuid);
 /// <param name="RecordedAt">When the problem was recorded (not when it began).</param>
 /// <param name="RecordedBy">The username legacy recorded as having recorded it, if any.</param>
 /// <param name="Verification">The <c>condition-verification</c> code, if recorded.</param>
+/// <param name="ETag">The record's current version as a strong entity tag, the same value the <c>ETag</c> header carries. Send it back in <c>If-Match</c> to update the problem. A list response has no per-item header, which is why it is also here.</param>
 public sealed record ProblemResponse(
     Guid Uuid,
     Guid? PatientUuid,
@@ -38,11 +39,13 @@ public sealed record ProblemResponse(
     string? Comments,
     DateTime? RecordedAt,
     string? RecordedBy,
-    string? Verification = null)
+    string? Verification = null,
+    string? ETag = null)
 {
     public static ProblemResponse From(ProblemView view) => new(
         view.Uuid, view.PatientUuid, view.PatientPid, view.Title, view.BeginDate, view.EndDate, view.Diagnosis, view.Outcome, view.Occurrence,
-        view.ReferredBy, view.Comments, view.RecordedAt, view.RecordedBy, view.Verification);
+        view.ReferredBy, view.Comments, view.RecordedAt, view.RecordedBy, view.Verification,
+        OpenEmrNext.ClinicalCare.Api.Endpoints.Preconditions.ETagOf(view.LastModified));
 }
 
 /// <summary>One bounded page of a patient's problems, newest first, with the total so a caller can page.</summary>

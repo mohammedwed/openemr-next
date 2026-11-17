@@ -226,6 +226,20 @@ public class EncounterEndpointTests(ClinicalCareContainerFixture fixture) : IAsy
     }
 
     [Fact]
+    public async Task The_body_etag_is_the_header_etag_on_a_get_and_every_list_item_carries_its_own()
+    {
+        var created = await (await _client.PostAsJsonAsync("/api/v1/encounters", Valid())).Content.ReadFromJsonAsync<EncounterCreatedResponse>();
+
+        var get = await _client.GetAsync($"/api/v1/encounters/{created!.Uuid}");
+        var body = await get.Content.ReadFromJsonAsync<EncounterResponse>();
+        var list = await (await _client.GetAsync($"/api/v1/encounters?patientUuid={EncounterTestData.PatientUuid}")).Content.ReadFromJsonAsync<EncounterListResponse>();
+
+        Assert.False(string.IsNullOrEmpty(body!.ETag));
+        Assert.Equal(get.Headers.ETag?.ToString(), body.ETag);
+        Assert.Equal(body.ETag, Assert.Single(list!.Items).ETag);
+    }
+
+    [Fact]
     public async Task A_404_carries_no_etag()
     {
         var response = await _client.GetAsync($"/api/v1/encounters/{Guid.NewGuid()}");

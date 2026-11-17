@@ -23,6 +23,7 @@ public sealed record AllergyRecordedResponse(Guid Uuid, Guid PatientUuid);
 /// <param name="Comments">Free-text comments.</param>
 /// <param name="RecordedAt">When the allergy was recorded (not when it began).</param>
 /// <param name="RecordedBy">The username legacy recorded as having recorded it, if any.</param>
+/// <param name="ETag">The record's current version as a strong entity tag, the same value the <c>ETag</c> header carries. Send it back in <c>If-Match</c> to update the allergy. A list response has no per-item header, which is why it is also here.</param>
 public sealed record AllergyResponse(
     Guid Uuid,
     Guid? PatientUuid,
@@ -36,11 +37,13 @@ public sealed record AllergyResponse(
     string? Verification,
     string? Comments,
     DateTime? RecordedAt,
-    string? RecordedBy)
+    string? RecordedBy,
+    string? ETag = null)
 {
     public static AllergyResponse From(AllergyView view) => new(
         view.Uuid, view.PatientUuid, view.PatientPid, view.Title, view.BeginDate, view.EndDate, view.Diagnosis, view.Reaction, view.Severity,
-        view.Verification, view.Comments, view.RecordedAt, view.RecordedBy);
+        view.Verification, view.Comments, view.RecordedAt, view.RecordedBy,
+        OpenEmrNext.ClinicalCare.Api.Endpoints.Preconditions.ETagOf(view.LastModified));
 }
 
 /// <summary>One bounded page of a patient's allergies, newest first, with the total so a caller can page.</summary>

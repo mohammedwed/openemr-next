@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using OpenEmrNext.ClinicalCare.Api.Contracts.Requests;
 using OpenEmrNext.ClinicalCare.Api.Contracts.Responses;
 using OpenEmrNext.ClinicalCare.Application;
@@ -50,10 +51,11 @@ public static class EncounterEndpoints
     }
 
     private static async Task<IResult> UpdateEncounter(
-        Guid uuid, UpdateEncounterRequest request, UpdateEncounterUseCase useCase, HttpContext http, CancellationToken ct)
+        Guid uuid, UpdateEncounterRequest request, UpdateEncounterUseCase useCase, HttpContext http,
+        [FromHeader(Name = "If-Match")] string? ifMatch, CancellationToken ct)
     {
         // Before anything else: an update must say which version it is based on (ADR 0068 #3).
-        if (!Preconditions.TryRead(http.Request, out var offered))
+        if (!Preconditions.TryRead(ifMatch, out var offered))
             return Preconditions.Required();
 
         try
