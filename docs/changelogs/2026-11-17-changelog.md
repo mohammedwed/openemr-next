@@ -165,3 +165,15 @@ Full record: `docs/clinical-care/06-update-encounter-slice.md` (rules CC-18 to C
 - **Contract:** the OpenAPI snapshot was regenerated (`generate-clinicalcare-openapi.sh`); the generated client and the whole solution build with no new warnings.
 - **Tests, all green on the first run (unit 300, architecture 33, integration 253):** domain (`EncounterChangeTests`), application (`EncounterChangeSetTests`,
   `UpdateEncounterUseCaseTests`), adapter (`EncounterUpdaterTests`), HTTP (`EncounterUpdateEndpointTests`), and revised grant tests.
+
+## Researched — M5c phase 0: problem list and allergies
+
+Full record: `docs/clinical-care/07-problems-and-allergies-research.md`. No code. ADR 0070 (Proposed).
+
+- **Neither is a table of its own.** Both are rows of `lists`, told apart by a free-text, site-extensible `type`, shared with medications, surgeries, dental
+  issues and devices. Clinical Care will own exactly `medical_problem` and `allergy`, and every statement filters on `type`.
+- **Ten legacy files write it, by routes that disagree:** the issue screen assigns **no uuid** (backfilled later) and stamps `date` with `H:m:s` (the month lands
+  in the minutes); REST assigns the uuid and uses `NOW()`, and its `DELETE` is a hard delete that orphans `issue_encounter` rows.
+- **The concurrency token already exists:** `lists.modifydate` is `ON UPDATE CURRENT_TIMESTAMP`, the same model as encounters.
+- **Resolving a problem is an update** (`enddate`, `outcome`): the UI marks resolved by `enddate`, not `activity`. So the slice needs no delete.
+- **Plan:** six slices (problems, allergies, update, encounter link, WebApp, verification); the M5b audit, concurrency and `ETag` machinery is reused.

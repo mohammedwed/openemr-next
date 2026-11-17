@@ -74,3 +74,4 @@ old one's status is updated to point to it.
 | [0067](0067-webapp-covers-encounters-and-vitals.md) | WebApp's frontend extends to encounters and vitals | Accepted | 2026-11-17 |
 | [0068](0068-clinical-care-updates-are-conditional-on-last-update-and-touch-only-owned-columns.md) | Clinical Care updates are conditional on the row's last-update stamp and touch only the columns they own | Accepted | 2026-11-17 |
 | [0069](0069-clinical-care-audits-writes-to-its-own-append-only-table.md) | Clinical Care audits its writes in its own append-only table | Proposed | 2026-11-17 |
+| [0070](0070-clinical-care-owns-the-problem-and-allergy-issue-types-in-the-shared-lists-table.md) | Clinical Care owns the problem and allergy issue types in the shared `lists` table | Proposed | 2026-11-17 |

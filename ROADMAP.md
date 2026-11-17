@@ -317,6 +317,16 @@ block further M4 work are:
 (`03-patient-registered-consumption.md`, ADR 0066), which removed the interim `patient_data` lookup. **Shadow comparison done**
 (`01-create-encounter-slice.md` section 12) and **layered review done** (`04-layered-review.md`). **Remaining:** the legacy-UI check.
 
+### M5c: Clinical Care problem list and allergies (phase 0 done Nov 17; branch `feat/m5b-update-and-audit`)
+
+Both are rows of legacy's one `lists` table (a free-text `type`), so this slice is mostly about ownership and about three legacy writers that disagree.
+Research: `docs/clinical-care/07-problems-and-allergies-research.md`; ADR 0070 (Proposed).
+
+- **Slices:** 1 record, get and list problems; 2 the same for allergies; 3 update (resolving a problem is an update); 4 link an issue to an
+  encounter; 5 WebApp tabs; 6 shadow comparison, review and the legacy-UI check.
+- **Reuses** the M5b machinery unchanged: `modifydate` as the `ETag` token, `If-Match` (428, 412), the append-only audit and the outbox.
+- **Out of scope:** delete (waits for the permission port), medications, surgeries, dental issues, devices and health concerns (other owners).
+
 ### M5 frontend: WebApp encounter pages (built Nov 17, ADR 0067)
 
 All through the gateway and the generated ClinicalCare client, in the same style as the patient pages:
