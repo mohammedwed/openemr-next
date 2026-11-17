@@ -22,7 +22,7 @@ trail therefore names the wrong person for every change.
 **Cost:** an API change in AuthFacade or PatientManagement, plus a client regeneration.
 
 **Update (ADR 0075, Nov 17):** **resolved for Clinical Care.** The gateway verifies the session and forwards the user's uuid; Clinical Care resolves it to `users.id` itself (one more granted column), so the acting provider and audit actor are the verified user and no Clinical Care dialog sends a provider id any more.
-**Still open for Patient Management:** the directive, document and registration dialogs still send the placeholder `1`, because Patient Management has no uuid-to-id lookup or grant yet. It is now behind the sign-in requirement, but its caller-named `RegisteredBy`, `OwnerId` and `AuthenticatorUserId` are unchanged.
+**Also resolved for Patient Management (same day):** it resolves the uuid itself (granted `users.active`), and registration, document upload and directive status take the verified user; the registration, upload and status dialogs no longer send a user id. Nothing about this item remains open.
 
 ## 2. Document upload size
 

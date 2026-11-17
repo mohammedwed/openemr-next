@@ -1,3 +1,4 @@
+using OpenEmrNext.PatientManagement.Api.Authentication;
 using Hl7.Fhir.Model;
 using OpenEmrNext.PatientManagement.Application;
 using OpenEmrNext.PatientManagement.Domain.ValueObjects;
@@ -110,12 +111,9 @@ public static class FhirPatientEndpoints
         return FhirContent(bundle);
     }
 
-    /// <param name="registeredBy">The id of the user creating this patient, as a query parameter
-    /// (<c>?registeredBy=</c>) -- caller-supplied for now, not verified against any authenticated
-    /// session, the same already-accepted ADR 0048 gap <c>RegisterPatientRequest.RegisteredBy</c>
-    /// documents for the plain registration path.</param>
+    /// <param name="registeredBy">Ignored: the user creating the patient is the signed-in user the gateway verified (ADR 0075), whatever <c>?registeredBy=</c> says. Kept optional so existing callers do not break.</param>
     private static async Task<IResult> CreatePatient(
-        HttpRequest request, long registeredBy,
+        HttpRequest request, long? registeredBy,
         RegisterPatientUseCase registerUseCase, ScorePatientForDuplicatesUseCase scoreUseCase,
         GetPatientFhirRecordUseCase getUseCase, CancellationToken ct)
     {
@@ -156,7 +154,7 @@ public static class FhirPatientEndpoints
         {
             registered = await registerUseCase.ExecuteAsync(
                 firstName, lastName, gender, dateOfBirth, email, trustedEmail,
-                registeredBy, DateTime.UtcNow, ct);
+                request.HttpContext.ActingUserId(registeredBy), DateTime.UtcNow, ct);
         }
         catch (PatientValidationException ex)
         {

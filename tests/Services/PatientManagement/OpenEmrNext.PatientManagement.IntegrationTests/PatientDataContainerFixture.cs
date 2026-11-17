@@ -17,6 +17,12 @@ namespace OpenEmrNext.PatientManagement.IntegrationTests;
 /// </summary>
 public sealed class PatientDataContainerFixture : IAsyncLifetime
 {
+    /// <summary>The seeded user (id 7) every authenticated test acts as, and a deactivated one, for the verified-user checks (ADR 0075).</summary>
+    public const long TestUserId = 7;
+    public static readonly Guid TestUserUuid = Guid.Parse("7e57c0de-0000-4000-8000-000000000007");
+    public const long InactiveUserId = 9;
+    public static readonly Guid InactiveUserUuid = Guid.Parse("7e57c0de-0000-4000-8000-000000000009");
+
     private const string Username = "patient_management_test";
     private const string Password = "patient_management_test_password";
     private const string DatabaseName = "openemr_test";
@@ -101,10 +107,16 @@ public sealed class PatientDataContainerFixture : IAsyncLifetime
         createUsers.CommandText = """
             CREATE TABLE users (
                 id bigint(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                uuid binary(16) DEFAULT NULL
+                uuid binary(16) DEFAULT NULL,
+                active tinyint(1) NOT NULL DEFAULT 1
             );
             """;
         await createUsers.ExecuteNonQueryAsync();
+
+        // The signed-in user every authenticated test acts as (ADR 0075): what the gateway would forward once it had verified their session.
+        await using var seedUsers = connection.CreateCommand();
+        seedUsers.CommandText = $"INSERT INTO users (id, uuid, active) VALUES ({TestUserId}, UNHEX('{TestUserUuid:N}'), 1), ({InactiveUserId}, UNHEX('{InactiveUserUuid:N}'), 0)";
+        await seedUsers.ExecuteNonQueryAsync();
 
         // The handful of list_options rows the FHIR Patient mapping actually resolves against,
         // trimmed from the real seed data in sql/7_0_3-to-7_0_4_upgrade.sql and sql/database.sql --

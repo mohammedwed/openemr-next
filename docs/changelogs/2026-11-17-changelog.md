@@ -398,3 +398,13 @@ Full record: `docs/clinical-care/20-webapp-clinical-screens.md`. **Compile-check
 - **WebApp:** no clinical dialog sends a provider id any more. Patient Management's dialogs still send the placeholder, because it has no uuid-to-id lookup yet (it is now behind the sign-in requirement, but its caller-named identity fields are unchanged).
 - **Tests, all green: Clinical Care unit 688, architecture 69, integration 798; gateway proxy 26; live-stack gateway 14.** The Clinical Care test client acts as a seeded user (`dr_who`, id 7); 33 new tests cover 401 and 403 on every route, the verified actor in audit and events, a second user as a different actor, the body `providerId` being ignored, and the grants. The live stack is rebuilt and re-seeded.
 - **Not verified in a browser** (needs a signed-in user): that the WebApp's calls carry the session through the gateway and succeed.
+
+## Security — M5b phase 1b, part 3: Patient Management acts as the verified user too (ADR 0075)
+
+**Closes decision 1 in `patient-view-pending-decisions.md`: no more hardcoded user id `1` anywhere in the WebApp.**
+
+- **Same rule as Clinical Care:** every `/api/v1` and `/fhir` route needs the verified user the gateway forwards (401 if none or malformed; 403 if it matches no user or an account legacy deactivated), as middleware that runs before any body is bound. Patient Management reads `users` itself (`id`, `uuid`, and the newly granted `active`; never the credential columns).
+- **The verified user is who registers a patient** (`patient_data.created_by`, also for `POST /fhir/Patient`), **owns an uploaded advance-directive document** and **reviews the directive status**. The `RegisteredBy`, `OwnerId`, `AuthenticatorUserId` and `?registeredBy=` a caller names are ignored and now optional.
+- **WebApp:** the registration, document upload and directive status dialogs no longer send a user id (the last three uses of the placeholder `1`).
+- **Not built, on purpose: a bearer-token path for external FHIR clients.** `/fhir` now needs a session, and nothing in this repository calls it from outside; the design depends on which clients exist (see ADR 0075 #7).
+- **Tests:** Patient Management unit 166, architecture 17, integration 86 (12 new, covering 401 and 403 on every route, the verified user recorded whatever the body says, FHIR create, and the secret still being required). PM OpenAPI snapshot regenerated; the live stack is rebuilt and re-seeded and the live gateway tests pass (14).

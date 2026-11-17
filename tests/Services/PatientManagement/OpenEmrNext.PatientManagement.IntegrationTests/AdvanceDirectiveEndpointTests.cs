@@ -32,6 +32,7 @@ public class AdvanceDirectiveEndpointTests(PatientDataContainerFixture fixture) 
             ])));
         _client = _factory.CreateClient();
         _client.DefaultRequestHeaders.Add("X-Internal-Gateway-Secret", "test-secret");
+        _client.DefaultRequestHeaders.Add("X-Authenticated-User", PatientDataContainerFixture.TestUserUuid.ToString());
         return Task.CompletedTask;
     }
 
@@ -133,7 +134,8 @@ public class AdvanceDirectiveEndpointTests(PatientDataContainerFixture fixture) 
         var body = await getResponse.Content.ReadFromJsonAsync<AdvanceDirectiveStatusResponse>();
         Assert.NotNull(body);
         Assert.Equal("yes", body!.Status);
-        Assert.Equal(3, body.AuthenticatorUserId);
+        // The request names user 3; the reviewer recorded is the signed-in user the gateway verified (ADR 0075), so the body cannot say who reviewed.
+        Assert.Equal(PatientDataContainerFixture.TestUserId, body.AuthenticatorUserId);
     }
 
     [Fact]

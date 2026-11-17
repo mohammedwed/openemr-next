@@ -25,13 +25,6 @@
 </MudDialog>
 
 @code {
-    /// <summary>
-    /// The id of the user recording the status. Same tracked gap as <c>Register.razor</c>'s own
-    /// <c>PlaceholderRegisteredById</c> (ADR 0055): the signed-in user only has a string subject, not
-    /// OpenEMR's numeric id.
-    /// </summary>
-    private const long PlaceholderUserId = 1;
-
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter, EditorRequired] public long Pid { get; set; }
     [Parameter] public string CurrentStatus { get; set; } = "unknown";
@@ -54,8 +47,7 @@
             var request = new SetAdvanceDirectiveStatusRequest
             {
                 Status = _status,
-                ReviewedAtUtc = _reviewedOn is { } reviewed ? new DateTimeOffset(reviewed) : null,
-                AuthenticatorUserId = PlaceholderUserId
+                ReviewedAtUtc = _reviewedOn is { } reviewed ? new DateTimeOffset(reviewed) : null
             };
             await PatientManagement.SetAdvanceDirectiveStatusAsync(Pid, request);
             MudDialog.Close(DialogResult.Ok(true));

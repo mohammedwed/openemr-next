@@ -92,12 +92,6 @@
     /// </summary>
     private static readonly string[] SexOptions = ["Male", "Female", "Other", "Unknown"];
 
-    /// <summary>
-    /// The id of the user performing the registration. Same tracked gap as the directive dialogs: the signed-in
-    /// user has no numeric OpenEMR id yet. See docs/patient-view-pending-decisions.md, item 1.
-    /// </summary>
-    private const long PlaceholderRegisteredById = 1;
-
     private State _state = State.Loading;
     private MudForm? _form;
     private readonly FormModel _model = new();
@@ -179,8 +173,7 @@
                 Sex = _model.Sex,
                 DateOfBirth = new DateTimeOffset(_model.DateOfBirth.Value),
                 Email = string.IsNullOrWhiteSpace(_model.Email) ? null : _model.Email,
-                TrustedEmail = string.IsNullOrWhiteSpace(_model.TrustedEmail) ? null : _model.TrustedEmail,
-                RegisteredBy = PlaceholderRegisteredById
+                TrustedEmail = string.IsNullOrWhiteSpace(_model.TrustedEmail) ? null : _model.TrustedEmail
             };
             var registered = await PatientManagement.RegisterPatientAsync(request);
             Snackbar.Add($"Registered {_model.FirstName} {_model.LastName} (patient ID {registered.Pubpid}).", Severity.Success);

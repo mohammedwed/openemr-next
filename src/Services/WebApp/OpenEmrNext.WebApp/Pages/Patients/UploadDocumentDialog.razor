@@ -37,12 +37,6 @@
 
 @code {
     /// <summary>
-    /// The id of the user uploading the document. Same tracked gap as <c>SetAdvanceDirectiveStatusDialog</c>
-    /// (ADR 0055): no numeric OpenEMR user id is available from the signed-in subject.
-    /// </summary>
-    private const long PlaceholderUserId = 1;
-
-    /// <summary>
     /// 20 MB, below the 30 MB the Domain allows (<c>AdvanceDirectiveDocument.MaxContentBytes</c>). The file
     /// travels as base64 inside a JSON body, which grows by about a third, and the API's default request
     /// size limit (about 30 MB) would reject larger files after they were already read. Raising this means
@@ -114,8 +108,7 @@
                 FileName = _fileName,
                 MimeType = _mimeType ?? "application/octet-stream",
                 ContentBase64 = _contentBase64,
-                EffectiveDate = _effectiveDate is { } effective ? new DateTimeOffset(effective) : null,
-                OwnerId = PlaceholderUserId
+                EffectiveDate = _effectiveDate is { } effective ? new DateTimeOffset(effective) : null
             };
             await PatientManagement.UploadAdvanceDirectiveDocumentAsync(Pid, request);
             MudDialog.Close(DialogResult.Ok(true));

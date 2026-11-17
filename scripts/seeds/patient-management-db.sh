@@ -79,9 +79,10 @@ GRANT SELECT, INSERT, DELETE ON \`${DB_NAME}\`.categories_to_documents TO '${PAT
 -- with a more permissive user, not this exact least-privilege grant set).
 GRANT SELECT, UPDATE ON \`${DB_NAME}\`.sequences TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 -- FHIR Patient API: read-only lookups for generalPractitioner and every coded extension -- this service never writes to
--- either. users is granted on the two columns the lookup reads (EfPatientFhirRepository selects id, uuid) and nothing
--- else: the table also holds a password column and other credential data this service must never see (finding F-CC-7).
-GRANT SELECT (id, uuid) ON \`${DB_NAME}\`.users TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
+-- either. users is granted on id and uuid (EfPatientFhirRepository selects both) and on active, which the verified-user
+-- check reads to refuse a deactivated account (ADR 0075), and nothing else: the table also holds a password column and
+-- other credential data this service must never see (finding F-CC-7).
+GRANT SELECT (id, uuid, active) ON \`${DB_NAME}\`.users TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 GRANT SELECT ON \`${DB_NAME}\`.list_options TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 -- Legacy records every uuid it hands out here; this service now does the same for the ones it creates (finding F-CC-3).
 -- Insert-only: it adds its own rows and never reads or edits anyone's.
