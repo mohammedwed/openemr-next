@@ -34,11 +34,23 @@ public class VitalsUseCaseTests
         public VitalsIdentity Allocate() { Calls++; return VitalsIdentity.Create(Guid.Parse("d0d0d0d0-0000-4000-8000-000000000001")); }
     }
 
+    private sealed class FakeAuditLog : IAuditLog
+    {
+        public List<AuditEntry> Entries { get; } = [];
+
+        public Task AppendAsync(AuditEntry entry, CancellationToken ct)
+        {
+            Entries.Add(entry);
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class FakeRegistry : IVitalsRegistry
     {
         public Vitals? Registered { get; private set; }
         public VitalsRecordedEvent? Event { get; private set; }
         public AuditEntry? Audit { get; private set; }
+        public FakeAuditLog Log { get; } = new();
 
         public Task RegisterAsync(Vitals vitals, VitalsRecordedEvent @event, AuditEntry audit, CancellationToken ct)
         {
@@ -76,7 +88,7 @@ public class VitalsUseCaseTests
     {
         var ids = new FakeIdentities();
         var registry = new FakeRegistry();
-        return (new RecordVitalsUseCase(new FakeEncounters(encounter), ids, registry, new FixedClock(Now)), ids, registry);
+        return (new RecordVitalsUseCase(new FakeEncounters(encounter), ids, registry, registry.Log, new FixedClock(Now)), ids, registry);
     }
 
     [Fact]
@@ -112,6 +124,46 @@ public class VitalsUseCaseTests
         Assert.False(audit.Actor.Verified);
         Assert.Equal("trace-2", audit.CorrelationId);
         Assert.Equal("192.0.2.2", audit.SourceAddress);
+    }
+
+    [Fact]
+    public async Task SEC_9_an_unknown_encounter_is_audited_as_failed_against_the_encounter_asked_about()
+    {
+        var (useCase, _, registry) = Build(null);
+        var command = Command(providerId: 9) with { Origin = new RequestOrigin("trace-4", "192.0.2.4") };
+
+        await Assert.ThrowsAsync<EncounterNotFoundException>(() => useCase.ExecuteAsync(command, CancellationToken.None));
+
+        Assert.Null(registry.Audit);
+        var row = Assert.Single(registry.Log.Entries);
+        Assert.Equal(AuditActions.VitalsRecord, row.Action);
+        Assert.Equal(AuditOutcome.Failed, row.Outcome);
+        Assert.Equal(EncounterUuid, row.Subject);
+        Assert.Equal("user:9", row.Actor.Subject);
+        Assert.Equal("trace-4", row.CorrelationId);
+    }
+
+    [Fact]
+    public async Task SEC_9_an_encounter_that_cannot_take_vitals_is_audited_as_failed()
+    {
+        var (useCase, _, registry) = Build(Encounter(number: null, patientUuid: Guid.Empty, pid: null));
+
+        await Assert.ThrowsAsync<VitalsValidationException>(() => useCase.ExecuteAsync(Command(), CancellationToken.None));
+
+        var row = Assert.Single(registry.Log.Entries);
+        Assert.Equal(AuditOutcome.Failed, row.Outcome);
+        Assert.Equal(EncounterUuid, row.Subject);
+        Assert.Null(registry.Audit);
+    }
+
+    [Fact]
+    public async Task SEC_9_a_successful_record_writes_no_separate_failed_row()
+    {
+        var (useCase, _, registry) = Build(Encounter());
+
+        await useCase.ExecuteAsync(Command(), CancellationToken.None);
+
+        Assert.Empty(registry.Log.Entries);
     }
 
     [Fact]

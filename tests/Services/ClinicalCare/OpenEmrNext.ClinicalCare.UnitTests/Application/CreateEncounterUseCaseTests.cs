@@ -50,11 +50,23 @@ public class CreateEncounterUseCaseTests
         }
     }
 
+    private sealed class FakeAuditLog : IAuditLog
+    {
+        public List<AuditEntry> Entries { get; } = [];
+
+        public Task AppendAsync(AuditEntry entry, CancellationToken ct)
+        {
+            Entries.Add(entry);
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class FakeRegistry : IEncounterRegistry
     {
         public Encounter? Registered { get; private set; }
         public EncounterCreatedEvent? Event { get; private set; }
         public AuditEntry? Audit { get; private set; }
+        public FakeAuditLog Log { get; } = new();
 
         public Task RegisterAsync(Encounter encounter, EncounterCreatedEvent @event, AuditEntry audit, CancellationToken ct)
         {
@@ -71,7 +83,7 @@ public class CreateEncounterUseCaseTests
         var registry = new FakeRegistry();
         var patient = patientExists ? PatientReference.Create(PatientUuid, 42) : null;
         var useCase = new CreateEncounterUseCase(
-            new FakePatients(patient), new FakeCodeLists(), new FakeFacilities(), allocator, registry, new FixedClock(Now));
+            new FakePatients(patient), new FakeCodeLists(), new FakeFacilities(), allocator, registry, registry.Log, new FixedClock(Now));
         return (useCase, allocator, registry);
     }
 
@@ -139,14 +151,59 @@ public class CreateEncounterUseCaseTests
     }
 
     [Fact]
-    public async Task SEC_9_a_refused_create_registers_no_audit_row_here()
+    public async Task SEC_9_an_unknown_patient_is_audited_as_failed_against_the_patient_asked_about()
     {
-        // Refused requests are audited by a later increment (outcome 'failed'); a rejected command must never reach the registry.
+        var (useCase, _, registry) = Build(patientExists: false);
+        var command = Command(providerId: 9) with { Origin = new RequestOrigin("trace-3", "192.0.2.3") };
+
+        await Assert.ThrowsAsync<PatientNotFoundException>(() => useCase.ExecuteAsync(command, CancellationToken.None));
+
+        Assert.Null(registry.Audit);   // nothing was registered
+        var row = Assert.Single(registry.Log.Entries);
+        Assert.Equal(AuditActions.EncounterCreate, row.Action);
+        Assert.Equal(AuditOutcome.Failed, row.Outcome);
+        Assert.Equal(PatientUuid, row.Subject);
+        Assert.Equal("user:9", row.Actor.Subject);
+        Assert.False(row.Actor.Verified);
+        Assert.Equal(Now.UtcDateTime, row.AtUtc);
+        Assert.Equal("trace-3", row.CorrelationId);
+        Assert.Equal("192.0.2.3", row.SourceAddress);
+    }
+
+    [Fact]
+    public async Task SEC_9_a_validation_failure_is_audited_as_failed_and_carries_no_field_values()
+    {
+        var (useCase, allocator, registry) = Build();
+
+        await Assert.ThrowsAsync<ClinicalCareValidationException>(
+            () => useCase.ExecuteAsync(Command(classCode: "NOPE"), CancellationToken.None));
+
+        var row = Assert.Single(registry.Log.Entries);
+        Assert.Equal(AuditOutcome.Failed, row.Outcome);
+        Assert.Null(row.Details);
+        Assert.Equal(0, allocator.Calls);   // a refusal takes no number from the shared counter
+        Assert.Null(registry.Audit);
+    }
+
+    [Fact]
+    public async Task SEC_9_the_empty_patient_uuid_is_audited_not_crashed_on()
+    {
         var (useCase, _, registry) = Build(patientExists: false);
 
-        await Assert.ThrowsAsync<PatientNotFoundException>(() => useCase.ExecuteAsync(Command(), CancellationToken.None));
+        await Assert.ThrowsAsync<PatientNotFoundException>(
+            () => useCase.ExecuteAsync(Command() with { PatientUuid = Guid.Empty }, CancellationToken.None));
 
-        Assert.Null(registry.Audit);
+        Assert.Equal(Guid.Empty, Assert.Single(registry.Log.Entries).Subject);
+    }
+
+    [Fact]
+    public async Task SEC_9_a_successful_create_writes_no_separate_failed_row()
+    {
+        var (useCase, _, registry) = Build();
+
+        await useCase.ExecuteAsync(Command(), CancellationToken.None);
+
+        Assert.Empty(registry.Log.Entries);   // the success row travels with the registry call, not the log
     }
 
     [Fact]

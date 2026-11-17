@@ -141,6 +141,21 @@ public class VitalsEndpointTests(ClinicalCareContainerFixture fixture) : IAsyncL
     }
 
     [Fact]
+    public async Task SEC_9_a_404_for_an_unknown_encounter_leaves_a_failed_audit_row_naming_it()
+    {
+        var unknown = Guid.NewGuid();
+
+        var response = await _client.PostAsJsonAsync($"/api/v1/encounters/{unknown}/vitals", Request(pulse: 64));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        // InitializeAsync created one encounter (a success row); the refusal adds exactly one failed row.
+        Assert.Equal(1L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_audit WHERE outcome = 'failed'"));
+        Assert.Equal("vitals.record", await fixture.RootScalarAsync<string>("SELECT action FROM clinical_care_audit WHERE outcome = 'failed'"));
+        Assert.Equal(unknown.ToString(),
+            await fixture.RootScalarAsync<string>("SELECT CONCAT(subject, '') FROM clinical_care_audit WHERE outcome = 'failed'"));
+    }
+
+    [Fact]
     public async Task CV_1_vitals_for_an_unknown_encounter_are_a_404_problem_json()
     {
         var response = await _client.PostAsJsonAsync($"/api/v1/encounters/{Guid.NewGuid()}/vitals", Request(pulse: 64));

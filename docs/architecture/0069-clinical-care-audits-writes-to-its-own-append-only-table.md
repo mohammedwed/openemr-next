@@ -23,8 +23,16 @@ grant on a table with other writers.
 2. **Append-only by grant:** the service user gets `INSERT` and `SELECT` on it, never `UPDATE` or `DELETE`.
 3. **Same transaction.** The audit insert is part of the registry's unit of work; a change cannot commit without its row. It sits behind an
    `IAuditLog` port (DOM-7) so a different store can replace it.
-4. **Every write is audited**, including the creates that already exist, and **a refused write** (conflict, validation, denied) writes a
-   row with its outcome where the request reached the business layer.
+4. **Every write is audited, and so is every refusal that reached the business layer.**
+   - A success row is written by the registry inside the change's transaction (item 3).
+   - A refusal (`failed`: the patient or encounter does not exist, or validation failed) is written by the use case as its own statement, since nothing
+     changed. It names **the record the caller asked about**: the patient for a refused create (no encounter exists), the encounter for refused vitals.
+     That uuid is caller-chosen, may not exist and may be the empty uuid, so only a *success* row must name a real record.
+   - **Fail closed:** if the refusal's audit insert fails, the request fails with a 500 instead of answering as though it had been audited.
+   - Not audited: requests refused before the business layer (a bad route, a missing secret, a unit the binder rejects) and unexpected errors, which the
+     global handler logs. `denied` is written only once a permission port exists.
+   - **Known cost:** an invalid-request flood writes a row per request. Rate limiting belongs to the gateway; the table is indexed on `(subject, at)` and
+     `at`, and a retention period is a later policy decision (item 7).
 5. **The actor is verified or the row says it is not.** Until Phase 1b (identity forwarding) the actor is the caller-asserted provider and
    the row records `actor_verified = 0`. After it, the subject comes from the gateway's validated session.
 6. **Reads are not audited in this slice.** Sensitive-read audit needs the permission port and a retention decision; it is recorded as

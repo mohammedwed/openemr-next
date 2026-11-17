@@ -119,3 +119,15 @@ Full record: `docs/clinical-care/05-update-and-audit-research.md`. No code; bran
 - **Not yet audited:** refused requests (outcome `failed`: validation, not found) and, later, denied ones. Next increment.
 - **Tests, all green (unit 228, architecture 31, integration 186):** use-case unit tests for the audit row and the no-origin case; registry integration tests for
   the row, retry-once and "no commit without the audit row" (a throwing audit log); a use-case integration test; an endpoint test for `X-Forwarded-For`.
+
+## Changed — M5b phase 1a, increment 3: refused creates are audited
+
+- **A refused encounter create or vitals record writes a `failed` audit row** (unknown patient or encounter, validation failure), naming the
+  record the caller asked about. Written by the use case as its own statement; the success path is unchanged. **Fail closed:** if that write
+  fails, the request is a 500.
+- **`AuditEntry` now lets a refusal name the empty uuid** (a caller can send one); a success still must name a real record. Without this, an empty
+  patient uuid would have turned a 404 into a 500.
+- **`CreateEncounterUseCase` and `RecordVitalsUseCase` take an `IAuditLog`** (a thin wrapper around the existing bodies).
+- **Tests, all green (unit 236, architecture 31, integration 192):** unit tests for both use cases (unknown record, validation failure, empty uuid, no
+  separate row on success, no number taken by a refusal); integration tests against the real database and through the HTTP endpoints.
+- **Phase 1a remaining:** `ETag` / `If-Match` (412, 428) and the update and delete event types.

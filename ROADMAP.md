@@ -334,7 +334,7 @@ M5 proved the slice pattern but both aggregates are create-only. M5b closes that
 - **Phase 0 (done Nov 17):** writer inventory from the running 8.0.0 container (21 files write `form_encounter`), the concurrency token
   (`last_update` / `last_updated`, `ON UPDATE CURRENT_TIMESTAMP`, whole-second), the editable column set, legacy delete behaviour.
   ADR 0068 (conditional updates on owned columns), ADR 0069 (own append-only audit table), both Proposed.
-- **Phase 1a (in progress):** `IAuditLog` port, `clinical_care_audit` table and grants, adapter, and audited creates (built Nov 17; Clinical Care suites green: unit 228, architecture 31, integration 186); still to do: audit refused requests (`failed`), `ETag` / `If-Match` (412, 428), update and delete events.
+- **Phase 1a (in progress):** `IAuditLog` port, `clinical_care_audit` table and grants, adapter, audited creates and audited refusals (built Nov 17; Clinical Care suites green: unit 236, architecture 31, integration 192); still to do: `ETag` / `If-Match` (412, 428), update and delete events.
 - **Phase 1b:** gateway validates the session and forwards a verified actor; fixes F-CC-1, the placeholder provider and the open patient API.
 - **Phase 2:** update an encounter (`PUT`). **Phase 3a:** correct vitals. **Phase 3b:** permission port, then soft delete.
 - **Phase 4:** lookup endpoints and WebApp edit flows. **Phase 5:** shadow comparison of update, concurrency test, layered review.

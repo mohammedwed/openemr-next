@@ -57,8 +57,10 @@ public sealed class AuditEntry
         ArgumentException.ThrowIfNullOrWhiteSpace(action);
         if (action.Length > MaxActionLength)
             throw new ArgumentException($"An audit action is at most {MaxActionLength} characters.", nameof(action));
-        if (subject == Guid.Empty)
-            throw new ArgumentException("An audit row names the record it is about.", nameof(subject));
+        // A success names the record it changed. A refusal names whatever the caller asked about, which may not exist and may be
+        // the empty uuid: that is still worth a row, and must not turn a 400 or 404 into a 500.
+        if (subject == Guid.Empty && outcome == AuditOutcome.Success)
+            throw new ArgumentException("A successful change names the record it changed.", nameof(subject));
 
         AtUtc = atUtc;
         Actor = actor with { Subject = Cut(actor.Subject, MaxActorLength) ?? "unknown" };

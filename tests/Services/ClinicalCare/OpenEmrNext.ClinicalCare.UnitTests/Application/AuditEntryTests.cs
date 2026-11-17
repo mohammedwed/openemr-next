@@ -76,8 +76,19 @@ public class AuditEntryTests
         Assert.Throws<ArgumentException>(() => Entry(action: new string('x', AuditEntry.MaxActionLength + 1)));
 
     [Fact]
-    public void An_audit_row_must_name_its_record() =>
+    public void A_successful_change_must_name_the_record_it_changed() =>
         Assert.Throws<ArgumentException>(() => Entry(subject: Guid.Empty));
+
+    [Theory]
+    [InlineData(AuditOutcome.Failed)]
+    [InlineData(AuditOutcome.Denied)]
+    public void A_refusal_may_name_a_uuid_that_does_not_exist_even_the_empty_one(AuditOutcome outcome)
+    {
+        // The caller chooses what a refused request is "about"; rejecting an empty uuid here would turn a 400 or 404 into a 500.
+        var entry = new AuditEntry(At, Actor, AuditActions.VitalsRecord, Guid.Empty, outcome);
+
+        Assert.Equal(Guid.Empty, entry.Subject);
+    }
 
     [Fact]
     public void A_field_list_that_cannot_fit_the_details_column_is_a_programming_error()

@@ -119,6 +119,29 @@ public class EncounterEndpointTests(ClinicalCareContainerFixture fixture) : IAsy
     }
 
     [Fact]
+    public async Task SEC_9_a_404_for_an_unknown_patient_leaves_a_failed_audit_row_naming_that_patient()
+    {
+        var unknown = Guid.NewGuid();
+
+        var response = await _client.PostAsJsonAsync("/api/v1/encounters", Valid(patient: unknown));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(1L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_audit"));
+        Assert.Equal("failed", await fixture.RootScalarAsync<string>("SELECT outcome FROM clinical_care_audit"));
+        Assert.Equal(unknown.ToString(), await fixture.RootScalarAsync<string>("SELECT CONCAT(subject, '') FROM clinical_care_audit"));
+    }
+
+    [Fact]
+    public async Task SEC_9_a_400_for_invalid_input_leaves_a_failed_audit_row_and_no_encounter()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/encounters", Valid(classCode: "NOPE"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM form_encounter"));
+        Assert.Equal("failed", await fixture.RootScalarAsync<string>("SELECT outcome FROM clinical_care_audit"));
+    }
+
+    [Fact]
     public async Task POST_encounters_with_an_unknown_facility_returns_400()
     {
         var response = await _client.PostAsJsonAsync("/api/v1/encounters", Valid(facilityId: 99));
