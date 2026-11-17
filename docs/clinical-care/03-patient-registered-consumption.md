@@ -33,14 +33,14 @@ It also gives the outbox the relay that design-set decision D2 said was missing.
 unknown envelope or payload fields are fine.
 
 **Responses:** `204` applied or already applied; `202` an event type this consumer does not handle (ignored, not rejected); `400` the event
-itself is unusable (unsupported `schemaVersion`, no usable patient, no `eventId`); `401` not the producers' secret.
+itself is unusable (unsupported `schemaVersion`, no usable patient, no `eventId`); `422` the event is well formed but contradicts a patient already held; `401` not the producers' secret.
 
 ## 3. Rule catalogue
 
 | Id | Rule | Where |
 |---|---|---|
 | EV-1 | An event is applied at most once: its id is recorded in the **same transaction** as its effect, and a repeat is a no-op that still answers success. | `EfPatientReferenceStore` |
-| EV-2 | A patient already known is left alone; a **different** uuid claiming a held pid fails loudly (unique key) and leaves the event unprocessed. | `EfPatientReferenceStore`, `clinical_care_patient_ref` |
+| EV-2 | A patient already known with the same pid is left alone. A **different** uuid claiming a held pid, or the same uuid with a different pid, is a `PatientReferenceConflictException`: answered **422** (a rejection of the event itself, so the relay dead-letters it at once, review finding R-9) and the event is **not** marked processed, so a corrected redelivery still applies. | `EfPatientReferenceStore`, `InternalEventEndpoints` |
 | EV-3 | A patient reference needs a non-empty uuid and a positive pid. | `PatientReference.Create` (one owner) |
 | EV-4 | Unknown event types are acknowledged, unsupported schema versions are rejected. | `InternalEventEndpoints` |
 | EV-5 | Delivery order is the outbox id order; a failure stops the pass; only a dead letter is skipped. | `RelayOutboxUseCase`, `EfOutboxRelayStore` |
@@ -65,7 +65,7 @@ itself is unusable (unsupported `schemaVersion`, no usable patient, no `eventId`
 |---|---|---|---|
 | F-PM-1 | **Eventual consistency window:** an encounter requested in the seconds between registration and delivery is a `404`. Visible and tested, not hidden. | L | By design |
 | F-PM-2 | `drive_uuid` of a document is a different kind of `uuid_registry` entry (`document_drive`) and is still **not** recorded. | L | Open |
-| F-PM-3 | `clinical_care_processed_events` and delivered outbox rows are never purged. | L | Open (needs a retention job, EVT-7) |
+| F-PM-3 | Processed event ids and delivered outbox rows are never purged. | L | **Clinical Care's side fixed 2026-11-17** (review finding R-10, a retention job). **PatientManagement's delivered `patient_management_outbox` rows are still never purged: open** |
 | F-PM-4 | The event id is derived from the outbox row id: if the table were recreated or ids reused, new events would collide with processed ones and be silently dropped. | M | Open; revisit if the outbox is ever rebuilt |
 | F-PM-5 | The backfill copies patients that exist **at seed time**. A patient created by a legacy writer later is only picked up at the next `compose up`; legacy registration is meant to be retired (ADR 0049 #5), so this should not arise. | L | By design, tracked |
 | F-PM-6 | There is no alert wired to a dead letter yet: it is an error-level log line with the row id, which an alert can be built on (OPS-11). | M | Open |

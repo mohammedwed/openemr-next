@@ -136,7 +136,7 @@ calls `Guid.NewGuid()` and `Random.Shared` inside its aggregate.
 
 - **Domain (built):** `Encounter` (aggregate root; no public constructor or setter; `AssignGeneratedId` is
   internal), `EncounterCreation` (validated value object; `Create(...)` collects **all** errors, DOM-2/3),
-  `PatientReference(Uuid, Pid)`, `EncounterIdentity(Uuid, Number)`, `EncounterValidationException`,
+  `PatientReference(Uuid, Pid)`, `EncounterIdentity(Uuid, Number)`, `ClinicalCareValidationException`,
   `EncounterClassRule` (pure, cited, DOM-12), and the reference-data records `EncounterClassOption`,
   `FacilityOption`, `EncounterReferenceData` (no invariants, read tolerantly, DOM-9).
 - **Application.Ports (built):** `IPatientDirectory` (interim stand-in), `IEncounterCodeLists`,
