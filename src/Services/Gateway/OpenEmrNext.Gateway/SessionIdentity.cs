@@ -13,6 +13,12 @@ internal sealed class SessionVerifier(IHttpClientFactory httpClientFactory, ILog
     /// <summary>The header carrying the verified user's uuid to the services (ADR 0075). Removed from every proxied request first, so only this check can set it.</summary>
     public const string VerifiedUserHeader = "X-Authenticated-User";
 
+    /// <summary>
+    /// The property of AuthFacade's <c>MeResponse</c> that holds the session's subject, the user's OpenEMR uuid. It is <b>"subject"</b>, not the JWT claim's name "sub": a test pins this against AuthFacade's published
+    /// contract (<c>AuthFacade.json</c>), because a wrong guess here makes every real session look signed out.
+    /// </summary>
+    public const string SubjectProperty = "subject";
+
     public async Task<SessionResult> VerifyAsync(HttpContext context, CancellationToken ct)
     {
         // No cookie at all is not worth a call.
@@ -47,7 +53,7 @@ internal sealed class SessionVerifier(IHttpClientFactory httpClientFactory, ILog
 
             using var body = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
             if (body.RootElement.ValueKind == JsonValueKind.Object
-                && body.RootElement.TryGetProperty("sub", out var sub)
+                && body.RootElement.TryGetProperty(SubjectProperty, out var sub)
                 && sub.ValueKind == JsonValueKind.String
                 && Guid.TryParse(sub.GetString(), out var uuid)
                 && uuid != Guid.Empty)

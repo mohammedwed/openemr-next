@@ -120,10 +120,15 @@ internal sealed class GatewayHarness : IAsyncDisposable
                 context.Response.StatusCode = StatusCodes.Status500InternalServerError;
                 return true;
             case "odd":
-                await context.Response.WriteAsJsonAsync(new { sub = "not-a-uuid", name = "Odd" });
+                await context.Response.WriteAsJsonAsync(new Dictionary<string, string> { [SessionVerifier.SubjectProperty] = "not-a-uuid", ["name"] = "Odd" });
                 return true;
             default:
-                await context.Response.WriteAsJsonAsync(new { sub = token.StartsWith("ok-", StringComparison.Ordinal) ? token["ok-".Length..] : token, name = "Dr Who" });
+                // The same shape AuthFacade's real MeResponse has (see AuthFacadeContractTests), named by the gateway's own constant.
+                await context.Response.WriteAsJsonAsync(new Dictionary<string, string>
+                {
+                    [SessionVerifier.SubjectProperty] = token.StartsWith("ok-", StringComparison.Ordinal) ? token["ok-".Length..] : token,
+                    ["name"] = "Dr Who"
+                });
                 return true;
         }
     }

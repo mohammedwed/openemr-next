@@ -408,3 +408,11 @@ Full record: `docs/clinical-care/20-webapp-clinical-screens.md`. **Compile-check
 - **WebApp:** the registration, document upload and directive status dialogs no longer send a user id (the last three uses of the placeholder `1`).
 - **Not built, on purpose: a bearer-token path for external FHIR clients.** `/fhir` now needs a session, and nothing in this repository calls it from outside; the design depends on which clients exist (see ADR 0075 #7).
 - **Tests:** Patient Management unit 166, architecture 17, integration 86 (12 new, covering 401 and 403 on every route, the verified user recorded whatever the body says, FHIR create, and the secret still being required). PM OpenAPI snapshot regenerated; the live stack is rebuilt and re-seeded and the live gateway tests pass (14).
+
+## Fixed — the gateway's session check read the wrong field, so every signed-in user looked signed out (ADR 0075)
+
+**Found by the user the first time the new sign-in check met a real session** ("when I navigate to patients it sees me as logged out"). The gateway asked AuthFacade `GET /api/v1/me` correctly and got a 200, but then looked for a `sub` property; AuthFacade's `MeResponse` calls it **`subject`**. Every real session was therefore treated as not signed in and refused with 401 before reaching Patient Management or Clinical Care. Anonymous requests were refused correctly, so nothing was ever exposed; it failed closed.
+
+- **Why the tests missed it:** the in-process gateway tests used a fake AuthFacade, and I wrote the fake with the same wrong guess as the code, so they agreed with each other and not with the real service. The live-stack tests only cover requests with no session, which needs no real field name. The browser check I had flagged as outstanding is exactly what would have caught it.
+- **Fix:** the gateway reads `subject`, named by one constant. The fake uses that constant, and two new contract tests read AuthFacade's published OpenAPI snapshot and assert that `MeResponse` has that property and does not have `sub`. Reintroducing the bug fails both.
+- **Lesson recorded:** a fake of another service must be derived from that service's published contract, not from the author's memory of it. The gateway proxy tests are now 28 and pass; the gateway is rebuilt and restarted.
