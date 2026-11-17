@@ -204,22 +204,6 @@ a:focus-visible {
     border: 0;
 }
 
-/* A neutral mid-gray tint at low opacity, not a theme palette var: it needs to read as a quiet, muted
-   badge in both light and dark mode without picking a side (the app's own palette vars are tuned for
-   each theme separately, and no single one of them stays muted-but-visible across both). */
-.op-soon-badge {
-    display: inline-block;
-    margin-inline-start: 6px;
-    padding: 1px 6px;
-    font-size: 0.6875rem;
-    font-weight: 600;
-    line-height: 1.4;
-    color: var(--mud-palette-text-secondary);
-    background-color: rgba(128, 128, 128, 0.18);
-    border-radius: 999px;
-    vertical-align: middle;
-}
-
 /* Matches MudMenuItem's own real padding (8px 12px) -- measured via getComputedStyle() on the actual
    "Log out" item in a running instance, not assumed: an earlier guess of 4px 16px here was wrong on both
    axes, and the mismatch (half the vertical padding of every item below it) was a real, visible part of
@@ -241,4 +225,20 @@ a:focus-visible {
    supports. */
 .op-menu-popover {
     min-width: 200px;
+}
+
+/* A long visit reason in the encounter list: two lines, then an ellipsis, with the full text in the cell's
+   title attribute. A free-text column would otherwise stretch a row to however long someone typed. */
+.op-clamp {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+}
+
+/* Free text the user typed (visit reason, vitals note): keep their line breaks instead of collapsing them. */
+.op-prewrap {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }

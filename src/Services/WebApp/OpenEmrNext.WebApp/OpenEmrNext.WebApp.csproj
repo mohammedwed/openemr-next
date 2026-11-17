@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\AuthFacade\OpenEmrNext.AuthFacade.Client\OpenEmrNext.AuthFacade.Client.csproj" />
     <ProjectReference Include="..\..\PatientManagement\OpenEmrNext.PatientManagement.Client\OpenEmrNext.PatientManagement.Client.csproj" />
+    <ProjectReference Include="..\..\ClinicalCare\OpenEmrNext.ClinicalCare.Client\OpenEmrNext.ClinicalCare.Client.csproj" />
   </ItemGroup>
 
 </Project>

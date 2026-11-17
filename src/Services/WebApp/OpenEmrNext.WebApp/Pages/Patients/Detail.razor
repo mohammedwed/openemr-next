@@ -54,6 +54,12 @@
 
             @* Scroll arrows always show, so a second tab cannot be hidden off the edge of a narrow screen. *@
             <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" AlwaysShowScrollButtons="true">
+                @* Encounters come from ClinicalCare, not PatientManagement, so this panel loads its own pages (the API
+                   is server-paged) and a ClinicalCare outage never blocks the patient or the other tabs. *@
+                <MudTabPanel Text="@WithCount("Encounters", _encounterTotal)">
+                    <PatientEncountersPanel @key="Uuid" PatientUuid="Uuid" TotalChanged="OnEncounterTotalChanged" />
+                </MudTabPanel>
+
                 <MudTabPanel Text="@WithCount("Insurance", _policies?.Count)">
                     <PatientInsurancePanel @key="patient.Pid" Pid="patient.Pid"
                         Policies="_policies" Error="_policiesError"
@@ -88,6 +94,11 @@
     private bool _statusError;
     private IReadOnlyList<AdvanceDirectiveDocumentResponse>? _documents;
     private bool _documentsError;
+
+    // Null until the Encounters panel has loaded its first page.
+    private int? _encounterTotal;
+
+    private void OnEncounterTotalChanged(int total) => _encounterTotal = total;
 
     private static string WithCount(string label, int? count) => count is null ? label : $"{label} ({count})";
 
@@ -128,6 +139,7 @@
         _policies = null;
         _status = null;
         _documents = null;
+        _encounterTotal = null;
         _policiesError = _statusError = _documentsError = false;
         _state = State.Loading;
 

@@ -24,5 +24,26 @@ public sealed class PatientPageContext
         }
     }
 
+    private string? _encounterLabel;
+
+    /// <summary>
+    /// The label of the encounter on screen ("Encounter 12"), or <c>null</c> on any other page. Set by the encounter
+    /// page for the same reason as <see cref="PatientName"/>: the URL only carries the encounter's uuid.
+    /// </summary>
+    public string? EncounterLabel
+    {
+        get => _encounterLabel;
+        set
+        {
+            if (_encounterLabel == value)
+            {
+                return;
+            }
+
+            _encounterLabel = value;
+            Changed?.Invoke();
+        }
+    }
+
     public event Action? Changed;
 }

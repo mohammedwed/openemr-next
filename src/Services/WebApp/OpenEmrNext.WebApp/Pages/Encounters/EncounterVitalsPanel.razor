@@ -1,0 +1,221 @@
+@using OpenEmrNext.ClinicalCare.Client
+@using OpenEmrNext.WebApp.Pages.Patients
+@using OpenEmrNext.WebApp.Shared
+@using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
+@inject IClinicalCareClient ClinicalCare
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+@* One card for an encounter's vitals. Like the patient's Encounters panel it loads its own pages (the API is
+   server-paged, API-6). A failed first load shows an error with "Try again"; a failed page or unit change keeps the
+   last data on screen with a warning, so a vitals reading is never replaced by an empty screen. *@
+<PatientSectionCard Title="Vitals"
+    HasData="_items is not null" Error="_error" OnRetry="LoadAsync"
+    ErrorMessage="Could not load vitals. The clinical care service may be unavailable."
+    StaleMessage="Could not refresh vitals. The list below may be out of date."
+    LoadingLabel="Loading vitals">
+    <Summary>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary" role="status">
+            @(_total == 1 ? "1 set of vitals" : $"{_total} sets of vitals")@(_total > PageSize ? $" · page {_page} of {PageCount}" : "")
+        </MudText>
+    </Summary>
+    <Actions>
+        @* The service stores US units and converts on read; this only asks it to convert (ADR 0065). *@
+        <MudSwitch T="bool" Value="_metric" ValueChanged="OnUnitsChangedAsync" Color="Color.Primary" Label="Metric units" Disabled="_loading" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenRecordAsync">Record vitals</MudButton>
+    </Actions>
+    <ChildContent>
+        <MudTable Items="_items ?? []" Hover="true" Elevation="0" Dense="true"
+            TableAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Vitals" })">
+            <HeaderContent>
+                <MudTh>Recorded</MudTh>
+                <MudTh>Blood pressure</MudTh>
+                <MudTh>Pulse (/min)</MudTh>
+                <MudTh>Resp. (/min)</MudTh>
+                <MudTh>SpO₂ (%)</MudTh>
+                <MudTh>Temperature</MudTh>
+                <MudTh>Weight</MudTh>
+                <MudTh>Height</MudTh>
+                <MudTh>BMI</MudTh>
+                <MudTh>Other</MudTh>
+            </HeaderContent>
+            <RowTemplate Context="vitals">
+                <MudTd DataLabel="Recorded">
+                    <div>@Formatting.DateTimeText(vitals.RecordedAt)</div>
+                    @if (!string.IsNullOrWhiteSpace(vitals.RecordedBy))
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">by @vitals.RecordedBy</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Blood pressure">@Formatting.BloodPressure(vitals.BloodPressureSystolic, vitals.BloodPressureDiastolic)</MudTd>
+                <MudTd DataLabel="Pulse (/min)">@(vitals.Pulse?.ToString() ?? "—")</MudTd>
+                <MudTd DataLabel="Resp. (/min)">@(vitals.Respiration?.ToString() ?? "—")</MudTd>
+                <MudTd DataLabel="SpO₂ (%)">@(vitals.OxygenSaturation?.ToString("0.##") ?? "—")</MudTd>
+                <MudTd DataLabel="Temperature">@Formatting.Measurement(vitals.Temperature?.Value, vitals.Temperature?.Unit)</MudTd>
+                <MudTd DataLabel="Weight">@Formatting.Measurement(vitals.Weight?.Value, vitals.Weight?.Unit)</MudTd>
+                <MudTd DataLabel="Height">@Formatting.Measurement(vitals.Height?.Value, vitals.Height?.Unit)</MudTd>
+                <MudTd DataLabel="BMI">
+                    @if (vitals.Bmi is { } bmi)
+                    {
+                        <div>@Math.Round(bmi, 1).ToString("0.#")</div>
+                        @if (!string.IsNullOrWhiteSpace(vitals.BmiStatus))
+                        {
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">@vitals.BmiStatus</MudText>
+                        }
+                    }
+                    else
+                    {
+                        <span>—</span>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Other">
+                    @{
+                        var other = OtherDetails(vitals);
+                    }
+                    @if (other.Count == 0)
+                    {
+                        <span>—</span>
+                    }
+                    else
+                    {
+                        @foreach (var line in other)
+                        {
+                            <div class="op-prewrap">@line</div>
+                        }
+                    }
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudStack Spacing="2" AlignItems="AlignItems.Start" Class="py-2">
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">No vitals recorded for this encounter yet.</MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="OpenRecordAsync">Record the first set</MudButton>
+                </MudStack>
+            </NoRecordsContent>
+        </MudTable>
+
+        @if (PageCount > 1)
+        {
+            <MudStack AlignItems="AlignItems.Center" Class="mt-4">
+                <MudPagination Count="PageCount" Selected="_page" SelectedChanged="OnPageChangedAsync"
+                    ShowFirstButton="true" ShowLastButton="true" Disabled="_loading" aria-label="Vitals pages" />
+            </MudStack>
+        }
+    </ChildContent>
+</PatientSectionCard>
+
+@code {
+    private const int PageSize = 10;
+
+    [Parameter, EditorRequired] public Guid EncounterUuid { get; set; }
+
+    // Null means "not loaded yet". A failed page or unit change keeps the previous page here on purpose.
+    private List<VitalsResponse>? _items;
+    private int _total;
+    private int _page = 1;
+    private bool _metric;      // what the switch says
+    private bool _shownMetric; // the units the table's numbers are actually in
+    private bool _error;
+    private bool _loading;
+
+    // Each load takes a number; only the latest one may apply its result, so a slow response for an
+    // earlier page or unit choice can never overwrite a newer one.
+    private int _loadCounter;
+
+    private int PageCount => Math.Max(1, (int)Math.Ceiling(_total / (double)PageSize));
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task OnPageChangedAsync(int page) => LoadAsync(page, _metric);
+
+    private async Task OnUnitsChangedAsync(bool metric)
+    {
+        _metric = metric;
+        // On a failure LoadAsync puts the switch back on the units the table is really showing, so the label never
+        // claims a unit system the numbers are not in.
+        await LoadAsync(_page, metric);
+    }
+
+    private Task LoadAsync() => LoadAsync(_page, _metric);
+
+    private async Task LoadAsync(int page, bool metric)
+    {
+        var ticket = ++_loadCounter;
+        _loading = true;
+        try
+        {
+            var result = await ClinicalCare.ListVitalsAsync(EncounterUuid, PageSize, (page - 1) * PageSize, metric ? "metric" : null!);
+            if (ticket != _loadCounter)
+            {
+                return; // a newer load has started since this one
+            }
+
+            _items = [.. result.Items];
+            _total = result.Total;
+            _page = page;
+            _metric = _shownMetric = metric;
+            _error = false;
+        }
+        catch (Exception ex) when (ex is ClinicalCareApiException or HttpRequestException)
+        {
+            if (ticket == _loadCounter)
+            {
+                _error = true;
+                _metric = _shownMetric;
+            }
+        }
+        finally
+        {
+            if (ticket == _loadCounter)
+            {
+                _loading = false;
+            }
+        }
+    }
+
+    /// <summary>The measurements that do not get their own column: circumferences, how the temperature was taken, and the note.</summary>
+    private static List<string> OtherDetails(VitalsResponse vitals)
+    {
+        var lines = new List<string>();
+        if (vitals.WaistCircumference is { } waist)
+        {
+            lines.Add($"Waist {Formatting.Measurement(waist.Value, waist.Unit)}");
+        }
+
+        if (vitals.HeadCircumference is { } head)
+        {
+            lines.Add($"Head {Formatting.Measurement(head.Value, head.Unit)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(vitals.TemperatureMethod))
+        {
+            lines.Add($"Temperature taken: {vitals.TemperatureMethod}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(vitals.Note))
+        {
+            lines.Add(vitals.Note);
+        }
+
+        return lines;
+    }
+
+    private async Task OpenRecordAsync()
+    {
+        var parameters = new DialogParameters<RecordVitalsDialog>
+        {
+            { x => x.EncounterUuid, EncounterUuid },
+            { x => x.Metric, _shownMetric },
+        };
+        var dialog = await DialogService.ShowAsync<RecordVitalsDialog>("Record vitals", parameters, DialogDefaults.Wide);
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: VitalsRecordedResponse recorded })
+        {
+            Snackbar.Add(recorded.Bmi is { } bmi
+                ? $"Vitals recorded. BMI {Math.Round(bmi, 1):0.#}{(string.IsNullOrWhiteSpace(recorded.BmiStatus) ? "" : $" ({recorded.BmiStatus})")}."
+                : "Vitals recorded.", Severity.Success);
+
+            // Newest first, so the new set is on page 1.
+            await LoadAsync(1, _metric);
+        }
+    }
+}

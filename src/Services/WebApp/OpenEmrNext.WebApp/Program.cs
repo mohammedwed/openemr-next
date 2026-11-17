@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
 using OpenEmrNext.AuthFacade.Client;
+using OpenEmrNext.ClinicalCare.Client;
 using OpenEmrNext.PatientManagement.Client;
 using OpenEmrNext.WebApp;
 using OpenEmrNext.WebApp.Resilience;
@@ -26,6 +27,14 @@ builder.Services.AddScoped(sp => new HttpClient(new TransientFailureCircuitBreak
 builder.Services.AddScoped<IAuthFacadeClient>(sp => new AuthFacadeClient(sp.GetRequiredService<HttpClient>()));
 
 builder.Services.AddScoped<IPatientManagementClient>(_ => new PatientManagementClient(
+    new HttpClient(new TransientFailureCircuitBreakingHandler { InnerHandler = new HttpClientHandler() })
+    {
+        BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
+    }));
+
+// Same shape as PatientManagement above: the gateway routes /api/v1/encounters/** to ClinicalCare, and this
+// client gets its own HttpClient and breaker so a ClinicalCare outage never trips the patient pages' breaker.
+builder.Services.AddScoped<IClinicalCareClient>(_ => new ClinicalCareClient(
     new HttpClient(new TransientFailureCircuitBreakingHandler { InnerHandler = new HttpClientHandler() })
     {
         BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
