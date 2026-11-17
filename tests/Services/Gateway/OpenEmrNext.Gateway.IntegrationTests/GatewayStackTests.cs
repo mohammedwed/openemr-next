@@ -7,8 +7,9 @@ namespace OpenEmrNext.Gateway.IntegrationTests;
 /// Smoke tests against the running gateway container, verifying the behavior ADR 0033/0039 built:
 /// routing AuthFacade's path prefixes to AuthFacade and everything else to WebApp, terminating TLS,
 /// redirecting plain HTTP, and sending HSTS. They do not exercise AuthFacade's own login flow —
-/// that is <c>AuthFacade.IntegrationTests</c>' job — and they do not assert anything about token
-/// validation, since the gateway does none yet (ADR 0048).
+/// that is <c>AuthFacade.IntegrationTests</c>' job. They check that the services holding clinical and
+/// patient data refuse a request with no session (ADR 0075); the signed-in half of that check needs a real
+/// OpenEMR login, so it is covered by <c>OpenEmrNext.Gateway.ProxyTests</c> against a fake sign-in service.
 /// </summary>
 /// <remarks>
 /// Requires the stack to be up. <see cref="GatewayReadinessFixture"/> waits for it before these
@@ -67,34 +68,50 @@ public class GatewayStackTests
     [Theory]
     [InlineData("/api/v1/patients")]
     [InlineData("/fhir/Patient")]
-    public async Task PatientManagement_route_prefixes_are_routed_to_PatientManagement_not_WebApp(string path)
+    public async Task PatientManagement_route_prefixes_need_a_session_and_are_not_served_by_WebApp(string path)
     {
         var response = await Http.GetAsync(GatewayStackConfig.GatewayHttpsBaseUrl + path);
 
-        // This client never presents X-Internal-Gateway-Secret itself -- the gateway attaches it
-        // server-side (ADR 0055) to every request matching this route, unconditionally, before
-        // forwarding. A 200 here proves the request actually reached PatientManagement (which would
-        // 401 without that header), not WebApp's SPA catch-all, which would answer any unmatched path
-        // with its own 200-HTML page instead.
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var contentType = response.Content.Headers.ContentType?.MediaType;
-        Assert.NotEqual("text/html", contentType);
+        // No session cookie: the gateway answers 401 itself and forwards nothing (ADR 0075). Before this check the gateway
+        // attached the service's secret to every request, so an anonymous caller got a 200 and the whole patient list.
+        // A 401 that is JSON (not WebApp's 200-HTML SPA fallback) shows the route was matched and the check ran.
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.NotEqual("text/html", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Theory]
+    [InlineData("GET", "/api/v1/encounters")]
+    [InlineData("POST", "/api/v1/encounters")]
+    [InlineData("GET", "/api/v1/problems")]
+    [InlineData("GET", "/api/v1/allergies")]
+    [InlineData("GET", "/api/v1/immunizations")]
+    [InlineData("GET", "/api/v1/lookups/facilities")]
+    public async Task ClinicalCare_route_prefixes_need_a_session_and_a_forged_identity_does_not_stand_in_for_one(string method, string path)
+    {
+        // An empty body would be a 400 from ClinicalCare, so a 401 proves the request never left the gateway. The forged header is
+        // what an attacker would try (ADR 0075): the gateway removes it, and without a session there is nothing to put in its place.
+        using var request = new HttpRequestMessage(new HttpMethod(method), GatewayStackConfig.GatewayHttpsBaseUrl + path);
+        request.Headers.Add("X-Authenticated-User", Guid.NewGuid().ToString());
+        if (method == "POST")
+        {
+            request.Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
+        }
+
+        var response = await Http.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.NotEqual("text/html", response.Content.Headers.ContentType?.MediaType);
     }
 
     [Fact]
-    public async Task ClinicalCare_route_prefix_is_routed_to_ClinicalCare_with_its_own_secret_attached()
+    public async Task A_cookie_that_is_not_a_session_is_refused_not_passed_through()
     {
-        // An empty body is deliberately invalid. Reaching request validation (400) proves three things at once:
-        // the request left the gateway for ClinicalCare, not WebApp's SPA catch-all (which would answer with
-        // HTML); the gateway attached ClinicalCare's own secret server-side, since this client never presents
-        // one and ClinicalCare would answer 401 without it (ADR 0055, ADR 0064); and the route is not
-        // PatientManagement's, which owns /api/v1/patients/ and not this prefix.
-        using var content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
+        using var request = new HttpRequestMessage(HttpMethod.Get, GatewayStackConfig.GatewayHttpsBaseUrl + "/api/v1/encounters");
+        request.Headers.Add("Cookie", ".AspNetCore.AuthFacadeSession=not-a-real-session");
 
-        var response = await Http.PostAsync(GatewayStackConfig.GatewayHttpsBaseUrl + "/api/v1/encounters", content);
+        var response = await Http.SendAsync(request);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.NotEqual("text/html", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]

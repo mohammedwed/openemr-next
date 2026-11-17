@@ -79,3 +79,4 @@ old one's status is updated to point to it.
 | [0072](0072-immunizations-are-versioned-by-content-because-the-table-has-no-usable-stamp.md) | Immunizations are versioned by content, because their table has no usable stamp | Accepted | 2026-11-17 |
 | [0073](0073-soap-notes-are-addressed-by-their-form-id-within-their-encounter.md) | SOAP notes are addressed by their form id within their encounter | Accepted | 2026-11-17 |
 | [0074](0074-clinical-notes-get-their-own-parent-form-allocated-under-a-database-lock.md) | Clinical notes get their own parent form, its id allocated under a database lock | Accepted | 2026-11-17 |
+| [0075](0075-the-gateway-validates-the-session-and-forwards-the-verified-user.md) | The gateway validates the session and forwards the verified user to Clinical Care and Patient Management | Accepted | 2026-11-17 |

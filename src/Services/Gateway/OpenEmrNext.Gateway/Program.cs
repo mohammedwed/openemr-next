@@ -1,3 +1,4 @@
+using OpenEmrNext.Gateway;
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Transforms;
 
@@ -63,6 +64,9 @@ string[] clinicalCareRoutePatterns =
     "/api/v1/encounters/{**catch-all}", "/api/v1/problems/{**catch-all}", "/api/v1/allergies/{**catch-all}",
     "/api/v1/immunizations/{**catch-all}", "/api/v1/lookups/{**catch-all}"
 ];
+
+// The only routes that need a signed-in user (ADR 0075): the two services that hold clinical and patient data. AuthFacade's own routes are how a user signs in, and WebApp's are static files.
+var protectedPaths = new ProtectedPaths(patientManagementRoutePatterns.Concat(clinicalCareRoutePatterns));
 
 var routes = authFacadeRoutePatterns
     .Select((pattern, index) => new RouteConfig
@@ -140,6 +144,23 @@ builder.Services.AddReverseProxy()
     .AddTransforms(transformContext =>
     {
         transformContext.AddXForwardedFor().AddXForwardedProto();
+
+        // The verified user is only ever set by the session check below. Any value a caller sends is removed on every route, so no service can be handed an identity this gateway did not verify (ADR 0075).
+        transformContext.AddRequestTransform(requestTransformContext =>
+        {
+            requestTransformContext.ProxyRequest.Headers.Remove(SessionVerifier.VerifiedUserHeader);
+            if (transformContext.Cluster?.ClusterId is "patientmanagement" or "clinicalcare")
+            {
+                // The two data services take the verified user from the header and never need the browser's session cookie, so it is not handed to them: a credential they cannot use is one they cannot leak.
+                requestTransformContext.ProxyRequest.Headers.Remove("Cookie");
+                if (requestTransformContext.HttpContext.Items[SessionIdentityExtensions.UserItem] is Guid user)
+                {
+                    requestTransformContext.ProxyRequest.Headers.Add(SessionVerifier.VerifiedUserHeader, user.ToString());
+                }
+            }
+
+            return ValueTask.CompletedTask;
+        });
         transformContext.AddResponseHeader("Strict-Transport-Security", "max-age=2592000", append: false, ResponseCondition.Always);
 
         // Scoped to only the patientmanagement cluster, not applied globally like the transforms
@@ -169,6 +190,14 @@ builder.Services.AddReverseProxy()
         }
     });
 
+// The session check calls AuthFacade over its internal address, with a short timeout: a slow sign-in service fails closed (503) rather than holding every request.
+builder.Services.AddSingleton<SessionVerifier>();
+builder.Services.AddHttpClient(SessionVerifier.ClientName, client =>
+{
+    client.BaseAddress = new Uri(authFacadeBaseUrl.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(5);
+});
+
 // HttpsRedirection:HttpsPort is the externally-published HTTPS port (GATEWAY_HTTPS_PORT), not Kestrel's
 // own internal 8443: the redirect's Location header must name a port the browser can actually reach.
 builder.Services.AddHttpsRedirection(options =>
@@ -187,5 +216,11 @@ var app = builder.Build();
 // transform above, not middleware here -- see that comment for why.
 app.UseHttpsRedirection();
 
+// After the redirect, before the proxy: a request to a protected route is checked (401 or 503) before it is forwarded.
+app.UseSessionIdentity(protectedPaths);
+
 app.MapReverseProxy();
 app.Run();
+
+/// <summary>Lets the in-process gateway tests start the real application.</summary>
+public partial class Program;
