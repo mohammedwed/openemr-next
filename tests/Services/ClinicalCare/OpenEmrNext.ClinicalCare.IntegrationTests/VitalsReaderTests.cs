@@ -151,9 +151,10 @@ public class VitalsReaderTests(ClinicalCareContainerFixture fixture) : IAsyncLif
     {
         var vitals = VitalsRegistryTests.NewVitals();
         await using (var db = fixture.CreateDbContext())
-            await new EfVitalsRegistry(db).RegisterAsync(
+            await new EfVitalsRegistry(db, new EfAuditLog(db)).RegisterAsync(
                 vitals,
                 new(vitals.Uuid, vitals.Encounter.Uuid, 1001, EncounterTestData.PatientUuid, 42, vitals.MeasurementsTaken, DateTime.UtcNow),
+                VitalsRegistryTests.AuditFor(vitals),
                 CancellationToken.None);
         await using var db2 = fixture.CreateDbContext();
 

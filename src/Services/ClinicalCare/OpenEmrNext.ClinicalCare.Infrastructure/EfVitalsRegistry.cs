@@ -15,9 +15,9 @@ namespace OpenEmrNext.ClinicalCare.Infrastructure;
 /// row; <c>clinical_care_outbox</c>. An absent measurement is written as <c>0</c>, the column default legacy reads as
 /// "not recorded" (CV-12). Retry-safe by uuid, as <see cref="EfEncounterRegistry"/> is (OPS-9).
 /// </remarks>
-public sealed class EfVitalsRegistry(ClinicalCareDbContext db) : IVitalsRegistry
+public sealed class EfVitalsRegistry(ClinicalCareDbContext db, IAuditLog auditLog) : IVitalsRegistry
 {
-    public async Task RegisterAsync(Vitals vitals, VitalsRecordedEvent @event, CancellationToken ct)
+    public async Task RegisterAsync(Vitals vitals, VitalsRecordedEvent @event, AuditEntry audit, CancellationToken ct)
     {
         var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(vitals.Uuid);
         var envelope = EventEnvelope.Serialize(
@@ -79,6 +79,9 @@ public sealed class EfVitalsRegistry(ClinicalCareDbContext db) : IVitalsRegistry
                 INSERT INTO clinical_care_outbox (event_type, payload, occurred_at)
                 VALUES ({VitalsRecordedEvent.EventType}, {envelope}, {@event.RecordedAtUtc})
                 """, ct);
+
+            // Last statement, same transaction: the vitals cannot exist without their audit row (SEC-9, ADR 0069 #3).
+            await auditLog.AppendAsync(audit, ct);
 
             await transaction.CommitAsync(ct);
             return rowId;

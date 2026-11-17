@@ -78,14 +78,15 @@ public static class EncounterEndpoints
     }
 
     private static async Task<IResult> CreateEncounter(
-        CreateEncounterRequest request, CreateEncounterUseCase useCase, CancellationToken ct)
+        CreateEncounterRequest request, CreateEncounterUseCase useCase, HttpContext http, CancellationToken ct)
     {
         try
         {
             var encounter = await useCase.ExecuteAsync(
                 new CreateEncounterCommand(
                     request.PatientUuid, request.ClassCode, request.CalendarCategoryId, ClientTime.ToServerLocal(request.Date), request.Reason,
-                    request.FacilityId, request.PosCode, request.ProviderId, ClientTime.ToServerLocal(request.OnsetDate), request.Sensitivity),
+                    request.FacilityId, request.PosCode, request.ProviderId, ClientTime.ToServerLocal(request.OnsetDate), request.Sensitivity,
+                    RequestOrigins.From(http)),
                 ct);
 
             return Results.Created(

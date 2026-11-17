@@ -11,4 +11,5 @@ public sealed record CreateEncounterCommand(
     int? PosCode,
     long ProviderId,
     DateTime? OnsetDate,
-    string? Sensitivity);
+    string? Sensitivity,
+    RequestOrigin? Origin = null);

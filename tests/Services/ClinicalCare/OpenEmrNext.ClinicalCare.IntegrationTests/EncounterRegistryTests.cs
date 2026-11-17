@@ -17,10 +17,14 @@ public class EncounterRegistryTests(ClinicalCareContainerFixture fixture) : IAsy
     private static EncounterCreatedEvent EventFor(OpenEmrNext.ClinicalCare.Domain.Encounter e) =>
         new(e.Uuid, e.Number, e.Patient.Uuid, e.Patient.Pid, e.ClassCode, e.Date, EncounterTestData.Now.ToUniversalTime());
 
+    internal static AuditEntry AuditFor(OpenEmrNext.ClinicalCare.Domain.Encounter e) =>
+        new(EncounterTestData.Now.ToUniversalTime(), new AuditActor($"user:{e.ProviderId}", e.ProviderId, Verified: false),
+            AuditActions.EncounterCreate, e.Uuid, AuditOutcome.Success, correlationId: "corr-enc", sourceAddress: "10.1.2.3");
+
     private async Task RegisterAsync(OpenEmrNext.ClinicalCare.Domain.Encounter encounter)
     {
         await using var db = fixture.CreateDbContext();
-        await new EfEncounterRegistry(db).RegisterAsync(encounter, EventFor(encounter), CancellationToken.None);
+        await new EfEncounterRegistry(db, new EfAuditLog(db)).RegisterAsync(encounter, EventFor(encounter), AuditFor(encounter), CancellationToken.None);
     }
 
     [Fact]
@@ -167,6 +171,51 @@ public class EncounterRegistryTests(ClinicalCareContainerFixture fixture) : IAsy
         Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM forms"));
         Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_outbox"));
         Assert.Equal(0, encounter.Id);
+    }
+
+    [Fact]
+    public async Task Register_writes_its_audit_row_in_the_same_transaction()
+    {
+        var encounter = EncounterTestData.NewEncounter();
+
+        await RegisterAsync(encounter);
+
+        Assert.Equal(1L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_audit"));
+        Assert.Equal("encounter.create", await fixture.RootScalarAsync<string>("SELECT action FROM clinical_care_audit"));
+        Assert.Equal(encounter.Uuid.ToString(), await fixture.RootScalarAsync<string>("SELECT CONCAT(subject, '') FROM clinical_care_audit"));
+        Assert.Equal("success", await fixture.RootScalarAsync<string>("SELECT outcome FROM clinical_care_audit"));
+        Assert.Equal($"user:{encounter.ProviderId}", await fixture.RootScalarAsync<string>("SELECT actor FROM clinical_care_audit"));
+        Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT actor_verified FROM clinical_care_audit"));
+        Assert.Equal("corr-enc", await fixture.RootScalarAsync<string>("SELECT correlation_id FROM clinical_care_audit"));
+        Assert.Equal("10.1.2.3", await fixture.RootScalarAsync<string>("SELECT source_address FROM clinical_care_audit"));
+    }
+
+    [Fact]
+    public async Task OPS_9_a_retried_registration_does_not_audit_twice()
+    {
+        var uuid = Guid.CreateVersion7();
+
+        await RegisterAsync(EncounterTestData.NewEncounter(uuid: uuid));
+        await RegisterAsync(EncounterTestData.NewEncounter(uuid: uuid));
+
+        Assert.Equal(1L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_audit"));
+    }
+
+    [Fact]
+    public async Task SEC_9_an_encounter_cannot_commit_without_its_audit_row()
+    {
+        // The audit insert is the last statement before the commit. If it fails, everything before it must roll back.
+        var encounter = EncounterTestData.NewEncounter();
+        await using var db = fixture.CreateDbContext();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new EfEncounterRegistry(db, new ThrowingAuditLog()).RegisterAsync(encounter, EventFor(encounter), AuditFor(encounter), CancellationToken.None));
+
+        Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM form_encounter"));
+        Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM forms"));
+        Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM uuid_registry"));
+        Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_outbox"));
+        Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_audit"));
     }
 
     [Fact]

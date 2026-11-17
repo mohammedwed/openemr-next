@@ -106,3 +106,16 @@ Full record: `docs/clinical-care/05-update-and-audit-research.md`. No code; bran
   Registered in DI; **not yet called** by any use case (next increments: creates, then update).
 - **Tests:** `AuditEntryTests` (unit) and `AuditLogTests` (integration: round trip, rollback and commit, no edit or delete, column widths pinned
   against the seed script). Both green.
+
+## Changed — M5b phase 1a, increment 2: creates are audited
+
+- **Every encounter create and vitals record now writes an audit row** (`encounter.create`, `vitals.record`) as the last statement of its
+  registry transaction, through `IAuditLog`. A change cannot commit without its audit row, and a failed audit insert rolls the change back.
+- **`IEncounterRegistry.RegisterAsync` and `IVitalsRegistry.RegisterAsync` take an `AuditEntry`.** The use cases build it: the actor is the provider
+  the caller named, flagged **unverified** until the gateway forwards a session (ADR 0069 #5, F-CC-1); the instant is the same clock reading as the event.
+- **`RequestOrigin`** (correlation id and source address) rides on the command as an optional last field, so no use case sees HTTP. The API builds it:
+  W3C trace id (else Kestrel's request id) and the first `X-Forwarded-For` entry (else the connection address).
+- **Retries stay safe:** a re-run after a lost commit acknowledgement returns before the audit insert, so it audits once.
+- **Not yet audited:** refused requests (outcome `failed`: validation, not found) and, later, denied ones. Next increment.
+- **Tests, all green (unit 228, architecture 31, integration 186):** use-case unit tests for the audit row and the no-origin case; registry integration tests for
+  the row, retry-once and "no commit without the audit row" (a throwing audit log); a use-case integration test; an endpoint test for `X-Forwarded-For`.

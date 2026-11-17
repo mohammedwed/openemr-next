@@ -54,11 +54,13 @@ public class CreateEncounterUseCaseTests
     {
         public Encounter? Registered { get; private set; }
         public EncounterCreatedEvent? Event { get; private set; }
+        public AuditEntry? Audit { get; private set; }
 
-        public Task RegisterAsync(Encounter encounter, EncounterCreatedEvent @event, CancellationToken ct)
+        public Task RegisterAsync(Encounter encounter, EncounterCreatedEvent @event, AuditEntry audit, CancellationToken ct)
         {
             Registered = encounter;
             Event = @event;
+            Audit = audit;
             return Task.CompletedTask;
         }
     }
@@ -102,6 +104,49 @@ public class CreateEncounterUseCaseTests
         Assert.Equal(42, @event.PatientPid);
         Assert.Equal("EMER", @event.ClassCode);
         Assert.Equal(Now.UtcDateTime, @event.CreatedAtUtc);
+    }
+
+    [Fact]
+    public async Task SEC_9_the_registered_audit_row_names_the_encounter_the_named_provider_and_the_origin()
+    {
+        var (useCase, _, registry) = Build();
+        var command = Command(providerId: 9) with { Origin = new RequestOrigin("trace-1", "192.0.2.1") };
+
+        var encounter = await useCase.ExecuteAsync(command, CancellationToken.None);
+
+        var audit = registry.Audit!;
+        Assert.Equal(AuditActions.EncounterCreate, audit.Action);
+        Assert.Equal(encounter.Uuid, audit.Subject);
+        Assert.Equal(AuditOutcome.Success, audit.Outcome);
+        Assert.Equal(Now.UtcDateTime, audit.AtUtc);
+        Assert.Equal("user:9", audit.Actor.Subject);
+        Assert.Equal(9, audit.Actor.UserId);
+        Assert.False(audit.Actor.Verified);   // the provider is caller-supplied until the gateway forwards a session (F-CC-1)
+        Assert.Equal("trace-1", audit.CorrelationId);
+        Assert.Equal("192.0.2.1", audit.SourceAddress);
+    }
+
+    [Fact]
+    public async Task SEC_9_a_command_with_no_origin_is_still_audited()
+    {
+        var (useCase, _, registry) = Build();
+
+        await useCase.ExecuteAsync(Command(), CancellationToken.None);
+
+        Assert.NotNull(registry.Audit);
+        Assert.Null(registry.Audit!.CorrelationId);
+        Assert.Null(registry.Audit.SourceAddress);
+    }
+
+    [Fact]
+    public async Task SEC_9_a_refused_create_registers_no_audit_row_here()
+    {
+        // Refused requests are audited by a later increment (outcome 'failed'); a rejected command must never reach the registry.
+        var (useCase, _, registry) = Build(patientExists: false);
+
+        await Assert.ThrowsAsync<PatientNotFoundException>(() => useCase.ExecuteAsync(Command(), CancellationToken.None));
+
+        Assert.Null(registry.Audit);
     }
 
     [Fact]

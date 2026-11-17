@@ -38,11 +38,13 @@ public class VitalsUseCaseTests
     {
         public Vitals? Registered { get; private set; }
         public VitalsRecordedEvent? Event { get; private set; }
+        public AuditEntry? Audit { get; private set; }
 
-        public Task RegisterAsync(Vitals vitals, VitalsRecordedEvent @event, CancellationToken ct)
+        public Task RegisterAsync(Vitals vitals, VitalsRecordedEvent @event, AuditEntry audit, CancellationToken ct)
         {
             Registered = vitals;
             Event = @event;
+            Audit = audit;
             return Task.CompletedTask;
         }
     }
@@ -91,6 +93,36 @@ public class VitalsUseCaseTests
         Assert.Equal(1001, registry.Event.EncounterNumber);
         Assert.Equal(PatientUuid, registry.Event.PatientUuid);
         Assert.Equal(42, registry.Event.PatientPid);
+    }
+
+    [Fact]
+    public async Task SEC_9_the_registered_audit_row_names_the_vitals_the_named_provider_and_the_origin()
+    {
+        var (useCase, _, registry) = Build(Encounter());
+        var command = Command(providerId: 9) with { Origin = new RequestOrigin("trace-2", "192.0.2.2") };
+
+        var vitals = await useCase.ExecuteAsync(command, CancellationToken.None);
+
+        var audit = registry.Audit!;
+        Assert.Equal(AuditActions.VitalsRecord, audit.Action);
+        Assert.Equal(vitals.Uuid, audit.Subject);
+        Assert.Equal(AuditOutcome.Success, audit.Outcome);
+        Assert.Equal(Now.UtcDateTime, audit.AtUtc);
+        Assert.Equal("user:9", audit.Actor.Subject);
+        Assert.False(audit.Actor.Verified);
+        Assert.Equal("trace-2", audit.CorrelationId);
+        Assert.Equal("192.0.2.2", audit.SourceAddress);
+    }
+
+    [Fact]
+    public async Task SEC_9_the_audit_row_carries_no_measurement_value()
+    {
+        var (useCase, _, registry) = Build(Encounter());
+
+        await useCase.ExecuteAsync(Command(), CancellationToken.None);
+
+        // Names or nothing (ADR 0069 #1): a recorded value must not be derivable from the trail.
+        Assert.Null(registry.Audit!.Details);
     }
 
     [Fact]

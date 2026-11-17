@@ -21,7 +21,7 @@ public class CreateEncounterUseCaseIntegrationTests(ClinicalCareContainerFixture
 
     private static CreateEncounterUseCase Build(ClinicalCareDbContext db) =>
         new(new EfPatientDirectory(db), new EfEncounterCodeLists(db), new EfFacilityDirectory(db),
-            new EfEncounterIdentityAllocator(db), new EfEncounterRegistry(db), TimeProvider.System);
+            new EfEncounterIdentityAllocator(db), new EfEncounterRegistry(db, new EfAuditLog(db)), TimeProvider.System);
 
     [Fact]
     public async Task Creating_an_encounter_for_a_registered_patient_lands_in_every_legacy_table_and_the_outbox()
@@ -37,6 +37,23 @@ public class CreateEncounterUseCaseIntegrationTests(ClinicalCareContainerFixture
         Assert.Equal(1L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM forms WHERE formdir = 'newpatient'"));
         Assert.Equal(1L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM uuid_registry"));
         Assert.Equal(1L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_outbox"));
+    }
+
+    [Fact]
+    public async Task SEC_9_a_created_encounter_is_audited_with_the_caller_and_origin()
+    {
+        await using var db = fixture.CreateDbContext();
+        var command = Command() with { Origin = new RequestOrigin("trace-abc", "192.0.2.9") };
+
+        var encounter = await Build(db).ExecuteAsync(command, CancellationToken.None);
+
+        Assert.Equal(1L, await fixture.RootScalarAsync<long>("SELECT COUNT(*) FROM clinical_care_audit"));
+        Assert.Equal("encounter.create", await fixture.RootScalarAsync<string>("SELECT action FROM clinical_care_audit"));
+        Assert.Equal(encounter.Uuid.ToString(), await fixture.RootScalarAsync<string>("SELECT CONCAT(subject, '') FROM clinical_care_audit"));
+        Assert.Equal("user:7", await fixture.RootScalarAsync<string>("SELECT actor FROM clinical_care_audit"));
+        Assert.Equal(0L, await fixture.RootScalarAsync<long>("SELECT actor_verified FROM clinical_care_audit"));
+        Assert.Equal("trace-abc", await fixture.RootScalarAsync<string>("SELECT correlation_id FROM clinical_care_audit"));
+        Assert.Equal("192.0.2.9", await fixture.RootScalarAsync<string>("SELECT source_address FROM clinical_care_audit"));
     }
 
     [Fact]

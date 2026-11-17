@@ -45,7 +45,12 @@ public sealed class CreateEncounterUseCase(
         var @event = new EncounterCreatedEvent(
             encounter.Uuid, encounter.Number, patient.Uuid, patient.Pid, encounter.ClassCode, encounter.Date, nowUtc);
 
-        await registry.RegisterAsync(encounter, @event, ct);
+        // Until the gateway forwards a validated session (ADR 0069 #5) the actor is the provider the caller named, flagged unverified.
+        var audit = new AuditEntry(
+            nowUtc, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false), AuditActions.EncounterCreate,
+            encounter.Uuid, AuditOutcome.Success, command.Origin?.CorrelationId, command.Origin?.SourceAddress);
+
+        await registry.RegisterAsync(encounter, @event, audit, ct);
 
         return encounter;
     }

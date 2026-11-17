@@ -62,6 +62,23 @@ public class EncounterEndpointTests(ClinicalCareContainerFixture fixture) : IAsy
     }
 
     [Fact]
+    public async Task SEC_9_POST_encounters_audits_the_create_with_the_forwarded_address_and_a_trace_id()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/encounters") { Content = JsonContent.Create(Valid()) };
+        request.Headers.Add("X-Forwarded-For", "203.0.113.7, 10.0.0.2");
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<EncounterCreatedResponse>();
+        Assert.Equal("encounter.create", await fixture.RootScalarAsync<string>("SELECT action FROM clinical_care_audit"));
+        Assert.Equal(body!.Uuid.ToString(), await fixture.RootScalarAsync<string>("SELECT CONCAT(subject, '') FROM clinical_care_audit"));
+        // The first entry of X-Forwarded-For is the original caller; the rest are proxies.
+        Assert.Equal("203.0.113.7", await fixture.RootScalarAsync<string>("SELECT source_address FROM clinical_care_audit"));
+        Assert.False(string.IsNullOrWhiteSpace(await fixture.RootScalarAsync<string>("SELECT correlation_id FROM clinical_care_audit")));
+    }
+
+    [Fact]
     public async Task POST_encounters_with_no_gateway_secret_returns_401_and_writes_nothing()
     {
         using var anonymous = _factory.CreateClient();

@@ -5,7 +5,7 @@ using OpenEmrNext.ClinicalCare.Domain.VitalSigns;
 namespace OpenEmrNext.ClinicalCare.Application;
 
 /// <summary>Everything a caller supplies to record vitals. Raw facts: <c>VitalsRecording.Create</c> owns the rules.</summary>
-public sealed record RecordVitalsCommand(Guid EncounterUuid, VitalsInput Input, long ProviderId);
+public sealed record RecordVitalsCommand(Guid EncounterUuid, VitalsInput Input, long ProviderId, RequestOrigin? Origin = null);
 
 /// <summary>
 /// Records vitals against an existing encounter (slice 2). Thin by design (ARC-4): find the encounter, let the domain
@@ -33,11 +33,17 @@ public sealed class RecordVitalsUseCase(
 
         var vitals = Vitals.Record(recording, identities.Allocate());
 
+        var nowUtc = clock.GetUtcNow().UtcDateTime;
+        var audit = new AuditEntry(
+            nowUtc, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false), AuditActions.VitalsRecord,
+            vitals.Uuid, AuditOutcome.Success, command.Origin?.CorrelationId, command.Origin?.SourceAddress);
+
         await registry.RegisterAsync(
             vitals,
             new VitalsRecordedEvent(
                 vitals.Uuid, encounter.Uuid, encounter.Number, encounter.Patient.Uuid, encounter.Patient.Pid,
-                vitals.MeasurementsTaken, clock.GetUtcNow().UtcDateTime),
+                vitals.MeasurementsTaken, nowUtc),
+            audit,
             ct);
 
         return vitals;
