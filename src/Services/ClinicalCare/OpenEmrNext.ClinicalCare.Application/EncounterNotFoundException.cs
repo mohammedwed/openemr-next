@@ -9,3 +9,9 @@ public sealed class EncounterNotFoundException(Guid encounterUuid)
 {
     public Guid EncounterUuid { get; } = encounterUuid;
 }
+
+/// <summary>The vitals to correct do not exist in this encounter, or legacy deleted them. Maps to 404 (DOM-17).</summary>
+public sealed class VitalsNotFoundException(Guid vitalsUuid) : Exception($"No vitals with uuid {vitalsUuid} exist in this encounter.")
+{
+    public Guid VitalsUuid { get; } = vitalsUuid;
+}

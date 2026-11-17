@@ -291,3 +291,19 @@ Full record: `docs/clinical-care/12-shadow-comparison-and-review.md`.
 - **Dead code removed:** three audit-action constants nothing used.
 - **Still open (not fixed here):** the gateway still serves these routes without a sign-in (the CRITICAL finding, which they inherit); the new screens and the legacy-UI check are not yet verified in a browser.
 - **Tests, all green (unit 499, architecture 51, integration 494).**
+
+## Added — M5d slice 1: correct recorded vitals (`PUT /encounters/{uuid}/vitals/{vitalsUuid}`)
+
+Full record: `docs/clinical-care/13-correct-vitals-slice.md` (rules CV-15 to CV-24, limitations L1 to L6). First slice of M5d, "finish Clinical Care", on branch `feat/m5d-clinical-care-completion`.
+
+- **The vitals counterpart of the other updates:** replaces the whole measurement set, conditional on the `ETag` the caller read (`form_vitals.last_updated`); 200 with the new `ETag`, 428 without `If-Match`, 412 (with the current
+  `ETag`) when the row changed, including by the legacy screen; 400, 401 and 404 as elsewhere. Either unit system for the response.
+- **One set of measurement rules for recording and correcting:** the unit conversion, bounds, whole-number readings, oxygen rounding, text limits and BMI moved out of `VitalsRecording.Create` into `VitalsFieldRules`, which both use; a test
+  runs the same inputs through both and demands the same values or the same messages. The extraction changed no recording behaviour (all existing tests passed unchanged first).
+- **Reaches only its own vitals:** the `UPDATE` matches through the `forms` registry row on encounter number and patient and excludes soft-deleted vitals, so vitals of another encounter or patient are a 404 even by exact uuid (legacy's own
+  statement checks neither).
+- **A reading can be removed** by leaving it out (stored as `0`, as legacy reads "not recorded"), at least one must remain, and the BMI is recomputed or cleared with it.
+- **Only the 14 measurement columns are written and granted;** who recorded the vitals and when, `authorized` and the `forms` row are untouched.
+- **No history, and the editor is unknown,** as for the other updates: the audit row names the measurements that changed, never values.
+- **Contract:** `VitalsResponse` gains an `eTag` (also on every list item) and the operation declares `If-Match`, 412 and 428; OpenAPI snapshot regenerated.
+- **Tests, all green (unit 533, architecture 53, integration 545).** The solution builds with no new warnings.

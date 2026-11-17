@@ -103,6 +103,8 @@ public static class ClinicalCareApiExtensions
         builder.Services.AddScoped<RecordVitalsUseCase>();
         builder.Services.AddScoped<GetVitalsUseCase>();
         builder.Services.AddScoped<ListEncounterVitalsUseCase>();
+        builder.Services.AddScoped<IVitalsUpdater, EfVitalsUpdater>();
+        builder.Services.AddScoped<CorrectVitalsUseCase>();
 
         // Anything an endpoint does not catch itself becomes a ProblemDetails 500, not ASP.NET's bare default
         // (OPS-8, API-4); Program.cs adds app.UseExceptionHandler(). Same minimal approach as ADR 0057.

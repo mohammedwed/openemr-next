@@ -33,6 +33,7 @@ public class InvariantEnforcementTests
         [typeof(PageRequest)],
         [typeof(Vitals)],
         [typeof(VitalsRecording)],
+        [typeof(VitalsChange)],
         [typeof(VitalsIdentity)],
         [typeof(EncounterReference)],
         [typeof(Problem)],

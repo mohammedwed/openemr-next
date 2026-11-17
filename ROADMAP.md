@@ -327,6 +327,14 @@ Research: `docs/clinical-care/07-problems-and-allergies-research.md`; ADR 0070 (
 - **Reuses** the M5b machinery unchanged: `modifydate` as the `ETag` token, `If-Match` (428, 412), the append-only audit and the outbox.
 - **Out of scope:** delete (waits for the permission port), medications, surgeries, dental issues, devices and health concerns (other owners).
 
+### M5d: finish Clinical Care (in progress, branch `feat/m5d-clinical-care-completion`)
+
+Fills the remaining Clinical Care functionality that needs no new service and no verified identity. Slices, each researched, built and tested in turn:
+
+1. **Correct vitals** (**done Nov 17**; suites green: unit 533, architecture 53, integration 545; `13-correct-vitals-slice.md`).
+2. Immunizations (their own legacy table). 3. Clinical notes and SOAP forms (the `forms` registry pattern vitals use). 4. Lookup endpoints (facilities, classes, categories, providers) and the WebApp fields they replace.
+- **Out of scope until identity and the permission port exist:** delete and editing `sensitivity`.
+
 ### M5 frontend: WebApp encounter pages (built Nov 17, ADR 0067)
 
 All through the gateway and the generated ClinicalCare client, in the same style as the patient pages:

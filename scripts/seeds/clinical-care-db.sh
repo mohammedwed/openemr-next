@@ -132,6 +132,10 @@ GRANT SELECT, INSERT ON \`${DB_NAME}\`.forms TO '${CLINICAL_CARE_DB_USER}'@'%';
 -- A set of vital signs (slice 2): inserted and read back, never updated or deleted (CV-10). form_vitals has no
 -- encounter column; its link to an encounter is the forms row granted above.
 GRANT SELECT, INSERT ON \`${DB_NAME}\`.form_vitals TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- Correcting vitals (M5d, ADR 0068): UPDATE on exactly the measurement columns and nothing else. Not who recorded them or when (user, groupname, date), not authorized or
+-- activity: legacy's own update leaves those alone too. last_updated is not listed: the database sets it.
+GRANT UPDATE (weight, height, temperature, temp_method, bps, bpd, pulse, respiration, oxygen_saturation, waist_circ, head_circ, BMI, BMI_status, note)
+  ON \`${DB_NAME}\`.form_vitals TO '${CLINICAL_CARE_DB_USER}'@'%';
 
 -- Legacy records every uuid it hands out here (CC-6). This service only ever adds its own; never reads or edits.
 GRANT INSERT ON \`${DB_NAME}\`.uuid_registry TO '${CLINICAL_CARE_DB_USER}'@'%';

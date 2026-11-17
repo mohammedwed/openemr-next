@@ -37,6 +37,7 @@ public static class AuditActions
     public const string EncounterCreate = "encounter.create";
     public const string EncounterUpdate = "encounter.update";
     public const string VitalsRecord = "vitals.record";
+    public const string VitalsCorrect = "vitals.correct";
     public const string ProblemRecord = "problem.record";
     public const string AllergyRecord = "allergy.record";
     public const string ProblemUpdate = "problem.update";

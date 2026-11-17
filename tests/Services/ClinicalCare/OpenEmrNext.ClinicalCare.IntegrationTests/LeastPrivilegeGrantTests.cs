@@ -36,7 +36,15 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("DELETE FROM forms")]
     [InlineData("DELETE FROM uuid_registry")]
     [InlineData("DELETE FROM sequences")]
-    [InlineData("UPDATE form_vitals SET weight = 1")]
+    [InlineData("UPDATE form_vitals SET `user` = 'x'")]
+    [InlineData("UPDATE form_vitals SET groupname = 'x'")]
+    [InlineData("UPDATE form_vitals SET `date` = NOW()")]
+    [InlineData("UPDATE form_vitals SET authorized = 0")]
+    [InlineData("UPDATE form_vitals SET activity = 0")]
+    [InlineData("UPDATE form_vitals SET pid = 1")]
+    [InlineData("UPDATE form_vitals SET uuid = NULL")]
+    [InlineData("UPDATE form_vitals SET last_updated = NOW()")]
+    [InlineData("UPDATE form_vitals SET weight = 1, `user` = 'x'")]
     [InlineData("DELETE FROM form_vitals")]
     [InlineData("INSERT INTO patient_data (pid) VALUES (1)")]
     [InlineData("UPDATE patient_data SET fname = 'x'")]
@@ -157,6 +165,32 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("TRUNCATE TABLE issue_encounter")]
     public async Task The_production_principal_cannot_change_or_remove_issues_beyond_inserting_a_problems_columns(string sql) =>
         await AssertDeniedAsync(sql);
+
+    [Theory]
+    [InlineData("weight")]
+    [InlineData("height")]
+    [InlineData("temperature")]
+    [InlineData("temp_method")]
+    [InlineData("bps")]
+    [InlineData("bpd")]
+    [InlineData("pulse")]
+    [InlineData("respiration")]
+    [InlineData("oxygen_saturation")]
+    [InlineData("waist_circ")]
+    [InlineData("head_circ")]
+    [InlineData("BMI")]
+    [InlineData("BMI_status")]
+    [InlineData("note")]
+    public async Task The_production_principal_may_update_exactly_the_vitals_measurement_columns(string column)
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // Setting a column to itself is enough to exercise the privilege check; no row is needed. The column name is one of this theory's own constants, never
+        // input, which is why the interpolation (EF1002) is safe here.
+#pragma warning disable EF1002
+        await db.Database.ExecuteSqlRawAsync($"UPDATE form_vitals SET `{column}` = `{column}`");
+#pragma warning restore EF1002
+    }
 
     [Theory]
     [InlineData("title")]
