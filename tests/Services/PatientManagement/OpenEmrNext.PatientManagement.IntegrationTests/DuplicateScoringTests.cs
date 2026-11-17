@@ -28,7 +28,7 @@ public class DuplicateScoringTests(PatientDataContainerFixture fixture)
         PatientManagementDbContext context, string firstName, string lastName, string sex, DateOnly dob, string? email = null)
     {
         var registration = PatientRegistration.Create(firstName, lastName, sex, dob, email, null);
-        return await new RegisterPatientUseCase(new EfPatientRegistry(context))
+        return await new RegisterPatientUseCase(new EfPatientRegistry(context, new EfAuditLog(context)), new EfAuditLog(context))
             .ExecuteAsync(registration, registeredBy: 1, Now, CancellationToken.None);
     }
 

@@ -13,7 +13,7 @@ namespace OpenEmrNext.PatientManagement.Application.Ports;
 /// </summary>
 public interface IInsurancePolicyRepository
 {
-    Task AddAsync(InsurancePolicy policy, CancellationToken ct);
+    Task AddAsync(InsurancePolicy policy, AuditEntry audit, CancellationToken ct);
 
     Task<IReadOnlyList<InsurancePolicyRow>> GetRowsAsync(long pid, CancellationToken ct);
 
@@ -38,5 +38,5 @@ public interface IInsurancePolicyRepository
     /// <c>InsuranceService::swapInsurance()</c>, including its atomicity -- unlike patient merge,
     /// this one already is transactional in legacy, and stays that way here.
     /// </summary>
-    Task PersistSwapAsync(InsuranceSwapResult result, CancellationToken ct);
+    Task PersistSwapAsync(InsuranceSwapResult result, AuditEntry audit, CancellationToken ct);
 }

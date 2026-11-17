@@ -13,7 +13,7 @@ namespace OpenEmrNext.PatientManagement.Infrastructure;
 /// <see cref="EfDuplicateScorer"/> already use for tables (or columns) outside the EF-mapped
 /// <c>Patient</c> entity.
 /// </summary>
-public sealed class EfAdvanceDirectiveRepository(PatientManagementDbContext db, IAdvanceDirectiveFileStore fileStore)
+public sealed class EfAdvanceDirectiveRepository(PatientManagementDbContext db, IAdvanceDirectiveFileStore fileStore, IAuditLog auditLog)
     : IAdvanceDirectiveRepository
 {
     // Seeded by every fresh legacy install (sql/database.sql: id 6, codes 'LOINC:42348-3') and the same
@@ -30,7 +30,7 @@ public sealed class EfAdvanceDirectiveRepository(PatientManagementDbContext db, 
     /// Not a complete fix: a process killed between the two writes still leaves one behind, which
     /// would need a real reconciliation job, not this -- this only compensates for a handled exception.
     /// </summary>
-    public async Task AddDocumentAsync(AdvanceDirectiveDocument document, CancellationToken ct)
+    public async Task AddDocumentAsync(AdvanceDirectiveDocument document, AuditEntry audit, CancellationToken ct)
     {
         var url = await fileStore.SaveAsync(document.Pid, document.DriveUuid, document.Content, ct);
 
@@ -90,6 +90,8 @@ public sealed class EfAdvanceDirectiveRepository(PatientManagementDbContext db, 
                     await db.Database.ExecuteSqlInterpolatedAsync(
                         $"REPLACE INTO categories_to_documents (category_id, document_id) VALUES ({categoryId}, {generatedId})", ct);
                 }
+
+                await auditLog.AppendAsync(audit, ct);   // last statement, same transaction (SEC-9, ADR 0078)
 
                 await transaction.CommitAsync(ct);
                 return generatedId;
@@ -170,18 +172,36 @@ public sealed class EfAdvanceDirectiveRepository(PatientManagementDbContext db, 
         return (row.MimeType ?? "", row.Name ?? "", content);
     }
 
-    public async Task SetStatusAsync(
+    public async Task<bool> SetStatusAsync(
         long pid, AdvanceDirectiveCompletionStatus status, DateTime? reviewedAtUtc,
-        long? authenticatorUserId, CancellationToken ct)
+        long? authenticatorUserId, AuditEntry audit, CancellationToken ct)
     {
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            UPDATE patient_data
-            SET completed_ad = {status.ToStoredValue()},
-                ad_reviewed = {reviewedAtUtc},
-                advance_directive_user_authenticator = {authenticatorUserId}
-            WHERE pid = {pid}
-            """, ct);
+        // One unit of work through the execution strategy: the update and its audit row commit together or not at all (SEC-9, ADR 0078).
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+
+            var matched = await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                UPDATE patient_data
+                SET completed_ad = {status.ToStoredValue()},
+                    ad_reviewed = {reviewedAtUtc},
+                    advance_directive_user_authenticator = {authenticatorUserId}
+                WHERE pid = {pid}
+                """, ct);
+
+            if (matched == 0)
+            {
+                // No such patient: nothing changed, so there is nothing to audit as a success.
+                await transaction.RollbackAsync(ct);
+                return false;
+            }
+
+            await auditLog.AppendAsync(audit, ct);
+            await transaction.CommitAsync(ct);
+            return true;
+        });
     }
 
     public async Task<(AdvanceDirectiveCompletionStatus Status, DateTime? ReviewedAtUtc, long? AuthenticatorUserId)> GetStatusAsync(

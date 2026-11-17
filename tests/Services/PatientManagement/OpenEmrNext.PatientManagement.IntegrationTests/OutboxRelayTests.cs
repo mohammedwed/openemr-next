@@ -184,7 +184,7 @@ public class OutboxRelayTests(PatientDataContainerFixture fixture) : IAsyncLifet
         for (var i = 0; i < 3; i++)
         {
             await using var context = fixture.CreateDbContext();
-            var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context)).ExecuteAsync(
+            var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context, new EfAuditLog(context)), new EfAuditLog(context)).ExecuteAsync(
                 PatientRegistration.Create("Ada", $"Lovelace{i}", "Female", new DateOnly(1990, 1, 1)), 1, DateTime.UtcNow, CancellationToken.None);
             uuids.Add(patient.Uuid);
         }
@@ -208,7 +208,7 @@ public class OutboxRelayTests(PatientDataContainerFixture fixture) : IAsyncLifet
     public async Task A_consumer_that_is_down_leaves_the_event_in_the_outbox_with_its_error_and_a_retry_time()
     {
         await using (var context = fixture.CreateDbContext())
-            await new RegisterPatientUseCase(new EfPatientRegistry(context)).ExecuteAsync(
+            await new RegisterPatientUseCase(new EfPatientRegistry(context, new EfAuditLog(context)), new EfAuditLog(context)).ExecuteAsync(
                 PatientRegistration.Create("Ada", "Lovelace", "Female", new DateOnly(1990, 1, 1)), 1, DateTime.UtcNow, CancellationToken.None);
 
         await using var db = fixture.CreateDbContext();

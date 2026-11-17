@@ -12,14 +12,24 @@ namespace OpenEmrNext.PatientManagement.Application;
 /// write (legacy's <c>documents</c>/<c>categories_to_documents</c> tables) and the file-bytes write
 /// (local disk) into one operation; this use case knows about neither.
 /// </summary>
-public sealed class UploadAdvanceDirectiveDocumentUseCase(IAdvanceDirectiveRepository repository)
+public sealed class UploadAdvanceDirectiveDocumentUseCase(IAdvanceDirectiveRepository repository, IAuditLog auditLog)
 {
     public async Task<AdvanceDirectiveDocument> ExecuteAsync(
         long pid, AdvanceDirectiveType type, string originalFileName, string mimeType,
-        byte[] content, DateOnly? effectiveDate, long ownerId, CancellationToken ct)
+        byte[] content, DateOnly? effectiveDate, long ownerId, CancellationToken ct, AuditOrigin? origin = null)
     {
-        var document = AdvanceDirectiveDocument.Upload(pid, type, originalFileName, mimeType, content, effectiveDate, ownerId);
-        await repository.AddDocumentAsync(document, ct);
+        AdvanceDirectiveDocument document;
+        try
+        {
+            document = AdvanceDirectiveDocument.Upload(pid, type, originalFileName, mimeType, content, effectiveDate, ownerId);
+        }
+        catch (AdvanceDirectiveDocumentValidationException)
+        {
+            await auditLog.AppendAsync(Audit.Failure(origin, AuditActions.DirectiveDocumentUpload, Audit.Patient(pid)), ct);
+            throw;
+        }
+
+        await repository.AddDocumentAsync(document, Audit.Success(origin, AuditActions.DirectiveDocumentUpload, document.Uuid.ToString()), ct);
         return document;
     }
 }

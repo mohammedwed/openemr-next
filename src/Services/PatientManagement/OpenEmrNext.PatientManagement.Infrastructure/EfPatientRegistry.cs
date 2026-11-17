@@ -12,9 +12,9 @@ namespace OpenEmrNext.PatientManagement.Infrastructure;
 /// F-CC-3). All three are written in **one transaction**, so the patient either exists completely or not at all.
 /// Application never sees any of this; it only ever sees the port.
 /// </summary>
-public sealed class EfPatientRegistry(PatientManagementDbContext db) : IPatientRegistry
+public sealed class EfPatientRegistry(PatientManagementDbContext db, IAuditLog auditLog) : IPatientRegistry
 {
-    public async Task RegisterAsync(Patient patient, PatientRegisteredEvent @event, CancellationToken ct)
+    public async Task RegisterAsync(Patient patient, PatientRegisteredEvent @event, AuditEntry audit, CancellationToken ct)
     {
         var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(patient.Uuid);
 
@@ -36,6 +36,9 @@ public sealed class EfPatientRegistry(PatientManagementDbContext db) : IPatientR
                 INSERT INTO uuid_registry (uuid, table_name, table_id, table_vertical, couchdb, document_drive, mapped, created)
                 VALUES ({uuidBytes}, 'patient_data', 'id', '', '', 0, 0, NOW())
                 """, ct);
+
+            // Last statement, same transaction: the registration cannot commit without its audit row (SEC-9, ADR 0078).
+            await auditLog.AppendAsync(audit, ct);
 
             await transaction.CommitAsync(ct);
         });

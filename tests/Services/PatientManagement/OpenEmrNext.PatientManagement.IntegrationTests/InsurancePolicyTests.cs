@@ -24,9 +24,9 @@ public class InsurancePolicyTests(PatientDataContainerFixture fixture)
     {
         var pid = NextPid();
         await using var context = fixture.CreateDbContext();
-        var repository = new EfInsurancePolicyRepository(context);
+        var repository = new EfInsurancePolicyRepository(context, new EfAuditLog(context));
 
-        await new AddInsurancePolicyUseCase(repository).ExecuteAsync(
+        await new AddInsurancePolicyUseCase(repository, new EfAuditLog(context)).ExecuteAsync(
             pid, InsuranceLevel.Primary, companyId: 7, "POL1", null, null, new DateOnly(2020, 1, 1), null, CancellationToken.None);
 
         var effective = await new GetEffectiveInsuranceUseCase(repository)
@@ -43,12 +43,12 @@ public class InsurancePolicyTests(PatientDataContainerFixture fixture)
     {
         var pid = NextPid();
         await using var context = fixture.CreateDbContext();
-        var repository = new EfInsurancePolicyRepository(context);
+        var repository = new EfInsurancePolicyRepository(context, new EfAuditLog(context));
 
-        var policy = await new AddInsurancePolicyUseCase(repository).ExecuteAsync(
+        var policy = await new AddInsurancePolicyUseCase(repository, new EfAuditLog(context)).ExecuteAsync(
             pid, InsuranceLevel.Primary, 7, "POL1", null, null, new DateOnly(2020, 1, 1), null, CancellationToken.None);
 
-        await new SwapInsuranceUseCase(repository).ExecuteAsync(pid, InsuranceLevel.Secondary, policy.Uuid, CancellationToken.None);
+        await new SwapInsuranceUseCase(repository, new EfAuditLog(context)).ExecuteAsync(pid, InsuranceLevel.Secondary, policy.Uuid, CancellationToken.None);
 
         var effective = await new GetEffectiveInsuranceUseCase(repository)
             .ExecuteAsync(pid, DateOnly.FromDateTime(DateTime.UtcNow), CancellationToken.None);
@@ -61,14 +61,14 @@ public class InsurancePolicyTests(PatientDataContainerFixture fixture)
     {
         var pid = NextPid();
         await using var context = fixture.CreateDbContext();
-        var repository = new EfInsurancePolicyRepository(context);
+        var repository = new EfInsurancePolicyRepository(context, new EfAuditLog(context));
 
-        var primary = await new AddInsurancePolicyUseCase(repository).ExecuteAsync(
+        var primary = await new AddInsurancePolicyUseCase(repository, new EfAuditLog(context)).ExecuteAsync(
             pid, InsuranceLevel.Primary, 7, "POL-PRIMARY", null, null, new DateOnly(2020, 1, 1), null, CancellationToken.None);
-        var secondary = await new AddInsurancePolicyUseCase(repository).ExecuteAsync(
+        var secondary = await new AddInsurancePolicyUseCase(repository, new EfAuditLog(context)).ExecuteAsync(
             pid, InsuranceLevel.Secondary, 8, "POL-SECONDARY", null, null, new DateOnly(2021, 1, 1), null, CancellationToken.None);
 
-        await new SwapInsuranceUseCase(repository).ExecuteAsync(pid, InsuranceLevel.Secondary, primary.Uuid, CancellationToken.None);
+        await new SwapInsuranceUseCase(repository, new EfAuditLog(context)).ExecuteAsync(pid, InsuranceLevel.Secondary, primary.Uuid, CancellationToken.None);
 
         var effective = await new GetEffectiveInsuranceUseCase(repository)
             .ExecuteAsync(pid, DateOnly.FromDateTime(DateTime.UtcNow), CancellationToken.None);
@@ -89,14 +89,14 @@ public class InsurancePolicyTests(PatientDataContainerFixture fixture)
         var pid = NextPid();
         var sameDate = new DateOnly(2022, 6, 15);
         await using var context = fixture.CreateDbContext();
-        var repository = new EfInsurancePolicyRepository(context);
+        var repository = new EfInsurancePolicyRepository(context, new EfAuditLog(context));
 
-        var primary = await new AddInsurancePolicyUseCase(repository).ExecuteAsync(
+        var primary = await new AddInsurancePolicyUseCase(repository, new EfAuditLog(context)).ExecuteAsync(
             pid, InsuranceLevel.Primary, 7, "POL-PRIMARY", null, null, sameDate, null, CancellationToken.None);
-        var secondary = await new AddInsurancePolicyUseCase(repository).ExecuteAsync(
+        var secondary = await new AddInsurancePolicyUseCase(repository, new EfAuditLog(context)).ExecuteAsync(
             pid, InsuranceLevel.Secondary, 8, "POL-SECONDARY", null, null, sameDate, null, CancellationToken.None);
 
-        await new SwapInsuranceUseCase(repository).ExecuteAsync(pid, InsuranceLevel.Secondary, primary.Uuid, CancellationToken.None);
+        await new SwapInsuranceUseCase(repository, new EfAuditLog(context)).ExecuteAsync(pid, InsuranceLevel.Secondary, primary.Uuid, CancellationToken.None);
 
         var effective = await new GetEffectiveInsuranceUseCase(repository)
             .ExecuteAsync(pid, DateOnly.FromDateTime(DateTime.UtcNow), CancellationToken.None);
@@ -122,13 +122,13 @@ public class InsurancePolicyTests(PatientDataContainerFixture fixture)
         var pid = NextPid();
         var sameDate = new DateOnly(2023, 3, 1);
         await using var context = fixture.CreateDbContext();
-        var repository = new EfInsurancePolicyRepository(context);
+        var repository = new EfInsurancePolicyRepository(context, new EfAuditLog(context));
 
-        await new AddInsurancePolicyUseCase(repository).ExecuteAsync(
+        await new AddInsurancePolicyUseCase(repository, new EfAuditLog(context)).ExecuteAsync(
             pid, InsuranceLevel.Primary, 7, "POL1", null, null, sameDate, null, CancellationToken.None);
 
         await Assert.ThrowsAsync<InsurancePolicyValidationException>(() =>
-            new AddInsurancePolicyUseCase(repository).ExecuteAsync(
+            new AddInsurancePolicyUseCase(repository, new EfAuditLog(context)).ExecuteAsync(
                 pid, InsuranceLevel.Primary, 9, "POL2", null, null, sameDate, null, CancellationToken.None));
     }
 
@@ -147,9 +147,9 @@ public class InsurancePolicyTests(PatientDataContainerFixture fixture)
             VALUES ({pid}, 'tertiary', '7', 'LEGACY-ROW', '0000-00-00', NULL, {Guid.NewGuid().ToByteArray()})
             """);
 
-        var repository = new EfInsurancePolicyRepository(context);
+        var repository = new EfInsurancePolicyRepository(context, new EfAuditLog(context));
 
-        var policy = await new AddInsurancePolicyUseCase(repository).ExecuteAsync(
+        var policy = await new AddInsurancePolicyUseCase(repository, new EfAuditLog(context)).ExecuteAsync(
             pid, InsuranceLevel.Primary, 7, "POL1", null, null, new DateOnly(2024, 1, 1), null, CancellationToken.None);
 
         Assert.Equal(InsuranceLevel.Primary, policy.Level);

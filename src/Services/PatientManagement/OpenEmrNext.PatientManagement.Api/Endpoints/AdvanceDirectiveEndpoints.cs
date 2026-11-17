@@ -37,6 +37,7 @@ public static class AdvanceDirectiveEndpoints
             .WithTags("AdvanceDirectives")
             .WithSummary("Set whether a patient has completed an advance directive, and who reviewed it")
             .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound)
             .ProducesValidationProblem();
 
         app.MapGet("/patients/{pid:long}/advance-directives/status", GetStatus)
@@ -69,7 +70,7 @@ public static class AdvanceDirectiveEndpoints
         try
         {
             document = await useCase.ExecuteAsync(
-                pid, type.Value, request.FileName, request.MimeType, content, request.EffectiveDate, http.ActingUserId(request.OwnerId), ct);
+                pid, type.Value, request.FileName, request.MimeType, content, request.EffectiveDate, http.ActingUserId(request.OwnerId), ct, AuditOrigins.From(http));
         }
         catch (AdvanceDirectiveDocumentValidationException ex)
         {
@@ -111,8 +112,11 @@ public static class AdvanceDirectiveEndpoints
         if (status is null)
             return ValidationProblems.Single("Status must be \"yes\", \"no\", or \"unknown\".");
 
-        await useCase.ExecuteAsync(pid, status.Value, request.ReviewedAtUtc, http.ActingUserId(request.AuthenticatorUserId), ct);
-        return Results.NoContent();
+        var done = await useCase.ExecuteAsync(
+            pid, status.Value, request.ReviewedAtUtc, http.ActingUserId(request.AuthenticatorUserId), ct, AuditOrigins.From(http));
+
+        // Setting the status of a patient that does not exist used to answer 204 and change nothing; it is 404 now, because a no-op cannot be audited as a success.
+        return done ? Results.NoContent() : Results.NotFound();
     }
 
     private static async Task<IResult> GetStatus(

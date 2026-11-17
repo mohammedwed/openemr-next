@@ -13,7 +13,7 @@ namespace OpenEmrNext.PatientManagement.Application.Ports;
 /// </summary>
 public interface IAdvanceDirectiveRepository
 {
-    Task AddDocumentAsync(AdvanceDirectiveDocument document, CancellationToken ct);
+    Task AddDocumentAsync(AdvanceDirectiveDocument document, AuditEntry audit, CancellationToken ct);
 
     Task<IReadOnlyList<AdvanceDirectiveDocumentSummary>> GetDocumentsAsync(long pid, CancellationToken ct);
 
@@ -21,9 +21,10 @@ public interface IAdvanceDirectiveRepository
     /// exists for this patient.</summary>
     Task<(string MimeType, string FileName, byte[] Content)?> GetDocumentContentAsync(long pid, Guid uuid, CancellationToken ct);
 
-    Task SetStatusAsync(
+    /// <returns><c>true</c> when the patient exists and was updated; <c>false</c> when no patient has this number, in which case nothing is written and nothing is audited as a success.</returns>
+    Task<bool> SetStatusAsync(
         long pid, AdvanceDirectiveCompletionStatus status, DateTime? reviewedAtUtc,
-        long? authenticatorUserId, CancellationToken ct);
+        long? authenticatorUserId, AuditEntry audit, CancellationToken ct);
 
     Task<(AdvanceDirectiveCompletionStatus Status, DateTime? ReviewedAtUtc, long? AuthenticatorUserId)> GetStatusAsync(
         long pid, CancellationToken ct);

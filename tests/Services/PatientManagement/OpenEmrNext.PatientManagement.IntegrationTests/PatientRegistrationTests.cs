@@ -25,7 +25,7 @@ public class PatientRegistrationTests(PatientDataContainerFixture fixture)
         var registration = PatientRegistration.Create("Ada", "Lovelace", "Female", new DateOnly(1990, 1, 1));
 
         await using var context = fixture.CreateDbContext();
-        var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context))
+        var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context, new EfAuditLog(context)), new EfAuditLog(context))
             .ExecuteAsync(registration, registeredBy: 1, Now, CancellationToken.None);
 
         // EF Core's own ValueGeneratedOnAdd() already populated this via the database's AUTO_INCREMENT --
@@ -68,7 +68,7 @@ public class PatientRegistrationTests(PatientDataContainerFixture fixture)
         var registration = PatientRegistration.Create("Grace", "Hopper", "Female", new DateOnly(1985, 5, 5));
 
         await using var context = fixture.CreateDbContext();
-        var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context))
+        var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context, new EfAuditLog(context)), new EfAuditLog(context))
             .ExecuteAsync(registration, registeredBy: 1, Now, CancellationToken.None);
 
         await using var verify = fixture.CreateDbContext();

@@ -154,7 +154,7 @@ public static class FhirPatientEndpoints
         {
             registered = await registerUseCase.ExecuteAsync(
                 firstName, lastName, gender, dateOfBirth, email, trustedEmail,
-                request.HttpContext.ActingUserId(registeredBy), DateTime.UtcNow, ct);
+                request.HttpContext.ActingUserId(registeredBy), DateTime.UtcNow, ct, AuditOrigins.From(request.HttpContext));
         }
         catch (PatientValidationException ex)
         {
