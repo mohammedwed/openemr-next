@@ -242,3 +242,8 @@ a:focus-visible {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+
+/* A form kept in the DOM (so its validation reference exists) but not shown while its values load. */
+.op-hidden {
+  display: none;
+}

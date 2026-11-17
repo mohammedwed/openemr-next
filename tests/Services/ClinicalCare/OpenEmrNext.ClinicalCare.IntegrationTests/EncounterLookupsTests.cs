@@ -132,7 +132,7 @@ public class EncounterLookupsTests(ClinicalCareContainerFixture fixture) : IAsyn
     {
         using var anonymous = _factory.CreateClient();
 
-        foreach (var path in new[] { "encounter-classes", "facilities", "calendar-categories" })
+        foreach (var path in new[] { "encounter-classes", "facilities", "calendar-categories", "immunization-options" })
             Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/v1/lookups/{path}")).StatusCode);
     }
 
@@ -140,5 +140,22 @@ public class EncounterLookupsTests(ClinicalCareContainerFixture fixture) : IAsyn
     public async Task Providers_are_not_offered_because_they_are_staff_names_and_come_from_the_session_once_identity_exists()
     {
         Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync("/api/v1/lookups/providers")).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_immunization_options_come_back_in_one_call_and_what_they_offer_is_accepted_when_recording()
+    {
+        await ImmunizationTestData.SeedCodesAsync(fixture);
+
+        var options = await _client.GetFromJsonAsync<ImmunizationOptionsResponse>("/api/v1/lookups/immunization-options");
+
+        Assert.NotNull(options);
+        Assert.Equal(["6", "7", "27"], options.Vaccines.Select(o => o.Id));
+        var response = await _client.PostAsJsonAsync(
+            "/api/v1/immunizations",
+            new RecordImmunizationRequest(
+                EncounterTestData.PatientUuid, new DateTime(2026, 11, 10, 8, 0, 0), int.Parse(options.Vaccines[0].Id), null, null, null, null, 0.5m, options.Units[0].Id, options.Routes[0].Id,
+                options.Sites[0].Id, options.CompletionStatuses[0].Id, options.InformationSources[0].Id, null, null, null, null, null, null, null, null, null, null, false, 7));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 }

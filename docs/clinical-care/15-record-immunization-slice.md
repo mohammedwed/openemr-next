@@ -44,6 +44,8 @@ The contract is the other updates' (200 with the new `ETag`, 400, 401, 404, 412 
 
 ## 4. Contract
 
+`ImmunizationResponse` also carries `encounterUuid` (the linked encounter, found from its number and the patient; not part of the version) so a caller can send the link back in a correction, which replaces the whole set: leaving it out removes the link. `GET /api/v1/lookups/immunization-options` returns the active choices for the seven coded fields in one call.
+
 `ImmunizationResponse` carries an `eTag` (also on every list item). `If-Match` is declared on the PUT, with 412 and 428 documented, so the generated client can send it. OpenAPI snapshot regenerated.
 A stamp's tag (`"..."` hex ticks) and a content tag (`"c-..."`) are different shapes and never satisfy one another.
 

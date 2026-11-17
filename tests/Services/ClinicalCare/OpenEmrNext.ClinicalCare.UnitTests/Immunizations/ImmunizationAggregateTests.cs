@@ -84,7 +84,7 @@ public class ImmunizationAggregateTests
         };
 
         // Every property of the view is either listed above or deliberately outside the version: a new property that is neither fails here, so it cannot be forgotten.
-        var notVersioned = new[] { nameof(v.Uuid), nameof(v.PatientUuid), nameof(v.PatientPid), nameof(v.RecordedAt) };
+        var notVersioned = new[] { nameof(v.Uuid), nameof(v.PatientUuid), nameof(v.PatientPid), nameof(v.RecordedAt), nameof(v.EncounterUuid) };
         var all = typeof(ImmunizationView).GetProperties().Where(p => p.Name != "EqualityContract").Select(p => p.Name).ToHashSet();
         Assert.Equal(all.Except(notVersioned).OrderBy(n => n), changes.Keys.OrderBy(n => n));
 

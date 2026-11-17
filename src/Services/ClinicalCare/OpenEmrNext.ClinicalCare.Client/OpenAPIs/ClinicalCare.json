@@ -1854,6 +1854,32 @@
         ]
       }
     },
+    "/api/v1/lookups/immunization-options": {
+      "get": {
+        "tags": [
+          "Lookups"
+        ],
+        "summary": "List the active choices for an immunization's coded fields (vaccine, route, site, status, source, refusal reason, unit)",
+        "operationId": "GetImmunizationOptions",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImmunizationOptionsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
+    },
     "/api/v1/lookups/clinical-note-types": {
       "get": {
         "tags": [
@@ -3698,6 +3724,62 @@
           }
         }
       },
+      "ImmunizationOptionsResponse": {
+        "required": [
+          "vaccines",
+          "routes",
+          "sites",
+          "completionStatuses",
+          "informationSources",
+          "refusalReasons",
+          "units"
+        ],
+        "type": "object",
+        "properties": {
+          "vaccines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LookupOptionResponse"
+            }
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LookupOptionResponse"
+            }
+          },
+          "sites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LookupOptionResponse"
+            }
+          },
+          "completionStatuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LookupOptionResponse"
+            }
+          },
+          "informationSources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LookupOptionResponse"
+            }
+          },
+          "refusalReasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LookupOptionResponse"
+            }
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LookupOptionResponse"
+            }
+          }
+        }
+      },
       "ImmunizationRecordedResponse": {
         "required": [
           "uuid",
@@ -3931,6 +4013,13 @@
           },
           "eTag": {
             "type": "string"
+          },
+          "encounterUuid": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -3940,6 +4029,21 @@
           "resolved": {
             "type": "boolean",
             "default": false
+          }
+        }
+      },
+      "LookupOptionResponse": {
+        "required": [
+          "id",
+          "title"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
           }
         }
       },

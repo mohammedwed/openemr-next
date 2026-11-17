@@ -38,6 +38,7 @@
                 <MudTh>Height</MudTh>
                 <MudTh>BMI</MudTh>
                 <MudTh>Other</MudTh>
+                <MudTh><span class="op-visually-hidden">Actions</span></MudTh>
             </HeaderContent>
             <RowTemplate Context="vitals">
                 <MudTd DataLabel="Recorded">
@@ -83,6 +84,11 @@
                             <div class="op-prewrap">@line</div>
                         }
                     }
+                </MudTd>
+                <MudTd>
+                    @* Named per row: a column of identical "Correct" buttons is not distinguishable to a screen reader. *@
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="@(() => OpenCorrectAsync(vitals))"
+                        aria-label="@($"Correct the vitals recorded {Formatting.DateTimeText(vitals.RecordedAt)}")">Correct</MudButton>
                 </MudTd>
             </RowTemplate>
             <NoRecordsContent>
@@ -197,6 +203,26 @@
         }
 
         return lines;
+    }
+
+    private async Task OpenCorrectAsync(VitalsResponse vitals)
+    {
+        var parameters = new DialogParameters<RecordVitalsDialog> { { x => x.EncounterUuid, EncounterUuid }, { x => x.Existing, vitals } };
+        var dialog = await DialogService.ShowAsync<RecordVitalsDialog>("Correct vitals", parameters, DialogDefaults.Wide);
+        var result = await dialog.Result;
+        if (result is not { Canceled: false, Data: IssueDialogResult saved })
+        {
+            return;
+        }
+
+        Snackbar.Add(
+            saved.Stale
+                ? "Those vitals were changed by someone else (or no longer exist), so nothing was saved. The list now shows what is stored."
+                : "Vitals corrected.",
+            saved.Stale ? Severity.Warning : Severity.Success);
+
+        // Always reload: on success to show the new values, on a stale refusal to show what is stored now.
+        await LoadAsync();
     }
 
     private async Task OpenRecordAsync()

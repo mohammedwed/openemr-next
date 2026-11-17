@@ -63,6 +63,7 @@ public static class ClinicalCareApiExtensions
 
         // Immunizations (M5d slice 2, ADR 0072).
         builder.Services.AddScoped<IImmunizationCodeLists, EfImmunizationCodeLists>();
+        builder.Services.AddScoped<IImmunizationLookups, EfImmunizationLookups>();
         builder.Services.AddSingleton<IImmunizationIdentityAllocator, GuidImmunizationIdentityAllocator>();
         builder.Services.AddScoped<IImmunizationRegistry, EfImmunizationRegistry>();
         builder.Services.AddScoped<IImmunizationReader, EfImmunizationReader>();

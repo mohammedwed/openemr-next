@@ -366,3 +366,14 @@ Full record: `docs/clinical-care/19-clinical-notes-slice.md` (rules CN-1 to CN-1
 - **Grants:** `SELECT, INSERT` plus `UPDATE` on exactly six columns of `form_clinical_notes`; `SELECT` on two more `list_options` columns (`notes`, `activity`). The existing test that pinned `list_options.notes` as unreadable was replaced deliberately, with the columns still denied listed instead.
 - **Not covered:** linked documents and results; `note_related_to` is not parsed (can be stale after a text correction).
 - **Tests, all green (unit 685, architecture 69, integration 760).** The solution builds with only the 7 pre-existing warnings.
+
+## Added — M5d: WebApp screens for vitals correction, immunizations, SOAP notes and clinical notes
+
+Full record: `docs/clinical-care/20-webapp-clinical-screens.md`. **Compile-checked only: the WebApp has no automated tests and none of this has been opened in a browser (it needs a signed-in user).**
+
+- **Vitals:** a "Correct" button per row; the dialog re-reads the record in US units (as stored) and saves against the fresh `ETag`.
+- **SOAP notes and clinical notes:** cards on the encounter page with record and edit. Clinical note type and category are selects from the lookups; a retired type stays selectable on a note that has it.
+- **Immunizations:** a new tab on the patient page with record and edit, coded fields as selects, and "Entered in error" to void an entry.
+- **A silent data loss prevented:** a correction replaces the whole set, and the immunization dialog does not show the linked encounter, ordering provider or the user id of who gave it, so saving would have cleared them. `ImmunizationResponse` now returns `encounterUuid` and the dialog sends all three back; a test pins keeping and clearing the link.
+- **API:** `GET /api/v1/lookups/immunization-options` (seven titled lists in one call, active only, legacy's order) and `encounterUuid` on the immunization response; OpenAPI snapshot regenerated.
+- **Tests, all green (unit 685, architecture 69, integration 765).** The solution builds with only the 7 pre-existing warnings.

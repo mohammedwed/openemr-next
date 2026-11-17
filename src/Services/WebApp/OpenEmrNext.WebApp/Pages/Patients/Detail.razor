@@ -70,6 +70,10 @@
                     <PatientAllergiesPanel @key="Uuid" PatientUuid="Uuid" TotalChanged="OnAllergyTotalChanged" />
                 </MudTabPanel>
 
+                <MudTabPanel Text="@WithCount("Immunizations", _immunizationTotal)">
+                    <PatientImmunizationsPanel @key="Uuid" PatientUuid="Uuid" TotalChanged="OnImmunizationTotalChanged" />
+                </MudTabPanel>
+
                 <MudTabPanel Text="@WithCount("Insurance", _policies?.Count)">
                     <PatientInsurancePanel @key="patient.Pid" Pid="patient.Pid"
                         Policies="_policies" Error="_policiesError"
@@ -113,10 +117,13 @@
     // Null until the Problems and Allergies panels have loaded their first page (they load when their tab is first shown).
     private int? _problemTotal;
     private int? _allergyTotal;
+    private int? _immunizationTotal;
 
     private void OnProblemTotalChanged(int total) => _problemTotal = total;
 
     private void OnAllergyTotalChanged(int total) => _allergyTotal = total;
+
+    private void OnImmunizationTotalChanged(int total) => _immunizationTotal = total;
 
     private static string WithCount(string label, int? count) => count is null ? label : $"{label} ({count})";
 

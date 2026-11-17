@@ -1,0 +1,386 @@
+@using OpenEmrNext.ClinicalCare.Client
+@using OpenEmrNext.WebApp.Shared
+@using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
+@inject IClinicalCareClient ClinicalCare
+
+@* One dialog for recording an immunization and for editing one: the fields are the same, and a correction replaces the whole set (a field you clear is removed). The coded fields are chosen from the
+   configured lists, which the dialog loads when it opens (a record or a correction needs the vaccine list, so without it nothing can be saved). A value the record already holds that legacy no longer offers
+   stays selectable, so editing one field does not silently change another. The "entered in error" switch is legacy's non-destructive way to void a mistaken entry; there is no delete. It closes only when the
+   save succeeds, or the record turns out to be stale (which hands back a marker so the list reloads). *@
+<MudDialog>
+    <DialogContent>
+        @if (_error is { } error)
+        {
+            <MudAlert Severity="@(_stale ? Severity.Warning : Severity.Error)" Variant="Variant.Outlined" Dense="true" Class="mb-4" role="alert">@error</MudAlert>
+        }
+        @if (_loading)
+        {
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" role="status" aria-label="Loading immunization options" />
+        }
+        <MudForm @ref="_form" Model="_model">
+            <MudStack Spacing="4" Class="@(_loading ? "op-hidden" : null)">
+                <MudSelect T="int?" @bind-Value="_model.ImmunizationId" Label="Vaccine" Clearable="true" Variant="Variant.Outlined"
+                    HelperText="Choose a vaccine, or give its CVX code below.">
+                    @foreach (var option in _vaccines)
+                    {
+                        <MudSelectItem T="int?" Value="@option.Id">@option.Title</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField @bind-Value="_model.CvxCode" Label="CVX code" Variant="Variant.Outlined" MaxLength="64" />
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="7">
+                        <MudDatePicker @bind-Date="_model.Date" Label="Date given" Required="true" RequiredError="A date is required." Editable="true" Variant="Variant.Outlined"
+                            MinDate="MinDate" MaxDate="MaxDate" />
+                    </MudItem>
+                    <MudItem xs="12" sm="5">
+                        <MudTimePicker @bind-Time="_model.Time" Label="Time" Editable="true" Variant="Variant.Outlined" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_model.LotNumber" Label="Lot number" Variant="Variant.Outlined" MaxLength="50" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_model.Manufacturer" Label="Manufacturer" Variant="Variant.Outlined" MaxLength="100" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        @* An expired vaccine is accepted: giving one is a reportable event, and refusing the record would hide it (IM-6). *@
+                        <MudDatePicker @bind-Date="_model.Expiration" Label="Vaccine expires" Editable="true" Clearable="true" Variant="Variant.Outlined" MinDate="MinDate" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="string" @bind-Value="_model.CompletionStatus" Label="Status" Clearable="true" Variant="Variant.Outlined">
+                            @foreach (var option in _statuses)
+                            {
+                                <MudSelectItem Value="@option.Id">@option.Title</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+
+                <MudSwitch T="bool" @bind-Value="_model.EnteredInError" Color="Color.Warning" Label="Entered in error"
+                    aria-describedby="immunization-error-help" />
+                <MudText Typo="Typo.caption" Class="mud-text-secondary" id="immunization-error-help">Marks a mistaken entry as void. It stays on the record; it is not deleted.</MudText>
+
+                <MudExpansionPanels Elevation="0" Class="op-expander">
+                    <MudExpansionPanel Text="More details">
+                        <MudStack Spacing="4">
+                            <MudGrid Spacing="2">
+                                <MudItem xs="12" sm="6">
+                                    @* The service's own rule (IM-5): greater than 0, and a unit when there is an amount. *@
+                                    <MudNumericField T="double?" @bind-Value="_model.Amount" Label="Amount given" Validation="_validateAmount" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudSelect T="string" @bind-Value="_model.AmountUnit" Label="Unit" Clearable="true" Variant="Variant.Outlined">
+                                        @foreach (var option in _units)
+                                        {
+                                            <MudSelectItem Value="@option.Id">@option.Title</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudSelect T="string" @bind-Value="_model.Route" Label="Route" Clearable="true" Variant="Variant.Outlined">
+                                        @foreach (var option in _routes)
+                                        {
+                                            <MudSelectItem Value="@option.Id">@option.Title</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudSelect T="string" @bind-Value="_model.Site" Label="Site" Clearable="true" Variant="Variant.Outlined">
+                                        @foreach (var option in _sites)
+                                        {
+                                            <MudSelectItem Value="@option.Id">@option.Title</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudSelect T="string" @bind-Value="_model.InformationSource" Label="Information source" Clearable="true" Variant="Variant.Outlined">
+                                        @foreach (var option in _sources)
+                                        {
+                                            <MudSelectItem Value="@option.Id">@option.Title</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudSelect T="string" @bind-Value="_model.RefusalReason" Label="Refusal reason" Clearable="true" Variant="Variant.Outlined">
+                                        @foreach (var option in _refusals)
+                                        {
+                                            <MudSelectItem Value="@option.Id">@option.Title</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudDatePicker @bind-Date="_model.Education" Label="Patient educated on" Editable="true" Clearable="true" Variant="Variant.Outlined" MinDate="MinDate" MaxDate="MaxDate" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudDatePicker @bind-Date="_model.Vis" Label="VIS date" Editable="true" Clearable="true" Variant="Variant.Outlined" MinDate="MinDate" MaxDate="MaxDate"
+                                        HelperText="The Vaccine Information Statement given." />
+                                </MudItem>
+                            </MudGrid>
+                            <MudTextField @bind-Value="_model.AdministeredBy" Label="Given by" Variant="Variant.Outlined" MaxLength="255" />
+                            <MudTextField @bind-Value="_model.ReasonCode" Label="Reason code" Variant="Variant.Outlined" MaxLength="31" />
+                            <MudTextField @bind-Value="_model.ReasonDescription" Label="Reason" Variant="Variant.Outlined" Lines="2" Sizing="InputSizing.Auto" />
+                            <MudTextField @bind-Value="_model.Note" Label="Note" Variant="Variant.Outlined" Lines="2" Sizing="InputSizing.Auto" />
+                        </MudStack>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        @if (_stale)
+        {
+            @* The record changed under the user: saving again would fail the same way. Close and reload is the only useful next step. *@
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseStale">Close and reload</MudButton>
+        }
+        else
+        {
+            <MudButton OnClick="Cancel">Cancel</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="@(_saving || _loading || _vaccines.Count == 0)">@(Existing is null ? "Record immunization" : "Save changes")</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    /// <summary>
+    /// The id of the acting provider. The same tracked gap as the other clinical dialogs (docs/patient-view-pending-decisions.md, item 1; ClinicalCare finding F-CC-1). A correction names no provider.
+    /// </summary>
+    private const long PlaceholderProviderId = 1;
+
+    // The service's own bounds (IM-1): 1900-01-01 up to tomorrow (a day of slack covers zones).
+    private static readonly DateTime MinDate = new(1900, 1, 1);
+    private static DateTime MaxDate => DateTime.Today.AddDays(1);
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    /// <summary>The patient to record for. Used only when <see cref="Existing"/> is <c>null</c>.</summary>
+    [Parameter] public Guid PatientUuid { get; set; }
+
+    /// <summary>The immunization to edit, as listed (it carries the version the correction must be based on). <c>null</c> records a new one.</summary>
+    [Parameter] public ImmunizationResponse? Existing { get; set; }
+
+    private readonly Func<double?, string?> _validateAmount = v => v is <= 0 ? "Amount given must be greater than 0." : null;
+
+    private MudForm _form = null!;
+    private readonly Model _model = new();
+    private bool _loading = true;
+    private bool _saving;
+    private bool _stale;
+    private string? _error;
+
+    // The time of day the stored row already had; kept when the picker still shows the same minute, so a save does not silently drop its seconds.
+    private TimeSpan _originalTime;
+
+    private List<(int Id, string Title)> _vaccines = [];
+    private List<(string Id, string Title)> _routes = [], _sites = [], _statuses = [], _sources = [], _refusals = [], _units = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Existing is { } e)
+        {
+            (_model.Date, _originalTime) = IssueWire.FromWire(e.AdministeredDate);
+            _model.Time = _originalTime;
+            _model.ImmunizationId = e.ImmunizationId;
+            _model.CvxCode = e.CvxCode;
+            _model.LotNumber = e.LotNumber;
+            _model.Manufacturer = e.Manufacturer;
+            _model.Expiration = IssueWire.FromWire(e.ExpirationDate).Date;
+            _model.Amount = e.AmountAdministered;
+            _model.AmountUnit = e.AmountUnit;
+            _model.Route = e.Route;
+            _model.Site = e.AdministrationSite;
+            _model.CompletionStatus = e.CompletionStatus;
+            _model.InformationSource = e.InformationSource;
+            _model.RefusalReason = e.RefusalReason;
+            _model.Education = IssueWire.FromWire(e.EducationDate).Date;
+            _model.Vis = IssueWire.FromWire(e.VisDate).Date;
+            _model.AdministeredBy = e.AdministeredBy;
+            _model.ReasonCode = e.ReasonCode;
+            _model.ReasonDescription = e.ReasonDescription;
+            _model.Note = e.Note;
+            _model.EnteredInError = e.EnteredInError;
+        }
+        else
+        {
+            var now = DateTime.Now;
+            _model.Date = now.Date;
+            _model.Time = new TimeSpan(now.Hour, now.Minute, 0);
+        }
+
+        try
+        {
+            var options = await ClinicalCare.GetImmunizationOptionsAsync();
+            _vaccines = options.Vaccines.Select(o => (int.Parse(o.Id), o.Title)).ToList();
+            _routes = Pairs(options.Routes, Existing?.Route);
+            _sites = Pairs(options.Sites, Existing?.AdministrationSite);
+            _statuses = Pairs(options.CompletionStatuses, Existing?.CompletionStatus);
+            _sources = Pairs(options.InformationSources, Existing?.InformationSource);
+            _refusals = Pairs(options.RefusalReasons, Existing?.RefusalReason);
+            _units = Pairs(options.Units, Existing?.AmountUnit);
+
+            if (Existing?.ImmunizationId is { } vaccine && _vaccines.All(v => v.Id != vaccine))
+            {
+                _vaccines.Add((vaccine, $"Vaccine {vaccine} (no longer offered)"));
+            }
+
+            if (_vaccines.Count == 0)
+            {
+                _error = "No vaccines are configured, so an immunization cannot be recorded.";
+            }
+        }
+        catch (Exception ex) when (ex is ClinicalCareApiException or HttpRequestException or FormatException)
+        {
+            _error = "Could not load the vaccine and option lists, so this cannot be saved. Close this and try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>The offered options, plus the value the record already holds if legacy no longer offers it.</summary>
+    private static List<(string Id, string Title)> Pairs(IEnumerable<LookupOptionResponse> options, string? current)
+    {
+        var list = options.Select(o => (o.Id, o.Title)).ToList();
+        if (!string.IsNullOrWhiteSpace(current) && list.All(o => o.Id != current))
+        {
+            list.Add((current, $"{current} (no longer offered)"));
+        }
+
+        return list;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void CloseStale() => MudDialog.Close(DialogResult.Ok(IssueDialogResult.OutOfDate()));
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+        {
+            return;
+        }
+
+        if (_model.ImmunizationId is null && string.IsNullOrWhiteSpace(_model.CvxCode))
+        {
+            _error = "Identify the vaccine: choose one, or give a CVX code.";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            // Wall-clock at offset zero, as for the other clinical dates (IssueWire).
+            var time = _model.Time is { } picked && (Existing is null || (int)picked.TotalMinutes != (int)_originalTime.TotalMinutes) ? picked : (Existing is null ? TimeSpan.Zero : _originalTime);
+            var given = IssueWire.ToWire(_model.Date, time);
+
+            if (Existing is null)
+            {
+                await ClinicalCare.RecordImmunizationAsync(new RecordImmunizationRequest
+                {
+                    PatientUuid = PatientUuid,
+                    AdministeredDate = given,
+                    ImmunizationId = _model.ImmunizationId,
+                    CvxCode = Blank(_model.CvxCode),
+                    Manufacturer = Blank(_model.Manufacturer),
+                    LotNumber = Blank(_model.LotNumber),
+                    ExpirationDate = IssueWire.ToWire(_model.Expiration, TimeSpan.Zero),
+                    AmountAdministered = _model.Amount,
+                    AmountUnit = Blank(_model.AmountUnit),
+                    Route = Blank(_model.Route),
+                    AdministrationSite = Blank(_model.Site),
+                    CompletionStatus = Blank(_model.CompletionStatus),
+                    InformationSource = Blank(_model.InformationSource),
+                    RefusalReason = Blank(_model.RefusalReason),
+                    EducationDate = IssueWire.ToWire(_model.Education, TimeSpan.Zero),
+                    VisDate = IssueWire.ToWire(_model.Vis, TimeSpan.Zero),
+                    AdministeredBy = Blank(_model.AdministeredBy),
+                    ReasonCode = Blank(_model.ReasonCode),
+                    ReasonDescription = Blank(_model.ReasonDescription),
+                    Note = Blank(_model.Note),
+                    EnteredInError = _model.EnteredInError,
+                    ProviderId = PlaceholderProviderId
+                });
+            }
+            else
+            {
+                // A correction replaces the whole set. The fields this dialog does not show (who gave it by user id, the ordering provider, the linked encounter) are sent back exactly as listed,
+                // so a correction here does not clear what another screen recorded.
+                await ClinicalCare.CorrectImmunizationAsync(Existing.Uuid, Existing.ETag, new CorrectImmunizationRequest
+                {
+                    AdministeredDate = given,
+                    ImmunizationId = _model.ImmunizationId,
+                    CvxCode = Blank(_model.CvxCode),
+                    Manufacturer = Blank(_model.Manufacturer),
+                    LotNumber = Blank(_model.LotNumber),
+                    ExpirationDate = IssueWire.ToWire(_model.Expiration, TimeSpan.Zero),
+                    AmountAdministered = _model.Amount,
+                    AmountUnit = Blank(_model.AmountUnit),
+                    Route = Blank(_model.Route),
+                    AdministrationSite = Blank(_model.Site),
+                    CompletionStatus = Blank(_model.CompletionStatus),
+                    InformationSource = Blank(_model.InformationSource),
+                    RefusalReason = Blank(_model.RefusalReason),
+                    EducationDate = IssueWire.ToWire(_model.Education, TimeSpan.Zero),
+                    VisDate = IssueWire.ToWire(_model.Vis, TimeSpan.Zero),
+                    AdministeredBy = Blank(_model.AdministeredBy),
+                    AdministeredById = Existing.AdministeredById,
+                    OrderingProvider = Existing.OrderingProvider,
+                    EncounterUuid = Existing.EncounterUuid,
+                    ReasonCode = Blank(_model.ReasonCode),
+                    ReasonDescription = Blank(_model.ReasonDescription),
+                    Note = Blank(_model.Note),
+                    EnteredInError = _model.EnteredInError
+                });
+            }
+
+            MudDialog.Close(DialogResult.Ok(IssueDialogResult.Saved("immunization", isNew: Existing is null)));
+        }
+        catch (ClinicalCareApiException ex)
+        {
+            _stale = ClinicalCareErrorFormatter.IsStale(ex);
+            _error = ClinicalCareErrorFormatter.Describe(ex, Existing is null
+                ? "Could not record this immunization. Please check the details and try again."
+                : "Could not save this immunization. Please check the details and try again.");
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Could not reach the clinical care service. Nothing was saved. Check your connection, then try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private sealed class Model
+    {
+        public int? ImmunizationId { get; set; }
+        public string? CvxCode { get; set; }
+        public DateTime? Date { get; set; }
+        public TimeSpan? Time { get; set; }
+        public string? LotNumber { get; set; }
+        public string? Manufacturer { get; set; }
+        public DateTime? Expiration { get; set; }
+        public double? Amount { get; set; }
+        public string? AmountUnit { get; set; }
+        public string? Route { get; set; }
+        public string? Site { get; set; }
+        public string? CompletionStatus { get; set; }
+        public string? InformationSource { get; set; }
+        public string? RefusalReason { get; set; }
+        public DateTime? Education { get; set; }
+        public DateTime? Vis { get; set; }
+        public string? AdministeredBy { get; set; }
+        public string? ReasonCode { get; set; }
+        public string? ReasonDescription { get; set; }
+        public string? Note { get; set; }
+        public bool EnteredInError { get; set; }
+    }
+}

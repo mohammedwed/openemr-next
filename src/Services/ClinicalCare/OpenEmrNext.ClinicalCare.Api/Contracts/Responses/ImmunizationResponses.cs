@@ -5,7 +5,7 @@ namespace OpenEmrNext.ClinicalCare.Api.Contracts.Responses;
 /// <summary>What <c>POST /api/v1/immunizations</c> returns.</summary>
 public sealed record ImmunizationRecordedResponse(Guid Uuid, Guid PatientUuid);
 
-/// <summary>One immunization as the API returns it. <paramref name="ETag"/> is its content version (ADR 0072), the same value as the header; send it in <c>If-Match</c> to correct it.</summary>
+/// <summary>One immunization as the API returns it. <c>EncounterUuid</c> is the linked encounter (alongside <c>EncounterNumber</c>); send it back as <c>encounterUuid</c> in a correction to keep the link, because a correction replaces the whole set. <paramref name="ETag"/> is its content version (ADR 0072), the same value as the header; send it in <c>If-Match</c> to correct it.</summary>
 public sealed record ImmunizationResponse(
     Guid Uuid,
     Guid? PatientUuid,
@@ -34,12 +34,13 @@ public sealed record ImmunizationResponse(
     string? Note,
     bool EnteredInError,
     DateTime? RecordedAt,
-    string ETag)
+    string ETag,
+    Guid? EncounterUuid = null)
 {
     public static ImmunizationResponse From(ImmunizationView v) => new(
         v.Uuid, v.PatientUuid, v.PatientPid, v.AdministeredDate, v.ImmunizationId, v.CvxCode, v.Manufacturer, v.LotNumber, v.ExpirationDate, v.AmountAdministered,
         v.AmountUnit, v.Route, v.AdministrationSite, v.CompletionStatus, v.InformationSource, v.RefusalReason, v.EducationDate, v.VisDate, v.AdministeredBy,
-        v.AdministeredById, v.OrderingProvider, v.EncounterNumber, v.ReasonCode, v.ReasonDescription, v.Note, v.EnteredInError, v.RecordedAt, v.Version().ToETag());
+        v.AdministeredById, v.OrderingProvider, v.EncounterNumber, v.ReasonCode, v.ReasonDescription, v.Note, v.EnteredInError, v.RecordedAt, v.Version().ToETag(), v.EncounterUuid);
 }
 
 /// <summary>One bounded page of a patient's immunizations, most recently administered first.</summary>

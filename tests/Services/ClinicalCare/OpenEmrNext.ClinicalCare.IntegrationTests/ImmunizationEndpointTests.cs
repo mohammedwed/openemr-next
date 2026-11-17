@@ -142,6 +142,7 @@ public class ImmunizationEndpointTests(ClinicalCareContainerFixture fixture) : I
 
         var body = await _client.GetFromJsonAsync<ImmunizationResponse>($"/api/v1/immunizations/{uuid}");
         Assert.Equal(encounter.Number, body!.EncounterNumber);
+        Assert.Equal(encounter.Uuid, body.EncounterUuid);   // so a correction can send the link back
     }
 
     [Fact]
@@ -214,6 +215,23 @@ public class ImmunizationEndpointTests(ClinicalCareContainerFixture fixture) : I
         Assert.NotEqual(etag, newETag);
         Assert.Equal(newETag, body.ETag);
         Assert.Equal(newETag, await ETagOfAsync(uuid));
+    }
+
+    [Fact]
+    public async Task A_correction_that_sends_the_encounter_back_keeps_the_link_and_one_that_leaves_it_out_clears_it()
+    {
+        var encounter = (await (await _client.PostAsJsonAsync(
+                "/api/v1/encounters", new CreateEncounterRequest(EncounterTestData.PatientUuid, null, 5, null, "visit", 3, null, 7, null, null)))
+            .Content.ReadFromJsonAsync<EncounterCreatedResponse>())!;
+        var uuid = await RecordedAsync(Record(encounter: encounter.Uuid));
+
+        var kept = await PutAsync(uuid, Correct(encounter: encounter.Uuid), await ETagOfAsync(uuid));
+        var cleared = await PutAsync(uuid, Correct(note: "again"), kept.Headers.ETag!.ToString());
+
+        var clearedBody = await cleared.Content.ReadFromJsonAsync<ImmunizationResponse>();
+        Assert.Equal(encounter.Uuid, (await kept.Content.ReadFromJsonAsync<ImmunizationResponse>())!.EncounterUuid);
+        Assert.Null(clearedBody!.EncounterUuid);   // replace-the-whole-set: leaving it out removes it
+        Assert.Null(clearedBody.EncounterNumber);
     }
 
     [Fact]

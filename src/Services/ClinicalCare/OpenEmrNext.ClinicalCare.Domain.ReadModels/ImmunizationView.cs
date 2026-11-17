@@ -9,6 +9,7 @@ namespace OpenEmrNext.ClinicalCare.Domain.ReadModels;
 /// <param name="Uuid">The public identity. A row without one is not addressable and never becomes a view (ADR 0070 #6).</param>
 /// <param name="EncounterNumber">The linked encounter's number (what the column stores), or <c>null</c>.</param>
 /// <param name="RecordedAt">When the row was created (<c>create_date</c>).</param>
+/// <param name="EncounterUuid">The uuid of the linked encounter, found from its number and the patient, so a caller can send the link back unchanged in a correction (which replaces the whole set). Not part of the version: the number is.</param>
 public sealed record ImmunizationView(
     Guid Uuid,
     Guid? PatientUuid,
@@ -36,7 +37,8 @@ public sealed record ImmunizationView(
     string? ReasonDescription,
     string? Note,
     bool EnteredInError,
-    DateTime? RecordedAt)
+    DateTime? RecordedAt,
+    Guid? EncounterUuid = null)
 {
     /// <summary>
     /// The row's concurrency version (ADR 0072): a hash of every <b>owned</b> column, so a change by any writer to any of them changes it. <see cref="Uuid"/>, the patient and <see cref="RecordedAt"/>

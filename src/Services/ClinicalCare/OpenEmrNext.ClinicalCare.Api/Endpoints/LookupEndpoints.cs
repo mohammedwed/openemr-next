@@ -1,5 +1,7 @@
 using OpenEmrNext.ClinicalCare.Api.Contracts.Responses;
 using OpenEmrNext.ClinicalCare.Application;
+using OpenEmrNext.ClinicalCare.Application.Ports;
+using OpenEmrNext.ClinicalCare.Domain.ReadModels;
 
 namespace OpenEmrNext.ClinicalCare.Api.Endpoints;
 
@@ -28,6 +30,17 @@ public static class LookupEndpoints
             .WithName("ListCalendarCategories").WithTags("Lookups")
             .WithSummary("List the active visit categories, as legacy's visit form offers them")
             .Produces<List<CalendarCategoryLookupResponse>>();
+
+        app.MapGet("/lookups/immunization-options", async (IImmunizationLookups lookups, CancellationToken ct) =>
+            {
+                var o = await lookups.GetOptionsAsync(ct);
+                static List<LookupOptionResponse> Map(IReadOnlyList<LookupOption> list) => list.Select(x => new LookupOptionResponse(x.Id, x.Title)).ToList();
+                return Results.Ok(new ImmunizationOptionsResponse(
+                    Map(o.Vaccines), Map(o.Routes), Map(o.Sites), Map(o.CompletionStatuses), Map(o.InformationSources), Map(o.RefusalReasons), Map(o.Units)));
+            })
+            .WithName("GetImmunizationOptions").WithTags("Lookups")
+            .WithSummary("List the active choices for an immunization's coded fields (vaccine, route, site, status, source, refusal reason, unit)")
+            .Produces<ImmunizationOptionsResponse>();
 
         app.MapGet("/lookups/clinical-note-types", async (ClinicalNoteLookupsUseCase useCase, CancellationToken ct) =>
                 Results.Ok((await useCase.TypesAsync(ct)).Select(t => new ClinicalNoteTypeLookupResponse(t.Id, t.Title, t.Code)).ToList()))

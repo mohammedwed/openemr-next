@@ -19,7 +19,8 @@ public sealed class EfImmunizationReader(ClinicalCareDbContext db) : IImmunizati
                i.completion_status AS CompletionStatus, i.information_source AS InformationSource, i.refusal_reason AS RefusalReason,
                i.education_date AS EducationDate, i.vis_date AS VisDate, i.administered_by AS AdministeredBy, i.administered_by_id AS AdministeredById,
                i.ordering_provider AS OrderingProvider, i.encounter_id AS EncounterNumber, i.reason_code AS ReasonCode,
-               i.reason_description AS ReasonDescription, i.note AS Note, i.added_erroneously AS EnteredInError, i.create_date AS RecordedAt
+               i.reason_description AS ReasonDescription, i.note AS Note, i.added_erroneously AS EnteredInError, i.create_date AS RecordedAt,
+               (SELECT fe.uuid FROM form_encounter fe WHERE fe.encounter = i.encounter_id AND fe.pid = i.patient_id LIMIT 1) AS EncounterUuid
         FROM immunizations i
         LEFT JOIN clinical_care_patient_ref pr ON pr.pid = i.patient_id
         """;
@@ -63,7 +64,8 @@ public sealed class EfImmunizationReader(ClinicalCareDbContext db) : IImmunizati
         Blank(r.AmountUnit), Blank(r.Route), Blank(r.AdministrationSite), Blank(r.CompletionStatus), Blank(r.InformationSource), Blank(r.RefusalReason),
         r.EducationDate, r.VisDate, Blank(r.AdministeredBy), r.AdministeredById is > 0 ? r.AdministeredById : null,
         r.OrderingProvider is > 0 ? r.OrderingProvider : null, r.EncounterNumber is > 0 ? r.EncounterNumber : null,
-        Blank(r.ReasonCode), Blank(r.ReasonDescription), Blank(r.Note), r.EnteredInError, r.RecordedAt);
+        Blank(r.ReasonCode), Blank(r.ReasonDescription), Blank(r.Note), r.EnteredInError, r.RecordedAt,
+        r.EncounterUuid is { Length: 16 } encounter ? Rfc4122GuidConverter.FromRfc4122Bytes(encounter) : null);
 
     private sealed class ImmunizationRow
     {
@@ -94,5 +96,6 @@ public sealed class EfImmunizationReader(ClinicalCareDbContext db) : IImmunizati
         public string? Note { get; set; }
         public bool EnteredInError { get; set; }
         public DateTime? RecordedAt { get; set; }
+        public byte[]? EncounterUuid { get; set; }
     }
 }

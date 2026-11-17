@@ -110,6 +110,7 @@ public class OpenApiDocumentTests : IDisposable
     [InlineData("/api/v1/lookups/facilities")]
     [InlineData("/api/v1/lookups/calendar-categories")]
     [InlineData("/api/v1/lookups/clinical-note-types")]
+    [InlineData("/api/v1/lookups/immunization-options")]
     [InlineData("/api/v1/lookups/clinical-note-categories")]
     public async Task The_lookups_are_documented_as_read_only_lists(string path)
     {

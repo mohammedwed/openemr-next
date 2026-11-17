@@ -11,3 +11,12 @@ public sealed record FacilityLookupResponse(int Id, string Name, int? PosCode, b
 
 /// <summary>A visit category a caller can choose, as <c>calendarCategoryId</c>.</summary>
 public sealed record CalendarCategoryLookupResponse(int Id, string Name);
+
+/// <summary>One choice in a configured list: the <paramref name="Id"/> to send and the <paramref name="Title"/> to show.</summary>
+public sealed record LookupOptionResponse(string Id, string Title);
+
+/// <summary>The choices for an immunization's coded fields, the active options in legacy's order. A vaccine's id is a whole number as text; send it as <c>immunizationId</c>.</summary>
+public sealed record ImmunizationOptionsResponse(
+    IReadOnlyList<LookupOptionResponse> Vaccines, IReadOnlyList<LookupOptionResponse> Routes, IReadOnlyList<LookupOptionResponse> Sites,
+    IReadOnlyList<LookupOptionResponse> CompletionStatuses, IReadOnlyList<LookupOptionResponse> InformationSources, IReadOnlyList<LookupOptionResponse> RefusalReasons,
+    IReadOnlyList<LookupOptionResponse> Units);

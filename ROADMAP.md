@@ -384,10 +384,10 @@ discrepancies.
 
 ### What remains before the post-M5 gate (as of Nov 17)
 
-**Build (no identity needed):** WebApp screens for correcting vitals and for immunizations, SOAP notes and clinical notes (the API is ahead of the UI); M5e FHIR (read-only). M5d's API work is done.
+**Build (no identity needed):** M5e FHIR (read-only). M5d's API work and its WebApp screens (vitals correction, immunizations, SOAP notes, clinical notes, lookups; `20-webapp-clinical-screens.md`) are built, **but the screens are compile-checked only**.
 **Needs the identity work (M5b phase 1b):** the gateway validating the session and forwarding a verified actor. It fixes the **open finding that the Clinical Care and patient APIs are reachable without sign-in**, replaces the caller-named `providerId`,
 and makes the audit actor real (every correction is `unknown` today). Then the permission port, soft delete and editing `sensitivity`. This is the largest open item.
-**Verification not yet done:** a browser check of every WebApp screen; a legacy-UI check that records written here display correctly in OpenEMR itself; shadow comparison of the update paths, vitals correction and immunizations (only creation was compared); a layered review of M5b to M5d.
+**Verification not yet done:** a browser check of every WebApp screen (including all the new M5d ones); a legacy-UI check that records written here display correctly in OpenEMR itself; shadow comparison of the update paths, vitals correction and immunizations (only creation was compared); a layered review of M5b to M5d.
 **New services, not started:** documents, pharmacy, labs, billing.
 **Then:** the post-M5 gate, and M6.
 
