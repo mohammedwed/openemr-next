@@ -118,4 +118,31 @@ public class AuditEntryTests
         Assert.All(verbs, verb => Assert.InRange(verb.Length, 1, AuditEntry.MaxActionLength));
         Assert.Equal(verbs.Count, verbs.Distinct().Count());
     }
+
+    [Fact]
+    public void A_record_with_no_uuid_is_named_by_a_short_key_stored_in_the_subject_column()
+    {
+        var entry = new AuditEntry(At, Actor, AuditActions.SoapCorrect, "soap:123", AuditOutcome.Success);
+
+        Assert.Equal("soap:123", entry.SubjectText);
+        Assert.Equal(Guid.Empty, entry.Subject);
+    }
+
+    [Fact]
+    public void A_uuid_subject_is_stored_as_its_text() =>
+        Assert.Equal(Subject.ToString(), Entry().SubjectText);
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_blank_subject_key_is_a_programming_error(string key) =>
+        Assert.Throws<ArgumentException>(() => new AuditEntry(At, Actor, AuditActions.SoapCorrect, key, AuditOutcome.Failed));
+
+    [Fact]
+    public void A_subject_key_that_cannot_fit_the_column_is_a_programming_error() =>
+        Assert.Throws<ArgumentException>(() => new AuditEntry(At, Actor, AuditActions.SoapCorrect, new string('k', AuditEntry.SubjectWidth + 1), AuditOutcome.Failed));
+
+    [Fact]
+    public void The_largest_note_id_still_fits_the_subject_column() =>
+        Assert.InRange($"soap:{long.MaxValue}".Length, 1, AuditEntry.SubjectWidth);
 }

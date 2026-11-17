@@ -1159,6 +1159,311 @@
         ]
       }
     },
+    "/api/v1/encounters/{encounterUuid}/soap-notes": {
+      "post": {
+        "tags": [
+          "SoapNotes"
+        ],
+        "summary": "Record a SOAP note on an encounter",
+        "operationId": "RecordSoapNote",
+        "parameters": [
+          {
+            "name": "encounterUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordSoapNoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoapNoteRecordedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "SoapNotes"
+        ],
+        "summary": "List an encounter's SOAP notes, newest first, one bounded page at a time",
+        "operationId": "ListSoapNotes",
+        "parameters": [
+          {
+            "name": "encounterUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoapNoteListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
+    },
+    "/api/v1/encounters/{encounterUuid}/soap-notes/{noteId}": {
+      "put": {
+        "tags": [
+          "SoapNotes"
+        ],
+        "summary": "Replace a SOAP note's sections, conditional on the ETag the caller read",
+        "operationId": "CorrectSoapNote",
+        "parameters": [
+          {
+            "name": "encounterUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "noteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectSoapNoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoapNoteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Precondition Required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "SoapNotes"
+        ],
+        "summary": "Get one SOAP note of an encounter, with an ETag",
+        "operationId": "GetSoapNote",
+        "parameters": [
+          {
+            "name": "encounterUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "noteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoapNoteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      }
+    },
     "/api/v1/allergies": {
       "post": {
         "tags": [
@@ -2014,6 +2319,41 @@
           },
           "enteredInError": {
             "type": "boolean"
+          }
+        }
+      },
+      "CorrectSoapNoteRequest": {
+        "required": [
+          "subjective",
+          "objective",
+          "assessment",
+          "plan"
+        ],
+        "type": "object",
+        "properties": {
+          "subjective": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "objective": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "assessment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "plan": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -3541,6 +3881,52 @@
           }
         }
       },
+      "RecordSoapNoteRequest": {
+        "required": [
+          "subjective",
+          "objective",
+          "assessment",
+          "plan",
+          "providerId"
+        ],
+        "type": "object",
+        "properties": {
+          "subjective": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "objective": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "assessment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "plan": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "providerId": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "RecordVitalsRequest": {
         "required": [
           "weight",
@@ -3685,6 +4071,131 @@
               "string"
             ],
             "format": "int64"
+          }
+        }
+      },
+      "SoapNoteListResponse": {
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SoapNoteResponse"
+            }
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "limit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "offset": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "SoapNoteRecordedResponse": {
+        "required": [
+          "id",
+          "encounterUuid"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "encounterUuid": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SoapNoteResponse": {
+        "required": [
+          "id",
+          "date",
+          "recordedBy",
+          "subjective",
+          "objective",
+          "assessment",
+          "plan",
+          "eTag"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "date": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "recordedBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "subjective": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "objective": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "assessment": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "plan": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "eTag": {
+            "type": "string"
           }
         }
       },
@@ -4195,6 +4706,9 @@
     },
     {
       "name": "Immunizations"
+    },
+    {
+      "name": "SoapNotes"
     },
     {
       "name": "Allergies"

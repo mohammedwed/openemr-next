@@ -146,6 +146,11 @@ GRANT UPDATE (administered_date, immunization_id, cvx_code, manufacturer, lot_nu
               information_source, refusal_reason, ordering_provider, reason_code, reason_description, encounter_id, update_date)
   ON \`${DB_NAME}\`.immunizations TO '${CLINICAL_CARE_DB_USER}'@'%';
 
+-- SOAP notes (M5d slice 3, ADR 0073): recorded and read back, and corrected on the four text sections only. Not who wrote it or when (user, groupname, date), not the patient (pid),
+-- not authorized or activity: legacy's own REST update rewrites date and pid, this service does not. A note is linked to its encounter by the forms row granted above. No DELETE.
+GRANT SELECT, INSERT ON \`${DB_NAME}\`.form_soap TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT UPDATE (subjective, objective, assessment, plan) ON \`${DB_NAME}\`.form_soap TO '${CLINICAL_CARE_DB_USER}'@'%';
+
 -- Legacy records every uuid it hands out here (CC-6). This service only ever adds its own; never reads or edits.
 GRANT INSERT ON \`${DB_NAME}\`.uuid_registry TO '${CLINICAL_CARE_DB_USER}'@'%';
 

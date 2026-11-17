@@ -41,7 +41,9 @@ public sealed class ClinicalCareContainerFixture : IAsyncLifetime
          // The issue tables (M5c): lists is shared by every issue type, and the last two exist so the grant tests can prove they are unreadable.
          "lists", "lists_touch", "lists_medication", "issue_encounter",
          // Immunizations (M5d slice 2): its own table, shared with no other record type.
-         "immunizations"];
+         "immunizations",
+         // SOAP notes (M5d slice 3): linked to an encounter through the forms row, like vitals.
+         "form_soap"];
 
     public string Hostname => _container.Hostname;
     public ushort Port => _container.GetMappedPublicPort(3306);
@@ -105,7 +107,7 @@ public sealed class ClinicalCareContainerFixture : IAsyncLifetime
         await using var root = new MySqlConnection(RootConnectionString);
         await root.OpenAsync();
         foreach (var table in new[]
-                 { "form_encounter", "form_vitals", "forms", "uuid_registry", "clinical_care_outbox", "clinical_care_audit", "lists", "lists_touch", "issue_encounter", "immunizations", "clinical_care_patient_ref", "clinical_care_processed_events", "patient_data", "users", "groups", "facility", "list_options", "sequences" })
+                 { "form_encounter", "form_vitals", "forms", "uuid_registry", "clinical_care_outbox", "clinical_care_audit", "lists", "lists_touch", "issue_encounter", "immunizations", "form_soap", "clinical_care_patient_ref", "clinical_care_processed_events", "patient_data", "users", "groups", "facility", "list_options", "sequences" })
             await ExecuteAsync(root, $"DELETE FROM `{table}`");
 
         // Reference rows: ids and values chosen to match the real snapshot (AMB is the default class; list order is `seq`).

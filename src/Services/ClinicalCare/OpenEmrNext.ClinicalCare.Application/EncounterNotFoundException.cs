@@ -29,3 +29,17 @@ public sealed class ImmunizationConflictException(Guid immunizationUuid, OpenEmr
 
     public OpenEmrNext.ClinicalCare.Domain.ValueObjects.ContentVersion? CurrentVersion { get; } = currentVersion;
 }
+
+public sealed class SoapNoteNotFoundException(long noteId) : Exception($"No SOAP note {noteId} exists in this encounter.")
+{
+    public long NoteId { get; } = noteId;
+}
+
+/// <summary>The note changed after the caller read it (ADR 0072): maps to 412, carrying the current content version.</summary>
+public sealed class SoapNoteConflictException(long noteId, OpenEmrNext.ClinicalCare.Domain.ValueObjects.ContentVersion? currentVersion)
+    : Exception($"SOAP note {noteId} changed after it was read.")
+{
+    public long NoteId { get; } = noteId;
+
+    public OpenEmrNext.ClinicalCare.Domain.ValueObjects.ContentVersion? CurrentVersion { get; } = currentVersion;
+}

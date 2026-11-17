@@ -321,3 +321,17 @@ Full record: `docs/clinical-care/15-record-immunization-slice.md` (rules IM-1 to
 - **Grants:** `SELECT, INSERT` plus `UPDATE` on exactly the 24 owned columns (including `update_date`, which this service now sets); no `DELETE`; the patient, uuid, creation and creator columns and `external_id` cannot be written.
 - **Contract:** new routes, `ImmunizationResponse.eTag`, `If-Match`/412/428 on the PUT; OpenAPI snapshot regenerated.
 - **Tests, all green (unit 616, architecture 59, integration 623).** The solution builds with only the 7 pre-existing warnings.
+
+## Added — M5d slice 3: SOAP notes (`/api/v1/encounters/{uuid}/soap-notes`)
+
+Full record: `docs/clinical-care/17-soap-notes-slice.md` (rules SN-1 to SN-10, limitations L1 to L6), research `16-soap-notes-research.md`, decision `docs/architecture/0073-...`.
+
+- **Record, read, list and correct** an encounter's SOAP notes. `form_soap` has no uuid and no stamp, so a note is addressed by its legacy id **within its encounter** (ADR 0073) and versioned by a content hash of its four sections (ADR 0072), the same
+  `ETag`/`If-Match`/412/428 contract as the immunizations.
+- **Safer than legacy's own REST update:** every statement matches the note through its encounter's `forms` row, so a note of another encounter or patient is a 404 (legacy's update checks neither); a correction does **not** rewrite `date` or `pid`, which legacy's does.
+- **The legacy rows now say who wrote them:** the acting provider's username and group are recorded (legacy's REST path leaves them empty).
+- **Bytes, not characters,** for the `text` sections; an entirely empty note is refused.
+- **Audit gains a keyed subject:** `AuditEntry` can name a record that has no uuid (`soap:{id}`), written into the same column.
+- **Grants:** `SELECT, INSERT` on `form_soap` plus `UPDATE` on exactly the four sections; no `DELETE`; date, pid, user, group, authorized and activity cannot be written.
+- **Refactor:** the content-versioned update outcome is now one shared `ContentUpdateOutcome` (immunizations and SOAP).
+- **Tests, all green (unit 650, architecture 63, integration 671).** The solution builds with only the 7 pre-existing warnings.

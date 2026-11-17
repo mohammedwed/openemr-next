@@ -73,13 +73,13 @@ public class ImmunizationUseCaseTests
 
     private sealed class FakeUpdater(FakeReader reader) : IImmunizationUpdater
     {
-        public ImmunizationUpdateOutcome? Outcome { get; set; }
+        public ContentUpdateOutcome? Outcome { get; set; }
         public ImmunizationUpdateRequest? Request { get; private set; }
 
-        public Task<ImmunizationUpdateOutcome> UpdateAsync(ImmunizationUpdateRequest request, CancellationToken ct)
+        public Task<ContentUpdateOutcome> UpdateAsync(ImmunizationUpdateRequest request, CancellationToken ct)
         {
             Request = request;
-            var outcome = Outcome ?? new ImmunizationUpdateOutcome(UpdateStatus.Updated, null);
+            var outcome = Outcome ?? new ContentUpdateOutcome(UpdateStatus.Updated, null);
             if (outcome.Status == UpdateStatus.Updated && reader.View is { } v)
             {
                 var f = request.Facts;
@@ -312,10 +312,10 @@ public class ImmunizationUseCaseTests
     {
         var (useCase, _, updater, log) = BuildCorrect(Stored());
         var winner = ContentVersion.Of(["winner"]);
-        updater.Outcome = new ImmunizationUpdateOutcome(UpdateStatus.Conflict, winner);
+        updater.Outcome = new ContentUpdateOutcome(UpdateStatus.Conflict, winner);
 
         var ex = await Assert.ThrowsAsync<ImmunizationConflictException>(() => useCase.ExecuteAsync(Correct(Same() with { Note = "x" }), CancellationToken.None));
-        updater.Outcome = new ImmunizationUpdateOutcome(UpdateStatus.NotFound, null);
+        updater.Outcome = new ContentUpdateOutcome(UpdateStatus.NotFound, null);
         await Assert.ThrowsAsync<ImmunizationNotFoundException>(() => useCase.ExecuteAsync(Correct(Same() with { Note = "x" }), CancellationToken.None));
 
         Assert.Equal(winner, ex.CurrentVersion);

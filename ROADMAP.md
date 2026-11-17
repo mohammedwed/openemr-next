@@ -333,7 +333,7 @@ Fills the remaining Clinical Care functionality that needs no new service and no
 
 1. **Correct vitals** (**done Nov 17**; suites green: unit 533, architecture 53, integration 545; `13-correct-vitals-slice.md`).
 2. **Immunizations** (**done Nov 17**; suites green: unit 616, architecture 59, integration 623; `15-record-immunization-slice.md`, ADR 0072).
-3. **SOAP notes** (research and ADR 0073 done Nov 17, `16-soap-notes-research.md`; build in progress): addressed by form id within the encounter, versioned by content. 3b. **Clinical notes** (`form_clinical_notes`: grouped notes, type and category lists,
+3. **SOAP notes** (**done Nov 17**; suites green: unit 650, architecture 63, integration 671; `17-soap-notes-slice.md`, ADR 0073): addressed by form id within the encounter, versioned by content. 3b. **Clinical notes** (`form_clinical_notes`: grouped notes, type and category lists,
    linked documents and results, soft delete by `activity`), its own slice.
 4. Lookup endpoints (facilities, classes, categories, providers) and the WebApp fields they replace.
 - **Out of scope until identity and the permission port exist:** delete and editing `sensitivity`.

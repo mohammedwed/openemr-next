@@ -111,6 +111,7 @@ public class OpenApiDocumentTests : IDisposable
     [InlineData("/api/v1/allergies/{uuid}")]
     [InlineData("/api/v1/encounters/{encounterUuid}/vitals/{vitalsUuid}")]
     [InlineData("/api/v1/immunizations/{uuid}")]
+    [InlineData("/api/v1/encounters/{encounterUuid}/soap-notes/{noteId}")]
     public async Task Every_PUT_declares_the_if_match_header_so_the_generated_client_can_send_it(string path)
     {
         using var document = await ReadDocumentAsync();
@@ -133,6 +134,7 @@ public class OpenApiDocumentTests : IDisposable
     [InlineData("AllergyResponse")]
     [InlineData("VitalsResponse")]
     [InlineData("ImmunizationResponse")]
+    [InlineData("SoapNoteResponse")]
     public async Task The_updatable_responses_carry_an_etag_property_because_a_list_has_no_per_item_header(string schemaName)
     {
         using var document = await ReadDocumentAsync();

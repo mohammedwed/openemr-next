@@ -237,7 +237,7 @@ public class ImmunizationAdapterTests(ClinicalCareContainerFixture fixture) : IA
             new AuditEntry(Now.ToUniversalTime(), AuditActor.Unknown, AuditActions.ImmunizationCorrect, recorded.Uuid, AuditOutcome.Success, "corr-ic", "10.9.9.9", names));
     }
 
-    private async Task<ImmunizationUpdateOutcome> UpdateAsync(ImmunizationUpdateRequest request)
+    private async Task<ContentUpdateOutcome> UpdateAsync(ImmunizationUpdateRequest request)
     {
         await using var db = fixture.CreateDbContext();
         return await new EfImmunizationUpdater(db, new EfAuditLog(db)).UpdateAsync(request, CancellationToken.None);

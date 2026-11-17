@@ -49,11 +49,9 @@ public interface IImmunizationCodeLists
 public sealed record ImmunizationUpdateRequest(
     Guid ImmunizationUuid, long PatientPid, ContentVersion Expected, ImmunizationFacts Facts, ImmunizationCorrectedEvent Event, AuditEntry Audit);
 
-/// <param name="Version">For <see cref="UpdateStatus.Conflict"/>, the row's current version.</param>
-public sealed record ImmunizationUpdateOutcome(UpdateStatus Status, ContentVersion? Version);
 
 /// <summary>Replaces an immunization's editable set if it is still the version the caller read, committing the row, its event and its audit row together.</summary>
 public interface IImmunizationUpdater
 {
-    Task<ImmunizationUpdateOutcome> UpdateAsync(ImmunizationUpdateRequest request, CancellationToken ct);
+    Task<ContentUpdateOutcome> UpdateAsync(ImmunizationUpdateRequest request, CancellationToken ct);
 }

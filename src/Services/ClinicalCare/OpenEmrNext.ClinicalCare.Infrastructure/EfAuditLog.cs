@@ -24,7 +24,7 @@ public sealed class EfAuditLog(ClinicalCareDbContext db) : IAuditLog
                 (at, actor, actor_id, actor_verified, action, subject, outcome, correlation_id, source_address, details)
             VALUES
                 ({entry.AtUtc}, {entry.Actor.Subject}, {entry.Actor.UserId}, {entry.Actor.Verified}, {entry.Action},
-                 {entry.Subject.ToString()}, {entry.OutcomeName}, {entry.CorrelationId}, {entry.SourceAddress}, {entry.Details})
+                 {entry.SubjectText}, {entry.OutcomeName}, {entry.CorrelationId}, {entry.SourceAddress}, {entry.Details})
             """, ct);
     }
 }

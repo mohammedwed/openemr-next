@@ -10,7 +10,7 @@ namespace OpenEmrNext.ClinicalCare.Infrastructure;
 /// </summary>
 public sealed class EfImmunizationUpdater(ClinicalCareDbContext db, IAuditLog auditLog) : IImmunizationUpdater
 {
-    public async Task<ImmunizationUpdateOutcome> UpdateAsync(ImmunizationUpdateRequest request, CancellationToken ct)
+    public async Task<ContentUpdateOutcome> UpdateAsync(ImmunizationUpdateRequest request, CancellationToken ct)
     {
         var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(request.ImmunizationUuid);
         var f = request.Facts;
@@ -30,21 +30,21 @@ public sealed class EfImmunizationUpdater(ClinicalCareDbContext db, IAuditLog au
             if (locked.Count == 0)
             {
                 await transaction.RollbackAsync(ct);
-                return new ImmunizationUpdateOutcome(UpdateStatus.NotFound, null);
+                return new ContentUpdateOutcome(UpdateStatus.NotFound, null);
             }
 
             var current = await EfImmunizationReader.FindAsync(db, request.ImmunizationUuid, ct);
             if (current is null)
             {
                 await transaction.RollbackAsync(ct);
-                return new ImmunizationUpdateOutcome(UpdateStatus.NotFound, null);
+                return new ContentUpdateOutcome(UpdateStatus.NotFound, null);
             }
 
             var currentVersion = current.Version();
             if (currentVersion != request.Expected)
             {
                 await transaction.RollbackAsync(ct);
-                return new ImmunizationUpdateOutcome(UpdateStatus.Conflict, currentVersion);
+                return new ContentUpdateOutcome(UpdateStatus.Conflict, currentVersion);
             }
 
             await db.Database.ExecuteSqlInterpolatedAsync(
@@ -70,7 +70,7 @@ public sealed class EfImmunizationUpdater(ClinicalCareDbContext db, IAuditLog au
             await transaction.CommitAsync(ct);
 
             var after = await EfImmunizationReader.FindAsync(db, request.ImmunizationUuid, ct);
-            return new ImmunizationUpdateOutcome(UpdateStatus.Updated, after?.Version());
+            return new ContentUpdateOutcome(UpdateStatus.Updated, after?.Version());
         });
     }
 }
