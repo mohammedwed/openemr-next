@@ -227,7 +227,6 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("UPDATE lists SET injury_part = 'x'")]
     [InlineData("UPDATE lists SET list_option_id = 'x'")]
     [InlineData("UPDATE lists SET title = 'changed', udi = 'x'")]
-    [InlineData("DELETE FROM lists")]
     [InlineData("DELETE FROM lists_touch WHERE pid = 1")]
     [InlineData("UPDATE lists_touch SET `date` = NOW()")]
     [InlineData("INSERT INTO lists (uuid, type, udi) VALUES (NULL, 'medical_problem', 'x')")]
@@ -250,6 +249,15 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
         // ADR 0076: the two flags a deletion sets, on rows that do not exist here (zero rows matched is still a statement the grant allowed).
         await db.Database.ExecuteSqlRawAsync("UPDATE forms SET deleted = 1 WHERE id = -1");
         await db.Database.ExecuteSqlRawAsync("UPDATE form_clinical_notes SET activity = 0 WHERE id = -1");
+    }
+
+    [Fact]
+    public async Task The_production_principal_can_delete_from_lists_only_because_a_problem_and_an_allergy_are_removed_the_way_legacy_removes_them()
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // ADR 0080: DELETE cannot be granted by column or by value, so it is the whole table. Which rows may go is the code's rule (every statement names its type), tested in IssueDeletionTests.
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM lists WHERE id = -1 AND type = 'medical_problem'");
     }
 
     [Fact]

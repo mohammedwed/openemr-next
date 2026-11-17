@@ -5,6 +5,7 @@ using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using OpenEmrNext.ClinicalCare.Client;
 using OpenEmrNext.WebApp.Pages.Encounters;
+using OpenEmrNext.WebApp.Pages.Patients;
 
 namespace OpenEmrNext.WebApp.UnitTests;
 
@@ -14,9 +15,10 @@ namespace OpenEmrNext.WebApp.UnitTests;
 /// </summary>
 public class RecordDeletionPanelTests
 {
-    public enum Panel { Vitals, Soap, ClinicalNote }
+    public enum Panel { Vitals, Soap, ClinicalNote, Problem, Allergy }
 
     private static readonly Guid Encounter = Guid.Parse("e0e0e0e0-0000-4000-8000-000000000001");
+    private static readonly Guid PatientUuid = Guid.Parse("b1a9c5f0-0000-4000-8000-0000000000aa");
     private static readonly Guid RowUuid = Guid.Parse("d0d0d0d0-0000-4000-8000-000000000001");
     private const string RowETag = "\"row-version-1\"";
 
@@ -67,7 +69,7 @@ public class RecordDeletionPanelTests
                     () => client.ReceivedCalls().Count(c => c.GetMethodInfo().Name == nameof(IClinicalCareClient.DeleteSoapNoteAsync)),
                     () => client.ReceivedCalls().Count(c => c.GetMethodInfo().Name == nameof(IClinicalCareClient.ListSoapNotesAsync)),
                     () => client.Received(1).DeleteSoapNoteAsync(Encounter, 88, RowETag));
-            default:
+            case Panel.ClinicalNote:
                 client.ListClinicalNotesAsync(Encounter, 10, 0).Returns(_ => Task.FromResult(new ClinicalNoteListResponse
                 {
                     Items = [new ClinicalNoteResponse { Uuid = RowUuid, Date = new DateTimeOffset(2026, 11, 10, 0, 0, 0, TimeSpan.Zero), Description = "comfortable", ETag = RowETag }],
@@ -78,6 +80,28 @@ public class RecordDeletionPanelTests
                     () => client.ReceivedCalls().Count(c => c.GetMethodInfo().Name == nameof(IClinicalCareClient.DeleteClinicalNoteAsync)),
                     () => client.ReceivedCalls().Count(c => c.GetMethodInfo().Name == nameof(IClinicalCareClient.ListClinicalNotesAsync)),
                     () => client.Received(1).DeleteClinicalNoteAsync(Encounter, RowUuid, RowETag));
+            case Panel.Problem:
+                client.ListProblemsAsync(PatientUuid, 10, 0).Returns(_ => Task.FromResult(new ProblemListResponse
+                {
+                    Items = [new ProblemResponse { Uuid = RowUuid, Title = "Asthma", ETag = RowETag }],
+                    Total = 1, Limit = 10
+                }));
+                return Build(
+                    host, c => c.Render<PatientProblemsPanel>(p => p.Add(x => x.PatientUuid, PatientUuid)), ex => client.DeleteProblemAsync(RowUuid, RowETag).ThrowsAsync(ex),
+                    () => client.ReceivedCalls().Count(c => c.GetMethodInfo().Name == nameof(IClinicalCareClient.DeleteProblemAsync)),
+                    () => client.ReceivedCalls().Count(c => c.GetMethodInfo().Name == nameof(IClinicalCareClient.ListProblemsAsync)),
+                    () => client.Received(1).DeleteProblemAsync(RowUuid, RowETag));
+            default:
+                client.ListAllergiesAsync(PatientUuid, 10, 0).Returns(_ => Task.FromResult(new AllergyListResponse
+                {
+                    Items = [new AllergyResponse { Uuid = RowUuid, Title = "Penicillin", ETag = RowETag }],
+                    Total = 1, Limit = 10
+                }));
+                return Build(
+                    host, c => c.Render<PatientAllergiesPanel>(p => p.Add(x => x.PatientUuid, PatientUuid)), ex => client.DeleteAllergyAsync(RowUuid, RowETag).ThrowsAsync(ex),
+                    () => client.ReceivedCalls().Count(c => c.GetMethodInfo().Name == nameof(IClinicalCareClient.DeleteAllergyAsync)),
+                    () => client.ReceivedCalls().Count(c => c.GetMethodInfo().Name == nameof(IClinicalCareClient.ListAllergiesAsync)),
+                    () => client.Received(1).DeleteAllergyAsync(RowUuid, RowETag));
         }
     }
 
@@ -95,6 +119,8 @@ public class RecordDeletionPanelTests
     [InlineData(Panel.Vitals)]
     [InlineData(Panel.Soap)]
     [InlineData(Panel.ClinicalNote)]
+    [InlineData(Panel.Problem)]
+    [InlineData(Panel.Allergy)]
     public async Task Every_row_offers_delete_named_for_the_record(Panel kind)
     {
         await using var a = new Disposable(Arrange(kind));
@@ -106,6 +132,8 @@ public class RecordDeletionPanelTests
     [InlineData(Panel.Vitals)]
     [InlineData(Panel.Soap)]
     [InlineData(Panel.ClinicalNote)]
+    [InlineData(Panel.Problem)]
+    [InlineData(Panel.Allergy)]
     public async Task Nothing_is_sent_until_the_user_confirms_and_cancelling_sends_nothing(Panel kind)
     {
         await using var a = new Disposable(Arrange(kind));
@@ -124,6 +152,8 @@ public class RecordDeletionPanelTests
     [InlineData(Panel.Vitals)]
     [InlineData(Panel.Soap)]
     [InlineData(Panel.ClinicalNote)]
+    [InlineData(Panel.Problem)]
+    [InlineData(Panel.Allergy)]
     public async Task Confirming_sends_the_rows_own_version_and_reloads_the_list(Panel kind)
     {
         await using var a = new Disposable(Arrange(kind));
@@ -140,6 +170,8 @@ public class RecordDeletionPanelTests
     [InlineData(Panel.Vitals)]
     [InlineData(Panel.Soap)]
     [InlineData(Panel.ClinicalNote)]
+    [InlineData(Panel.Problem)]
+    [InlineData(Panel.Allergy)]
     public async Task Someone_who_may_not_delete_is_told_so_and_the_list_is_left_alone(Panel kind)
     {
         await using var a = new Disposable(Arrange(kind));
@@ -157,9 +189,13 @@ public class RecordDeletionPanelTests
     [InlineData(Panel.Vitals, 412, "changed by someone else")]
     [InlineData(Panel.Soap, 412, "changed by someone else")]
     [InlineData(Panel.ClinicalNote, 412, "changed by someone else")]
+    [InlineData(Panel.Problem, 412, "changed by someone else")]
+    [InlineData(Panel.Allergy, 412, "changed by someone else")]
     [InlineData(Panel.Vitals, 404, "already gone")]
     [InlineData(Panel.Soap, 404, "already gone")]
     [InlineData(Panel.ClinicalNote, 404, "already gone")]
+    [InlineData(Panel.Problem, 404, "already gone")]
+    [InlineData(Panel.Allergy, 404, "already gone")]
     public async Task A_record_that_changed_or_vanished_says_so_and_the_list_is_read_again(Panel kind, int status, string words)
     {
         await using var a = new Disposable(Arrange(kind));
@@ -177,6 +213,8 @@ public class RecordDeletionPanelTests
     [InlineData(Panel.Vitals)]
     [InlineData(Panel.Soap)]
     [InlineData(Panel.ClinicalNote)]
+    [InlineData(Panel.Problem)]
+    [InlineData(Panel.Allergy)]
     public async Task A_network_failure_says_nothing_was_deleted_and_the_list_is_left_alone(Panel kind)
     {
         await using var a = new Disposable(Arrange(kind));
@@ -201,6 +239,19 @@ public class RecordDeletionPanelTests
 
         a.Value.Host.ShouldShow("not removed from the database");
         a.Value.Host.ShouldShow("can restore");
+    }
+
+    [Theory]
+    [InlineData(Panel.Problem)]
+    [InlineData(Panel.Allergy)]
+    public async Task The_confirmation_for_an_issue_says_it_is_removed_and_cannot_be_restored(Panel kind)
+    {
+        await using var a = new Disposable(Arrange(kind));
+
+        a.Value.ClickRowDelete();
+
+        a.Value.Host.ShouldShow("cannot be restored");
+        a.Value.Host.ShouldShow("together with its links to encounters");
     }
 
     private sealed class Disposable(Arranged value) : IAsyncDisposable

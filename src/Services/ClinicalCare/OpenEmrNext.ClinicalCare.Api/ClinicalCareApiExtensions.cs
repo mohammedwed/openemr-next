@@ -92,6 +92,8 @@ public static class ClinicalCareApiExtensions
         builder.Services.AddScoped<IRecordDeleter, EfRecordDeleter>();
         builder.Services.AddScoped<IIdempotencyStore, EfIdempotencyStore>();
         builder.Services.AddScoped<DeleteRecordUseCase>();
+        builder.Services.AddScoped<IIssueDeleter, EfIssueDeleter>();
+        builder.Services.AddScoped<DeleteIssueUseCase>();
         builder.Services.AddScoped<EncounterLookupsUseCase>();
 
         // SOAP notes (M5d slice 3, ADR 0073).

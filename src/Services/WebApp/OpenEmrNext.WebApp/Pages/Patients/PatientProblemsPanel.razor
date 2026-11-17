@@ -60,6 +60,8 @@
                     @* Named per problem: a column of identical "Edit" buttons is not distinguishable to a screen reader. *@
                     <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Disabled="@Busy(problem)" OnClick="@(() => OpenEditAsync(problem))"
                         aria-label="@($"Edit problem {problem.Title}")">Edit</MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" Disabled="@Busy(problem)" OnClick="@(() => DeleteAsync(problem))"
+                        aria-label="@($"Delete problem {problem.Title}")">Delete</MudButton>
                     @if (problem.EndDate is null)
                     {
                         <MudButton Variant="Variant.Text" Color="Color.Success" Size="Size.Small" Disabled="@Busy(problem)" OnClick="@(() => SetResolvedAsync(problem, resolved: true))"
@@ -186,6 +188,30 @@
         }
 
         await LoadAsync();
+    }
+
+    /// <summary>
+    /// Deleting removes the problem and its links to encounters, as OpenEMR does (ADR 0080), so the confirmation says it cannot be undone. Needs OpenEMR's administrator right: the service refuses anyone else and
+    /// <see cref="RecordDeletion"/> explains it. Based on the version the row was listed with.
+    /// </summary>
+    private async Task DeleteAsync(ProblemResponse problem)
+    {
+        _busy = problem.Uuid;
+        try
+        {
+            var reload = await RecordDeletion.ConfirmAndDeleteAsync(
+                DialogService, Snackbar, "Delete this problem?",
+                $"\"{problem.Title}\" is removed from the patient's record, here and in OpenEMR, together with its links to encounters. It cannot be restored. Resolving a problem instead keeps it on the record.",
+                () => ClinicalCare.DeleteProblemAsync(problem.Uuid, problem.ETag));
+            if (reload)
+            {
+                await LoadAsync(_page > 1 && _items?.Count == 1 ? _page - 1 : _page);
+            }
+        }
+        finally
+        {
+            _busy = null;
+        }
     }
 
     /// <summary>

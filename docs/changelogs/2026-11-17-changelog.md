@@ -473,3 +473,11 @@ Full record: `docs/clinical-care/20-webapp-clinical-screens.md`. **Compile-check
 - **What that means for a user:** a save whose answer was lost and is pressed again does not create a second record; a save edited before the retry is a new request, not an error; recording the same vitals twice on purpose is still two records.
 - **Tests:** 15 new tests (`IdempotencyKeyHandlerTests`, WebApp unit 39 in all), including one that drives the real generated client through the handler. Mutation check: not clearing the attempt, or ignoring the body in the key, fails 6; restored.
 - **Not verified:** the dialogs' own calls to the attempt are compile-checked only; no test renders a dialog, and nothing has been seen in a browser.
+
+## Added — delete for problems and allergies (M5n, ADR 0080)
+
+- **`DELETE /api/v1/problems/{uuid}` and `/api/v1/allergies/{uuid}`** remove the row and its links to encounters, as legacy's `deleter.php` does. Decided by the user on Nov 17 (hard delete, like legacy), because legacy's issue screens do not hide an inactive issue, so a flag would have left the two systems disagreeing. Same rules as the other deletions: `admin/super` only, `If-Match` under a row lock, 401, 428, 403, 404, 412 in that order, one transaction with its event and audit row.
+- **The cost, stated:** the service's database user now holds `DELETE` on `lists`, which is table-wide because MariaDB cannot grant it any narrower. A row is reached only by its uuid and type, and tests try to delete a medication, a surgery and a device by uuid and fail. A deleted issue cannot be restored and its content is not kept in the audit row.
+- **WebApp:** a Delete button with a confirmation on each problem and allergy row ("cannot be restored"), using the same helper that explains a 403 as "only an administrator can delete".
+- **Database:** a grant only; re-run the seed script on an existing database.
+- **Tests: written, built, and NOT RUN.** The 12 `IssueDeletionTests`, the changed lists grant assertion and the extended WebApp delete tests have not been executed (the run was stopped at the user's request). Nothing here is verified beyond compiling; the Clinical Care suites need a full run before this merges.

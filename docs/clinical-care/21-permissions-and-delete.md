@@ -31,7 +31,7 @@ Decisions are in ADR 0076; this note is the slice's working record: what was bui
 
 | # | Limitation | Why accepted |
 |---|---|---|
-| L1 | **Issues (problems, allergies) are not covered.** Legacy hard-deletes them and its screens do not hide an inactive one. | Waiting on a user decision (ADR 0076, "Not decided"). |
+| L1 | ~~Issues (problems, allergies) are not covered.~~ **Covered since M5n (ADR 0080):** removed outright, as legacy does. | Decided by the user |
 | L2 | No undelete. The `forms.deleted` grant could set the flag back, and the code never does. | An administrator restores in OpenEMR. |
 | L3 | The WebApp offers Delete to everyone and shows the 403 as "only an administrator can delete"; there is no "can I delete?" signal. The buttons are **compile-checked only**: no browser check and the WebApp has no automated tests. | The session does not carry rights; refine later. |
 | L4 | Legacy's `return_value` (read, write, addonly) and its per-session cache are not reproduced. | Nothing here needs a narrowed right; a cache would serve revoked rights. |
