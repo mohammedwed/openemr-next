@@ -93,46 +93,9 @@ public sealed record VitalsRecording
     public static VitalsRecording Create(EncounterReference encounter, VitalsInput input, long providerId, DateTime now)
     {
         var errors = new List<string>();
-        var taken = new List<string>();
 
-        var weight = Convert(MeasurementKind.Weight, "Weight", input.Weight, MinWeightPounds, MaxWeightPounds, "lb", errors, taken, "weight", lowerInclusive: true);
-        var height = Convert(MeasurementKind.Height, "Height", input.Height, MinHeightInches, MaxHeightInches, "in", errors, taken, "height", lowerInclusive: true);
-        var temperature = Convert(MeasurementKind.Temperature, "Temperature", input.Temperature,
-            MinTemperatureFahrenheit, MaxTemperatureFahrenheit, "degF", errors, taken, "temperature", lowerInclusive: true);
-        var waist = Convert(MeasurementKind.WaistCircumference, "Waist circumference", input.WaistCircumference, 0m,
-            MaxCircumferenceInches, "in", errors, taken, "waistCircumference");
-        var head = Convert(MeasurementKind.HeadCircumference, "Head circumference", input.HeadCircumference, 0m,
-            MaxCircumferenceInches, "in", errors, taken, "headCircumference");
-
-        CheckWhole(input.Systolic, MaxBloodPressure, "Systolic blood pressure", errors, taken, "bloodPressureSystolic");
-        CheckWhole(input.Diastolic, MaxBloodPressure, "Diastolic blood pressure", errors, taken, "bloodPressureDiastolic");
-        CheckWhole(input.Pulse, MaxPulse, "Pulse", errors, taken, "pulse");
-        CheckWhole(input.Respiration, MaxRespiration, "Respiration", errors, taken, "respiration");
-
-        // form_vitals.oxygen_saturation is decimal(6,2); rounding here means the value the caller is told about is the one stored.
-        decimal? saturationStored = null;
-        if (input.OxygenSaturation is { } saturation)
-        {
-            if (saturation <= 0m || saturation > MaxOxygenSaturation)
-            {
-                errors.Add($"Oxygen saturation must be greater than 0 and at most {MaxOxygenSaturation:0}.");
-            }
-            else
-            {
-                saturationStored = Math.Round(saturation, 2, MidpointRounding.AwayFromZero);
-                taken.Add("oxygenSaturation");
-            }
-        }
-
-        if (input.Note is { Length: > MaxTextLength })
-            errors.Add($"Note must be at most {MaxTextLength} characters.");
-
-        if (input.TemperatureMethod is { Length: > MaxTextLength })
-            errors.Add($"Temperature method must be at most {MaxTextLength} characters.");
-
-        // CV-2 (new): an empty form is not a measurement.
-        if (taken.Count == 0 && errors.Count == 0)
-            errors.Add("At least one measurement is required.");
+        // The measurements, notes and the "at least one" rule are shared with VitalsChange (VitalsFieldRules); who is acting is not.
+        var fields = VitalsFieldRules.Validate(input, errors);
 
         // The provider must be identifiable (as CC-10 for encounters), and its id must fit the int column legacy keeps it in
         // (review finding R-1).
@@ -142,72 +105,9 @@ public sealed record VitalsRecording
         if (errors.Count > 0)
             throw new VitalsValidationException(errors);
 
-        // CV-5 and CV-6: BMI is derived from the stored values, never taken from the caller.
-        var bmi = BmiRule.Calculate(weight, height);
-        var status = bmi is { } value && BmiRule.Categorize(value) is { } category ? BmiRule.Label(category) : null;
-
-        // CV-7: legacy clears the method when there is no temperature.
-        var method = temperature is null || string.IsNullOrEmpty(input.TemperatureMethod) ? null : input.TemperatureMethod;
-
         return new VitalsRecording(
-            encounter, providerId, now, weight, height, temperature, method, input.Systolic, input.Diastolic,
-            input.Pulse, input.Respiration, saturationStored, waist, head, bmi, status,
-            string.IsNullOrEmpty(input.Note) ? null : input.Note, taken);
+            encounter, providerId, now, fields.WeightPounds, fields.HeightInches, fields.TemperatureFahrenheit, fields.TemperatureMethod,
+            fields.Systolic, fields.Diastolic, fields.Pulse, fields.Respiration, fields.OxygenSaturation, fields.WaistInches, fields.HeadInches,
+            fields.Bmi, fields.BmiStatus, fields.Note, fields.MeasurementsTaken);
     }
-
-    private static decimal? Convert(
-        MeasurementKind kind, string label, Quantity? quantity, decimal lower, decimal upper, string storedUnit,
-        List<string> errors, List<string> taken, string name, bool lowerInclusive = false)
-    {
-        if (quantity is null)
-            return null;
-
-        if (!UnitConversion.IsAcceptable(kind, quantity.Unit))
-        {
-            errors.Add($"{label} must be given in {Accepted(kind)}.");
-            return null;
-        }
-
-        // Before any arithmetic: a number this large would overflow System.Decimal inside the conversion (review finding R-3).
-        // It is out of bounds in every unit, so it is reported with the same message as any other out-of-bounds value.
-        if (Math.Abs(quantity.Value) > MaxRawMeasurement)
-        {
-            errors.Add(BoundsMessage(label, lower, upper, storedUnit, lowerInclusive));
-            return null;
-        }
-
-        var stored = UnitConversion.ToStored(kind, quantity);
-        var aboveLower = lowerInclusive ? stored >= lower : stored > lower;
-        if (!aboveLower || stored > upper)
-        {
-            errors.Add(BoundsMessage(label, lower, upper, storedUnit, lowerInclusive));
-            return null;
-        }
-
-        taken.Add(name);
-        return stored;
-    }
-
-    private static string BoundsMessage(string label, decimal lower, decimal upper, string unit, bool lowerInclusive) =>
-        lowerInclusive
-            ? $"{label} must be between {lower:0.##} and {upper:0.##} {unit}."
-            : $"{label} must be greater than {lower:0.##} and at most {upper:0.##} {unit}.";
-
-    private static void CheckWhole(int? value, int max, string label, List<string> errors, List<string> taken, string name)
-    {
-        if (value is null)
-            return;
-
-        if (value < 1 || value > max)
-            errors.Add($"{label} must be between 1 and {max}.");
-        else
-            taken.Add(name);
-    }
-
-    private static string Accepted(MeasurementKind kind) => kind switch
-    {
-        MeasurementKind.Weight => "lb or kg",
-        MeasurementKind.Temperature => "degF or degC",
-        _ => "in or cm"
-    };
 }

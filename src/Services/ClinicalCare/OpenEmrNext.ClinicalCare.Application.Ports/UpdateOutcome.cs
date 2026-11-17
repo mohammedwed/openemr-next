@@ -16,3 +16,6 @@ public enum UpdateStatus
 /// <param name="Status">How the attempt ended.</param>
 /// <param name="Stamp">For <see cref="UpdateStatus.Updated"/>, the row's new stamp; for <see cref="UpdateStatus.Conflict"/>, its current one.</param>
 public sealed record UpdateOutcome(UpdateStatus Status, DateTime? Stamp);
+
+/// <summary>How a content-versioned update (ADR 0072) ended. <paramref name="Version"/> is the row's new version after <see cref="UpdateStatus.Updated"/>, or its current one after <see cref="UpdateStatus.Conflict"/>.</summary>
+public sealed record ContentUpdateOutcome(UpdateStatus Status, OpenEmrNext.ClinicalCare.Domain.ValueObjects.ContentVersion? Version);

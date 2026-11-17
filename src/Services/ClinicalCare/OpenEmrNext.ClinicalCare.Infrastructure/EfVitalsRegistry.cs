@@ -22,7 +22,7 @@ public sealed class EfVitalsRegistry(ClinicalCareDbContext db, IAuditLog auditLo
         var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(vitals.Uuid);
         var envelope = EventEnvelope.Serialize(
             VitalsRecordedEvent.EventType, @event.RecordedAtUtc, vitals.Uuid.ToString(),
-            actor: $"user:{vitals.ProviderId}", @event);
+            actor: audit.Actor.Subject, @event);
 
         // bps and bpd are varchar(40) in legacy; a whole number as text is what its own REST validation requires (CV-8).
         var systolic = vitals.Systolic?.ToString(System.Globalization.CultureInfo.InvariantCulture);

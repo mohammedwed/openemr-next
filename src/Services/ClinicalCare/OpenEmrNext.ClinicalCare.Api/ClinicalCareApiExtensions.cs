@@ -39,6 +39,7 @@ public static class ClinicalCareApiExtensions
 
         // The only place each port is wired to its real adapter; Application only ever sees the port.
         builder.Services.AddScoped<IPatientDirectory, EfPatientDirectory>();
+        builder.Services.AddScoped<IUserDirectory, EfUserDirectory>();
         builder.Services.AddScoped<IPatientReferenceStore, EfPatientReferenceStore>();
         builder.Services.AddScoped<ConsumePatientRegisteredUseCase>();
         builder.Services.AddScoped<IEncounterCodeLists, EfEncounterCodeLists>();
@@ -60,6 +61,43 @@ public static class ClinicalCareApiExtensions
         builder.Services.AddScoped<ListPatientProblemsUseCase>();
         builder.Services.AddScoped<IProblemUpdater, EfProblemUpdater>();
         builder.Services.AddScoped<UpdateProblemUseCase>();
+
+        // Immunizations (M5d slice 2, ADR 0072).
+        builder.Services.AddScoped<IImmunizationCodeLists, EfImmunizationCodeLists>();
+        builder.Services.AddScoped<IImmunizationLookups, EfImmunizationLookups>();
+        builder.Services.AddSingleton<IImmunizationIdentityAllocator, GuidImmunizationIdentityAllocator>();
+        builder.Services.AddScoped<IImmunizationRegistry, EfImmunizationRegistry>();
+        builder.Services.AddScoped<IImmunizationReader, EfImmunizationReader>();
+        builder.Services.AddScoped<IImmunizationUpdater, EfImmunizationUpdater>();
+        builder.Services.AddScoped<RecordImmunizationUseCase>();
+        builder.Services.AddScoped<CorrectImmunizationUseCase>();
+        builder.Services.AddScoped<GetImmunizationUseCase>();
+        builder.Services.AddScoped<ListPatientImmunizationsUseCase>();
+
+        // Clinical notes (M5d slice 3b, ADR 0074).
+        builder.Services.AddScoped<IClinicalNoteCodeLists, EfClinicalNoteCodeLists>();
+        builder.Services.AddSingleton<IClinicalNoteIdentityAllocator, GuidClinicalNoteIdentityAllocator>();
+        builder.Services.AddScoped<IClinicalNoteRegistry, EfClinicalNoteRegistry>();
+        builder.Services.AddScoped<IClinicalNoteReader, EfClinicalNoteReader>();
+        builder.Services.AddScoped<IClinicalNoteUpdater, EfClinicalNoteUpdater>();
+        builder.Services.AddScoped<RecordClinicalNoteUseCase>();
+        builder.Services.AddScoped<CorrectClinicalNoteUseCase>();
+        builder.Services.AddScoped<GetClinicalNoteUseCase>();
+        builder.Services.AddScoped<ListEncounterClinicalNotesUseCase>();
+        builder.Services.AddScoped<ClinicalNoteLookupsUseCase>();
+
+        // Lookups (M5d slice 4).
+        builder.Services.AddScoped<IEncounterLookups, EfEncounterLookups>();
+        builder.Services.AddScoped<EncounterLookupsUseCase>();
+
+        // SOAP notes (M5d slice 3, ADR 0073).
+        builder.Services.AddScoped<ISoapNoteRegistry, EfSoapNoteRegistry>();
+        builder.Services.AddScoped<ISoapNoteReader, EfSoapNoteReader>();
+        builder.Services.AddScoped<ISoapNoteUpdater, EfSoapNoteUpdater>();
+        builder.Services.AddScoped<RecordSoapNoteUseCase>();
+        builder.Services.AddScoped<CorrectSoapNoteUseCase>();
+        builder.Services.AddScoped<GetSoapNoteUseCase>();
+        builder.Services.AddScoped<ListEncounterSoapNotesUseCase>();
 
         // Allergies (M5c slice 2, ADR 0070).
         builder.Services.AddScoped<IAllergyCodeLists, EfAllergyCodeLists>();
@@ -103,6 +141,8 @@ public static class ClinicalCareApiExtensions
         builder.Services.AddScoped<RecordVitalsUseCase>();
         builder.Services.AddScoped<GetVitalsUseCase>();
         builder.Services.AddScoped<ListEncounterVitalsUseCase>();
+        builder.Services.AddScoped<IVitalsUpdater, EfVitalsUpdater>();
+        builder.Services.AddScoped<CorrectVitalsUseCase>();
 
         // Anything an endpoint does not catch itself becomes a ProblemDetails 500, not ASP.NET's bare default
         // (OPS-8, API-4); Program.cs adds app.UseExceptionHandler(). Same minimal approach as ADR 0057.

@@ -57,7 +57,7 @@ public static class AllergyEndpoints
             var allergy = await useCase.ExecuteAsync(
                 new RecordAllergyCommand(
                     request.PatientUuid, request.Title, ClientTime.ToServerLocal(request.BeginDate), ClientTime.ToServerLocal(request.EndDate),
-                    request.Diagnosis, request.Reaction, request.Severity, request.Verification, request.Comments, request.ProviderId,
+                    request.Diagnosis, request.Reaction, request.Severity, request.Verification, request.Comments, RequestOrigins.ProviderOf(http, request.ProviderId),
                     RequestOrigins.From(http)),
                 ct);
 

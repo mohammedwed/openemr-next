@@ -42,7 +42,18 @@ internal static class ApiFactory
         });
     }
 
-    public static HttpClient ClientWithSecret(this WebApplicationFactory<Program> factory)
+    public const string UserHeader = "X-Authenticated-User";
+
+    /// <summary>A client the gateway would have forwarded: the shared secret, and the verified user (by default the seeded <c>dr_who</c>, user 7).</summary>
+    public static HttpClient ClientWithSecret(this WebApplicationFactory<Program> factory, Guid? user = null)
+    {
+        var client = factory.ClientWithSecretOnly();
+        client.DefaultRequestHeaders.Add(UserHeader, (user ?? ClinicalCareContainerFixture.TestUserUuid).ToString());
+        return client;
+    }
+
+    /// <summary>The shared secret but no verified user: a request that reached the service but whose session the gateway never checked.</summary>
+    public static HttpClient ClientWithSecretOnly(this WebApplicationFactory<Program> factory)
     {
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(SecretHeader, Secret);

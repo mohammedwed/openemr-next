@@ -11,9 +11,7 @@ namespace OpenEmrNext.PatientManagement.Api.Contracts.Requests;
 /// factory's own check (including its own, separate <c>MaxContentBytes</c> check on the *decoded*
 /// bytes, which this attribute cannot express against a base64 string's own length).
 /// </summary>
-/// <param name="OwnerId">The id of the user uploading the document. Caller-supplied for now, not
-/// verified against any authenticated session -- an already-accepted gap inherited from ADR 0048 (no
-/// authentication wired into this service yet). Revisit once that gap closes.</param>
+/// <param name="OwnerId">Ignored: the acting user is the signed-in user the gateway verified (ADR 0075), whatever this says. Kept optional so existing callers do not break; it will be removed in a later contract version.</param>
 public sealed record UploadAdvanceDirectiveDocumentRequest(
     [Required(ErrorMessage = "Type is required.")] string Type,
     [Required(ErrorMessage = "File name must be between 1 and 255 characters.")]
@@ -22,4 +20,4 @@ public sealed record UploadAdvanceDirectiveDocumentRequest(
     [Required(ErrorMessage = "MimeType is required.")] string MimeType,
     [Required(ErrorMessage = "Content must not be empty.")] string ContentBase64,
     DateOnly? EffectiveDate,
-    [Range(1, long.MaxValue, ErrorMessage = "OwnerId must identify the uploading user.")] long OwnerId);
+    [Range(1, long.MaxValue, ErrorMessage = "OwnerId must identify the uploading user.")] long? OwnerId);

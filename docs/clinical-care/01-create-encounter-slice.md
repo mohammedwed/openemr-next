@@ -213,7 +213,7 @@ ROLLBACK:     Remove the gateway route and the compose service; delete created r
 
 | Id | Finding | Sev | Effort | Evidence | Fix | Depends on | Status |
 |---|---|---|---|---|---|---|---|
-| F-CC-1 | The acting provider is caller-supplied (no verified identity), so `provider_id` and the `forms.user` are unverified. Same as M4's `RegisteredBy`. | H | L | ADR 0055 | Identity forwarding (SEC-4) | AuthFacade work | Open, tracked |
+| F-CC-1 | **Resolved Nov 17 (ADR 0075): the gateway verifies the session and Clinical Care uses the verified user as the acting provider and audit actor; a body `providerId` is ignored.** Originally: the acting provider is caller-supplied (no verified identity), so `provider_id` and the `forms.user` are unverified. Same as M4's `RegisteredBy`. | H | L | ADR 0055 | Identity forwarding (SEC-4) | AuthFacade work | Open, tracked |
 | F-CC-2 | `form_encounter.sensitivity` gates legacy access through ACLs. This service stores it but nothing enforces it on read. | H | M | `form_encounter` column; legacy ACL `sensitivities` | Authorization policy port (SEC-5) | F-CC-1 | Open, tracked |
 | F-CC-3 | M4's `Patient.Register` uses `Guid.NewGuid()` and writes no `uuid_registry` row, unlike legacy. May be harmless, may break uuid-to-table lookups. | M | S | `Patient.cs:70`; `UuidRegistry.php:109-124` | Verify (section 8), then register uuids in both services | none | **Fixed in PatientManagement** for `patient_data`, `insurance_data` and `documents` (slice 3; `drive_uuid` is F-PM-2) |
 | F-CC-4 | Legacy `insertEncounter` does two inserts with no transaction; a failure can leave an encounter with no `forms` row. This service writes both atomically. | L | S | `EncounterService.php:419-437` | Done by design (CC-7) | none | Designed out |

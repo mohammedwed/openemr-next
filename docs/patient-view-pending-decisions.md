@@ -21,6 +21,9 @@ trail therefore names the wrong person for every change.
 
 **Cost:** an API change in AuthFacade or PatientManagement, plus a client regeneration.
 
+**Update (ADR 0075, Nov 17):** **resolved for Clinical Care.** The gateway verifies the session and forwards the user's uuid; Clinical Care resolves it to `users.id` itself (one more granted column), so the acting provider and audit actor are the verified user and no Clinical Care dialog sends a provider id any more.
+**Also resolved for Patient Management (same day):** it resolves the uuid itself (granted `users.active`), and registration, document upload and directive status take the verified user; the registration, upload and status dialogs no longer send a user id. Nothing about this item remains open.
+
 ## 2. Document upload size
 
 **Blocked:** the webapp caps uploads at 20 MB. The Domain allows 30 MB (`AdvanceDirectiveDocument.MaxContentBytes`).
@@ -116,4 +119,6 @@ values. The webapp offers the 11 legacy class codes from a fixed list, plain num
 the first two through `IEncounterCodeLists` and `IFacilityDirectory`), and, once identity is forwarded, resolve the provider from the session.
 
 **Cost:** API endpoints with tests, an OpenAPI snapshot and client regeneration, then selects in `CreateEncounterDialog`.
+
+**Update (M5d slice 4):** the three read endpoints (classes, facilities, calendar categories) are built and tested (`docs/clinical-care/18-lookups-slice.md`). The selects are wired into `CreateEncounterDialog`, with a fallback to the old fields if a lookup cannot be loaded. **Still open:** providers, which wait for identity forwarding.
 

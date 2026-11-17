@@ -33,7 +33,7 @@ public sealed class CreateEncounterUseCase(
             // audited is not answered as if it had been (fail closed).
             await auditLog.AppendAsync(
                 new AuditEntry(
-                    clock.GetUtcNow().UtcDateTime, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false),
+                    clock.GetUtcNow().UtcDateTime, Actors.Of(command.Origin, command.ProviderId),
                     AuditActions.EncounterCreate, command.PatientUuid, AuditOutcome.Failed,
                     command.Origin?.CorrelationId, command.Origin?.SourceAddress),
                 ct);
@@ -69,7 +69,7 @@ public sealed class CreateEncounterUseCase(
 
         // Until the gateway forwards a validated session (ADR 0069 #5) the actor is the provider the caller named, flagged unverified.
         var audit = new AuditEntry(
-            nowUtc, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false), AuditActions.EncounterCreate,
+            nowUtc, Actors.Of(command.Origin, command.ProviderId), AuditActions.EncounterCreate,
             encounter.Uuid, AuditOutcome.Success, command.Origin?.CorrelationId, command.Origin?.SourceAddress);
 
         await registry.RegisterAsync(encounter, @event, audit, ct);

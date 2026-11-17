@@ -81,6 +81,11 @@
             <EncounterIssuesPanel @key="encounter.Uuid" EncounterUuid="encounter.Uuid" PatientUuid="PatientUuid" />
 
             <EncounterVitalsPanel @key="encounter.Uuid" EncounterUuid="encounter.Uuid" />
+
+            @* The notes written at the visit follow the measurements: SOAP notes first, then the free-standing clinical notes. *@
+            <EncounterSoapNotesPanel @key="encounter.Uuid" EncounterUuid="encounter.Uuid" />
+
+            <EncounterClinicalNotesPanel @key="encounter.Uuid" EncounterUuid="encounter.Uuid" />
             break;
     }
 </MudContainer>

@@ -1,4 +1,5 @@
 using OpenEmrNext.PatientManagement.Api;
+using OpenEmrNext.PatientManagement.Api.Authentication;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,6 +12,9 @@ app.UseExceptionHandler();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// A verified user on every /api/v1 and /fhir route (ADR 0075), checked before any body is read.
+app.UseVerifiedUser();
 
 app.MapPatientManagementEndpoints();
 

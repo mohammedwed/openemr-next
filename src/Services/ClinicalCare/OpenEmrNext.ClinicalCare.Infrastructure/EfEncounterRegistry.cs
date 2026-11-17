@@ -32,7 +32,7 @@ public sealed class EfEncounterRegistry(ClinicalCareDbContext db, IAuditLog audi
         var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(encounter.Uuid);
         var envelope = EventEnvelope.Serialize(
             EncounterCreatedEvent.EventType, @event.CreatedAtUtc, encounter.Uuid.ToString(),
-            actor: $"user:{encounter.ProviderId}", @event);
+            actor: audit.Actor.Subject, @event);
 
         var strategy = db.Database.CreateExecutionStrategy();
         var id = await strategy.ExecuteAsync(async () =>

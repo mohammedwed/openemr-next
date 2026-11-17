@@ -25,8 +25,9 @@ public static class PatientManagementOpenApi
             document.Info.Title = "PatientManagement API";
             document.Info.Description =
                 "Patient registration, insurance, advance directives, and the FHIR Patient API. Every " +
-                "endpoint requires the shared X-Internal-Gateway-Secret header (ADR 0055) -- there is no " +
-                "per-user authentication yet; see that ADR for why.";
+                "endpoint requires the shared X-Internal-Gateway-Secret header (ADR 0055), which proves the request came from the gateway, and a " +
+                "verified user in X-Authenticated-User, which only the gateway sets after checking the session (ADR 0075). The verified user is " +
+                "who registers a patient, owns an uploaded document and reviews an advance directive; the ids a request body names for those are ignored.";
 
             document.Components ??= new OpenApiComponents();
             document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();

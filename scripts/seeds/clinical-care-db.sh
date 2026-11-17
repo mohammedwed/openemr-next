@@ -132,6 +132,30 @@ GRANT SELECT, INSERT ON \`${DB_NAME}\`.forms TO '${CLINICAL_CARE_DB_USER}'@'%';
 -- A set of vital signs (slice 2): inserted and read back, never updated or deleted (CV-10). form_vitals has no
 -- encounter column; its link to an encounter is the forms row granted above.
 GRANT SELECT, INSERT ON \`${DB_NAME}\`.form_vitals TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- Correcting vitals (M5d, ADR 0068): UPDATE on exactly the measurement columns and nothing else. Not who recorded them or when (user, groupname, date), not authorized or
+-- activity: legacy's own update leaves those alone too. last_updated is not listed: the database sets it.
+GRANT UPDATE (weight, height, temperature, temp_method, bps, bpd, pulse, respiration, oxygen_saturation, waist_circ, head_circ, BMI, BMI_status, note)
+  ON \`${DB_NAME}\`.form_vitals TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- Immunizations (M5d slice 2, ADR 0072): recorded and read back, and corrected on exactly the columns the service owns plus update_date, which has no default and
+-- no ON UPDATE so this service sets it. Not who recorded it or when (create_date, created_by, updated_by), not the patient, not the uuid, not external_id. No DELETE:
+-- an entry made in error is marked, not removed (the permission port gates real deletes).
+GRANT SELECT, INSERT ON \`${DB_NAME}\`.immunizations TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT UPDATE (administered_date, immunization_id, cvx_code, manufacturer, lot_number, administered_by_id, administered_by, education_date, vis_date, note,
+              amount_administered, amount_administered_unit, expiration_date, route, administration_site, added_erroneously, completion_status,
+              information_source, refusal_reason, ordering_provider, reason_code, reason_description, encounter_id, update_date)
+  ON \`${DB_NAME}\`.immunizations TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- Clinical notes (M5d slice 3b, ADR 0074): recorded and read back, and corrected on exactly the columns the service owns. Not who wrote it (user is set on insert only, as legacy does),
+-- not groupname, authorized or activity (activity 0 is how legacy retires a note, so that is a delete and waits for the permission port), not the parent form id, not note_related_to,
+-- not external_id. last_updated is not listed: the database sets it. No DELETE. The parent form is registered in forms, granted above.
+GRANT SELECT, INSERT ON \`${DB_NAME}\`.form_clinical_notes TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT UPDATE (\`date\`, code, codetext, description, clinical_notes_type, clinical_notes_category) ON \`${DB_NAME}\`.form_clinical_notes TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- SOAP notes (M5d slice 3, ADR 0073): recorded and read back, and corrected on the four text sections only. Not who wrote it or when (user, groupname, date), not the patient (pid),
+-- not authorized or activity: legacy's own REST update rewrites date and pid, this service does not. A note is linked to its encounter by the forms row granted above. No DELETE.
+GRANT SELECT, INSERT ON \`${DB_NAME}\`.form_soap TO '${CLINICAL_CARE_DB_USER}'@'%';
+GRANT UPDATE (subjective, objective, assessment, plan) ON \`${DB_NAME}\`.form_soap TO '${CLINICAL_CARE_DB_USER}'@'%';
 
 -- Legacy records every uuid it hands out here (CC-6). This service only ever adds its own; never reads or edits.
 GRANT INSERT ON \`${DB_NAME}\`.uuid_registry TO '${CLINICAL_CARE_DB_USER}'@'%';
@@ -141,15 +165,19 @@ GRANT INSERT ON \`${DB_NAME}\`.uuid_registry TO '${CLINICAL_CARE_DB_USER}'@'%';
 -- of a SET expression (learned the hard way in ADR 0050's grant for the same table).
 GRANT SELECT, UPDATE ON \`${DB_NAME}\`.sequences TO '${CLINICAL_CARE_DB_USER}'@'%';
 
--- Encounter classes (_ActEncounterCode): only the columns the class lookup reads.
-GRANT SELECT (list_id, option_id, title, seq, is_default) ON \`${DB_NAME}\`.list_options TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- Configured option lists: encounter classes (_ActEncounterCode) and clinical note types and categories. Only the columns the lookups read; notes holds a note type's LOINC code, activity whether it is still offered.
+GRANT SELECT (list_id, option_id, title, seq, is_default, notes, activity) ON \`${DB_NAME}\`.list_options TO '${CLINICAL_CARE_DB_USER}'@'%';
 
--- Facility name and default place-of-service code, copied onto the encounter (CC-8). Nothing else about a facility.
-GRANT SELECT (id, name, pos_code) ON \`${DB_NAME}\`.facility TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- Facility name and default place-of-service code, copied onto the encounter (CC-8), and whether it is inactive or a service location, for the facility lookup (M5d slice 4).
+-- Nothing else about a facility: no address, phone or tax columns.
+GRANT SELECT (id, name, pos_code, inactive, service_location) ON \`${DB_NAME}\`.facility TO '${CLINICAL_CARE_DB_USER}'@'%';
 
--- The acting provider's username and group, for the legacy forms row (CC-7). users also holds credential and
--- contact columns this service must never see, so the grant is on id and username only.
-GRANT SELECT (id, username) ON \`${DB_NAME}\`.users TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- The visit categories the lookup offers (M5d slice 4): only the columns legacy's own visit form filters and orders on, not the recurrence, colour or description columns.
+GRANT SELECT (pc_catid, pc_catname, pc_cattype, pc_active, pc_seq, pc_constant_id) ON \`${DB_NAME}\`.openemr_postcalendar_categories TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- The acting user (ADR 0075): the gateway forwards the OpenEMR user uuid it verified, and this resolves it to the id and username legacy's columns record, and refuses an inactive account.
+-- The username and group also go on the legacy forms row (CC-7). users also holds credential and contact columns this service must never see, so the grant is on id, username, uuid and active only.
+GRANT SELECT (id, username, uuid, active) ON \`${DB_NAME}\`.users TO '${CLINICAL_CARE_DB_USER}'@'%';
 GRANT SELECT (name, \`user\`) ON \`${DB_NAME}\`.\`groups\` TO '${CLINICAL_CARE_DB_USER}'@'%';
 
 -- No grant on patient_data. The interim stand-in that read it was removed when events arrived (ADR 0064 #5, ADR 0066):

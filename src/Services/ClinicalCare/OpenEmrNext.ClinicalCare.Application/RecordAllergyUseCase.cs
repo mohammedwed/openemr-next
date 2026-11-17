@@ -44,7 +44,7 @@ public sealed class RecordAllergyUseCase(
             // No allergy exists yet, so the row names the patient the caller asked about; if this write fails the request fails (fail closed).
             await auditLog.AppendAsync(
                 new AuditEntry(
-                    clock.GetUtcNow().UtcDateTime, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false),
+                    clock.GetUtcNow().UtcDateTime, Actors.Of(command.Origin, command.ProviderId),
                     AuditActions.AllergyRecord, command.PatientUuid, AuditOutcome.Failed,
                     command.Origin?.CorrelationId, command.Origin?.SourceAddress),
                 ct);
@@ -73,7 +73,7 @@ public sealed class RecordAllergyUseCase(
             allergy,
             new AllergyRecordedEvent(allergy.Uuid, patient.Uuid, patient.Pid, nowUtc),
             new AuditEntry(
-                nowUtc, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false), AuditActions.AllergyRecord,
+                nowUtc, Actors.Of(command.Origin, command.ProviderId), AuditActions.AllergyRecord,
                 allergy.Uuid, AuditOutcome.Success, command.Origin?.CorrelationId, command.Origin?.SourceAddress),
             ct);
 

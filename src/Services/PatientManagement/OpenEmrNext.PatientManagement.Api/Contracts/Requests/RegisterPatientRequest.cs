@@ -15,12 +15,7 @@ namespace OpenEmrNext.PatientManagement.Api.Contracts.Requests;
 /// <param name="DateOfBirth">The patient's date of birth.</param>
 /// <param name="Email">Optional. Validated for shape if present.</param>
 /// <param name="TrustedEmail">Optional. Validated for shape if present.</param>
-/// <param name="RegisteredBy">
-/// The id of the user performing the registration. Caller-supplied for now, not verified against any
-/// authenticated session -- this service has no authentication wired into it yet (an already-accepted
-/// gap inherited from ADR 0048: the gateway validates no tokens yet, and nothing downstream of it does
-/// either). Revisit once that gap closes.
-/// </param>
+/// <param name="RegisteredBy">Ignored: the acting user is the signed-in user the gateway verified (ADR 0075), whatever this says. Kept optional so existing callers do not break; it will be removed in a later contract version.</param>
 public sealed record RegisterPatientRequest(
     [Required(ErrorMessage = "First name must be between 1 and 255 characters.")]
     [StringLength(255, MinimumLength = 1, ErrorMessage = "First name must be between 1 and 255 characters.")]
@@ -34,4 +29,4 @@ public sealed record RegisterPatientRequest(
     DateOnly DateOfBirth,
     [EmailAddress(ErrorMessage = "Email is not a valid email.")] string? Email,
     [EmailAddress(ErrorMessage = "Trusted Email is not a valid email.")] string? TrustedEmail,
-    [Range(1, long.MaxValue, ErrorMessage = "RegisteredBy must identify the registering user.")] long RegisteredBy);
+    [Range(1, long.MaxValue, ErrorMessage = "RegisteredBy must identify the registering user.")] long? RegisteredBy);

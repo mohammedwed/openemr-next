@@ -10,11 +10,11 @@ namespace OpenEmrNext.ClinicalCare.Infrastructure;
 internal static class IssueRows
 {
     /// <summary>Registers the uuid so legacy recognises it as its own (it backfills and validates uuids through this table).</summary>
-    public static Task RegisterUuidAsync(ClinicalCareDbContext db, byte[] uuidBytes, CancellationToken ct) =>
+    public static Task RegisterUuidAsync(ClinicalCareDbContext db, byte[] uuidBytes, CancellationToken ct, string tableName = "lists") =>
         db.Database.ExecuteSqlInterpolatedAsync(
             $"""
             INSERT INTO uuid_registry (uuid, table_name, table_id, table_vertical, couchdb, document_drive, mapped, created)
-            VALUES ({uuidBytes}, 'lists', 'id', '', '', 0, 0, NOW())
+            VALUES ({uuidBytes}, {tableName}, 'id', '', '', 0, 0, NOW())
             """, ct);
 
     /// <summary>

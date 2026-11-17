@@ -36,24 +36,81 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("DELETE FROM forms")]
     [InlineData("DELETE FROM uuid_registry")]
     [InlineData("DELETE FROM sequences")]
-    [InlineData("UPDATE form_vitals SET weight = 1")]
+    [InlineData("DELETE FROM form_clinical_notes")]
+    [InlineData("UPDATE form_clinical_notes SET `user` = 'x'")]
+    [InlineData("UPDATE form_clinical_notes SET groupname = 'x'")]
+    [InlineData("UPDATE form_clinical_notes SET activity = 0")]
+    [InlineData("UPDATE form_clinical_notes SET authorized = 0")]
+    [InlineData("UPDATE form_clinical_notes SET pid = 1")]
+    [InlineData("UPDATE form_clinical_notes SET encounter = '1'")]
+    [InlineData("UPDATE form_clinical_notes SET form_id = 1")]
+    [InlineData("UPDATE form_clinical_notes SET uuid = NULL")]
+    [InlineData("UPDATE form_clinical_notes SET note_related_to = 'x'")]
+    [InlineData("UPDATE form_clinical_notes SET external_id = 'x'")]
+    [InlineData("UPDATE form_clinical_notes SET description = 'x', activity = 0")]
+    [InlineData("UPDATE list_options SET title = 'x'")]
+    [InlineData("DELETE FROM form_soap")]
+    [InlineData("UPDATE form_soap SET pid = 1")]
+    [InlineData("INSERT INTO openemr_postcalendar_categories (pc_catname) VALUES ('x')")]
+    [InlineData("UPDATE openemr_postcalendar_categories SET pc_active = 0")]
+    [InlineData("DELETE FROM openemr_postcalendar_categories")]
+    [InlineData("UPDATE facility SET inactive = 1")]
+    [InlineData("UPDATE form_soap SET `date` = NOW()")]
+    [InlineData("UPDATE form_soap SET `user` = 'x'")]
+    [InlineData("UPDATE form_soap SET groupname = 'x'")]
+    [InlineData("UPDATE form_soap SET authorized = 0")]
+    [InlineData("UPDATE form_soap SET activity = 0")]
+    [InlineData("UPDATE form_soap SET plan = 'x', pid = 1")]
+    [InlineData("DELETE FROM immunizations")]
+    [InlineData("UPDATE immunizations SET patient_id = 1")]
+    [InlineData("UPDATE immunizations SET uuid = NULL")]
+    [InlineData("UPDATE immunizations SET create_date = NOW()")]
+    [InlineData("UPDATE immunizations SET created_by = 1")]
+    [InlineData("UPDATE immunizations SET updated_by = 1")]
+    [InlineData("UPDATE immunizations SET external_id = 'x'")]
+    [InlineData("UPDATE immunizations SET note = 'x', patient_id = 1")]
+    [InlineData("UPDATE form_vitals SET `user` = 'x'")]
+    [InlineData("UPDATE form_vitals SET groupname = 'x'")]
+    [InlineData("UPDATE form_vitals SET `date` = NOW()")]
+    [InlineData("UPDATE form_vitals SET authorized = 0")]
+    [InlineData("UPDATE form_vitals SET activity = 0")]
+    [InlineData("UPDATE form_vitals SET pid = 1")]
+    [InlineData("UPDATE form_vitals SET uuid = NULL")]
+    [InlineData("UPDATE form_vitals SET last_updated = NOW()")]
+    [InlineData("UPDATE form_vitals SET weight = 1, `user` = 'x'")]
     [InlineData("DELETE FROM form_vitals")]
     [InlineData("INSERT INTO patient_data (pid) VALUES (1)")]
     [InlineData("UPDATE patient_data SET fname = 'x'")]
     [InlineData("INSERT INTO users (username) VALUES ('intruder')")]
+    [InlineData("UPDATE users SET active = 0")]
+    [InlineData("UPDATE users SET uuid = NULL")]
+    [InlineData("UPDATE users SET username = 'x'")]
     [InlineData("DROP TABLE form_encounter")]
     public async Task The_production_principal_cannot_change_what_it_does_not_own(string sql) =>
         await AssertDeniedAsync(sql);
 
     [Theory]
     [InlineData("SELECT password FROM users")]
+    [InlineData("SELECT fname FROM users")]
+    [InlineData("SELECT email FROM users")]
+    [InlineData("SELECT authorized FROM users")]
+    [InlineData("SELECT npi FROM users")]
+    [InlineData("SELECT federaldrugid FROM users")]
     [InlineData("SELECT * FROM users")]
     [InlineData("SELECT fname FROM patient_data")]
     [InlineData("SELECT * FROM patient_data")]
     [InlineData("SELECT uuid FROM patient_data")]
     [InlineData("SELECT pid FROM patient_data")]
     [InlineData("SELECT phone FROM facility")]
-    [InlineData("SELECT notes FROM list_options")]
+    [InlineData("SELECT street FROM facility")]
+    [InlineData("SELECT federal_ein FROM facility")]
+    [InlineData("SELECT pc_catcolor FROM openemr_postcalendar_categories")]
+    [InlineData("SELECT pc_catdesc FROM openemr_postcalendar_categories")]
+    [InlineData("SELECT pc_recurrspec FROM openemr_postcalendar_categories")]
+    [InlineData("SELECT codes FROM list_options")]
+    [InlineData("SELECT toggle_setting_1 FROM list_options")]
+    [InlineData("SELECT mapping FROM list_options")]
+    [InlineData("SELECT * FROM list_options")]
     public async Task The_production_principal_cannot_read_columns_or_tables_it_has_no_need_for(string sql)
     {
         await using var db = fixture.CreateDbContext();
@@ -157,6 +214,117 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("TRUNCATE TABLE issue_encounter")]
     public async Task The_production_principal_cannot_change_or_remove_issues_beyond_inserting_a_problems_columns(string sql) =>
         await AssertDeniedAsync(sql);
+
+    [Fact]
+    public async Task The_production_principal_can_read_exactly_the_user_columns_that_identify_and_name_the_acting_user()
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // The forwarded uuid resolves to an id and username, and an inactive account is refused (ADR 0075): four columns, none of the credential or contact ones.
+        await db.Database.ExecuteSqlRawAsync("SELECT id, username, uuid, active FROM users LIMIT 1");
+    }
+
+    [Fact]
+    public async Task The_production_principal_can_read_the_option_columns_the_lookups_use_including_a_note_types_loinc_code_and_whether_it_is_active()
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // Granted for the clinical note types (ADR 0074): notes holds the LOINC code legacy stores with the type, activity whether it is still offered.
+        await db.Database.ExecuteSqlRawAsync("SELECT list_id, option_id, title, seq, is_default, notes, activity FROM list_options LIMIT 1");
+    }
+
+    [Theory]
+    [InlineData("date")]
+    [InlineData("code")]
+    [InlineData("codetext")]
+    [InlineData("description")]
+    [InlineData("clinical_notes_type")]
+    [InlineData("clinical_notes_category")]
+    public async Task The_production_principal_may_update_exactly_the_clinical_note_columns_it_owns(string column)
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // The column name is one of this theory's own constants, never input, which is why the interpolation (EF1002) is safe here.
+#pragma warning disable EF1002
+        await db.Database.ExecuteSqlRawAsync($"UPDATE form_clinical_notes SET `{column}` = `{column}`");
+#pragma warning restore EF1002
+    }
+
+    [Theory]
+    [InlineData("subjective")]
+    [InlineData("objective")]
+    [InlineData("assessment")]
+    [InlineData("plan")]
+    public async Task The_production_principal_may_update_exactly_the_four_soap_sections(string column)
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // The column name is one of this theory's own constants, never input, which is why the interpolation (EF1002) is safe here.
+#pragma warning disable EF1002
+        await db.Database.ExecuteSqlRawAsync($"UPDATE form_soap SET `{column}` = `{column}`");
+#pragma warning restore EF1002
+    }
+
+    [Theory]
+    [InlineData("administered_date")]
+    [InlineData("immunization_id")]
+    [InlineData("cvx_code")]
+    [InlineData("manufacturer")]
+    [InlineData("lot_number")]
+    [InlineData("administered_by_id")]
+    [InlineData("administered_by")]
+    [InlineData("education_date")]
+    [InlineData("vis_date")]
+    [InlineData("note")]
+    [InlineData("amount_administered")]
+    [InlineData("amount_administered_unit")]
+    [InlineData("expiration_date")]
+    [InlineData("route")]
+    [InlineData("administration_site")]
+    [InlineData("added_erroneously")]
+    [InlineData("completion_status")]
+    [InlineData("information_source")]
+    [InlineData("refusal_reason")]
+    [InlineData("ordering_provider")]
+    [InlineData("reason_code")]
+    [InlineData("reason_description")]
+    [InlineData("encounter_id")]
+    [InlineData("update_date")]
+    public async Task The_production_principal_may_update_exactly_the_immunization_columns_it_owns(string column)
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // Setting a column to itself is enough to exercise the privilege check; no row is needed. The column name is one of this theory's own constants.
+#pragma warning disable EF1002
+        await db.Database.ExecuteSqlRawAsync($"UPDATE immunizations SET `{column}` = `{column}`");
+#pragma warning restore EF1002
+    }
+
+    [Theory]
+    [InlineData("weight")]
+    [InlineData("height")]
+    [InlineData("temperature")]
+    [InlineData("temp_method")]
+    [InlineData("bps")]
+    [InlineData("bpd")]
+    [InlineData("pulse")]
+    [InlineData("respiration")]
+    [InlineData("oxygen_saturation")]
+    [InlineData("waist_circ")]
+    [InlineData("head_circ")]
+    [InlineData("BMI")]
+    [InlineData("BMI_status")]
+    [InlineData("note")]
+    public async Task The_production_principal_may_update_exactly_the_vitals_measurement_columns(string column)
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // Setting a column to itself is enough to exercise the privilege check; no row is needed. The column name is one of this theory's own constants, never
+        // input, which is why the interpolation (EF1002) is safe here.
+#pragma warning disable EF1002
+        await db.Database.ExecuteSqlRawAsync($"UPDATE form_vitals SET `{column}` = `{column}`");
+#pragma warning restore EF1002
+    }
 
     [Theory]
     [InlineData("title")]

@@ -38,7 +38,8 @@ public sealed record VitalsResponse(
     QuantityResponse? HeadCircumference,
     decimal? Bmi,
     string? BmiStatus,
-    string? Note)
+    string? Note,
+    string? ETag = null)
 {
     public static VitalsResponse From(VitalsView view, UnitSystem system) => new(
         view.Uuid, view.RecordedAt, view.RecordedBy,
@@ -48,7 +49,7 @@ public sealed record VitalsResponse(
         view.TemperatureMethod, view.Systolic, view.Diastolic, view.Pulse, view.Respiration, view.OxygenSaturation,
         Quantity(MeasurementKind.WaistCircumference, view.WaistInches, system),
         Quantity(MeasurementKind.HeadCircumference, view.HeadInches, system),
-        view.Bmi, view.BmiStatus, view.Note);
+        view.Bmi, view.BmiStatus, view.Note, Preconditions.ETagOf(view.LastUpdated));
 
     private static QuantityResponse? Quantity(MeasurementKind kind, decimal? stored, UnitSystem system) =>
         stored is null

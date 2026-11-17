@@ -47,6 +47,7 @@
     <Project Path="tests/Services/ClinicalCare/OpenEmrNext.ClinicalCare.ArchitectureTests/OpenEmrNext.ClinicalCare.ArchitectureTests.csproj" />
     <Project Path="tests/Services/ClinicalCare/OpenEmrNext.ClinicalCare.IntegrationTests/OpenEmrNext.ClinicalCare.IntegrationTests.csproj" />
     <Project Path="tests/Services/Gateway/OpenEmrNext.Gateway.IntegrationTests/OpenEmrNext.Gateway.IntegrationTests.csproj" />
+    <Project Path="tests/Services/Gateway/OpenEmrNext.Gateway.ProxyTests/OpenEmrNext.Gateway.ProxyTests.csproj" />
     <Project Path="tests/Services/PatientManagement/OpenEmrNext.PatientManagement.UnitTests/OpenEmrNext.PatientManagement.UnitTests.csproj" />
     <Project Path="tests/Services/PatientManagement/OpenEmrNext.PatientManagement.ArchitectureTests/OpenEmrNext.PatientManagement.ArchitectureTests.csproj" />
     <Project Path="tests/Services/PatientManagement/OpenEmrNext.PatientManagement.IntegrationTests/OpenEmrNext.PatientManagement.IntegrationTests.csproj" />

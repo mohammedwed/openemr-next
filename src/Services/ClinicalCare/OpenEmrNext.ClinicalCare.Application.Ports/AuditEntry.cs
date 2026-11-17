@@ -37,10 +37,17 @@ public static class AuditActions
     public const string EncounterCreate = "encounter.create";
     public const string EncounterUpdate = "encounter.update";
     public const string VitalsRecord = "vitals.record";
+    public const string VitalsCorrect = "vitals.correct";
     public const string ProblemRecord = "problem.record";
     public const string AllergyRecord = "allergy.record";
     public const string ProblemUpdate = "problem.update";
     public const string AllergyUpdate = "allergy.update";
+    public const string ImmunizationRecord = "immunization.record";
+    public const string ImmunizationCorrect = "immunization.correct";
+    public const string ClinicalNoteRecord = "clinical_note.record";
+    public const string ClinicalNoteCorrect = "clinical_note.correct";
+    public const string SoapRecord = "soap.record";
+    public const string SoapCorrect = "soap.correct";
     public const string EncounterIssueLink = "encounter.issue.link";
     public const string EncounterIssueUnlink = "encounter.issue.unlink";
 }
@@ -57,11 +64,18 @@ public static class AuditActions
 public sealed class AuditEntry
 {
     /// <summary>Column widths in <c>clinical_care_audit</c>; the seed script is the other place these numbers live.</summary>
-    public const int MaxActorLength = 100, MaxActionLength = 50, MaxCorrelationLength = 100, MaxAddressLength = 45, MaxDetailsLength = 1000;
+    public const int MaxActorLength = 100, MaxActionLength = 50, MaxCorrelationLength = 100, MaxAddressLength = 45, MaxDetailsLength = 1000, SubjectWidth = 36;
 
     public AuditEntry(
         DateTime atUtc, AuditActor actor, string action, Guid subject, AuditOutcome outcome,
         string? correlationId = null, string? sourceAddress = null, IReadOnlyList<string>? changedFields = null)
+        : this(atUtc, actor, action, subject, outcome, correlationId, sourceAddress, changedFields, null)
+    {
+    }
+
+    private AuditEntry(
+        DateTime atUtc, AuditActor actor, string action, Guid subject, AuditOutcome outcome,
+        string? correlationId, string? sourceAddress, IReadOnlyList<string>? changedFields, string? subjectKey)
     {
         ArgumentNullException.ThrowIfNull(actor);
         ArgumentException.ThrowIfNullOrWhiteSpace(action);
@@ -69,8 +83,17 @@ public sealed class AuditEntry
             throw new ArgumentException($"An audit action is at most {MaxActionLength} characters.", nameof(action));
         // A success names the record it changed. A refusal names whatever the caller asked about, which may not exist and may be
         // the empty uuid: that is still worth a row, and must not turn a 400 or 404 into a 500.
-        if (subject == Guid.Empty && outcome == AuditOutcome.Success)
+        if (subjectKey is not null)
+        {
+            if (string.IsNullOrWhiteSpace(subjectKey) || subjectKey.Length > SubjectWidth)
+                throw new ArgumentException($"An audit subject key is 1 to {SubjectWidth} characters.", nameof(subjectKey));
+        }
+        else if (subject == Guid.Empty && outcome == AuditOutcome.Success)
+        {
             throw new ArgumentException("A successful change names the record it changed.", nameof(subject));
+        }
+
+        SubjectText = subjectKey ?? subject.ToString();
 
         AtUtc = atUtc;
         Actor = actor with { Subject = Cut(actor.Subject, MaxActorLength) ?? "unknown" };
@@ -86,10 +109,24 @@ public sealed class AuditEntry
             throw new ArgumentException($"The changed-field list serializes to more than {MaxDetailsLength} characters.", nameof(changedFields));
     }
 
+    /// <summary>
+    /// For a record that has no uuid (a SOAP note is addressed by its form id, ADR 0073): the subject is a short key such as <c>soap:123</c>, which fits the column that holds a uuid's text.
+    /// <see cref="Subject"/> is then <see cref="Guid.Empty"/>. A key is built by code from a number, never from input.
+    /// </summary>
+    public AuditEntry(
+        DateTime atUtc, AuditActor actor, string action, string subjectKey, AuditOutcome outcome,
+        string? correlationId = null, string? sourceAddress = null, IReadOnlyList<string>? changedFields = null)
+        : this(atUtc, actor, action, Guid.Empty, outcome, correlationId, sourceAddress, changedFields, subjectKey)
+    {
+    }
+
     public DateTime AtUtc { get; }
     public AuditActor Actor { get; }
     public string Action { get; }
     public Guid Subject { get; }
+
+    /// <summary>What is stored in the <c>subject</c> column: the uuid's text, or the key of a record that has no uuid.</summary>
+    public string SubjectText { get; }
     public AuditOutcome Outcome { get; }
     public string? CorrelationId { get; }
     public string? SourceAddress { get; }

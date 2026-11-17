@@ -32,7 +32,7 @@ public sealed class RecordVitalsUseCase(
             // audit write fails the request rather than letting an unaudited refusal through.
             await auditLog.AppendAsync(
                 new AuditEntry(
-                    clock.GetUtcNow().UtcDateTime, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false),
+                    clock.GetUtcNow().UtcDateTime, Actors.Of(command.Origin, command.ProviderId),
                     AuditActions.VitalsRecord, command.EncounterUuid, AuditOutcome.Failed,
                     command.Origin?.CorrelationId, command.Origin?.SourceAddress),
                 ct);
@@ -56,7 +56,7 @@ public sealed class RecordVitalsUseCase(
 
         var nowUtc = clock.GetUtcNow().UtcDateTime;
         var audit = new AuditEntry(
-            nowUtc, new AuditActor($"user:{command.ProviderId}", command.ProviderId, Verified: false), AuditActions.VitalsRecord,
+            nowUtc, Actors.Of(command.Origin, command.ProviderId), AuditActions.VitalsRecord,
             vitals.Uuid, AuditOutcome.Success, command.Origin?.CorrelationId, command.Origin?.SourceAddress);
 
         await registry.RegisterAsync(

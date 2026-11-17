@@ -130,7 +130,7 @@ public static class EncounterEndpoints
             var encounter = await useCase.ExecuteAsync(
                 new CreateEncounterCommand(
                     request.PatientUuid, request.ClassCode, request.CalendarCategoryId, ClientTime.ToServerLocal(request.Date), request.Reason,
-                    request.FacilityId, request.PosCode, request.ProviderId, ClientTime.ToServerLocal(request.OnsetDate), request.Sensitivity,
+                    request.FacilityId, request.PosCode, request.ProviderId ?? RequestOrigins.ProviderOf(http, null), ClientTime.ToServerLocal(request.OnsetDate), request.Sensitivity,
                     RequestOrigins.From(http)),
                 ct);
 

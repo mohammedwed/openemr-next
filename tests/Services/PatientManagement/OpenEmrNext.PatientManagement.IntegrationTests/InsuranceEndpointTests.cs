@@ -30,6 +30,7 @@ public class InsuranceEndpointTests(PatientDataContainerFixture fixture) : IAsyn
             ])));
         _client = _factory.CreateClient();
         _client.DefaultRequestHeaders.Add("X-Internal-Gateway-Secret", "test-secret");
+        _client.DefaultRequestHeaders.Add("X-Authenticated-User", PatientDataContainerFixture.TestUserUuid.ToString());
         return Task.CompletedTask;
     }
 

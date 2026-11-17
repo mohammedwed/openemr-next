@@ -33,7 +33,7 @@ public sealed class UpdateEncounterUseCase(
             // A refused update changed nothing, so its audit row is its own statement (ADR 0069 #4); it fails closed like the creates.
             await auditLog.AppendAsync(
                 new AuditEntry(
-                    clock.GetUtcNow().UtcDateTime, AuditActor.Unknown, AuditActions.EncounterUpdate, command.EncounterUuid,
+                    clock.GetUtcNow().UtcDateTime, Actors.Of(command.Origin), AuditActions.EncounterUpdate, command.EncounterUuid,
                     AuditOutcome.Failed, command.Origin?.CorrelationId, command.Origin?.SourceAddress),
                 ct);
             throw;
@@ -70,7 +70,7 @@ public sealed class UpdateEncounterUseCase(
                 new EncounterUpdatedEvent(
                     current.Uuid, current.Number, current.PatientUuid, current.PatientPid, changed, nowUtc),
                 new AuditEntry(
-                    nowUtc, AuditActor.Unknown, AuditActions.EncounterUpdate, command.EncounterUuid, AuditOutcome.Success,
+                    nowUtc, Actors.Of(command.Origin), AuditActions.EncounterUpdate, command.EncounterUuid, AuditOutcome.Success,
                     command.Origin?.CorrelationId, command.Origin?.SourceAddress, changed)),
             ct);
 

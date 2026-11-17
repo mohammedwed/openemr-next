@@ -1,3 +1,4 @@
+using OpenEmrNext.PatientManagement.Api.Authentication;
 using OpenEmrNext.PatientManagement.Api.Contracts.Requests;
 using OpenEmrNext.PatientManagement.Api.Contracts.Responses;
 using OpenEmrNext.PatientManagement.Application;
@@ -48,7 +49,7 @@ public static class AdvanceDirectiveEndpoints
     }
 
     private static async Task<IResult> UploadDocument(
-        long pid, UploadAdvanceDirectiveDocumentRequest request, UploadAdvanceDirectiveDocumentUseCase useCase, CancellationToken ct)
+        long pid, UploadAdvanceDirectiveDocumentRequest request, UploadAdvanceDirectiveDocumentUseCase useCase, HttpContext http, CancellationToken ct)
     {
         var type = AdvanceDirectiveTypeExtensions.TryParse(request.Type);
         if (type is null)
@@ -68,7 +69,7 @@ public static class AdvanceDirectiveEndpoints
         try
         {
             document = await useCase.ExecuteAsync(
-                pid, type.Value, request.FileName, request.MimeType, content, request.EffectiveDate, request.OwnerId, ct);
+                pid, type.Value, request.FileName, request.MimeType, content, request.EffectiveDate, http.ActingUserId(request.OwnerId), ct);
         }
         catch (AdvanceDirectiveDocumentValidationException ex)
         {
@@ -104,13 +105,13 @@ public static class AdvanceDirectiveEndpoints
     }
 
     private static async Task<IResult> SetStatus(
-        long pid, SetAdvanceDirectiveStatusRequest request, SetAdvanceDirectiveStatusUseCase useCase, CancellationToken ct)
+        long pid, SetAdvanceDirectiveStatusRequest request, SetAdvanceDirectiveStatusUseCase useCase, HttpContext http, CancellationToken ct)
     {
         var status = AdvanceDirectiveCompletionStatusExtensions.TryParseWireValue(request.Status);
         if (status is null)
             return ValidationProblems.Single("Status must be \"yes\", \"no\", or \"unknown\".");
 
-        await useCase.ExecuteAsync(pid, status.Value, request.ReviewedAtUtc, request.AuthenticatorUserId, ct);
+        await useCase.ExecuteAsync(pid, status.Value, request.ReviewedAtUtc, http.ActingUserId(request.AuthenticatorUserId), ct);
         return Results.NoContent();
     }
 

@@ -40,6 +40,7 @@ public static class PatientManagementApiExtensions
 
         // The only place the port (Application.Ports.IPatientRegistry) is wired to its real adapter
         // (Infrastructure's EfPatientRegistry) -- Application itself never sees this choice.
+        builder.Services.AddScoped<IUserDirectory, EfUserDirectory>();
         builder.Services.AddScoped<IPatientRegistry, EfPatientRegistry>();
         builder.Services.AddScoped<RegisterPatientUseCase>();
 

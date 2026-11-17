@@ -106,9 +106,30 @@ public class OpenApiDocumentTests : IDisposable
     }
 
     [Theory]
+    [InlineData("/api/v1/lookups/encounter-classes")]
+    [InlineData("/api/v1/lookups/facilities")]
+    [InlineData("/api/v1/lookups/calendar-categories")]
+    [InlineData("/api/v1/lookups/clinical-note-types")]
+    [InlineData("/api/v1/lookups/immunization-options")]
+    [InlineData("/api/v1/lookups/clinical-note-categories")]
+    public async Task The_lookups_are_documented_as_read_only_lists(string path)
+    {
+        using var document = await ReadDocumentAsync();
+
+        var item = document.RootElement.GetProperty("paths").GetProperty(path);
+
+        Assert.True(item.TryGetProperty("get", out _));
+        Assert.False(item.TryGetProperty("put", out _) || item.TryGetProperty("post", out _) || item.TryGetProperty("delete", out _));
+    }
+
+    [Theory]
     [InlineData("/api/v1/encounters/{uuid}")]
     [InlineData("/api/v1/problems/{uuid}")]
     [InlineData("/api/v1/allergies/{uuid}")]
+    [InlineData("/api/v1/encounters/{encounterUuid}/vitals/{vitalsUuid}")]
+    [InlineData("/api/v1/immunizations/{uuid}")]
+    [InlineData("/api/v1/encounters/{encounterUuid}/soap-notes/{noteId}")]
+    [InlineData("/api/v1/encounters/{encounterUuid}/clinical-notes/{noteUuid}")]
     public async Task Every_PUT_declares_the_if_match_header_so_the_generated_client_can_send_it(string path)
     {
         using var document = await ReadDocumentAsync();
@@ -129,6 +150,10 @@ public class OpenApiDocumentTests : IDisposable
     [InlineData("EncounterResponse")]
     [InlineData("ProblemResponse")]
     [InlineData("AllergyResponse")]
+    [InlineData("VitalsResponse")]
+    [InlineData("ImmunizationResponse")]
+    [InlineData("SoapNoteResponse")]
+    [InlineData("ClinicalNoteResponse")]
     public async Task The_updatable_responses_carry_an_etag_property_because_a_list_has_no_per_item_header(string schemaName)
     {
         using var document = await ReadDocumentAsync();

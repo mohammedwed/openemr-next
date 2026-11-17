@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using OpenEmrNext.ClinicalCare.Api.Contracts.Requests;
 using OpenEmrNext.ClinicalCare.Api.Contracts.Responses;
 using OpenEmrNext.ClinicalCare.Application;
@@ -30,6 +31,16 @@ public static class VitalsEndpoints
             .Produces<VitalsListResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        app.MapPut("/encounters/{encounterUuid:guid}/vitals/{vitalsUuid:guid}", CorrectVitals)
+            .WithName("CorrectVitals")
+            .WithTags("Vitals")
+            .WithSummary("Replace a set of vital signs, conditional on the ETag the caller read")
+            .Produces<VitalsResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status412PreconditionFailed)
+            .ProducesProblem(StatusCodes.Status428PreconditionRequired);
 
         app.MapGet("/encounters/{encounterUuid:guid}/vitals/{vitalsUuid:guid}", GetVitals)
             .WithName("GetVitals")
@@ -66,7 +77,7 @@ public static class VitalsEndpoints
                         weight, height, temperature, request.TemperatureMethod, request.BloodPressureSystolic,
                         request.BloodPressureDiastolic, request.Pulse, request.Respiration, request.OxygenSaturation,
                         waist, head, request.Note),
-                    request.ProviderId,
+                    RequestOrigins.ProviderOf(http, request.ProviderId),
                     RequestOrigins.From(http)),
                 ct);
 
@@ -105,6 +116,60 @@ public static class VitalsEndpoints
         catch (EncounterNotFoundException ex)
         {
             return NotFound("Encounter not found.", ex.Message);
+        }
+    }
+
+    private static async Task<IResult> CorrectVitals(
+        Guid encounterUuid, Guid vitalsUuid, CorrectVitalsRequest request, string? units, CorrectVitalsUseCase useCase, HttpContext http,
+        [FromHeader(Name = "If-Match")] string? ifMatch, CancellationToken ct)
+    {
+        // Before anything else: a correction must say which version it is based on (ADR 0068 #3).
+        if (!Preconditions.TryRead(ifMatch, out var offered))
+            return Preconditions.Required();
+
+        if (!UnitWire.TryParseSystem(units, out var system))
+            return ValidationProblems.Single("units must be 'us' or 'metric'.");
+
+        // A unit that is not one of ours is a 400 in the same shape as every other validation failure, decided (like a malformed body) before the record is read.
+        var errors = new List<string>();
+        var weight = ToQuantity(request.Weight, "Weight", errors);
+        var height = ToQuantity(request.Height, "Height", errors);
+        var temperature = ToQuantity(request.Temperature, "Temperature", errors);
+        var waist = ToQuantity(request.WaistCircumference, "Waist circumference", errors);
+        var head = ToQuantity(request.HeadCircumference, "Head circumference", errors);
+
+        if (errors.Count > 0)
+            return ValidationProblems.Many(errors);
+
+        try
+        {
+            var result = await useCase.ExecuteAsync(
+                new CorrectVitalsCommand(
+                    encounterUuid, vitalsUuid, offered,
+                    new VitalsInput(
+                        weight, height, temperature, request.TemperatureMethod, request.BloodPressureSystolic, request.BloodPressureDiastolic, request.Pulse,
+                        request.Respiration, request.OxygenSaturation, waist, head, request.Note),
+                    RequestOrigins.From(http)),
+                ct);
+
+            // The new ETag, so the caller can keep editing without another read.
+            return Preconditions.Ok(VitalsResponse.From(result.Vitals, system), result.Vitals.LastUpdated);
+        }
+        catch (VitalsValidationException ex)
+        {
+            return ValidationProblems.Many(ex.Errors);
+        }
+        catch (EncounterNotFoundException ex)
+        {
+            return NotFound("Encounter not found.", ex.Message);
+        }
+        catch (VitalsNotFoundException ex)
+        {
+            return NotFound("Vitals not found.", ex.Message);
+        }
+        catch (ConcurrencyConflictException ex)
+        {
+            return Preconditions.Failed(ex.CurrentStamp);
         }
     }
 

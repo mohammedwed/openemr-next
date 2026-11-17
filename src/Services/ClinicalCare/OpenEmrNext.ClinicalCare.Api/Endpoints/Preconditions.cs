@@ -51,6 +51,32 @@ internal static class Preconditions
     private static IResult WithETag(IResult inner, DateTime? stamp) =>
         stamp is null ? inner : new ETagResult(inner, ConcurrencyToken.From(stamp.Value).ToETag());
 
+    // The same contract for a row versioned by content instead of a stamp (ADR 0072): the tag has its own shape, so one kind can never satisfy the other.
+
+    /// <summary>A 200 carrying <paramref name="body"/> and the content version's <c>ETag</c>.</summary>
+    public static IResult Ok<T>(T body, ContentVersion version) => new ETagResult(Results.Ok(body), version.ToETag());
+
+    /// <summary>As <see cref="TryRead"/>, for content tags: <c>false</c> when there is nothing to compare against (absent, blank or <c>*</c>).</summary>
+    public static bool TryReadContent(string? header, out IReadOnlyList<ContentVersion> offered)
+    {
+        offered = [];
+        if (string.IsNullOrWhiteSpace(header) || header.Trim() == "*")
+            return false;
+
+        offered = ContentVersion.ParseIfMatch(header);
+        return true;
+    }
+
+    /// <summary>412 for a content-versioned record, carrying its current <c>ETag</c> when known.</summary>
+    public static IResult Failed(ContentVersion? currentVersion)
+    {
+        var problem = Results.Problem(
+            title: "The record has changed.",
+            detail: "It was changed after you read it, possibly in the legacy screens. Read it again and apply your change to the current version.",
+            statusCode: StatusCodes.Status412PreconditionFailed);
+        return currentVersion is { } version ? new ETagResult(problem, version.ToETag()) : problem;
+    }
+
     private sealed class ETagResult(IResult inner, string etag) : IResult
     {
         public Task ExecuteAsync(HttpContext httpContext)

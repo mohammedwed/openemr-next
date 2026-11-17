@@ -9,3 +9,42 @@ public sealed class EncounterNotFoundException(Guid encounterUuid)
 {
     public Guid EncounterUuid { get; } = encounterUuid;
 }
+
+/// <summary>The vitals to correct do not exist in this encounter, or legacy deleted them. Maps to 404 (DOM-17).</summary>
+public sealed class VitalsNotFoundException(Guid vitalsUuid) : Exception($"No vitals with uuid {vitalsUuid} exist in this encounter.")
+{
+    public Guid VitalsUuid { get; } = vitalsUuid;
+}
+
+public sealed class ImmunizationNotFoundException(Guid immunizationUuid) : Exception($"No immunization with uuid {immunizationUuid} exists.")
+{
+    public Guid ImmunizationUuid { get; } = immunizationUuid;
+}
+
+/// <summary>The immunization changed after the caller read it (ADR 0072): maps to 412, carrying the current content version so the caller can reload.</summary>
+public sealed class ImmunizationConflictException(Guid immunizationUuid, OpenEmrNext.ClinicalCare.Domain.ValueObjects.ContentVersion? currentVersion)
+    : Exception($"{immunizationUuid} changed after it was read.")
+{
+    public Guid ImmunizationUuid { get; } = immunizationUuid;
+
+    public OpenEmrNext.ClinicalCare.Domain.ValueObjects.ContentVersion? CurrentVersion { get; } = currentVersion;
+}
+
+public sealed class SoapNoteNotFoundException(long noteId) : Exception($"No SOAP note {noteId} exists in this encounter.")
+{
+    public long NoteId { get; } = noteId;
+}
+
+/// <summary>The note changed after the caller read it (ADR 0072): maps to 412, carrying the current content version.</summary>
+public sealed class SoapNoteConflictException(long noteId, OpenEmrNext.ClinicalCare.Domain.ValueObjects.ContentVersion? currentVersion)
+    : Exception($"SOAP note {noteId} changed after it was read.")
+{
+    public long NoteId { get; } = noteId;
+
+    public OpenEmrNext.ClinicalCare.Domain.ValueObjects.ContentVersion? CurrentVersion { get; } = currentVersion;
+}
+
+public sealed class ClinicalNoteNotFoundException(Guid noteUuid) : Exception($"No clinical note with uuid {noteUuid} exists in this encounter.")
+{
+    public Guid NoteUuid { get; } = noteUuid;
+}

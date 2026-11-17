@@ -93,7 +93,8 @@ Strictly greater than: `> 42` Obesity III; `> 34` Obesity II; `> 30` Obesity I; 
 
 | Item | Status | Precondition |
 |---|---|---|
-| Update or delete vitals | Deferred | Concurrency token (LEG-10), audit (SEC-9), writer inventory |
+| Update vitals | **Built in M5d** (`13-correct-vitals-slice.md`) | The concurrency token, audit and writer inventory are in place |
+| Delete vitals | Deferred | The permission port (legacy needs `admin/super`) |
 | Per-measurement details (`form_vital_details`: interpretation, reason code) | Deferred | A code-list port for `observation_interpretation`; clinical review |
 | Oxygen flow rate, inhaled oxygen concentration | Deferred | A need; rarely used |
 | Paediatric percentile fields (`ped_*`) | Deferred | Patient age, which Clinical Care does not hold |

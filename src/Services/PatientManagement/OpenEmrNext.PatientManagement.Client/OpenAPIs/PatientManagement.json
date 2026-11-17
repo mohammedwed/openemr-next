@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "PatientManagement API",
-    "description": "Patient registration, insurance, advance directives, and the FHIR Patient API. Every endpoint requires the shared X-Internal-Gateway-Secret header (ADR 0055) -- there is no per-user authentication yet; see that ADR for why.",
+    "description": "Patient registration, insurance, advance directives, and the FHIR Patient API. Every endpoint requires the shared X-Internal-Gateway-Secret header (ADR 0055), which proves the request came from the gateway, and a verified user in X-Authenticated-User, which only the gateway sets after checking the session (ADR 0075). The verified user is who registers a patient, owns an uploaded document and reviews an advance directive; the ids a request body names for those are ignored.",
     "version": "1.0.0"
   },
   "paths": {
@@ -591,7 +591,6 @@
           {
             "name": "registeredBy",
             "in": "query",
-            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1096,6 +1095,7 @@
             "minimum": 1,
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
+              "null",
               "integer",
               "string"
             ],
@@ -1185,6 +1185,7 @@
             "minimum": 1,
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
+              "null",
               "integer",
               "string"
             ],

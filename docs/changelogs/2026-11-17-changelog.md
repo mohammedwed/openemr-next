@@ -291,3 +291,128 @@ Full record: `docs/clinical-care/12-shadow-comparison-and-review.md`.
 - **Dead code removed:** three audit-action constants nothing used.
 - **Still open (not fixed here):** the gateway still serves these routes without a sign-in (the CRITICAL finding, which they inherit); the new screens and the legacy-UI check are not yet verified in a browser.
 - **Tests, all green (unit 499, architecture 51, integration 494).**
+
+## Added — M5d slice 1: correct recorded vitals (`PUT /encounters/{uuid}/vitals/{vitalsUuid}`)
+
+Full record: `docs/clinical-care/13-correct-vitals-slice.md` (rules CV-15 to CV-24, limitations L1 to L6). First slice of M5d, "finish Clinical Care", on branch `feat/m5d-clinical-care-completion`.
+
+- **The vitals counterpart of the other updates:** replaces the whole measurement set, conditional on the `ETag` the caller read (`form_vitals.last_updated`); 200 with the new `ETag`, 428 without `If-Match`, 412 (with the current
+  `ETag`) when the row changed, including by the legacy screen; 400, 401 and 404 as elsewhere. Either unit system for the response.
+- **One set of measurement rules for recording and correcting:** the unit conversion, bounds, whole-number readings, oxygen rounding, text limits and BMI moved out of `VitalsRecording.Create` into `VitalsFieldRules`, which both use; a test
+  runs the same inputs through both and demands the same values or the same messages. The extraction changed no recording behaviour (all existing tests passed unchanged first).
+- **Reaches only its own vitals:** the `UPDATE` matches through the `forms` registry row on encounter number and patient and excludes soft-deleted vitals, so vitals of another encounter or patient are a 404 even by exact uuid (legacy's own
+  statement checks neither).
+- **A reading can be removed** by leaving it out (stored as `0`, as legacy reads "not recorded"), at least one must remain, and the BMI is recomputed or cleared with it.
+- **Only the 14 measurement columns are written and granted;** who recorded the vitals and when, `authorized` and the `forms` row are untouched.
+- **No history, and the editor is unknown,** as for the other updates: the audit row names the measurements that changed, never values.
+- **Contract:** `VitalsResponse` gains an `eTag` (also on every list item) and the operation declares `If-Match`, 412 and 428; OpenAPI snapshot regenerated.
+- **Tests, all green (unit 533, architecture 53, integration 545).** The solution builds with no new warnings.
+
+## Added — M5d slice 2: immunizations (`/api/v1/immunizations`)
+
+Full record: `docs/clinical-care/15-record-immunization-slice.md` (rules IM-1 to IM-16, limitations L1 to L7), research `14-immunizations-research.md`, decision `docs/architecture/0072-...`.
+
+- **Record, read, list and correct,** the first API that can write legacy's `immunizations` table (legacy's REST and FHIR surface is read-only and its service's write methods are stubs, so the rules are all new). Entered-in-error is a field of the
+  correction, legacy's non-destructive void; there is no delete.
+- **Versioned by content, not by a stamp** (ADR 0072): the table's `update_date` has no default and no `ON UPDATE`, and the issue screen saves with `REPLACE INTO`, which moves nothing. The `ETag` is a hash of the owned columns (`"c-..."`, a different shape from a
+  stamp's), verified under a row lock inside the write transaction, so even a legacy edit landing between the read and the write is a 412. A test fires six concurrent corrections on one version and demands exactly one winner.
+- **An expired vaccine is accepted:** giving one is a reportable event, and refusing the record would hide it.
+- **Bytes, not characters,** for the two `text` columns; the float `amount_administered` is read and written at four places; a linked encounter must be the same patient's.
+- **Grants:** `SELECT, INSERT` plus `UPDATE` on exactly the 24 owned columns (including `update_date`, which this service now sets); no `DELETE`; the patient, uuid, creation and creator columns and `external_id` cannot be written.
+- **Contract:** new routes, `ImmunizationResponse.eTag`, `If-Match`/412/428 on the PUT; OpenAPI snapshot regenerated.
+- **Tests, all green (unit 616, architecture 59, integration 623).** The solution builds with only the 7 pre-existing warnings.
+
+## Added — M5d slice 3: SOAP notes (`/api/v1/encounters/{uuid}/soap-notes`)
+
+Full record: `docs/clinical-care/17-soap-notes-slice.md` (rules SN-1 to SN-10, limitations L1 to L6), research `16-soap-notes-research.md`, decision `docs/architecture/0073-...`.
+
+- **Record, read, list and correct** an encounter's SOAP notes. `form_soap` has no uuid and no stamp, so a note is addressed by its legacy id **within its encounter** (ADR 0073) and versioned by a content hash of its four sections (ADR 0072), the same
+  `ETag`/`If-Match`/412/428 contract as the immunizations.
+- **Safer than legacy's own REST update:** every statement matches the note through its encounter's `forms` row, so a note of another encounter or patient is a 404 (legacy's update checks neither); a correction does **not** rewrite `date` or `pid`, which legacy's does.
+- **The legacy rows now say who wrote them:** the acting provider's username and group are recorded (legacy's REST path leaves them empty).
+- **Bytes, not characters,** for the `text` sections; an entirely empty note is refused.
+- **Audit gains a keyed subject:** `AuditEntry` can name a record that has no uuid (`soap:{id}`), written into the same column.
+- **Grants:** `SELECT, INSERT` on `form_soap` plus `UPDATE` on exactly the four sections; no `DELETE`; date, pid, user, group, authorized and activity cannot be written.
+- **Refactor:** the content-versioned update outcome is now one shared `ContentUpdateOutcome` (immunizations and SOAP).
+- **Tests, all green (unit 650, architecture 63, integration 671).** The solution builds with only the 7 pre-existing warnings.
+
+## Added — M5d slice 4: encounter lookups (`/api/v1/lookups/...`)
+
+Full record: `docs/clinical-care/18-lookups-slice.md` (rules LK-1 to LK-6, limitations L1 to L3). The API half of decision 10 in `patient-view-pending-decisions.md`.
+
+- **Three read-only lists:** `encounter-classes`, `facilities` and `calendar-categories`, so a caller can offer a choice instead of typing ids. Categories are the ones legacy's own visit form offers (active patient-visit categories, not no-show, in legacy's order); facilities are the
+  non-inactive ones. Every list is bounded at 500 rows, and what they offer is what creating an encounter accepts (a test does exactly that).
+- **No providers list on purpose:** staff names over an API reachable without sign-in would widen that open finding; the acting provider should come from the session once identity is forwarded.
+- **Grants:** `SELECT` on `inactive` and `service_location` of `facility`, and on six columns of `openemr_postcalendar_categories`; nothing else about either table is readable and neither is writable.
+- **Not yet done:** the WebApp still shows its fixed class list and numeric category and facility fields.
+- **Tests, all green (unit 650, architecture 63, integration 692).** The solution builds with only the 7 pre-existing warnings.
+
+## Changed — M5d: lookups wired into the WebApp, and the gateway now routes immunizations and lookups
+
+- **Create-encounter dialog:** class, visit category and facility are now selects filled from the lookups (class defaults to legacy's default, category to the first configured one, facility to the only one when there is exactly one). If a lookup cannot be loaded the
+  dialog warns and falls back to the previous fixed class list and plain id fields. Not browser-verified.
+- **Bug fixed: the gateway had no route for `/api/v1/immunizations` or `/api/v1/lookups`.** Both were served by Clinical Care and built with passing tests, but 404ed for every browser, because the gateway lists each prefix it forwards and its own tests run only against a live stack. Both routes added.
+- **Guard:** `GatewayRoutesTests` (Clinical Care suite) compares every API prefix in the OpenAPI document with the gateway's route list, so a new route group cannot be built and left unreachable. Verified to fail without the fix.
+
+## Added — M5d slice 3b: clinical notes (`/api/v1/encounters/{uuid}/clinical-notes`) — M5d is complete
+
+Full record: `docs/clinical-care/19-clinical-notes-slice.md` (rules CN-1 to CN-10, limitations L1 to L6), decision `docs/architecture/0074-...`.
+
+- **Record, read, list and correct** an encounter's clinical notes. Unlike SOAP, `form_clinical_notes` has a uuid and a real stamp, so identity and the `ETag` follow vitals; the new difficulty is that **one parent `forms` row groups several note rows** whose `form_id` legacy allocates as an unlocked `MAX+1`.
+- **Each note gets its own parent form, its id allocated under a database lock** (ADR 0074). A test with eight simultaneous writers found a real bug in the first version: the transaction's snapshot was fixed before the lock was acquired, so waiting writers still read the stale maximum and took the same id.
+  The lock is now taken on an explicitly held connection before the transaction begins. It serialises this service's writers; legacy's own writer takes no lock, so that race is narrowed, not closed.
+- **The code and label are derived from the type** (the LOINC code in the option's `notes`), so a note cannot carry a code that disagrees with its type. A note is reached only through its own encounter, matching both its own columns and its parent's `forms` row, and only while active; retiring a note (`activity = 0`) is a delete and is not offered.
+- **Two lookups:** `/lookups/clinical-note-types` (with each type's LOINC code) and `/lookups/clinical-note-categories`, the active options in legacy's order.
+- **Grants:** `SELECT, INSERT` plus `UPDATE` on exactly six columns of `form_clinical_notes`; `SELECT` on two more `list_options` columns (`notes`, `activity`). The existing test that pinned `list_options.notes` as unreadable was replaced deliberately, with the columns still denied listed instead.
+- **Not covered:** linked documents and results; `note_related_to` is not parsed (can be stale after a text correction).
+- **Tests, all green (unit 685, architecture 69, integration 760).** The solution builds with only the 7 pre-existing warnings.
+
+## Added — M5d: WebApp screens for vitals correction, immunizations, SOAP notes and clinical notes
+
+Full record: `docs/clinical-care/20-webapp-clinical-screens.md`. **Compile-checked only: the WebApp has no automated tests and none of this has been opened in a browser (it needs a signed-in user).**
+
+- **Vitals:** a "Correct" button per row; the dialog re-reads the record in US units (as stored) and saves against the fresh `ETag`.
+- **SOAP notes and clinical notes:** cards on the encounter page with record and edit. Clinical note type and category are selects from the lookups; a retired type stays selectable on a note that has it.
+- **Immunizations:** a new tab on the patient page with record and edit, coded fields as selects, and "Entered in error" to void an entry.
+- **A silent data loss prevented:** a correction replaces the whole set, and the immunization dialog does not show the linked encounter, ordering provider or the user id of who gave it, so saving would have cleared them. `ImmunizationResponse` now returns `encounterUuid` and the dialog sends all three back; a test pins keeping and clearing the link.
+- **API:** `GET /api/v1/lookups/immunization-options` (seven titled lists in one call, active only, legacy's order) and `encounterUuid` on the immunization response; OpenAPI snapshot regenerated.
+- **Tests, all green (unit 685, architecture 69, integration 765).** The solution builds with only the 7 pre-existing warnings.
+
+## Security — M5b phase 1b, part 1: the gateway now requires a signed-in session for Clinical Care and Patient Management (ADR 0075)
+
+**Closes the critical finding that the Clinical Care and patient APIs were reachable through the gateway with no sign-in.** Until now the gateway attached each backend's shared secret to every request for its routes, so anyone who could reach the gateway could read and write clinical data.
+
+- **The gateway asks AuthFacade** (`GET /api/v1/me`, forwarding only the caller's cookie) before forwarding any request to a Clinical Care or Patient Management route (including `/fhir`). No session is **401** and nothing is forwarded; AuthFacade down or answering oddly is **503** (fail closed). AuthFacade's own revocable session store means a revoked session stops working on the next request; the check is not cached.
+- **The verified user is forwarded** to those two services as `X-Authenticated-User` (the OpenEMR user uuid). The gateway deletes any caller-supplied value of that header on every route, and no longer forwards the browser's session cookie to the two data services.
+- **Tests:** a new in-process project, `OpenEmrNext.Gateway.ProxyTests` (26 tests), runs the real gateway and real YARP proxying against fake backends: 401 without a session on every protected prefix, a revoked or odd session, 503 when the sign-in service errors or is unreachable, a forged identity header replaced or ignored, only the cookie sent to the check, case-insensitive path matching, no check for sign-in or the static app, and revocation taking effect at once. With the check switched off, 21 of the 26 fail. The live-stack tests are updated to expect 401 and pass (14) against the rebuilt gateway.
+- **Not yet done (part 2):** Clinical Care does not use the forwarded identity yet; the acting provider and audit actor are still caller-named. External FHIR clients now need a session; a bearer-token path is a separate decision.
+
+## Security — M5b phase 1b, part 2: Clinical Care acts as the verified user (ADR 0075)
+
+**Closes finding F-CC-1 (the acting provider was whatever the caller named) and the placeholder provider in the WebApp.** With part 1, Clinical Care is now closed to anyone without a signed-in session and records who really did each thing.
+
+- **Every `/api/v1` route needs the verified user** the gateway forwards (`X-Authenticated-User`): none or malformed is **401**, a uuid matching no user or an account legacy has deactivated is **403**. It is middleware, so it runs before any body is bound: a first version as an endpoint filter answered a bad body with 400 before telling an anonymous caller to sign in, which a test caught.
+- **The verified user is the acting provider and the audit actor** (`Verified = true`, subject their uuid, id `users.id`). Every audit row, success or refusal, record or correction, names a real user: `unknown` and `user:{caller-named}` no longer appear from HTTP. Event envelopes carry the same actor.
+- **A `providerId` in a request body is ignored** and is now optional on all seven record requests (an encounter's own provider, a field of the visit, defaults to the acting user and can differ from them). Legacy rows (`user`, `groupname`, `created_by`) name the signed-in user. The OpenAPI document and snapshot are updated.
+- **Grant:** `users` readable columns are now `id`, `username`, `uuid`, `active` (still no credential or contact columns); tests pin what stays denied and that nothing is writable.
+- **WebApp:** no clinical dialog sends a provider id any more. Patient Management's dialogs still send the placeholder, because it has no uuid-to-id lookup yet (it is now behind the sign-in requirement, but its caller-named identity fields are unchanged).
+- **Tests, all green: Clinical Care unit 688, architecture 69, integration 798; gateway proxy 26; live-stack gateway 14.** The Clinical Care test client acts as a seeded user (`dr_who`, id 7); 33 new tests cover 401 and 403 on every route, the verified actor in audit and events, a second user as a different actor, the body `providerId` being ignored, and the grants. The live stack is rebuilt and re-seeded.
+- **Not verified in a browser** (needs a signed-in user): that the WebApp's calls carry the session through the gateway and succeed.
+
+## Security — M5b phase 1b, part 3: Patient Management acts as the verified user too (ADR 0075)
+
+**Closes decision 1 in `patient-view-pending-decisions.md`: no more hardcoded user id `1` anywhere in the WebApp.**
+
+- **Same rule as Clinical Care:** every `/api/v1` and `/fhir` route needs the verified user the gateway forwards (401 if none or malformed; 403 if it matches no user or an account legacy deactivated), as middleware that runs before any body is bound. Patient Management reads `users` itself (`id`, `uuid`, and the newly granted `active`; never the credential columns).
+- **The verified user is who registers a patient** (`patient_data.created_by`, also for `POST /fhir/Patient`), **owns an uploaded advance-directive document** and **reviews the directive status**. The `RegisteredBy`, `OwnerId`, `AuthenticatorUserId` and `?registeredBy=` a caller names are ignored and now optional.
+- **WebApp:** the registration, document upload and directive status dialogs no longer send a user id (the last three uses of the placeholder `1`).
+- **Not built, on purpose: a bearer-token path for external FHIR clients.** `/fhir` now needs a session, and nothing in this repository calls it from outside; the design depends on which clients exist (see ADR 0075 #7).
+- **Tests:** Patient Management unit 166, architecture 17, integration 86 (12 new, covering 401 and 403 on every route, the verified user recorded whatever the body says, FHIR create, and the secret still being required). PM OpenAPI snapshot regenerated; the live stack is rebuilt and re-seeded and the live gateway tests pass (14).
+
+## Fixed — the gateway's session check read the wrong field, so every signed-in user looked signed out (ADR 0075)
+
+**Found by the user the first time the new sign-in check met a real session** ("when I navigate to patients it sees me as logged out"). The gateway asked AuthFacade `GET /api/v1/me` correctly and got a 200, but then looked for a `sub` property; AuthFacade's `MeResponse` calls it **`subject`**. Every real session was therefore treated as not signed in and refused with 401 before reaching Patient Management or Clinical Care. Anonymous requests were refused correctly, so nothing was ever exposed; it failed closed.
+
+- **Why the tests missed it:** the in-process gateway tests used a fake AuthFacade, and I wrote the fake with the same wrong guess as the code, so they agreed with each other and not with the real service. The live-stack tests only cover requests with no session, which needs no real field name. The browser check I had flagged as outstanding is exactly what would have caught it.
+- **Fix:** the gateway reads `subject`, named by one constant. The fake uses that constant, and two new contract tests read AuthFacade's published OpenAPI snapshot and assert that `MeResponse` has that property and does not have `sub`. Reintroducing the bug fails both.
+- **Lesson recorded:** a fake of another service must be derived from that service's published contract, not from the author's memory of it. The gateway proxy tests are now 28 and pass; the gateway is rebuilt and restarted.

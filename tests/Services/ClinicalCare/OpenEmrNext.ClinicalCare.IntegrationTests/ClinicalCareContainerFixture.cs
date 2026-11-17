@@ -39,7 +39,18 @@ public sealed class ClinicalCareContainerFixture : IAsyncLifetime
     private static readonly string[] LegacyTables =
         ["patient_data", "users", "groups", "facility", "list_options", "form_encounter", "form_vitals", "forms", "uuid_registry", "sequences",
          // The issue tables (M5c): lists is shared by every issue type, and the last two exist so the grant tests can prove they are unreadable.
-         "lists", "lists_touch", "lists_medication", "issue_encounter"];
+         "lists", "lists_touch", "lists_medication", "issue_encounter",
+         // Immunizations (M5d slice 2): its own table, shared with no other record type.
+         "immunizations",
+         // SOAP notes (M5d slice 3): linked to an encounter through the forms row, like vitals.
+         "form_soap",
+         // Clinical notes (M5d slice 3b): grouped under a parent form registered in forms.
+         "form_clinical_notes",
+         // Visit categories (M5d slice 4): the lookup reads a few columns of legacy's calendar categories.
+         "openemr_postcalendar_categories"];
+
+    /// <summary>The uuid of the seeded user (id 7, <c>dr_who</c>) the test client acts as: what the gateway would forward once it had verified their session (ADR 0075).</summary>
+    public static readonly Guid TestUserUuid = Guid.Parse("7e57c0de-0000-4000-8000-000000000007");
 
     public string Hostname => _container.Hostname;
     public ushort Port => _container.GetMappedPublicPort(3306);
@@ -103,12 +114,12 @@ public sealed class ClinicalCareContainerFixture : IAsyncLifetime
         await using var root = new MySqlConnection(RootConnectionString);
         await root.OpenAsync();
         foreach (var table in new[]
-                 { "form_encounter", "form_vitals", "forms", "uuid_registry", "clinical_care_outbox", "clinical_care_audit", "lists", "lists_touch", "issue_encounter", "clinical_care_patient_ref", "clinical_care_processed_events", "patient_data", "users", "groups", "facility", "list_options", "sequences" })
+                 { "form_encounter", "form_vitals", "forms", "uuid_registry", "clinical_care_outbox", "clinical_care_audit", "lists", "lists_touch", "issue_encounter", "immunizations", "form_soap", "form_clinical_notes", "openemr_postcalendar_categories", "clinical_care_patient_ref", "clinical_care_processed_events", "patient_data", "users", "groups", "facility", "list_options", "sequences" })
             await ExecuteAsync(root, $"DELETE FROM `{table}`");
 
         // Reference rows: ids and values chosen to match the real snapshot (AMB is the default class; list order is `seq`).
         await ExecuteAsync(root, "INSERT INTO sequences VALUES (1000)");
-        await ExecuteAsync(root, "INSERT INTO users (id, username) VALUES (7, 'dr_who')");
+        await ExecuteAsync(root, $"INSERT INTO users (id, username, uuid, active) VALUES (7, 'dr_who', UNHEX('{TestUserUuid:N}'), 1)");
         await ExecuteAsync(root, "INSERT INTO `groups` (name, `user`) VALUES ('Default', 'dr_who')");
         await ExecuteAsync(root, "INSERT INTO facility (id, name, pos_code) VALUES (3, 'Main Clinic', 11), (4, 'Unnamed POS', NULL)");
         await ExecuteAsync(root,

@@ -1,3 +1,4 @@
+using OpenEmrNext.PatientManagement.Api.Authentication;
 using OpenEmrNext.PatientManagement.Api.Contracts.Requests;
 using OpenEmrNext.PatientManagement.Api.Contracts.Responses;
 using OpenEmrNext.PatientManagement.Application;
@@ -37,7 +38,7 @@ public static class PatientEndpoints
 
     private static async Task<IResult> RegisterPatient(
         RegisterPatientRequest request, RegisterPatientUseCase useCase,
-        ScorePatientForDuplicatesUseCase scoreUseCase, CancellationToken ct)
+        ScorePatientForDuplicatesUseCase scoreUseCase, HttpContext http, CancellationToken ct)
     {
         Patient patient;
         try
@@ -45,7 +46,7 @@ public static class PatientEndpoints
             patient = await useCase.ExecuteAsync(
                 request.FirstName, request.LastName, request.Sex, request.DateOfBirth,
                 request.Email, request.TrustedEmail,
-                request.RegisteredBy, DateTime.UtcNow, ct);
+                http.ActingUserId(request.RegisteredBy), DateTime.UtcNow, ct);
         }
         catch (PatientValidationException ex)
         {
