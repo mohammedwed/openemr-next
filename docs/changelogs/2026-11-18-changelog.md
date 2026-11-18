@@ -14,3 +14,12 @@
 - **A gap the first mutation check found:** removing the *store's* version check was not caught, because the use case checks first and answers 412 before the store is reached (the same thing found for the issue deleter), and even the six-simultaneous test passed by timing. Two tests now call the store directly: one with a stale version, one where a legacy edit lands **between** the read and the write while the correction waits for the row lock. Both pass on the real code and fail with the check removed.
 - **My tests had collateral damage, and I fixed them, not the old test:** they gave every patient the same date of birth (1815-12-10) as an existing duplicate-scoring test, which made my patients its duplicates and failed it. My data is now unique per test.
 - **A response inconsistency fixed:** the single-patient `GET` returned an empty email as `""` and the `PUT` returned `null`; both are now `null`.
+
+## Fixed — the encounter page crashed on first render (found in the first browser check)
+
+The first real look at the WebApp, signed in on the rebuilt stack, found that **opening any encounter showed "An unhandled error has occurred"**. The browser console named the cause: `More than one sibling of component 'EncounterVitalsPanel' has the same key value`.
+
+- **Cause:** `Pages/Encounters/Detail.razor` keyed all four panels (issues, vitals, SOAP notes, clinical notes) with the bare encounter id. The keys exist so each panel reloads when the route moves to another encounter, but Blazor requires keys to be unique **among siblings**, and these four are siblings. The page therefore threw whenever it rendered them together. It has been there since the M5c and M5d screens.
+- **Fix:** each key is now the encounter id paired with the panel's name, so the reload-on-navigation behaviour is unchanged and the keys are unique.
+- **Why no test caught it:** those screens were only compile-checked, and the bUnit project covers the delete flows, not this page. That is the case for the browser check, and for a render test of this page (not yet written).
+- **Checked, not affected:** the patient page uses the same key pattern, but each panel sits in its own tab, so they are not siblings; its tabs all rendered correctly in the same check.
