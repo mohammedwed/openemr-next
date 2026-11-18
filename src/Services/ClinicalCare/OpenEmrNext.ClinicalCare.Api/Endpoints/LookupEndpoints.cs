@@ -6,8 +6,8 @@ using OpenEmrNext.ClinicalCare.Domain.ReadModels;
 namespace OpenEmrNext.ClinicalCare.Api.Endpoints;
 
 /// <summary>
-/// Read-only lists of the choices an encounter needs (M5d slice 4, decision 10 of docs/patient-view-pending-decisions.md). Each is small configuration and returned whole. Providers are not offered: they are staff names,
-/// and the acting provider comes from the session once identity is forwarded (M5b phase 1b).
+/// Read-only lists of the choices an encounter needs (M5d slice 4, decision 10 of docs/patient-view-pending-decisions.md). Each is small configuration and returned whole. Providers are offered (M5f) only to choose someone
+/// other than the signed-in user; the acting provider still comes from the session (ADR 0075).
 /// </summary>
 public static class LookupEndpoints
 {
@@ -30,6 +30,12 @@ public static class LookupEndpoints
             .WithName("ListCalendarCategories").WithTags("Lookups")
             .WithSummary("List the active visit categories, as legacy's visit form offers them")
             .Produces<List<CalendarCategoryLookupResponse>>();
+
+        app.MapGet("/lookups/providers", async (EncounterLookupsUseCase useCase, CancellationToken ct) =>
+                Results.Ok((await useCase.ProvidersAsync(ct)).Select(p => new ProviderLookupResponse(p.Id, p.DisplayName)).ToList()))
+            .WithName("ListProviders").WithTags("Lookups")
+            .WithSummary("List the active providers (users legacy marks authorized), by name")
+            .Produces<List<ProviderLookupResponse>>();
 
         app.MapGet("/lookups/immunization-options", async (IImmunizationLookups lookups, CancellationToken ct) =>
             {

@@ -49,6 +49,8 @@
                 <MudTd>
                     <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="@(() => OpenEditAsync(note))"
                         aria-label="@($"Edit the clinical note of {Formatting.DateText(note.Date)}")">Edit</MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteAsync(note))"
+                        aria-label="@($"Delete the clinical note of {Formatting.DateText(note.Date)}")">Delete</MudButton>
                 </MudTd>
             </RowTemplate>
             <NoRecordsContent>
@@ -119,6 +121,18 @@
             {
                 _loading = false;
             }
+        }
+    }
+
+    private async Task DeleteAsync(ClinicalNoteResponse note)
+    {
+        var reload = await RecordDeletion.ConfirmAndDeleteAsync(
+            DialogService, Snackbar, "Delete this clinical note?",
+            "The note is marked inactive and no longer shown here or in OpenEMR. It is not removed from the database, and an administrator can restore it in OpenEMR.",
+            () => ClinicalCare.DeleteClinicalNoteAsync(EncounterUuid, note.Uuid, note.ETag));
+        if (reload)
+        {
+            await LoadAsync(_page > 1 && _items?.Count == 1 ? _page - 1 : _page);
         }
     }
 

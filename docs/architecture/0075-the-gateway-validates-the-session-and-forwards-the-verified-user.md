@@ -29,3 +29,7 @@ AuthFacade keeps sessions in a server-side store (ADR 0043, 0044) so they can be
 - A WebApp session that expires mid-use now gets 401 from clinical calls and must sign in again; the pages already treat 401 as signed out where they check, and the panels show their generic error.
 - CSRF is unchanged: the cookie is same-origin (ADR 0033) and this ADR adds no new cross-site exposure, but nothing here adds a CSRF token either.
 - The check adds one local call per request. If it matters, a short cache keyed by a hash of the cookie is the next step, trading a bounded revocation delay for latency.
+
+## Amendment, Nov 17 (M5f): the `users` grant is seven columns, not four
+
+Clause 4 above describes Clinical Care's grant on `users` as the columns that resolve the verified uuid (`id`, `username`, `uuid`, `active`). The providers lookup (`docs/clinical-care/18-lookups-slice.md` section 5) added `fname`, `lname` and `authorized`, so that a caller can choose a provider by name from the people legacy marks as providers. The user chose this over a username-only list. The credential and contact columns remain unreadable, and the grant tests pin the exact set of seven. Nothing else in this decision changes.

@@ -32,14 +32,20 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("UPDATE form_encounter SET last_update = NOW()")]
     [InlineData("UPDATE form_encounter SET reason = 'changed', billing_note = 'x'")]
     [InlineData("DELETE FROM form_encounter")]
-    [InlineData("UPDATE forms SET deleted = 1")]
+    // A forms row can be flagged deleted and nothing else about it changed (ADR 0076): every other column, and removing the row, stays refused.
+    [InlineData("UPDATE forms SET formdir = 'vitals'")]
+    [InlineData("UPDATE forms SET form_id = 1")]
+    [InlineData("UPDATE forms SET pid = 1")]
+    [InlineData("UPDATE forms SET encounter = 1")]
+    [InlineData("UPDATE forms SET `user` = 'x'")]
+    [InlineData("UPDATE forms SET authorized = 1")]
+    [InlineData("UPDATE forms SET deleted = 1, formdir = 'x'")]
     [InlineData("DELETE FROM forms")]
     [InlineData("DELETE FROM uuid_registry")]
     [InlineData("DELETE FROM sequences")]
     [InlineData("DELETE FROM form_clinical_notes")]
     [InlineData("UPDATE form_clinical_notes SET `user` = 'x'")]
     [InlineData("UPDATE form_clinical_notes SET groupname = 'x'")]
-    [InlineData("UPDATE form_clinical_notes SET activity = 0")]
     [InlineData("UPDATE form_clinical_notes SET authorized = 0")]
     [InlineData("UPDATE form_clinical_notes SET pid = 1")]
     [InlineData("UPDATE form_clinical_notes SET encounter = '1'")]
@@ -47,7 +53,7 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("UPDATE form_clinical_notes SET uuid = NULL")]
     [InlineData("UPDATE form_clinical_notes SET note_related_to = 'x'")]
     [InlineData("UPDATE form_clinical_notes SET external_id = 'x'")]
-    [InlineData("UPDATE form_clinical_notes SET description = 'x', activity = 0")]
+    [InlineData("UPDATE form_clinical_notes SET description = 'x', pid = 1")]
     [InlineData("UPDATE list_options SET title = 'x'")]
     [InlineData("DELETE FROM form_soap")]
     [InlineData("UPDATE form_soap SET pid = 1")]
@@ -85,18 +91,39 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
     [InlineData("UPDATE users SET active = 0")]
     [InlineData("UPDATE users SET uuid = NULL")]
     [InlineData("UPDATE users SET username = 'x'")]
+    [InlineData("UPDATE users SET fname = 'x'")]
+    [InlineData("UPDATE users SET authorized = 0")]
+    [InlineData("UPDATE gacl_acl SET allow = 1")]
+    [InlineData("UPDATE gacl_aro_groups SET lft = 1")]
+    [InlineData("INSERT INTO gacl_aro_map (acl_id, section_value, value) VALUES (1, 'users', 'x')")]
+    [InlineData("INSERT INTO gacl_aro_groups_map (acl_id, group_id) VALUES (1, 1)")]
+    [InlineData("INSERT INTO gacl_groups_aro_map (group_id, aro_id) VALUES (1, 1)")]
+    [InlineData("DELETE FROM gacl_aco_map")]
+    [InlineData("DELETE FROM gacl_aro")]
     [InlineData("DROP TABLE form_encounter")]
     public async Task The_production_principal_cannot_change_what_it_does_not_own(string sql) =>
         await AssertDeniedAsync(sql);
 
     [Theory]
     [InlineData("SELECT password FROM users")]
-    [InlineData("SELECT fname FROM users")]
     [InlineData("SELECT email FROM users")]
-    [InlineData("SELECT authorized FROM users")]
+    [InlineData("SELECT mname FROM users")]
+    [InlineData("SELECT phone FROM users")]
+    [InlineData("SELECT title FROM users")]
+    [InlineData("SELECT specialty FROM users")]
+    [InlineData("SELECT fname, password FROM users")]
     [InlineData("SELECT npi FROM users")]
     [InlineData("SELECT federaldrugid FROM users")]
     [InlineData("SELECT * FROM users")]
+    [InlineData("SELECT * FROM gacl_acl")]
+    [InlineData("SELECT note FROM gacl_acl")]
+    [InlineData("SELECT return_value FROM gacl_acl")]
+    [InlineData("SELECT updated_date FROM gacl_acl")]
+    [InlineData("SELECT name FROM gacl_aro")]
+    [InlineData("SELECT hidden FROM gacl_aro")]
+    [InlineData("SELECT name FROM gacl_aro_groups")]
+    [InlineData("SELECT parent_id FROM gacl_aro_groups")]
+    [InlineData("SELECT * FROM gacl_axo_map")]
     [InlineData("SELECT fname FROM patient_data")]
     [InlineData("SELECT * FROM patient_data")]
     [InlineData("SELECT uuid FROM patient_data")]
@@ -216,12 +243,46 @@ public class LeastPrivilegeGrantTests(ClinicalCareContainerFixture fixture) : IA
         await AssertDeniedAsync(sql);
 
     [Fact]
-    public async Task The_production_principal_can_read_exactly_the_user_columns_that_identify_and_name_the_acting_user()
+    public async Task The_production_principal_can_flag_a_registry_row_deleted_and_a_clinical_note_inactive_and_that_is_all_a_deletion_needs()
     {
         await using var db = fixture.CreateDbContext();
 
-        // The forwarded uuid resolves to an id and username, and an inactive account is refused (ADR 0075): four columns, none of the credential or contact ones.
-        await db.Database.ExecuteSqlRawAsync("SELECT id, username, uuid, active FROM users LIMIT 1");
+        // ADR 0076: the two flags a deletion sets, on rows that do not exist here (zero rows matched is still a statement the grant allowed).
+        await db.Database.ExecuteSqlRawAsync("UPDATE forms SET deleted = 1 WHERE id = -1");
+        await db.Database.ExecuteSqlRawAsync("UPDATE form_clinical_notes SET activity = 0 WHERE id = -1");
+    }
+
+    [Fact]
+    public async Task The_production_principal_can_read_exactly_the_user_columns_that_identify_the_acting_user_and_name_a_provider()
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // The forwarded uuid resolves to an id and username, and an inactive account is refused (ADR 0075); the providers lookup (M5f) adds the name and legacy's authorized flag.
+        // Seven columns, none of the credential or contact ones.
+        await db.Database.ExecuteSqlRawAsync("SELECT id, username, uuid, active, fname, lname, authorized FROM users LIMIT 1");
+    }
+
+    [Fact]
+    public async Task The_production_principal_can_read_exactly_the_access_control_columns_the_permission_check_joins()
+    {
+        await using var db = fixture.CreateDbContext();
+
+        // ADR 0076: the single decision query, written out in full, so a column dropped from the grant fails here and not on the first delete in a running stack.
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            SELECT a.id, a.allow, ac.section_value, ac.value, ar.section_value, ar.value, ax.acl_id, axg.acl_id, arg.group_id,
+                   o.id, o.section_value, o.value, gm.group_id, gm.aro_id, g1.id, g1.lft, g1.rgt
+            FROM gacl_acl a
+            LEFT JOIN gacl_aco_map ac ON ac.acl_id = a.id
+            LEFT JOIN gacl_aro_map ar ON ar.acl_id = a.id
+            LEFT JOIN gacl_aro_groups_map arg ON arg.acl_id = a.id
+            LEFT JOIN gacl_axo_map ax ON ax.acl_id = a.id
+            LEFT JOIN gacl_axo_groups_map axg ON axg.acl_id = a.id
+            LEFT JOIN gacl_aro o ON o.id = 0
+            LEFT JOIN gacl_groups_aro_map gm ON gm.aro_id = o.id
+            LEFT JOIN gacl_aro_groups g1 ON g1.id = gm.group_id
+            WHERE a.enabled = 1 LIMIT 1
+            """);
     }
 
     [Fact]

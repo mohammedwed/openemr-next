@@ -14,7 +14,7 @@
         @if (_lookupsFailed)
         {
             <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mb-4" role="alert">
-                The lists of classes, categories and facilities could not be loaded, so they are shown as plain fields. You can still create the encounter.
+                The lists of classes, categories, facilities and providers could not be loaded, so they are shown as plain fields. You can still create the encounter.
             </MudAlert>
         }
         <MudForm @ref="_form" Model="_model">
@@ -85,6 +85,18 @@
                     </MudItem>
                 </MudGrid>
 
+                @* Offered only when the list loaded: left on "Me" the encounter is recorded under the signed-in user, which is what the service does anyway (ADR 0075). *@
+                @if (_providers.Count > 0)
+                {
+                    <MudSelect T="long?" @bind-Value="_model.ProviderId" Label="Provider" Variant="Variant.Outlined" Clearable="false">
+                        <MudSelectItem T="long?" Value="@((long?)null)">Me (signed-in user)</MudSelectItem>
+                        @foreach (var provider in _providers)
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)provider.Id)">@provider.DisplayName</MudSelectItem>
+                        }
+                    </MudSelect>
+                }
+
                 <MudExpansionPanels Elevation="0" Class="op-expander">
                     <MudExpansionPanel Text="More details">
                         <MudStack Spacing="4">
@@ -131,6 +143,7 @@
     private IReadOnlyList<(string Code, string Title)> _classes = CodeLabels.EncounterClassCodes.Select(c => (c, CodeLabels.Of(c))).ToList();
     private IReadOnlyList<CalendarCategoryLookupResponse> _categories = [];
     private IReadOnlyList<FacilityLookupResponse> _facilities = [];
+    private IReadOnlyList<ProviderLookupResponse> _providers = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -152,6 +165,7 @@
             var classes = await ClinicalCare.ListEncounterClassesAsync();
             var categories = await ClinicalCare.ListCalendarCategoriesAsync();
             var facilities = await ClinicalCare.ListFacilitiesAsync();
+            var providers = await ClinicalCare.ListProvidersAsync();
 
             if (classes.Count > 0)
             {
@@ -166,6 +180,7 @@
             }
 
             _facilities = facilities.ToList();
+            _providers = providers.ToList();
             // Legacy preselects the facility when there is only one to choose.
             if (_facilities.Count == 1)
             {
@@ -203,6 +218,7 @@
                 Reason = string.IsNullOrWhiteSpace(_model.Reason) ? null : _model.Reason,
                 FacilityId = _model.FacilityId,
                 PosCode = _model.PosCode,
+                ProviderId = _model.ProviderId,
                 OnsetDate = _model.OnsetDate is { } onset ? new DateTimeOffset(onset.Date) : null,
                 Sensitivity = string.IsNullOrWhiteSpace(_model.Sensitivity) ? null : _model.Sensitivity
             };
@@ -240,6 +256,9 @@
         public int FacilityId { get; set; }
 
         public int? PosCode { get; set; }
+
+        // Null is "me": the service records the signed-in user as the provider when none is named.
+        public long? ProviderId { get; set; }
 
         public DateTime? OnsetDate { get; set; }
 

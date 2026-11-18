@@ -48,6 +48,9 @@ public static class AuditActions
     public const string ClinicalNoteCorrect = "clinical_note.correct";
     public const string SoapRecord = "soap.record";
     public const string SoapCorrect = "soap.correct";
+    public const string VitalsDelete = "vitals.delete";
+    public const string SoapDelete = "soap.delete";
+    public const string ClinicalNoteDelete = "clinical_note.delete";
     public const string EncounterIssueLink = "encounter.issue.link";
     public const string EncounterIssueUnlink = "encounter.issue.unlink";
 }

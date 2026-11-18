@@ -28,6 +28,10 @@ All follow the existing panel and dialog conventions: a server-paged card that l
 | L1 | **Not browser-verified, no automated UI tests.** Layout, the dialogs' behaviour and accessibility are checked by reading and compiling only. |
 | L2 | ~~The acting provider is the placeholder `1`~~ **Resolved (ADR 0075):** the dialogs send no provider; the signed-in user is the actor. |
 | L3 | A note's date and an immunization's dates go as wall-clock at offset zero: exact only when the API runs in UTC (decision 9). |
-| L4 | No delete anywhere (the permission port). SOAP and clinical notes have no "void" either, unlike immunizations. |
+| L4 | **Delete exists for vitals, SOAP notes and clinical notes** (section 7, ADR 0076), not for problems, allergies or immunizations (which have "entered in error"). |
 | L5 | The immunization dialog does not offer the linked encounter, the ordering provider or the user id; it preserves them but cannot set them. |
 | L6 | Clinical notes show their category by its id, not its label. |
+
+## 7. Delete (M5g)
+
+Each vitals row, SOAP note row and clinical note row has a **Delete** button (red text, named per row for screen readers). It asks first ("Delete these vitals?" and the like, saying the record is marked deleted, not removed, and that an administrator can restore it in OpenEMR), then calls the `DELETE` endpoint with the row's `ETag`. One helper, `Shared/RecordDeletion.cs`, words the outcomes: a **403** is "Only an administrator can delete records"; a **404** or **412** says the record was already gone or changed and reloads the list; a network failure says nothing was deleted. Deleting the last row of a later page steps back one page. The button is offered to everyone because the session does not carry rights (ADR 0076). Compile-checked only: not yet seen in a browser.

@@ -5,7 +5,7 @@ using OpenEmrNext.ClinicalCare.Domain.ReadModels;
 namespace OpenEmrNext.ClinicalCare.Infrastructure;
 
 /// <summary>
-/// The adapter side of <see cref="IEncounterLookups"/> (LEG-2): two parameterless, bounded reads of legacy configuration tables. Both lists are small configuration, capped at <see cref="MaxRows"/> so a
+/// The adapter side of <see cref="IEncounterLookups"/> (LEG-2): three parameterless, bounded reads of legacy configuration tables (facilities, visit categories and providers). Both lists are small configuration, capped at <see cref="MaxRows"/> so a
 /// misconfigured install cannot make a lookup unbounded (API-6).
 /// </summary>
 /// <remarks>
@@ -42,6 +42,29 @@ public sealed class EfEncounterLookups(ClinicalCareDbContext db) : IEncounterLoo
             .ToListAsync(ct);
 
         return rows.Select(r => new CalendarCategoryLookup(r.Id, r.Name ?? "")).ToList();
+    }
+
+    public async Task<IReadOnlyList<ProviderLookup>> GetProvidersAsync(CancellationToken ct)
+    {
+        // Legacy's own provider lists filter the same way: an active, authorized user with a username. The grant is on these columns only; nothing about the account beyond the name is read.
+        var rows = await db.Database
+            .SqlQuery<ProviderRow>(
+                $"""
+                SELECT id AS Id, fname AS FirstName, lname AS LastName, username AS Username
+                FROM users WHERE active = 1 AND authorized = 1 AND username IS NOT NULL AND username <> ''
+                ORDER BY lname, fname, id LIMIT {MaxRows}
+                """)
+            .ToListAsync(ct);
+
+        return rows.Select(r => new ProviderLookup(r.Id, r.FirstName?.Trim() ?? "", r.LastName?.Trim() ?? "", r.Username ?? "")).ToList();
+    }
+
+    private sealed class ProviderRow
+    {
+        public long Id { get; set; }
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string? Username { get; set; }
     }
 
     private sealed class FacilityRow

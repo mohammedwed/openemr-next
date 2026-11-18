@@ -12,6 +12,9 @@ public sealed record FacilityLookupResponse(int Id, string Name, int? PosCode, b
 /// <summary>A visit category a caller can choose, as <c>calendarCategoryId</c>.</summary>
 public sealed record CalendarCategoryLookupResponse(int Id, string Name);
 
+/// <summary>A provider a caller can choose, as <c>providerId</c>. <paramref name="DisplayName"/> is the name to show (first and last, or the username when legacy holds no name).</summary>
+public sealed record ProviderLookupResponse(long Id, string DisplayName);
+
 /// <summary>One choice in a configured list: the <paramref name="Id"/> to send and the <paramref name="Title"/> to show.</summary>
 public sealed record LookupOptionResponse(string Id, string Title);
 
