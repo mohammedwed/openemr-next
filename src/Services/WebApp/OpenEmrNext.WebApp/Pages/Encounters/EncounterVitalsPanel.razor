@@ -211,7 +211,7 @@
     {
         var reload = await RecordDeletion.ConfirmAndDeleteAsync(
             DialogService, Snackbar, "Delete these vitals?",
-            "The vitals are marked deleted and no longer shown here or in OpenEMR. They are not removed from the database, and an administrator can restore them in OpenEMR.",
+            "The vitals are marked deleted and no longer listed here or in OpenEMR's encounter forms. They are not removed from the database, and an administrator can restore them in OpenEMR. OpenEMR's patient dashboard can still show them as the latest vitals: that summary is a quirk of its own query, and a delete made in OpenEMR looks the same.",
             () => ClinicalCare.DeleteVitalsAsync(EncounterUuid, vitals.Uuid, vitals.ETag));
         if (reload)
         {
