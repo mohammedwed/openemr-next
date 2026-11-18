@@ -20,6 +20,8 @@ internal sealed class WebAppTestHost : IAsyncDisposable
         Ctx.JSInterop.Mode = JSRuntimeMode.Loose;   // MudBlazor calls into JavaScript for layout; none of it matters to what these tests check
         Ctx.Services.AddMudServices();
         Ctx.Services.AddSingleton(ClinicalCare);
+        Ctx.Services.AddSingleton<TimeProvider>(Clock);
+        Ctx.Services.AddScoped<OpenEmrNext.WebApp.Shared.IdempotencyAttempt>();   // the create dialogs hold one per attempt, as in the app's own Program.cs
 
         Providers = Ctx.Render(builder =>
         {
@@ -36,6 +38,9 @@ internal sealed class WebAppTestHost : IAsyncDisposable
 
     public IClinicalCareClient ClinicalCare { get; } = Substitute.For<IClinicalCareClient>();
 
+    /// <summary>The clock the dialogs read their default times from, pinned so a test can say what "now" is: 2026-11-18 04:30 UTC.</summary>
+    public FixedTimeProvider Clock { get; } = new(new DateTimeOffset(2026, 11, 18, 4, 30, 0, TimeSpan.Zero));
+
     /// <summary>Everything MudBlazor renders outside a component: open dialogs and snackbars.</summary>
     public IRenderedComponent<IComponent> Providers { get; }
 
@@ -51,4 +56,9 @@ internal sealed class WebAppTestHost : IAsyncDisposable
     public void ShouldNotShow(string text) => Assert.DoesNotContain(text, Providers.Markup);
 
     public ValueTask DisposeAsync() => Ctx.DisposeAsync();
+}
+
+internal sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+{
+    public override DateTimeOffset GetUtcNow() => now;
 }

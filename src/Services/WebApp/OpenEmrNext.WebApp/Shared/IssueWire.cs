@@ -21,5 +21,5 @@ public static class IssueWire
         date is { } d ? new DateTimeOffset(DateTime.SpecifyKind(d.Date + timeOfDay, DateTimeKind.Unspecified), TimeSpan.Zero) : null;
 
     /// <summary>The end date the quick Resolve action sets: today, as a calendar date.</summary>
-    public static DateTimeOffset Today() => ToWire(DateTime.Today, TimeSpan.Zero)!.Value;
+    public static DateTimeOffset Today() => ToWire(UtcTime.Today, TimeSpan.Zero)!.Value;
 }

@@ -10,7 +10,7 @@
    page on screen with a warning. An allergy is ended by an end date, not by a flag (ADR 0070), so End and Reopen are updates, made with the version the row was
    listed with: if someone changed it in the meantime the save is refused and the list reloads. *@
 <PatientSectionCard Title="Allergies"
-    HasData="_items is not null" Error="_error" OnRetry="LoadAsync"
+    HasData="_items is not null" Error="_error" StillSettingUp="_settingUp" OnRetry="LoadAsync"
     ErrorMessage="Could not load allergies. The clinical care service may be unavailable."
     StaleMessage="Could not refresh allergies. The list below may be out of date."
     LoadingLabel="Loading allergies">
@@ -103,6 +103,9 @@
     private int _total;
     private int _page = 1;
     private bool _error;
+
+    /// <summary>The last failure was Clinical Care not knowing this patient yet (404): registration is only a few seconds old, so the card says so and retries.</summary>
+    private bool _settingUp;
     private bool _loading;
 
     // The row whose quick action is in flight, so it cannot be clicked twice and cannot race itself.
@@ -137,6 +140,7 @@
             _total = result.Total;
             _page = page;
             _error = false;
+            _settingUp = false;
             await TotalChanged.InvokeAsync(_total);
         }
         catch (Exception ex) when (ex is ClinicalCareApiException or HttpRequestException)
@@ -144,6 +148,7 @@
             if (ticket == _loadCounter)
             {
                 _error = true;
+                _settingUp = ex is ClinicalCareApiException { StatusCode: 404 };
             }
         }
         finally

@@ -1,6 +1,9 @@
+@implements IDisposable
 @* One outlined card for a patient section. It owns the parts every section shares: a title, optional
    summary and actions, and three states. Loading shows a spinner. A failed first load shows an error with
-   "Try again". A failed refresh keeps the last data on screen with a warning. *@
+   "Try again". A failed refresh keeps the last data on screen with a warning. A section backed by Clinical Care can also say the
+   patient is "still being set up": Clinical Care learns of a new patient from the registration event, a few seconds after it is
+   registered, and until then answers 404 for them. That is not an outage, so it gets its own message and a few automatic retries. *@
 <MudPaper Outlined="true" Class="@($"pa-5 {Class}".Trim())">
     @* Title and actions wrap onto separate lines when the card is narrow, so the buttons never squeeze the title. *@
     <div class="op-section-header mb-5">
@@ -17,7 +20,14 @@
         }
     </div>
 
-    @if (!HasData && Error)
+    @if (!HasData && Error && StillSettingUp)
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" role="status">
+            Clinical records for this new patient are still being set up. This usually takes a few seconds, and this section will check again by itself.
+            <MudButton Variant="Variant.Text" Color="Color.Info" OnClick="OnRetry">Check now</MudButton>
+        </MudAlert>
+    }
+    else if (!HasData && Error)
     {
         <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true">
             @ErrorMessage
@@ -58,6 +68,12 @@
 
     [Parameter] public EventCallback OnRetry { get; set; }
 
+    /// <summary>
+    /// True when the failed load was the service saying it does not know this patient yet (a 404 straight after registration). The card
+    /// then says so and retries a few times by itself, instead of reporting an outage.
+    /// </summary>
+    [Parameter] public bool StillSettingUp { get; set; }
+
     /// <summary>Shown when there is no data and the load failed.</summary>
     [Parameter] public string ErrorMessage { get; set; } = "Could not load this section.";
 
@@ -76,4 +92,50 @@
     [Parameter] public string? Class { get; set; }
 
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>How many times the card retries by itself: with the default delay, about 15 seconds in all, far longer than the relay takes.</summary>
+    public const int MaxAutomaticRetries = 5;
+
+    /// <summary>How long the card waits before each automatic retry. A parameter so a test need not wait for the real delay.</summary>
+    [Parameter] public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(3);
+
+    private readonly CancellationTokenSource _disposed = new();
+    private bool _retryPending;
+    private int _automaticRetries;
+
+    protected override void OnParametersSet()
+    {
+        if (HasData)
+        {
+            _automaticRetries = 0;
+            return;
+        }
+
+        if (Error && StillSettingUp && !_retryPending && _automaticRetries < MaxAutomaticRetries)
+        {
+            _retryPending = true;
+            _ = RetryLaterAsync();
+        }
+    }
+
+    private async Task RetryLaterAsync()
+    {
+        try
+        {
+            await Task.Delay(RetryDelay, _disposed.Token);
+            _automaticRetries++;
+            _retryPending = false;
+            await InvokeAsync(() => OnRetry.InvokeAsync());
+        }
+        catch (OperationCanceledException)
+        {
+            // the card is gone: nothing to retry
+        }
+    }
+
+    public void Dispose()
+    {
+        _disposed.Cancel();
+        _disposed.Dispose();
+    }
 }

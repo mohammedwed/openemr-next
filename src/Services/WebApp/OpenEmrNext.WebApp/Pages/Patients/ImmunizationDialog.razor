@@ -3,6 +3,7 @@
 @using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
 @inject IClinicalCareClient ClinicalCare
 @inject OpenEmrNext.WebApp.Shared.IdempotencyAttempt Attempt
+@inject TimeProvider Clock
 
 @* One dialog for recording an immunization and for editing one: the fields are the same, and a correction replaces the whole set (a field you clear is removed). The coded fields are chosen from the
    configured lists, which the dialog loads when it opens (a record or a correction needs the vaccine list, so without it nothing can be saved). A value the record already holds that legacy no longer offers
@@ -35,7 +36,7 @@
                             MinDate="MinDate" MaxDate="MaxDate" />
                     </MudItem>
                     <MudItem xs="12" sm="5">
-                        <MudTimePicker @bind-Time="_model.Time" Label="Time" Editable="true" Variant="Variant.Outlined" />
+                        <MudTimePicker @bind-Time="_model.Time" Label="Time (UTC)" Editable="true" Variant="Variant.Outlined" />
                     </MudItem>
                 </MudGrid>
 
@@ -147,7 +148,7 @@
 @code {
     // The service's own bounds (IM-1): 1900-01-01 up to tomorrow (a day of slack covers zones).
     private static readonly DateTime MinDate = new(1900, 1, 1);
-    private static DateTime MaxDate => DateTime.Today.AddDays(1);
+    private static DateTime MaxDate => UtcTime.Today.AddDays(1);
 
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
 
@@ -200,7 +201,7 @@
         }
         else
         {
-            var now = DateTime.Now;
+            var now = Clock.GetUtcNow();
             _model.Date = now.Date;
             _model.Time = new TimeSpan(now.Hour, now.Minute, 0);
         }

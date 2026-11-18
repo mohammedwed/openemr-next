@@ -15,6 +15,47 @@
 - **My tests had collateral damage, and I fixed them, not the old test:** they gave every patient the same date of birth (1815-12-10) as an existing duplicate-scoring test, which made my patients its duplicates and failed it. My data is now unique per test.
 - **A response inconsistency fixed:** the single-patient `GET` returned an empty email as `""` and the `PUT` returned `null`; both are now `null`.
 
+## Fixed — the encounter page crashed on first render (found in the first browser check)
+
+The first real look at the WebApp, signed in on the rebuilt stack, found that **opening any encounter showed "An unhandled error has occurred"**. The browser console named the cause: `More than one sibling of component 'EncounterVitalsPanel' has the same key value`.
+
+- **Cause:** `Pages/Encounters/Detail.razor` keyed all four panels (issues, vitals, SOAP notes, clinical notes) with the bare encounter id. The keys exist so each panel reloads when the route moves to another encounter, but Blazor requires keys to be unique **among siblings**, and these four are siblings. The page therefore threw whenever it rendered them together. It has been there since the M5c and M5d screens.
+- **Fix:** each key is now the encounter id paired with the panel's name, so the reload-on-navigation behaviour is unchanged and the keys are unique.
+- **Why no test caught it:** those screens were only compile-checked, and the bUnit project covers the delete flows, not this page. That is the case for the browser check, and for a render test of this page (not yet written).
+- **Checked, not affected:** the patient page uses the same key pattern, but each panel sits in its own tab, so they are not siblings; its tabs all rendered correctly in the same check.
+
+## Fixed — CI on `main` failed after the stacked merge (`PageRequest` had a public setter)
+
+The stack was merged without waiting for CI on each pull request, so the first full test run of the combined code was the run on `main`, and it failed one test: the Clinical Care architecture rule `Has_no_publicly_settable_property` for `PageRequest`.
+
+- **Cause:** the `_lastUpdated` work (M5q) added `PageRequest.Updated` as `{ get; init; }` and copied the request with `with`. An `init` accessor is a public setter to reflection, and `PageRequest` is one of the types the architecture test requires to be immutable after construction.
+- **Fix:** `Updated` is read-only and set only by the private constructor. `Within(window)` builds a new request through that constructor. No caller changed.
+- **How it slipped through:** CI had been cancelled on the intermediate merges, and I built the whole solution but did not run the architecture project. A solution build cannot catch a rule like this.
+
+## Fixed — every delete in the WebApp reported failure when it had worked (found in the browser check)
+
+Deleting a vitals set from the encounter page showed **"Could not delete this record. Nothing was deleted."**, while the database showed the row flagged deleted and Clinical Care's log showed the request answered `204 No Content` with its audit row and outbox event written.
+
+- **Cause:** the OpenAPI document declared only `200` for five delete endpoints (vitals, SOAP notes, clinical notes, problems, allergies) because they had no `.Produces(...)`. They return `204`. The WebApp's client is generated from that document, and a generated client throws on any status the document does not declare, so every successful delete raised an exception that the screen put into words as a failure. The unlink-from-encounter endpoint declared its `204` and was unaffected. The same applied to M5g and M5n: no delete from the WebApp has ever reported success.
+- **Fix:** the five endpoints declare `204`; the snapshot is regenerated.
+- **A second flaw it exposed:** the screen said "Nothing was deleted" for any failure it had no special case for, including a 5xx or a dropped connection, where the request may have committed. Those now say the outcome is unknown ("may or may not have happened") and read the list again, as the 404 and 412 cases already did.
+- **Why no test caught it:** the panel tests script the client, so they never met the real generated one. New tests use the real `ClinicalCareClient` against a stub that answers 204, for all five deletes (with the old snapshot all five fail, which is the bug reproduced), and a Clinical Care test now asserts every `DELETE` in the document declares `204` and not `200`. Also new: a panel test for 5xx and the updated network-failure wording.
+- **Seen once and not explained:** the first failed delete showed an HTTP 503 in the browser's network list, although Clinical Care and the gateway both logged a 204. Two later deletes through the gateway returned 204 on the wire. I could not reproduce the 503, and have not found where it came from, so it is open.
+- **Checks:** WebApp unit 70 passed, Clinical Care OpenAPI document tests 26 passed, whole solution builds with 0 errors. The Clinical Care delete integration suites were not rerun (the endpoint code is unchanged apart from its declared metadata).
+
+## Changed — times in the WebApp are UTC (ADR 0083), and a new patient's records no longer look like an outage
+
+**The time bug.** A user in Cairo (UTC+2) opened New encounter, which proposed 06:30, created it, and the page showed 04:30. The dialog attached the browser's offset to the local time, Clinical Care stored the UTC equivalent, and the pages show stored digits without converting back. The project owner decided: **times are UTC**.
+
+- A default time comes from the UTC clock (an injected `TimeProvider`, so a test can pin it); a time typed into a dialog is sent as the same digits at a zero offset (`UtcTime.ToWire`); a time on a page is shown as stored with a ` UTC` suffix; the time pickers say "Time (UTC)".
+- Date-only values (date of birth, policy dates, onset and effective dates) are sent as midnight at a zero offset, so the browser's zone can never move one by a day; "today" for the date pickers and the age on the patient page is the UTC date.
+- This depends on the stack's clocks being UTC, and they are (checked: the database, both services and legacy's PHP default; legacy's `gbl_time_zone` is empty). ADR 0083 records the condition.
+- Tests: the encounter dialog is opened with a clock pinned at 04:30 UTC and must propose and send 04:30 at a zero offset; helper and display tests. Under `TZ=Africa/Cairo` the old code fails the dialog test (both the old clock and the old offset, separately). On a UTC machine, as in CI, only the clock half can fail.
+
+**The registration race.** Right after registering a patient, the Encounters, Problems, Allergies and Immunizations sections said "the clinical care service may be unavailable". Clinical Care learns of a new patient from the registration event a few seconds later and answers 404 until then, which is not an outage. Those sections now say "Clinical records for this new patient are still being set up", offer "Check now", and retry by themselves every 3 seconds up to 5 times (the shared `PatientSectionCard`); any other failure still reports an unavailable service and is never retried automatically.
+- Tests (six): a 404 says "still being set up" and not "unavailable", a 500 or 503 still says "unavailable", the section appears once Clinical Care knows the patient, the card retries by itself but only up to the limit, and a plain failure is never retried. Removing the cap, or the 404 recognition, fails the right tests.
+- **Checks:** WebApp unit 83 passed (also under the Cairo clock), whole solution builds with 0 errors and 0 warnings.
+
 ## Changed — patient searches are bounded pages, and `LIKE` text is matched as typed (ADR 0082)
 
 An audit of how both services pass values to SQL found **no SQL injection path**: about 145 interpolated calls are parameterized by EF, 24 `SqlQueryRaw` calls use numbered placeholders, the one direct `MySqlCommand` uses a named parameter, and the only runtime-built SQL text (the `IN (…)` lists and the patient search filter) is made of placeholders and literal column names. It did find two weaknesses in Patient Management's patient search, both now fixed:

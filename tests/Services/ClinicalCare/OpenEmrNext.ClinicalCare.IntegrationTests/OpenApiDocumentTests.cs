@@ -45,6 +45,30 @@ public class OpenApiDocumentTests : IDisposable
         JsonDocument.Parse(await _client.GetStringAsync("/openapi/v1.json"));
 
     [Fact]
+    public async Task Every_delete_declares_the_204_it_returns_and_no_200_it_does_not()
+    {
+        // A client generated from this document throws on any status the document does not declare. The deletes answer 204 No Content,
+        // so a document that says 200 makes the WebApp report a delete that worked as a failure.
+        using var document = await ReadDocumentAsync();
+
+        var wrong = new List<string>();
+        var checkedDeletes = 0;
+        foreach (var path in document.RootElement.GetProperty("paths").EnumerateObject())
+        {
+            if (!path.Value.TryGetProperty("delete", out var delete))
+                continue;
+
+            checkedDeletes++;
+            var responses = delete.GetProperty("responses");
+            if (!responses.TryGetProperty("204", out _) || responses.TryGetProperty("200", out _))
+                wrong.Add(path.Name);
+        }
+
+        Assert.True(checkedDeletes >= 6, "the document should describe all six delete routes");
+        Assert.Empty(wrong);
+    }
+
+    [Fact]
     public async Task Document_describes_the_api()
     {
         using var document = await ReadDocumentAsync();

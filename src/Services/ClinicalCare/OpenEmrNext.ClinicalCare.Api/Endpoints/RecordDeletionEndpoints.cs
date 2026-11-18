@@ -22,7 +22,8 @@ public static class RecordDeletionEndpoints
                 ? DeleteAsync(useCase, http, DeletableRecord.Vitals, encounterUuid, vitalsUuid.ToString(), offered.Select(t => t.ToETag()).ToList(), ct)
                 : Task.FromResult(Preconditions.Required()))
             .WithName("DeleteVitals").WithTags("Vitals")
-            .WithSummary("Delete a set of vital signs (flag it deleted; needs legacy's admin/super right), conditional on the ETag the caller read");
+            .WithSummary("Delete a set of vital signs (flag it deleted; needs legacy's admin/super right), conditional on the ETag the caller read")
+            .Produces(StatusCodes.Status204NoContent);
 
         app.MapDelete("/encounters/{encounterUuid:guid}/clinical-notes/{noteUuid:guid}", (
                 Guid encounterUuid, Guid noteUuid, DeleteRecordUseCase useCase, HttpContext http, [FromHeader(Name = "If-Match")] string? ifMatch, CancellationToken ct) =>
@@ -30,7 +31,8 @@ public static class RecordDeletionEndpoints
                 ? DeleteAsync(useCase, http, DeletableRecord.ClinicalNote, encounterUuid, noteUuid.ToString(), offered.Select(t => t.ToETag()).ToList(), ct)
                 : Task.FromResult(Preconditions.Required()))
             .WithName("DeleteClinicalNote").WithTags("Clinical notes")
-            .WithSummary("Delete a clinical note (mark it inactive; needs legacy's admin/super right), conditional on the ETag the caller read");
+            .WithSummary("Delete a clinical note (mark it inactive; needs legacy's admin/super right), conditional on the ETag the caller read")
+            .Produces(StatusCodes.Status204NoContent);
 
         app.MapDelete("/encounters/{encounterUuid:guid}/soap-notes/{noteId:long}", (
                 Guid encounterUuid, long noteId, DeleteRecordUseCase useCase, HttpContext http, [FromHeader(Name = "If-Match")] string? ifMatch, CancellationToken ct) =>
@@ -38,7 +40,8 @@ public static class RecordDeletionEndpoints
                 ? DeleteAsync(useCase, http, DeletableRecord.SoapNote, encounterUuid, noteId.ToString(System.Globalization.CultureInfo.InvariantCulture), offered.Select(v => v.ToETag()).ToList(), ct)
                 : Task.FromResult(Preconditions.Required()))
             .WithName("DeleteSoapNote").WithTags("SOAP notes")
-            .WithSummary("Delete a SOAP note (flag it deleted; needs legacy's admin/super right), conditional on the ETag the caller read");
+            .WithSummary("Delete a SOAP note (flag it deleted; needs legacy's admin/super right), conditional on the ETag the caller read")
+            .Produces(StatusCodes.Status204NoContent);
 
         // Problems and allergies belong to a patient, not an encounter, so their routes have no encounter in them (ADR 0080). Legacy removes the row, so this does too.
         app.MapDelete("/problems/{uuid:guid}", (
@@ -47,7 +50,8 @@ public static class RecordDeletionEndpoints
                 ? DeleteIssueAsync(useCase, http, DeletableIssue.Problem, uuid, offered.Select(t => t.ToETag()).ToList(), ct)
                 : Task.FromResult(Preconditions.Required()))
             .WithName("DeleteProblem").WithTags("Problems")
-            .WithSummary("Delete a problem (remove it and its encounter links; needs legacy's admin/super right), conditional on the ETag the caller read");
+            .WithSummary("Delete a problem (remove it and its encounter links; needs legacy's admin/super right), conditional on the ETag the caller read")
+            .Produces(StatusCodes.Status204NoContent);
 
         app.MapDelete("/allergies/{uuid:guid}", (
                 Guid uuid, DeleteIssueUseCase useCase, HttpContext http, [FromHeader(Name = "If-Match")] string? ifMatch, CancellationToken ct) =>
@@ -55,7 +59,8 @@ public static class RecordDeletionEndpoints
                 ? DeleteIssueAsync(useCase, http, DeletableIssue.Allergy, uuid, offered.Select(t => t.ToETag()).ToList(), ct)
                 : Task.FromResult(Preconditions.Required()))
             .WithName("DeleteAllergy").WithTags("Allergies")
-            .WithSummary("Delete an allergy (remove it and its encounter links; needs legacy's admin/super right), conditional on the ETag the caller read");
+            .WithSummary("Delete an allergy (remove it and its encounter links; needs legacy's admin/super right), conditional on the ETag the caller read")
+            .Produces(StatusCodes.Status204NoContent);
 
         return app;
     }

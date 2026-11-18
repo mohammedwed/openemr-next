@@ -30,7 +30,7 @@
                 </MudItem>
                 <MudItem xs="12" sm="6">
                     <MudDatePicker @bind-Date="_model.DateOfBirth" Label="Date of birth" Required="true" RequiredError="Date of birth is required." Editable="true"
-                        MaxDate="DateTime.Today" Variant="Variant.Outlined" />
+                        MaxDate="UtcTime.Today" Variant="Variant.Outlined" />
                 </MudItem>
                 <MudItem xs="12">
                     <MudTextField @bind-Value="_model.Email" Label="Email (optional)" Variant="Variant.Outlined" InputType="InputType.Email" />
@@ -93,7 +93,7 @@
                 FirstName = _model.FirstName.Trim(),
                 LastName = _model.LastName.Trim(),
                 Sex = _model.Sex,
-                DateOfBirth = new DateTimeOffset(dob.Date),
+                DateOfBirth = UtcTime.ToWire(dob.Date),
                 Email = string.IsNullOrWhiteSpace(_model.Email) ? null : _model.Email.Trim(),
                 TrustedEmail = string.IsNullOrWhiteSpace(_model.TrustedEmail) ? null : _model.TrustedEmail.Trim()
             };

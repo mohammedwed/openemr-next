@@ -65,8 +65,8 @@
                 PolicyNumber = _model.PolicyNumber,
                 GroupNumber = string.IsNullOrWhiteSpace(_model.GroupNumber) ? null : _model.GroupNumber,
                 PlanName = string.IsNullOrWhiteSpace(_model.PlanName) ? null : _model.PlanName,
-                StartDate = new DateTimeOffset(_model.StartDate.Value),
-                EndDate = _model.EndDate is { } end ? new DateTimeOffset(end) : null
+                StartDate = UtcTime.ToWire(_model.StartDate.Value),
+                EndDate = _model.EndDate is { } end ? UtcTime.ToWire(end) : null
             };
             await PatientManagement.AddInsurancePolicyAsync(Pid, request);
             MudDialog.Close(DialogResult.Ok(true));

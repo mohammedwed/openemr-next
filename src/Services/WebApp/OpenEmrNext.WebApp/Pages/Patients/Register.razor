@@ -63,7 +63,7 @@
                         </MudItem>
                         <MudItem xs="12" sm="6">
                             <MudDatePicker @bind-Date="_model.DateOfBirth" Label="Date of birth" Required="true"
-                                RequiredError="Date of birth is required." Editable="true" MaxDate="DateTime.Today" Variant="Variant.Outlined" />
+                                RequiredError="Date of birth is required." Editable="true" MaxDate="UtcTime.Today" Variant="Variant.Outlined" />
                         </MudItem>
                         <MudItem xs="12">
                             <MudTextField @bind-Value="_model.Email" Label="Email (optional)" Variant="Variant.Outlined" InputType="InputType.Email" />
@@ -171,7 +171,7 @@
                 FirstName = _model.FirstName,
                 LastName = _model.LastName,
                 Sex = _model.Sex,
-                DateOfBirth = new DateTimeOffset(_model.DateOfBirth.Value),
+                DateOfBirth = UtcTime.ToWire(_model.DateOfBirth.Value),
                 Email = string.IsNullOrWhiteSpace(_model.Email) ? null : _model.Email,
                 TrustedEmail = string.IsNullOrWhiteSpace(_model.TrustedEmail) ? null : _model.TrustedEmail
             };
@@ -226,6 +226,6 @@
         public NotInFutureAttribute() : base("Date of birth cannot be in the future.") { }
 
         public override bool IsValid(object? value) =>
-            value is not DateTime date || date.Date <= DateTime.Today;
+            value is not DateTime date || date.Date <= UtcTime.Today;
     }
 }
