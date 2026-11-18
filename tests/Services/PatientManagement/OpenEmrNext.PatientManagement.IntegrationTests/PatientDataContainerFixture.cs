@@ -275,11 +275,16 @@ public sealed class PatientDataContainerFixture : IAsyncLifetime
         // The audit table, taken from the real seed script (scripts/seeds/patient-management-db.sh) so the test table cannot drift from the deployed one: the script's shell escapes are undone and its database name filled in.
         // (This fixture connects as the container's owner, not as the least-privilege user the script creates, so the append-only grant itself is not exercised here.)
         await using var createAudit = connection.CreateCommand();
-        createAudit.CommandText = AuditTableDdl();
+        createAudit.CommandText = TableDdl("patient_management_audit");
         await createAudit.ExecuteNonQueryAsync();
+
+        // The idempotency table, from the same script for the same reason.
+        await using var createIdempotency = connection.CreateCommand();
+        createIdempotency.CommandText = TableDdl("patient_management_idempotency");
+        await createIdempotency.ExecuteNonQueryAsync();
     }
 
-    private static string AuditTableDdl()
+    private static string TableDdl(string table)
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
         {
@@ -289,8 +294,8 @@ public sealed class PatientDataContainerFixture : IAsyncLifetime
 
             var text = File.ReadAllText(script).Replace("\\`", "`").Replace("${DB_NAME}", DatabaseName);
             var match = System.Text.RegularExpressions.Regex.Match(
-                text, @"CREATE TABLE IF NOT EXISTS `[^`]+`\.`patient_management_audit` \(.*?\n\);", System.Text.RegularExpressions.RegexOptions.Singleline);
-            return match.Success ? match.Value : throw new InvalidOperationException("The seed script has no patient_management_audit table.");
+                text, $@"CREATE TABLE IF NOT EXISTS `[^`]+`\.`{table}` \(.*?\n\);", System.Text.RegularExpressions.RegexOptions.Singleline);
+            return match.Success ? match.Value : throw new InvalidOperationException($"The seed script has no {table} table.");
         }
 
         throw new FileNotFoundException("scripts/seeds/patient-management-db.sh was not found above the test output directory.");
