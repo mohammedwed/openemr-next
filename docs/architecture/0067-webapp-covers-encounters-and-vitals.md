@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-17
+- **Amended by:** [0083](0083-times-in-the-webapp-are-utc.md) (the "Dates cross a zone boundary" point: times in the WebApp are now UTC)
 - **Builds on:** [0061](0061-webapp-covers-insurance-and-advance-directives.md), [0064](0064-clinical-care-shares-the-legacy-database-and-coexists-with-legacy-encounter-writers.md), [0065](0065-vitals-are-stored-in-us-units-and-the-api-takes-explicit-units.md)
 
 ## Context

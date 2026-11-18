@@ -215,16 +215,37 @@ public class RecordDeletionPanelTests
     [InlineData(Panel.ClinicalNote)]
     [InlineData(Panel.Problem)]
     [InlineData(Panel.Allergy)]
-    public async Task A_network_failure_says_nothing_was_deleted_and_the_list_is_left_alone(Panel kind)
+    public async Task A_network_failure_does_not_claim_the_delete_did_not_happen_and_the_list_is_read_again(Panel kind)
     {
+        // The request may have reached the service and committed before the connection failed, so "nothing was deleted" would be a guess.
         await using var a = new Disposable(Arrange(kind));
         a.Value.DeleteFails(new HttpRequestException("down"));
 
         a.Value.ClickRowDelete();
         a.Value.Host.ClickInDialog("Delete");
 
-        a.Value.Host.ShouldShow("Nothing was deleted");
-        Assert.Equal(1, a.Value.ListsRead);
+        a.Value.Host.ShouldShow("may or may not have happened");
+        a.Value.Host.ShouldNotShow("Nothing was deleted");
+        a.Value.WaitFor(() => Assert.Equal(2, a.Value.ListsRead));
+    }
+
+    [Theory]
+    [InlineData(Panel.Vitals, 500)]
+    [InlineData(Panel.Soap, 502)]
+    [InlineData(Panel.ClinicalNote, 503)]
+    [InlineData(Panel.Problem, 503)]
+    [InlineData(Panel.Allergy, 504)]
+    public async Task A_server_error_does_not_claim_nothing_was_deleted_and_the_list_is_read_again(Panel kind, int status)
+    {
+        await using var a = new Disposable(Arrange(kind));
+        a.Value.DeleteFails(Refused(status));
+
+        a.Value.ClickRowDelete();
+        a.Value.Host.ClickInDialog("Delete");
+
+        a.Value.Host.ShouldShow("did not confirm the delete");
+        a.Value.Host.ShouldNotShow("Nothing was deleted");
+        a.Value.WaitFor(() => Assert.Equal(2, a.Value.ListsRead));
     }
 
     [Theory]

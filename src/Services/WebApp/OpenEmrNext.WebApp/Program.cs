@@ -36,6 +36,8 @@ builder.Services.AddScoped<IPatientManagementClient>(_ => new PatientManagementC
 // client gets its own HttpClient and breaker so a ClinicalCare outage never trips the patient pages' breaker.
 // A creating POST carries an Idempotency-Key while a dialog's save is in progress (ADR 0077), so a retried save is answered, not repeated.
 builder.Services.AddScoped<OpenEmrNext.WebApp.Shared.IdempotencyAttempt>();
+// The clock dialogs read their default times from, injected so a test can pin it. Times are UTC (OpenEmrNext.WebApp.Shared.UtcTime).
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IClinicalCareClient>(sp => new ClinicalCareClient(
     new HttpClient(new OpenEmrNext.WebApp.Resilience.IdempotencyKeyHandler(sp.GetRequiredService<OpenEmrNext.WebApp.Shared.IdempotencyAttempt>())
     {

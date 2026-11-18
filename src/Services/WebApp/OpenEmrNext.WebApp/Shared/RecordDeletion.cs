@@ -11,7 +11,7 @@ public static class RecordDeletion
 {
     /// <summary>
     /// Asks, then runs <paramref name="delete"/> and reports. Returns <c>true</c> when the list should be read again: the record was deleted, or it turned out to be gone or changed (so what is on screen was stale).
-    /// Returns <c>false</c> when the user cancelled, was refused, or the service could not be reached: nothing changed, the list is as it was.
+    /// Returns <c>false</c> when the user cancelled or was refused: nothing changed, the list is as it was. When the service did not answer clearly (a 5xx, or no connection) the outcome is unknown, so that also returns <c>true</c> and the list is read again.
     /// </summary>
     public static async Task<bool> ConfirmAndDeleteAsync(IDialogService dialogs, ISnackbar snackbar, string title, string message, Func<Task> delete)
     {
@@ -41,13 +41,20 @@ public static class RecordDeletion
             snackbar.Add("That record was changed by someone else, so nothing was deleted. The list now shows what is stored; delete it again if you still want to.", Severity.Warning);
             return true;
         }
+        catch (ClinicalCareApiException ex) when (ex.StatusCode >= 500)
+        {
+            // The service may have finished the delete before the reply failed, so "nothing was deleted" would be a guess. Say what is known and read the list again.
+            snackbar.Add("The service did not confirm the delete, so it may or may not have happened. The list now shows what is stored.", Severity.Warning);
+            return true;
+        }
         catch (ClinicalCareApiException ex)
         {
             snackbar.Add(ClinicalCareErrorFormatter.Describe(ex, "Could not delete this record. Nothing was deleted."), Severity.Error);
         }
         catch (HttpRequestException)
         {
-            snackbar.Add("Could not reach the clinical care service. Nothing was deleted. Check your connection, then try again.", Severity.Error);
+            snackbar.Add("Could not reach the clinical care service, so the delete may or may not have happened. The list now shows what is stored.", Severity.Warning);
+            return true;
         }
 
         return false;

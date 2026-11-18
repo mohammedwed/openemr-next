@@ -108,7 +108,7 @@
                 FileName = _fileName,
                 MimeType = _mimeType ?? "application/octet-stream",
                 ContentBase64 = _contentBase64,
-                EffectiveDate = _effectiveDate is { } effective ? new DateTimeOffset(effective) : null
+                EffectiveDate = _effectiveDate is { } effective ? UtcTime.ToWire(effective) : null
             };
             await PatientManagement.UploadAdvanceDirectiveDocumentAsync(Pid, request);
             MudDialog.Close(DialogResult.Ok(true));

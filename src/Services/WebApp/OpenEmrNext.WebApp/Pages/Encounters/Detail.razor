@@ -78,14 +78,16 @@
             </MudPaper>
 
             @* What the visit addressed sits above the vitals: it is clinical context for them, and a short list. *@
-            <EncounterIssuesPanel @key="encounter.Uuid" EncounterUuid="encounter.Uuid" PatientUuid="PatientUuid" />
+            @* Each panel is keyed by the encounter so it reloads when the route moves to another encounter. Keys must be unique among
+               siblings, so the panel's own name is part of the key: four panels sharing the bare encounter id throws on first render. *@
+            <EncounterIssuesPanel @key="(encounter.Uuid, nameof(EncounterIssuesPanel))" EncounterUuid="encounter.Uuid" PatientUuid="PatientUuid" />
 
-            <EncounterVitalsPanel @key="encounter.Uuid" EncounterUuid="encounter.Uuid" />
+            <EncounterVitalsPanel @key="(encounter.Uuid, nameof(EncounterVitalsPanel))" EncounterUuid="encounter.Uuid" />
 
             @* The notes written at the visit follow the measurements: SOAP notes first, then the free-standing clinical notes. *@
-            <EncounterSoapNotesPanel @key="encounter.Uuid" EncounterUuid="encounter.Uuid" />
+            <EncounterSoapNotesPanel @key="(encounter.Uuid, nameof(EncounterSoapNotesPanel))" EncounterUuid="encounter.Uuid" />
 
-            <EncounterClinicalNotesPanel @key="encounter.Uuid" EncounterUuid="encounter.Uuid" />
+            <EncounterClinicalNotesPanel @key="(encounter.Uuid, nameof(EncounterClinicalNotesPanel))" EncounterUuid="encounter.Uuid" />
             break;
     }
 </MudContainer>

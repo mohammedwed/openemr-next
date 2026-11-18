@@ -17,11 +17,11 @@ public static class Formatting
     }
 
     /// <summary>
-    /// "2026-11-17 09:30", or a dash when missing. Shows the digits the API returned, not a conversion: the
-    /// service stores server-local time with no zone, so re-zoning here would show a different time than it holds.
+    /// "2026-11-17 09:30 UTC", or a dash when missing. Shows the digits the API returned, not a conversion: times are UTC everywhere in
+    /// this app (<see cref="UtcTime"/>), so the digits are already what the user entered, and the suffix says which clock they are on.
     /// </summary>
     public static string DateTimeText(DateTimeOffset? value) =>
-        value is { } v ? v.DateTime.ToString("yyyy-MM-dd HH:mm") : "—";
+        value is { } v ? v.DateTime.ToString("yyyy-MM-dd HH:mm") + " UTC" : "—";
 
     /// <summary>"2026-11-17", or a dash when missing. Same no-conversion rule as <see cref="DateTimeText"/>.</summary>
     public static string DateText(DateTimeOffset? value) =>

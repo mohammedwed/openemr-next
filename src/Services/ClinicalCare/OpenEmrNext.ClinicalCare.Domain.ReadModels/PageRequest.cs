@@ -18,14 +18,15 @@ public sealed record PageRequest
     public int Offset { get; }
 
     /// <summary>When set, only records whose last-changed stamp falls in this window (the FHIR <c>_lastUpdated</c> search, ADR 0079). It rides on the page request so every reader that lists by page can honour it without a new signature.</summary>
-    public UpdatedWindow? Updated { get; init; }
+    public UpdatedWindow? Updated { get; }
 
-    public PageRequest Within(UpdatedWindow? window) => this with { Updated = window };
+    public PageRequest Within(UpdatedWindow? window) => new(Limit, Offset, window);
 
-    private PageRequest(int limit, int offset)
+    private PageRequest(int limit, int offset, UpdatedWindow? updated = null)
     {
         Limit = limit;
         Offset = offset;
+        Updated = updated;
     }
 
     /// <exception cref="ClinicalCareValidationException">The limit is outside 1 to <see cref="MaxLimit"/> or the offset is negative.</exception>

@@ -3,6 +3,7 @@
 @using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
 @inject IClinicalCareClient ClinicalCare
 @inject OpenEmrNext.WebApp.Shared.IdempotencyAttempt Attempt
+@inject TimeProvider Clock
 
 @* Creating an encounter is a change, so it lives in its own dialog. It closes only when the save succeeds,
    handing the created encounter back to the caller; on failure it stays open with the typed values intact. *@
@@ -37,7 +38,7 @@
                             MinDate="MinDate" MaxDate="MaxDate" />
                     </MudItem>
                     <MudItem xs="12" sm="5">
-                        <MudTimePicker @bind-Time="_model.Time" Label="Time" Editable="true" Variant="Variant.Outlined"
+                        <MudTimePicker @bind-Time="_model.Time" Label="Time (UTC)" Editable="true" Variant="Variant.Outlined"
                             Required="@(_model.Date is not null)" RequiredError="Choose a time." />
                     </MudItem>
                 </MudGrid>
@@ -123,7 +124,7 @@
 @code {
     // The API's own bounds (CC-17): 1900-01-01 up to one year ahead. Stopping them in the picker saves a round trip.
     private static readonly DateTime MinDate = new(1900, 1, 1);
-    private static DateTime MaxDate => DateTime.Today.AddYears(1);
+    private static DateTime MaxDate => UtcTime.Today.AddYears(1);
 
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter, EditorRequired] public Guid PatientUuid { get; set; }
@@ -148,7 +149,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var now = DateTime.Now;
+        var now = Clock.GetUtcNow();
         _model.Date = now.Date;
         _model.Time = new TimeSpan(now.Hour, now.Minute, 0);
 
@@ -213,14 +214,14 @@
                 PatientUuid = PatientUuid,
                 ClassCode = _model.ClassCode,
                 CalendarCategoryId = _model.CalendarCategoryId,
-                // A date with a zone is an instant; the API converts it to its own local time (R-11). Left null,
-                // the API uses its own "now".
-                Date = _model.Date is { } date ? new DateTimeOffset(date.Date + (_model.Time ?? TimeSpan.Zero)) : null,
+                // Times are UTC everywhere in this app (UtcTime): the digits the user sees are the digits sent, with a zero offset.
+                // Left null, the API uses its own "now".
+                Date = _model.Date is { } date ? UtcTime.ToWire(date.Date + (_model.Time ?? TimeSpan.Zero)) : null,
                 Reason = string.IsNullOrWhiteSpace(_model.Reason) ? null : _model.Reason,
                 FacilityId = _model.FacilityId,
                 PosCode = _model.PosCode,
                 ProviderId = _model.ProviderId,
-                OnsetDate = _model.OnsetDate is { } onset ? new DateTimeOffset(onset.Date) : null,
+                OnsetDate = _model.OnsetDate is { } onset ? UtcTime.ToWire(onset.Date) : null,
                 Sensitivity = string.IsNullOrWhiteSpace(_model.Sensitivity) ? null : _model.Sensitivity
             };
             // A retried save is one request, not two: the attempt lives until a save succeeds (ADR 0077).
