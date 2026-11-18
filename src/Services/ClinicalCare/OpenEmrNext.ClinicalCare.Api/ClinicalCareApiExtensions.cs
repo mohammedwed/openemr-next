@@ -90,6 +90,7 @@ public static class ClinicalCareApiExtensions
         builder.Services.AddScoped<IEncounterLookups, EfEncounterLookups>();
         builder.Services.AddScoped<IAccessControl, EfAccessControl>();
         builder.Services.AddScoped<IRecordDeleter, EfRecordDeleter>();
+        builder.Services.AddScoped<IIdempotencyStore, EfIdempotencyStore>();
         builder.Services.AddScoped<DeleteRecordUseCase>();
         builder.Services.AddScoped<EncounterLookupsUseCase>();
 

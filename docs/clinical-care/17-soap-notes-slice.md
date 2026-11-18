@@ -28,7 +28,7 @@ Records a SOAP note (subjective, objective, assessment, plan) on an encounter, r
 | # | Limitation | Why accepted |
 |---|---|---|
 | L1 | A note's public identity is a number, an exception to DOM-6 contained to this resource (ADR 0073). | `form_soap` has no uuid; the encounter in the route authorises it |
-| L2 | **No retry guard.** Other registries find an earlier committed attempt by uuid; a note has no identity before its insert, so a transaction retried after a lost commit acknowledgement could write a second note. | Needs a transient fault at the commit reply; idempotency keys are deferred (F-CC-8) |
+| L2 | ~~**No retry guard.**~~ **Resolved (M5h, ADR 0077):** the registry gives each attempt an id, writes it into the event in the same transaction, and finds it on a re-run. A test loses a real commit acknowledgement and shows one note. | A client retry is covered by the `Idempotency-Key` |
 | L3 | Legacy's `REST` and screen writers rewrite a note with no stamp, so one that runs after this service wins silently. | Inherent to coexistence (ADR 0072) |
 | L4 | No delete (`forms.deleted` needs the permission port). | As elsewhere |
 | L5 | The audit table's `subject` column holds either a uuid's text or a `soap:{id}` key. A reader of that column must read it as text (the connector parses `CHAR(36)` as a Guid). Production only inserts. | One column, two kinds of subject, documented here and in `AuditEntry` |

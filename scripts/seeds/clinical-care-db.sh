@@ -49,6 +49,24 @@ CREATE TABLE IF NOT EXISTS \`${DB_NAME}\`.\`clinical_care_outbox\` (
   published_at DATETIME DEFAULT NULL
 );
 
+-- Idempotency keys (API-5, ADR 0077): what a creating request answered, by (user, key), kept 24 hours so a retried request is answered, not repeated. Only the hash of the
+-- request and the answer (identifiers, status, location) are held, never the request body. The primary key is what makes claiming a key atomic.
+CREATE TABLE IF NOT EXISTS \`${DB_NAME}\`.\`clinical_care_idempotency\` (
+  actor_id BIGINT NOT NULL,
+  idem_key VARCHAR(64) NOT NULL,
+  fingerprint CHAR(64) NOT NULL,
+  state VARCHAR(8) NOT NULL,
+  claim_token VARCHAR(36) NOT NULL,
+  claimed_at DATETIME(6) NOT NULL,
+  completed_at DATETIME(6) DEFAULT NULL,
+  status_code INT DEFAULT NULL,
+  content_type VARCHAR(100) DEFAULT NULL,
+  location VARCHAR(300) DEFAULT NULL,
+  body TEXT DEFAULT NULL,
+  PRIMARY KEY (actor_id, idem_key),
+  KEY ix_clinical_care_idempotency_claimed (claimed_at)
+);
+
 -- The audit trail (SEC-9, ADR 0069): who did what to which record, field names only, never values. Append-only: the service
 -- user is granted INSERT and SELECT below and nothing else. Subject is the record's uuid as text so the table reads without a
 -- converter. Widths here must match AuditEntry's limits (the unit test pins them).
@@ -200,6 +218,9 @@ GRANT SELECT (id, lft, rgt) ON \`${DB_NAME}\`.gacl_aro_groups TO '${CLINICAL_CAR
 
 -- This service's own outbox: fully owned, so the relay can mark rows published and purge them (EVT-7).
 GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.clinical_care_outbox TO '${CLINICAL_CARE_DB_USER}'@'%';
+
+-- The idempotency table is fully owned: claims are inserted, completed, released and swept.
+GRANT SELECT, INSERT, UPDATE, DELETE ON \`${DB_NAME}\`.clinical_care_idempotency TO '${CLINICAL_CARE_DB_USER}'@'%';
 
 -- The audit trail is append-only by privilege: no UPDATE, no DELETE, and the retention job never touches it (ADR 0069 #2, #7).
 GRANT INSERT, SELECT ON \`${DB_NAME}\`.clinical_care_audit TO '${CLINICAL_CARE_DB_USER}'@'%';
