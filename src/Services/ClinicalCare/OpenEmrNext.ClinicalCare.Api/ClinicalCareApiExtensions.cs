@@ -146,6 +146,8 @@ public static class ClinicalCareApiExtensions
         builder.Services.AddScoped<IVitalsReader, EfVitalsReader>();
         builder.Services.AddScoped<RecordVitalsUseCase>();
         builder.Services.AddScoped<GetVitalsUseCase>();
+        builder.Services.AddScoped<FindVitalsAnywhereUseCase>();
+        builder.Services.AddScoped<ListPatientVitalsUseCase>();
         builder.Services.AddScoped<ListEncounterVitalsUseCase>();
         builder.Services.AddScoped<IVitalsUpdater, EfVitalsUpdater>();
         builder.Services.AddScoped<CorrectVitalsUseCase>();

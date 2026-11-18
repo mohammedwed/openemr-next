@@ -36,6 +36,32 @@ public sealed class EfUserDirectory(ClinicalCareDbContext db) : IUserDirectory
         return rows.ToDictionary(r => r.Id, r => Rfc4122GuidConverter.FromRfc4122Bytes(r.Uuid));
     }
 
+    public async Task<IReadOnlyDictionary<long, UserPerson>> FindPeopleAsync(IReadOnlyCollection<long> userIds, CancellationToken ct)
+    {
+        var ids = userIds.Where(i => i > 0).Distinct().Take(500).ToList();
+        if (ids.Count == 0)
+            return new Dictionary<long, UserPerson>();
+
+        var placeholders = string.Join(',', ids.Select((_, i) => "{" + i + "}"));
+#pragma warning disable EF1003 // The text is built from a count of placeholders and nothing else; every id travels as a bound parameter.
+        var rows = await db.Database
+            .SqlQueryRaw<PersonRow>("SELECT id AS Id, uuid AS Uuid, fname AS FirstName, lname AS LastName FROM users WHERE uuid IS NOT NULL AND id IN (" + placeholders + ")", ids.Cast<object>().ToArray())
+            .ToListAsync(ct);
+#pragma warning restore EF1003
+
+        return rows.ToDictionary(
+            r => r.Id,
+            r => new UserPerson(Rfc4122GuidConverter.FromRfc4122Bytes(r.Uuid), string.Join(' ', new[] { r.FirstName, r.LastName }.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n!.Trim())) is { Length: > 0 } n ? n : null));
+    }
+
+    private sealed class PersonRow
+    {
+        public long Id { get; set; }
+        public byte[] Uuid { get; set; } = [];
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+    }
+
     private sealed class UuidRow
     {
         public long Id { get; set; }

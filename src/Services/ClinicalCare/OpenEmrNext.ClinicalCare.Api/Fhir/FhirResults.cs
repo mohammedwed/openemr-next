@@ -24,6 +24,9 @@ internal sealed class FhirResult(Resource body, int statusCode = StatusCodes.Sta
 /// <summary>The <c>OperationOutcome</c>s a FHIR client is told when it asks for something that is not there, or asks wrongly.</summary>
 internal static class FhirOutcomes
 {
+    public static IResult NotFound(string resourceType, string id) =>
+        Error(StatusCodes.Status404NotFound, OperationOutcome.IssueType.NotFound, $"{resourceType}/{id} does not exist.");
+
     public static IResult NotFound(string resourceType, Guid id) =>
         Error(StatusCodes.Status404NotFound, OperationOutcome.IssueType.NotFound, $"{resourceType}/{id} does not exist.");
 

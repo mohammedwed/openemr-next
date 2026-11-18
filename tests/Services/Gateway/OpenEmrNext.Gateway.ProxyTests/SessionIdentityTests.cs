@@ -16,7 +16,9 @@ public class SessionIdentityTests
     [
         ["/api/v1/encounters"], ["/api/v1/encounters/6c0c0c0c-0000-4000-8000-000000000001/vitals"], ["/api/v1/problems"], ["/api/v1/allergies"], ["/api/v1/immunizations"],
         ["/api/v1/lookups/facilities"], ["/api/v1/patients"], ["/api/v1/patients/abc/insurance"], ["/fhir/Patient"],
-        ["/fhir/Immunization"], ["/fhir/Immunization/6c0c0c0c-0000-4000-8000-000000000001"]
+        ["/fhir/Immunization"], ["/fhir/Immunization/6c0c0c0c-0000-4000-8000-000000000001"],
+        ["/fhir/AllergyIntolerance"], ["/fhir/Condition"], ["/fhir/Encounter"], ["/fhir/Encounter/6c0c0c0c-0000-4000-8000-000000000001"],
+        ["/fhir/Observation"], ["/fhir/Observation/6c0c0c0c-0000-4000-8000-000000000001-body-weight"]
     ];
 
     [Theory]
@@ -65,6 +67,12 @@ public class SessionIdentityTests
     [Theory]
     [InlineData("/fhir/Immunization")]
     [InlineData("/fhir/Immunization/6c0c0c0c-0000-4000-8000-000000000001")]
+    [InlineData("/fhir/AllergyIntolerance")]
+    [InlineData("/fhir/Condition")]
+    [InlineData("/fhir/Encounter")]
+    [InlineData("/fhir/Encounter/6c0c0c0c-0000-4000-8000-000000000001")]
+    [InlineData("/fhir/Observation")]
+    [InlineData("/fhir/Observation/6c0c0c0c-0000-4000-8000-000000000001-body-weight")]
     public async Task A_valid_session_sends_a_clinical_fhir_read_to_clinical_care_not_to_patient_management(string path)
     {
         await using var gateway = await GatewayHarness.StartAsync();

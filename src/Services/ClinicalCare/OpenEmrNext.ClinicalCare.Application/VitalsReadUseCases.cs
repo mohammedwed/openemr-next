@@ -37,3 +37,23 @@ public sealed class ListEncounterVitalsUseCase(IEncounterReader encounters, IVit
             : new VitalsPage([], 0);
     }
 }
+
+/// <summary>One vitals set by its uuid, wherever it was taken, with its encounter and patient (the FHIR Observation, ADR 0079).</summary>
+public sealed class FindVitalsAnywhereUseCase(IVitalsReader reader)
+{
+    public Task<PatientVitals?> ExecuteAsync(Guid vitalsUuid, CancellationToken ct) => reader.FindAnywhereAsync(vitalsUuid, ct);
+}
+
+/// <summary>A patient's vitals sets across every encounter, newest first, bounded (ADR 0079). The patient has to be known here.</summary>
+public sealed class ListPatientVitalsUseCase(IPatientDirectory patients, IVitalsReader reader)
+{
+    /// <summary>The most vitals sets one FHIR search looks at. A patient with more has their oldest sets out of reach of FHIR; the JSON API still lists them all, by encounter.</summary>
+    public const int MaxSets = 1000;
+
+    /// <exception cref="PatientNotFoundException">No patient has this uuid.</exception>
+    public async Task<IReadOnlyList<PatientVitals>> ExecuteAsync(Guid patientUuid, CancellationToken ct)
+    {
+        var patient = await patients.FindAsync(patientUuid, ct) ?? throw new PatientNotFoundException(patientUuid);
+        return await reader.ListForPatientAsync(patient, MaxSets, ct);
+    }
+}

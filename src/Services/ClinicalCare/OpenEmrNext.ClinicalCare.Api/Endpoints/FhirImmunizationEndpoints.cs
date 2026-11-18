@@ -1,9 +1,9 @@
 using Hl7.Fhir.Model;
-using Task = System.Threading.Tasks.Task;
 using OpenEmrNext.ClinicalCare.Api.Fhir;
 using OpenEmrNext.ClinicalCare.Application;
 using OpenEmrNext.ClinicalCare.Application.Ports;
 using OpenEmrNext.ClinicalCare.Domain.ReadModels;
+using Task = System.Threading.Tasks.Task;
 
 namespace OpenEmrNext.ClinicalCare.Api.Endpoints;
 
@@ -18,66 +18,35 @@ public static class FhirImmunizationEndpoints
 
     public static IEndpointRouteBuilder MapFhirImmunizationEndpoints(this IEndpointRouteBuilder fhir)
     {
-        fhir.MapGet("/Immunization/{id:guid}", Read)
+        fhir.MapGet("/Immunization/{id:guid}", (Guid id, GetImmunizationUseCase get, IUserDirectory users, CancellationToken ct) =>
+                FhirEndpointKit.ReadAsync<ImmunizationView>(Type, id, get.ExecuteAsync, (v, c) => MapAsync(v, users, c), v => $"W/{v.Version().ToETag()}", ct))
             .WithName("FhirReadImmunization").WithTags("FHIR")
             .WithSummary("Read an immunization as a FHIR R4 Immunization resource")
             .Produces<Immunization>(contentType: FhirResult.ContentType)
             .Produces<OperationOutcome>(StatusCodes.Status404NotFound, FhirResult.ContentType);
 
-        fhir.MapGet("/Immunization", Search)
+        fhir.MapGet("/Immunization", (HttpContext http, ListPatientImmunizationsUseCase list, GetImmunizationUseCase get, IUserDirectory users, CancellationToken ct) =>
+                FhirEndpointKit.SearchAsync<ImmunizationView>(
+                    http, Type, NoExtraParameters, FhirEndpointKit.NoExtra, get.ExecuteAsync, v => v.PatientUuid,
+                    async (patient, count, offset, c) =>
+                    {
+                        try
+                        {
+                            var page = await list.ExecuteAsync(patient, count, offset, c);
+                            return (page.Items, page.Total);
+                        }
+                        catch (PatientNotFoundException)
+                        {
+                            return ([], 0);   // FHIR answers a search for a patient that is not there with an empty set, not an error
+                        }
+                    },
+                    (v, c) => MapAsync(v, users, c), ct))
             .WithName("FhirSearchImmunizations").WithTags("FHIR")
             .WithSummary("Search one patient's immunizations (patient, _id, _count, _offset), as a FHIR searchset Bundle")
             .Produces<Bundle>(contentType: FhirResult.ContentType)
             .Produces<OperationOutcome>(StatusCodes.Status400BadRequest, FhirResult.ContentType);
 
         return fhir;
-    }
-
-    private static async Task<IResult> Read(Guid id, GetImmunizationUseCase useCase, IUserDirectory users, CancellationToken ct)
-    {
-        var view = await useCase.ExecuteAsync(id, ct);
-        if (view is null)
-            return FhirOutcomes.NotFound(Type, id);
-
-        var resource = await MapAsync([view], users, ct);
-        return new FhirResult(resource[0], weakETag: $"W/{view.Version().ToETag()}");
-    }
-
-    private static async Task<IResult> Search(
-        HttpContext http, ListPatientImmunizationsUseCase list, GetImmunizationUseCase get, IUserDirectory users, CancellationToken ct)
-    {
-        if (!FhirSearchParser.TryParse(Type, http.Request.Query, NoExtraParameters, out var search, out var refusal))
-            return refusal;
-
-        IReadOnlyList<ImmunizationView> found;
-        int total;
-        if (search.Id is { } id)
-        {
-            // By id: at most one, and when a patient is also named it has to be that patient's.
-            var one = await get.ExecuteAsync(id, ct);
-            found = one is not null && (search.Patient is null || one.PatientUuid == search.Patient) ? [one] : [];
-            total = found.Count;
-        }
-        else
-        {
-            try
-            {
-                var page = await list.ExecuteAsync(search.Patient!.Value, search.Count, search.Offset, ct);
-                found = page.Items;
-                total = page.Total;
-            }
-            catch (PatientNotFoundException)
-            {
-                (found, total) = ([], 0);   // FHIR answers a search for a patient that is not there with an empty set, not an error
-            }
-        }
-
-        var filters = new Dictionary<string, string>();
-        if (search.Patient is { } p) filters["patient"] = p.ToString();
-        if (search.Id is { } i) filters["_id"] = i.ToString();
-
-        var resources = await MapAsync(found, users, ct);
-        return new FhirResult(FhirBundles.SearchSet(http.Request, Type, resources, total, search, filters));
     }
 
     private static async Task<IReadOnlyList<Resource>> MapAsync(IReadOnlyList<ImmunizationView> views, IUserDirectory users, CancellationToken ct)

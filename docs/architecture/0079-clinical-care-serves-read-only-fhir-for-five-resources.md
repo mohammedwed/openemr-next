@@ -40,7 +40,8 @@ The alternatives are named so the choice is visible. **Confirmed by the user on 
 
 ## Progress
 
-- **Immunization: built** (M5e slice 1, `docs/clinical-care/24-fhir-immunization.md`), with the shared plumbing: the result type, strict search, the Bundle builder, the user-id lookup and the gateway split of `/fhir`. Remaining: AllergyIntolerance, Condition, Encounter, Observation.
+- **All five resources are built** (`24-fhir-immunization.md`, `25-fhir-clinical-resources.md`).
+- **Two places differ from the decisions above, recorded in `25-fhir-clinical-resources.md` section 3:** an Observation id is `{vitalsUuid}-{measurement}` rather than a name-based UUID (so it can be read back; it is still derived, deterministic and write-free, which is what decision 3 was for), and `_lastUpdated` search (decision 6) is **not built yet**: it is refused like any unsupported parameter, while `meta.lastUpdated` is served.
 
 ## Order of work
 
