@@ -15,7 +15,8 @@ public class SessionIdentityTests
     public static IEnumerable<object[]> ProtectedPaths =>
     [
         ["/api/v1/encounters"], ["/api/v1/encounters/6c0c0c0c-0000-4000-8000-000000000001/vitals"], ["/api/v1/problems"], ["/api/v1/allergies"], ["/api/v1/immunizations"],
-        ["/api/v1/lookups/facilities"], ["/api/v1/patients"], ["/api/v1/patients/abc/insurance"], ["/fhir/Patient"]
+        ["/api/v1/lookups/facilities"], ["/api/v1/patients"], ["/api/v1/patients/abc/insurance"], ["/fhir/Patient"],
+        ["/fhir/Immunization"], ["/fhir/Immunization/6c0c0c0c-0000-4000-8000-000000000001"]
     ];
 
     [Theory]
@@ -58,6 +59,23 @@ public class SessionIdentityTests
         Assert.Equal(User.ToString(), seen.Headers["X-Authenticated-User"]);
         Assert.Equal(GatewayHarness.ClinicalSecret, seen.Headers["X-Internal-Gateway-Secret"]);
         Assert.False(seen.Headers.ContainsKey("Cookie"), "the session cookie must not reach the data services");
+        Assert.Empty(gateway.PatientManagement.Requests);
+    }
+
+    [Theory]
+    [InlineData("/fhir/Immunization")]
+    [InlineData("/fhir/Immunization/6c0c0c0c-0000-4000-8000-000000000001")]
+    public async Task A_valid_session_sends_a_clinical_fhir_read_to_clinical_care_not_to_patient_management(string path)
+    {
+        await using var gateway = await GatewayHarness.StartAsync();
+
+        var response = await gateway.Client.SendAsync(gateway.Request(HttpMethod.Get, path, Valid));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var seen = Assert.Single(gateway.ClinicalCare.Requests);
+        Assert.Equal(User.ToString(), seen.Headers["X-Authenticated-User"]);
+        Assert.Equal(GatewayHarness.ClinicalSecret, seen.Headers["X-Internal-Gateway-Secret"]);
+        Assert.False(seen.Headers.ContainsKey("Cookie"));
         Assert.Empty(gateway.PatientManagement.Requests);
     }
 

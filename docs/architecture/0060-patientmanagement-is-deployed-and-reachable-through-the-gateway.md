@@ -33,7 +33,7 @@ docker-compose service, and no Gateway route at all.
    path. A new `INTERNAL_GATEWAY_SECRET` (`.env.example`, `scripts/setup/new-env.sh`, CI's own `.env`
    step) is shared between this service and the `gateway` service only.
 3. **`src/Services/Gateway/OpenEmrNext.Gateway/Program.cs`**: a new `patientmanagement` cluster and two
-   routes, `/api/v1/patients/{**catch-all}` and `/fhir/{**catch-all}` -- more specific than AuthFacade's
+   routes, `/api/v1/patients/{**catch-all}` and `/fhir/{**catch-all}` (narrowed to `/fhir/Patient/{**catch-all}` by ADR 0079, when Clinical Care began to serve the clinical FHIR resources) -- more specific than AuthFacade's
    existing `/api/{**catch-all}`, so the same route-precedence reasoning already documented there
    applies. A request transform, scoped to only this cluster (checked via
    `TransformBuilderContext.Cluster.ClusterId`, not applied globally like the `XForwardedFor`/HSTS
