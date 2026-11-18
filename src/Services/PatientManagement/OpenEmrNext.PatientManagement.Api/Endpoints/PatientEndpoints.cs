@@ -46,7 +46,7 @@ public static class PatientEndpoints
             patient = await useCase.ExecuteAsync(
                 request.FirstName, request.LastName, request.Sex, request.DateOfBirth,
                 request.Email, request.TrustedEmail,
-                http.ActingUserId(request.RegisteredBy), DateTime.UtcNow, ct);
+                http.ActingUserId(request.RegisteredBy), DateTime.UtcNow, ct, AuditOrigins.From(http));
         }
         catch (PatientValidationException ex)
         {

@@ -24,8 +24,11 @@ public class AdvanceDirectiveTests(PatientDataContainerFixture fixture) : IDispo
 
     public void Dispose() => _repositoryRoot.Delete(recursive: true);
 
-    private EfAdvanceDirectiveRepository CreateRepository() =>
-        new(fixture.CreateDbContext(), new LocalDiskAdvanceDirectiveFileStore(_repositoryRoot.FullName));
+    private EfAdvanceDirectiveRepository CreateRepository()
+    {
+        var db = fixture.CreateDbContext();
+        return new(db, new LocalDiskAdvanceDirectiveFileStore(_repositoryRoot.FullName), new EfAuditLog(db));
+    }
 
     /// <summary>The status flags live on <c>patient_data</c> -- unlike documents, which have no foreign
     /// key, setting them for a pid with no row there is a silent no-op, so these tests need a real
@@ -34,7 +37,7 @@ public class AdvanceDirectiveTests(PatientDataContainerFixture fixture) : IDispo
     {
         var registration = PatientRegistration.Create(
             "Test", $"Patient{Guid.NewGuid():N}", $"TestSex{Guid.NewGuid():N}"[..30], new DateOnly(2000, 1, 1), null, null);
-        var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context))
+        var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context, new EfAuditLog(context)), new EfAuditLog(context))
             .ExecuteAsync(registration, registeredBy: 1, DateTime.UtcNow, CancellationToken.None);
         return patient.Pid;
     }
@@ -46,7 +49,7 @@ public class AdvanceDirectiveTests(PatientDataContainerFixture fixture) : IDispo
         var repository = CreateRepository();
         var content = Encoding.UTF8.GetBytes("a living will, in plain text for this test");
 
-        var uploaded = await new UploadAdvanceDirectiveDocumentUseCase(repository).ExecuteAsync(
+        var uploaded = await new UploadAdvanceDirectiveDocumentUseCase(repository, new EfAuditLog(fixture.CreateDbContext())).ExecuteAsync(
             pid, AdvanceDirectiveType.LivingWill, "consent.pdf", "application/pdf", content, new DateOnly(2026, 1, 1), ownerId: 7, CancellationToken.None);
 
         var documents = await new GetAdvanceDirectiveDocumentsUseCase(repository).ExecuteAsync(pid, CancellationToken.None);
@@ -68,7 +71,7 @@ public class AdvanceDirectiveTests(PatientDataContainerFixture fixture) : IDispo
         var repository = CreateRepository();
         var content = Encoding.UTF8.GetBytes("durable power of attorney scan bytes");
 
-        var uploaded = await new UploadAdvanceDirectiveDocumentUseCase(repository).ExecuteAsync(
+        var uploaded = await new UploadAdvanceDirectiveDocumentUseCase(repository, new EfAuditLog(fixture.CreateDbContext())).ExecuteAsync(
             pid, AdvanceDirectiveType.DurablePowerOfAttorney, "poa.pdf", "application/pdf", content, null, 7, CancellationToken.None);
 
         var downloaded = await new DownloadAdvanceDirectiveDocumentUseCase(repository).ExecuteAsync(pid, uploaded.Uuid, CancellationToken.None);
@@ -85,7 +88,7 @@ public class AdvanceDirectiveTests(PatientDataContainerFixture fixture) : IDispo
         var pid = NextPid();
         var repository = CreateRepository();
 
-        var uploaded = await new UploadAdvanceDirectiveDocumentUseCase(repository).ExecuteAsync(
+        var uploaded = await new UploadAdvanceDirectiveDocumentUseCase(repository, new EfAuditLog(fixture.CreateDbContext())).ExecuteAsync(
             pid, AdvanceDirectiveType.DnrOrder, "dnr.pdf", "application/pdf", [1, 2, 3], null, 7, CancellationToken.None);
 
         var downloaded = await new DownloadAdvanceDirectiveDocumentUseCase(repository)
@@ -100,9 +103,9 @@ public class AdvanceDirectiveTests(PatientDataContainerFixture fixture) : IDispo
         var pid = NextPid();
         var repository = CreateRepository();
 
-        var first = await new UploadAdvanceDirectiveDocumentUseCase(repository).ExecuteAsync(
+        var first = await new UploadAdvanceDirectiveDocumentUseCase(repository, new EfAuditLog(fixture.CreateDbContext())).ExecuteAsync(
             pid, AdvanceDirectiveType.LivingWill, "a.pdf", "application/pdf", [1], null, 7, CancellationToken.None);
-        var second = await new UploadAdvanceDirectiveDocumentUseCase(repository).ExecuteAsync(
+        var second = await new UploadAdvanceDirectiveDocumentUseCase(repository, new EfAuditLog(fixture.CreateDbContext())).ExecuteAsync(
             pid, AdvanceDirectiveType.DnrOrder, "b.pdf", "application/pdf", [2], null, 7, CancellationToken.None);
 
         Assert.NotEqual(0, first.Id);
@@ -120,7 +123,7 @@ public class AdvanceDirectiveTests(PatientDataContainerFixture fixture) : IDispo
         var pid = await RegisterPatient(fixture.CreateDbContext());
         var reviewedAt = new DateTime(2026, 2, 1, 10, 0, 0, DateTimeKind.Utc);
 
-        await new SetAdvanceDirectiveStatusUseCase(repository)
+        await new SetAdvanceDirectiveStatusUseCase(repository, new EfAuditLog(fixture.CreateDbContext()))
             .ExecuteAsync(pid, AdvanceDirectiveCompletionStatus.Yes, reviewedAt, authenticatorUserId: 3, CancellationToken.None);
 
         var (status, reviewedAtUtc, authenticatorUserId) = await new GetAdvanceDirectiveStatusUseCase(repository)

@@ -13,13 +13,23 @@ namespace OpenEmrNext.PatientManagement.Application;
 /// decision (ADR 0053). The decision logic itself lives entirely in the aggregate; this use case is
 /// just the load/decide/persist orchestration.
 /// </summary>
-public sealed class SwapInsuranceUseCase(IInsurancePolicyRepository repository)
+public sealed class SwapInsuranceUseCase(IInsurancePolicyRepository repository, IAuditLog auditLog)
 {
-    public async Task ExecuteAsync(long pid, InsuranceLevel targetLevel, Guid policyUuid, CancellationToken ct)
+    public async Task ExecuteAsync(long pid, InsuranceLevel targetLevel, Guid policyUuid, CancellationToken ct, AuditOrigin? origin = null)
     {
-        var policies = await repository.GetPoliciesAsync(pid, ct);
-        var coverage = InsuranceCoverage.For(pid, policies);
-        var result = coverage.Swap(policyUuid, targetLevel);
-        await repository.PersistSwapAsync(result, ct);
+        InsuranceSwapResult result;
+        try
+        {
+            var policies = await repository.GetPoliciesAsync(pid, ct);
+            var coverage = InsuranceCoverage.For(pid, policies);
+            result = coverage.Swap(policyUuid, targetLevel);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InsurancePolicyValidationException)
+        {
+            await auditLog.AppendAsync(Audit.Failure(origin, AuditActions.InsuranceSwap, policyUuid.ToString()), ct);
+            throw;
+        }
+
+        await repository.PersistSwapAsync(result, Audit.Success(origin, AuditActions.InsuranceSwap, policyUuid.ToString()), ct);
     }
 }

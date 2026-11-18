@@ -44,6 +44,23 @@ CREATE TABLE IF NOT EXISTS \`${DB_NAME}\`.\`patient_management_outbox\` (
   occurred_at DATETIME NOT NULL,
   published_at DATETIME DEFAULT NULL
 );
+-- The audit trail (SEC-9, ADR 0078): who did what to which record, field names only, never values. Append-only: the service user is granted INSERT
+-- and SELECT below and nothing else. Subject is the record's uuid as text, or a short key such as patient:42. Widths here must match AuditEntry's limits.
+CREATE TABLE IF NOT EXISTS \`${DB_NAME}\`.\`patient_management_audit\` (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  at DATETIME(6) NOT NULL,
+  actor VARCHAR(100) NOT NULL,
+  actor_id BIGINT DEFAULT NULL,
+  actor_verified TINYINT(1) NOT NULL DEFAULT 0,
+  action VARCHAR(50) NOT NULL,
+  subject VARCHAR(36) NOT NULL,
+  outcome VARCHAR(10) NOT NULL,
+  correlation_id VARCHAR(100) DEFAULT NULL,
+  source_address VARCHAR(45) DEFAULT NULL,
+  details VARCHAR(1000) DEFAULT NULL,
+  KEY ix_patient_management_audit_subject (subject, at),
+  KEY ix_patient_management_audit_at (at)
+);
 -- The relay's bookkeeping (EVT-7, ADR 0066): attempts and back-off, a lease so a crashed relay loses nothing, and a
 -- dead-letter mark. ADD COLUMN IF NOT EXISTS keeps this idempotent on a database that already has the older table.
 ALTER TABLE \`${DB_NAME}\`.\`patient_management_outbox\`
@@ -88,6 +105,8 @@ GRANT SELECT ON \`${DB_NAME}\`.list_options TO '${PATIENT_MANAGEMENT_DB_USER}'@'
 -- Insert-only: it adds its own rows and never reads or edits anyone's.
 GRANT INSERT ON \`${DB_NAME}\`.uuid_registry TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.patient_management_outbox TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
+-- The audit trail is append-only by privilege: no UPDATE, no DELETE (ADR 0078).
+GRANT INSERT, SELECT ON \`${DB_NAME}\`.patient_management_audit TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 FLUSH PRIVILEGES;
 SQL
 

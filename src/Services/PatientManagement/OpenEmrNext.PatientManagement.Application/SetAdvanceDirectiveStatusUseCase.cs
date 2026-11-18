@@ -13,10 +13,18 @@ namespace OpenEmrNext.PatientManagement.Application;
 /// <paramref name="authenticatorUserId"/>'s validity to <paramref name="status"/>'s value for this
 /// service to enforce.
 /// </summary>
-public sealed class SetAdvanceDirectiveStatusUseCase(IAdvanceDirectiveRepository repository)
+public sealed class SetAdvanceDirectiveStatusUseCase(IAdvanceDirectiveRepository repository, IAuditLog auditLog)
 {
-    public Task ExecuteAsync(
+    /// <returns><c>true</c> when the status was set; <c>false</c> when no patient has this number (nothing written, a <c>failed</c> audit row).</returns>
+    public async Task<bool> ExecuteAsync(
         long pid, AdvanceDirectiveCompletionStatus status, DateTime? reviewedAtUtc,
-        long? authenticatorUserId, CancellationToken ct) =>
-        repository.SetStatusAsync(pid, status, reviewedAtUtc, authenticatorUserId, ct);
+        long? authenticatorUserId, CancellationToken ct, AuditOrigin? origin = null)
+    {
+        var done = await repository.SetStatusAsync(
+            pid, status, reviewedAtUtc, authenticatorUserId, Audit.Success(origin, AuditActions.DirectiveStatusSet, Audit.Patient(pid), ["status"]), ct);
+        if (!done)
+            await auditLog.AppendAsync(Audit.Failure(origin, AuditActions.DirectiveStatusSet, Audit.Patient(pid)), ct);
+
+        return done;
+    }
 }

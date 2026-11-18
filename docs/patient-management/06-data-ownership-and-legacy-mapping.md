@@ -240,7 +240,7 @@ the missing file.
 | Who created a patient | `created_by` (caller-supplied, unverified) |
 | Who last changed a patient | **Nothing**: `updated_by` is never written |
 | Who filed or reviewed a directive | `documents.owner` (caller-supplied); `advance_directive_user_authenticator` (caller-supplied) |
-| Insurance changes | **Nothing recorded** |
+| Insurance changes | **Audited since Nov 17** (`patient_management_audit`, ADR 0078): who, which policy, when, from where. Every write of this service is audited the same way. |
 | Reads of PHI (who looked at which chart) | **Nothing** |
 | Legacy's own audit log | Legacy has a `log` table. **This service writes nothing to it.** Whether legacy's own REST and UI patient-creation paths write there was not verified; if they do, patients created here are **missing from legacy's audit trail**. |
 

@@ -24,7 +24,7 @@ public class PatientFhirTests(PatientDataContainerFixture fixture)
         var registration = PatientRegistration.Create(
             "Test", $"Patient{Guid.NewGuid():N}", sex ?? "Male", new DateOnly(2000, 1, 1),
             $"{Guid.NewGuid():N}@example.com", null);
-        return await new RegisterPatientUseCase(new EfPatientRegistry(context))
+        return await new RegisterPatientUseCase(new EfPatientRegistry(context, new EfAuditLog(context)), new EfAuditLog(context))
             .ExecuteAsync(registration, registeredBy: 1, DateTime.UtcNow, CancellationToken.None);
     }
 
@@ -132,7 +132,7 @@ public class PatientFhirTests(PatientDataContainerFixture fixture)
         var context = fixture.CreateDbContext();
         var uniqueLastName = $"Searchable{Guid.NewGuid():N}";
         var registration = PatientRegistration.Create("Findme", uniqueLastName, "Female", new DateOnly(1990, 5, 5), null, null);
-        var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context))
+        var patient = await new RegisterPatientUseCase(new EfPatientRegistry(context, new EfAuditLog(context)), new EfAuditLog(context))
             .ExecuteAsync(registration, registeredBy: 1, DateTime.UtcNow, CancellationToken.None);
 
         var repository = new EfPatientFhirRepository(context);

@@ -450,3 +450,12 @@ Full record: `docs/clinical-care/20-webapp-clinical-screens.md`. **Compile-check
 - **24 tests** for the delete flows of the vitals, SOAP and clinical note panels: confirm sends the row's own `ETag` and reloads; "Keep it" sends nothing; 403, 404, 412 and a network failure each say the right thing and reload or not as they should.
 - **Mutation check:** making the 403 handling claim success fails 3 tests, sending a wrong `ETag` fails 4; both restored.
 - **Not covered:** everything else in the WebApp, and anything that needs a real browser. The browser check of all screens is still outstanding.
+
+## Added — Patient Management's audit trail (M5k, ADR 0078)
+
+- **Every Patient Management write now leaves an audit row** in its own append-only table, `patient_management_audit`: who (the verified user's uuid and `users.id`, marked verified), what, which record, the outcome, the trace id, the caller's address, and the names of the fields changed, never a value. Registering a patient (API and FHIR), adding and swapping insurance, uploading an advance directive document and setting the directive status are covered.
+- **In the write's own transaction, as its last statement:** a change cannot commit without its audit row, and if the row cannot be written the change does not happen (tested for registration, insurance, documents and status). A refusal (a registration, policy or document the domain rejects, a swap of an unknown policy) leaves a `failed` row.
+- **One behaviour change:** setting an advance directive status for a patient that does not exist is **404** (it used to be a silent 204 that changed nothing), because a no-op cannot be audited as a success. The OpenAPI document and its snapshot declare the 404.
+- **Not covered, on purpose:** reads of patient data (a separate access log), and legacy's own `log` table. The PM tests connect as the container owner, so the append-only grant is not exercised there.
+- **Database:** one new table created by the seed script (re-run it on an existing database); no legacy table touched.
+- **Tests:** Patient Management unit 166, architecture 17, integration 103 (17 new, `AuditTrailTests`; the existing ones were updated for the new constructors), all green. Mutation check: removing the in-transaction audit append from the registry and the insurance add fails 6 tests; restored. One `DuplicateScoringTests` failure appeared once in the first full run and did not recur in three more; not diagnosed.

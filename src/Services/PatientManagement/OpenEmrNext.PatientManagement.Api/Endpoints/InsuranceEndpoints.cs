@@ -36,7 +36,7 @@ public static class InsuranceEndpoints
     }
 
     private static async Task<IResult> AddInsurancePolicy(
-        long pid, AddInsurancePolicyRequest request, AddInsurancePolicyUseCase useCase, CancellationToken ct)
+        long pid, AddInsurancePolicyRequest request, AddInsurancePolicyUseCase useCase, HttpContext http, CancellationToken ct)
     {
         var level = InsuranceLevelExtensions.TryParse(request.Level);
         if (level is null)
@@ -47,7 +47,7 @@ public static class InsuranceEndpoints
         {
             policy = await useCase.ExecuteAsync(
                 pid, level.Value, request.CompanyId, request.PolicyNumber,
-                request.GroupNumber, request.PlanName, request.StartDate, request.EndDate, ct);
+                request.GroupNumber, request.PlanName, request.StartDate, request.EndDate, ct, AuditOrigins.From(http));
         }
         catch (InsurancePolicyValidationException ex)
         {
@@ -73,7 +73,7 @@ public static class InsuranceEndpoints
     }
 
     private static async Task<IResult> SwapInsurance(
-        long pid, SwapInsuranceRequest request, SwapInsuranceUseCase useCase, CancellationToken ct)
+        long pid, SwapInsuranceRequest request, SwapInsuranceUseCase useCase, HttpContext http, CancellationToken ct)
     {
         var level = InsuranceLevelExtensions.TryParse(request.TargetLevel);
         if (level is null)
@@ -81,7 +81,7 @@ public static class InsuranceEndpoints
 
         try
         {
-            await useCase.ExecuteAsync(pid, level.Value, request.PolicyUuid, ct);
+            await useCase.ExecuteAsync(pid, level.Value, request.PolicyUuid, ct, AuditOrigins.From(http));
         }
         catch (KeyNotFoundException ex)
         {

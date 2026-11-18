@@ -10,37 +10,48 @@ namespace OpenEmrNext.PatientManagement.Application;
 /// concrete database -- to commit together. This class knows nothing about EF Core, MariaDB, or the
 /// outbox table; that is entirely the adapter's job (Infrastructure's <c>EfPatientRegistry</c>).
 /// </summary>
-public sealed class RegisterPatientUseCase(IPatientRegistry registry)
+public sealed class RegisterPatientUseCase(IPatientRegistry registry, IAuditLog auditLog)
 {
-    /// <summary>
-    /// Builds the <see cref="PatientRegistration"/> from raw facts first, then registers it -- the one
-    /// place that sequence lives. Both <c>PatientEndpoints.RegisterPatient</c> and
-    /// <c>FhirPatientEndpoints.CreatePatient</c> used to construct the registration themselves before
-    /// calling <see cref="ExecuteAsync(PatientRegistration,long,DateTime,CancellationToken)"/>
-    /// directly -- duplicated, identical orchestration across two Api files for two different input
-    /// shapes (raw HTTP fields vs. FHIR-resource-extracted fields). Each endpoint still shapes its own
-    /// error response for <see cref="PatientValidationException"/> (REST <c>ValidationProblem</c> vs.
-    /// FHIR <c>OperationOutcome</c>) -- only the construct-then-register sequence moved here.
-    /// </summary>
-    /// <exception cref="PatientValidationException">One or more fields fail validation. Nothing is persisted.</exception>
-    public Task<Patient> ExecuteAsync(
-        string firstName, string lastName, string sex, DateOnly dateOfBirth, string? email, string? trustedEmail,
-        long registeredBy, DateTime registeredAtUtc, CancellationToken ct) =>
-        ExecuteAsync(
-            PatientRegistration.Create(firstName, lastName, sex, dateOfBirth, email, trustedEmail),
-            registeredBy, registeredAtUtc, ct);
-
-    /// <exception cref="PatientValidationException">One or more fields fail validation. Nothing is persisted.</exception>
+    /// <summary>Builds the registration from raw fields (so the domain owns the rules), then registers. A field that fails validation writes a <c>failed</c> audit row and throws <see cref="PatientValidationException"/>.</summary>
     public async Task<Patient> ExecuteAsync(
-        PatientRegistration registration, long registeredBy, DateTime registeredAtUtc, CancellationToken ct)
+        string firstName, string lastName, string sex, DateOnly dateOfBirth, string? email, string? trustedEmail,
+        long registeredBy, DateTime registeredAtUtc, CancellationToken ct, AuditOrigin? origin = null)
     {
-        var patient = Patient.Register(registration, registeredBy, registeredAtUtc);
+        PatientRegistration registration;
+        try
+        {
+            registration = PatientRegistration.Create(firstName, lastName, sex, dateOfBirth, email, trustedEmail);
+        }
+        catch (PatientValidationException)
+        {
+            await AuditRefusalAsync(origin, ct);
+            throw;
+        }
+
+        return await ExecuteAsync(registration, registeredBy, registeredAtUtc, ct, origin);
+    }
+
+    /// <summary>Registers the patient. The success audit row is committed with the patient (SEC-9, ADR 0078); a refusal writes a <c>failed</c> one.</summary>
+    public async Task<Patient> ExecuteAsync(
+        PatientRegistration registration, long registeredBy, DateTime registeredAtUtc, CancellationToken ct, AuditOrigin? origin = null)
+    {
+        Patient patient;
+        try
+        {
+            patient = Patient.Register(registration, registeredBy, registeredAtUtc);
+        }
+        catch (PatientValidationException)
+        {
+            await AuditRefusalAsync(origin, ct);
+            throw;
+        }
 
         var @event = new PatientRegisteredEvent(
             patient.Uuid, patient.Pid, patient.FirstName, patient.LastName, patient.RegisteredAtUtc);
-
-        await registry.RegisterAsync(patient, @event, ct);
-
+        await registry.RegisterAsync(patient, @event, Audit.Success(origin, AuditActions.PatientRegister, patient.Uuid.ToString()), ct);
         return patient;
     }
+
+    private Task AuditRefusalAsync(AuditOrigin? origin, CancellationToken ct) =>
+        auditLog.AppendAsync(Audit.Failure(origin, AuditActions.PatientRegister, "unregistered"), ct);
 }

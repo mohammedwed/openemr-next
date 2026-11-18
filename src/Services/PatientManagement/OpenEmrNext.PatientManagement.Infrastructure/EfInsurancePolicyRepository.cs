@@ -17,9 +17,9 @@ namespace OpenEmrNext.PatientManagement.Infrastructure;
 /// <see cref="EffectiveInsuranceRule"/> exists to tolerate. One mapping strategy for the whole table,
 /// not two, so writes use the same raw-SQL style as reads.
 /// </summary>
-public sealed class EfInsurancePolicyRepository(PatientManagementDbContext db) : IInsurancePolicyRepository
+public sealed class EfInsurancePolicyRepository(PatientManagementDbContext db, IAuditLog auditLog) : IInsurancePolicyRepository
 {
-    public async Task AddAsync(InsurancePolicy policy, CancellationToken ct)
+    public async Task AddAsync(InsurancePolicy policy, AuditEntry audit, CancellationToken ct)
     {
         var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(policy.Uuid);
 
@@ -54,6 +54,8 @@ public sealed class EfInsurancePolicyRepository(PatientManagementDbContext db) :
                 INSERT INTO uuid_registry (uuid, table_name, table_id, table_vertical, couchdb, document_drive, mapped, created)
                 VALUES ({uuidBytes}, 'insurance_data', 'id', '', '', 0, 0, NOW())
                 """, ct);
+
+            await auditLog.AppendAsync(audit, ct);   // last statement, same transaction (SEC-9, ADR 0078)
 
             await transaction.CommitAsync(ct);
             return generatedId;
@@ -124,7 +126,7 @@ public sealed class EfInsurancePolicyRepository(PatientManagementDbContext db) :
     private static DateOnly? TryParseDateOnly(string? stored) =>
         DateOnly.TryParseExact(stored, "yyyy-MM-dd", out var day) ? day : null;
 
-    public async Task PersistSwapAsync(InsuranceSwapResult result, CancellationToken ct)
+    public async Task PersistSwapAsync(InsuranceSwapResult result, AuditEntry audit, CancellationToken ct)
     {
         var source = result.Source;
         var target = result.DisplacedOccupant;
@@ -185,6 +187,8 @@ public sealed class EfInsurancePolicyRepository(PatientManagementDbContext db) :
                         WHERE uuid = {Rfc4122GuidConverter.ToRfc4122Bytes(source.Uuid)}
                         """, ct);
                 }
+
+                await auditLog.AppendAsync(audit, ct);   // last statement, same transaction (SEC-9, ADR 0078)
 
                 await transaction.CommitAsync(ct);
             }

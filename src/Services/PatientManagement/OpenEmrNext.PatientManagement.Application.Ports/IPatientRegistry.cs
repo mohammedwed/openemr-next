@@ -11,5 +11,5 @@ namespace OpenEmrNext.PatientManagement.Application.Ports;
 /// </summary>
 public interface IPatientRegistry
 {
-    Task RegisterAsync(Patient patient, PatientRegisteredEvent @event, CancellationToken ct);
+    Task RegisterAsync(Patient patient, PatientRegisteredEvent @event, AuditEntry audit, CancellationToken ct);
 }

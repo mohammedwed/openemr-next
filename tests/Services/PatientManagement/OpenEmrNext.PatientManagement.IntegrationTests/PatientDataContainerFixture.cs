@@ -271,6 +271,29 @@ public sealed class PatientDataContainerFixture : IAsyncLifetime
             );
             """;
         await createUuidRegistry.ExecuteNonQueryAsync();
+
+        // The audit table, taken from the real seed script (scripts/seeds/patient-management-db.sh) so the test table cannot drift from the deployed one: the script's shell escapes are undone and its database name filled in.
+        // (This fixture connects as the container's owner, not as the least-privilege user the script creates, so the append-only grant itself is not exercised here.)
+        await using var createAudit = connection.CreateCommand();
+        createAudit.CommandText = AuditTableDdl();
+        await createAudit.ExecuteNonQueryAsync();
+    }
+
+    private static string AuditTableDdl()
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        {
+            var script = Path.Combine(dir.FullName, "scripts", "seeds", "patient-management-db.sh");
+            if (!File.Exists(script))
+                continue;
+
+            var text = File.ReadAllText(script).Replace("\\`", "`").Replace("${DB_NAME}", DatabaseName);
+            var match = System.Text.RegularExpressions.Regex.Match(
+                text, @"CREATE TABLE IF NOT EXISTS `[^`]+`\.`patient_management_audit` \(.*?\n\);", System.Text.RegularExpressions.RegexOptions.Singleline);
+            return match.Success ? match.Value : throw new InvalidOperationException("The seed script has no patient_management_audit table.");
+        }
+
+        throw new FileNotFoundException("scripts/seeds/patient-management-db.sh was not found above the test output directory.");
     }
 
     public async Task DisposeAsync() => await _container.DisposeAsync();

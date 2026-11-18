@@ -438,5 +438,5 @@ are the same whichever transport wins, so they can be built now without the deci
    containment now? Recommend containment now, handler with the relay.
 4. **Idempotency window and storage:** how long are keys honored, and where are they kept?
 5. **Should the audit trail be the events, or a separate audit log?** Outbox rows are purged after
-   publishing, so they cannot be the long-term audit record. Doc 07 should decide.
+   publishing, so they cannot be the long-term audit record. **Decided (ADR 0078, Nov 17): a separate, append-only audit table** written in the change's own transaction; see `09-audit-trail.md`.
 6. **`pid` routes:** how long do they live beside `uuid` routes? (doc 03, D1)
