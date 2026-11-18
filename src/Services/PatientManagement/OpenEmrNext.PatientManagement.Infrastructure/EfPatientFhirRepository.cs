@@ -43,20 +43,22 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
         return BuildView(row, listOptions);
     }
 
-    public async Task<IReadOnlyList<PatientFhirView>> SearchAsync(PatientFhirSearchCriteria criteria, CancellationToken ct)
+    public async Task<PatientFhirSearchResult> SearchAsync(PatientFhirSearchCriteria criteria, CancellationToken ct)
     {
-        var sql = BaseSelect + " WHERE 1=1";
+        // Text built here is column names written in this file and numbered placeholders, nothing a caller sent: every value goes into
+        // `parameters`, and the same filter text serves the page and the count so the total always describes the same set.
+        var filter = " WHERE 1=1";
         var parameters = new List<object>();
         void AddLike(string column, string? value)
         {
             if (string.IsNullOrEmpty(value)) return;
-            sql += $" AND {column} LIKE {{{parameters.Count}}}";
-            parameters.Add($"%{value}%");
+            filter += $" AND {column} LIKE {{{parameters.Count}}} ESCAPE '{SqlLike.EscapeCharacter}'";
+            parameters.Add(SqlLike.Contains(value));
         }
         void AddEquals(string column, object? value)
         {
             if (value is null) return;
-            sql += $" AND {column} = {{{parameters.Count}}}";
+            filter += $" AND {column} = {{{parameters.Count}}}";
             parameters.Add(value);
         }
 
@@ -64,7 +66,7 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
             AddEquals("patient_data.uuid", Rfc4122GuidConverter.ToRfc4122Bytes(id));
         if (!string.IsNullOrEmpty(criteria.Identifier))
         {
-            sql += $" AND (ss = {{{parameters.Count}}} OR pubpid = {{{parameters.Count}}})";
+            filter += $" AND (ss = {{{parameters.Count}}} OR pubpid = {{{parameters.Count}}})";
             parameters.Add(criteria.Identifier);
         }
         AddLike("fname", criteria.Given);
@@ -72,13 +74,13 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
         AddLike("lname", criteria.Family);
         if (!string.IsNullOrEmpty(criteria.Name))
         {
-            sql += $" AND (fname LIKE {{{parameters.Count}}} OR lname LIKE {{{parameters.Count}}})";
-            parameters.Add($"%{criteria.Name}%");
+            filter += $" AND (fname LIKE {{{parameters.Count}}} ESCAPE '{SqlLike.EscapeCharacter}' OR lname LIKE {{{parameters.Count}}} ESCAPE '{SqlLike.EscapeCharacter}')";
+            parameters.Add(SqlLike.Contains(criteria.Name));
         }
         AddEquals("DOB", criteria.BirthDate?.ToString("yyyy-MM-dd"));
         if (!string.IsNullOrEmpty(criteria.Gender))
         {
-            sql += $" AND LOWER(sex) = {{{parameters.Count}}}";
+            filter += $" AND LOWER(sex) = {{{parameters.Count}}}";
             parameters.Add(criteria.Gender.ToLowerInvariant());
         }
         AddLike("street", criteria.Address);
@@ -87,36 +89,50 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
         AddLike("state", criteria.AddressState);
         if (!string.IsNullOrEmpty(criteria.Email))
         {
-            sql += $" AND (email = {{{parameters.Count}}} OR email_direct = {{{parameters.Count}}})";
+            filter += $" AND (email = {{{parameters.Count}}} OR email_direct = {{{parameters.Count}}})";
             parameters.Add(criteria.Email);
         }
         if (!string.IsNullOrEmpty(criteria.Phone))
         {
-            sql += $" AND (phone_home = {{{parameters.Count}}} OR phone_biz = {{{parameters.Count}}} OR phone_cell = {{{parameters.Count}}})";
+            filter += $" AND (phone_home = {{{parameters.Count}}} OR phone_biz = {{{parameters.Count}}} OR phone_cell = {{{parameters.Count}}})";
             parameters.Add(criteria.Phone);
         }
         if (!string.IsNullOrEmpty(criteria.Telecom))
         {
-            sql += $" AND (email = {{{parameters.Count}}} OR email_direct = {{{parameters.Count}}} OR phone_home = {{{parameters.Count}}} OR phone_biz = {{{parameters.Count}}} OR phone_cell = {{{parameters.Count}}})";
+            filter += $" AND (email = {{{parameters.Count}}} OR email_direct = {{{parameters.Count}}} OR phone_home = {{{parameters.Count}}} OR phone_biz = {{{parameters.Count}}} OR phone_cell = {{{parameters.Count}}})";
             parameters.Add(criteria.Telecom);
         }
         if (criteria.LastUpdatedSince is { } since)
         {
-            sql += $" AND patient_data.date >= {{{parameters.Count}}}";
+            filter += $" AND patient_data.date >= {{{parameters.Count}}}";
             parameters.Add(since);
         }
         if (criteria.GeneralPractitioner is { } gp)
         {
-            sql += $" AND provider.uuid = {{{parameters.Count}}}";
+            filter += $" AND provider.uuid = {{{parameters.Count}}}";
             parameters.Add(Rfc4122GuidConverter.ToRfc4122Bytes(gp));
         }
 
-        var rows = await db.Database.SqlQueryRaw<RawPatientRow>(sql, parameters.ToArray()).ToListAsync(ct);
+        // The total is counted over the same filter, before the page's own parameters are added.
+        var filterParameters = parameters.ToArray();
+#pragma warning disable EF1003 // The concatenated text is a constant FROM clause plus filter text built in this method from literal column names and numbered placeholders; every value is in filterParameters.
+        var total = await db.Database.SqlQueryRaw<long>("SELECT COUNT(*) AS Value" + FromClause + filter, filterParameters).SingleAsync(ct);
+#pragma warning restore EF1003
+
+        var limit = Math.Clamp(criteria.Limit, 1, PatientFhirSearchCriteria.MaxLimit);
+        var offset = Math.Max(criteria.Offset, 0);
+        var limitAt = parameters.Count;
+        parameters.Add(limit);
+        parameters.Add(offset);
+
+        // pid is unique, so the order is total and a page never repeats or skips a patient between requests.
+        var pageSql = BaseSelect + filter + $" ORDER BY patient_data.pid LIMIT {{{limitAt}}} OFFSET {{{limitAt + 1}}}";
+        var rows = await db.Database.SqlQueryRaw<RawPatientRow>(pageSql, parameters.ToArray()).ToListAsync(ct);
         if (rows.Count == 0)
-            return [];
+            return new PatientFhirSearchResult([], (int)total);
 
         var listOptions = await LoadListOptionsAsync(ct);
-        return [.. rows.Select(row => BuildView(row, listOptions))];
+        return new PatientFhirSearchResult([.. rows.Select(row => BuildView(row, listOptions))], (int)total);
     }
 
     private const string BaseSelect =
@@ -133,6 +149,11 @@ public sealed class EfPatientFhirRepository(PatientManagementDbContext db) : IPa
                gender_identity AS GenderIdentity, sex_identified AS SexIdentified,
                tribal_affiliations AS TribalAffiliations, interpreter_needed AS InterpreterNeeded,
                deceased_date AS DeceasedDate
+        """ + FromClause;
+
+    private const string FromClause =
+        """
+
         FROM patient_data
         LEFT JOIN (SELECT id, uuid FROM users) provider ON patient_data.providerID = provider.id
         """;

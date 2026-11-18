@@ -76,7 +76,7 @@ public class GlobalExceptionHandlingTests(PatientDataContainerFixture fixture) :
         public Task<PatientFhirView?> GetByUuidAsync(Guid uuid, CancellationToken ct) =>
             throw new InvalidOperationException("Simulated unanticipated failure.");
 
-        public Task<IReadOnlyList<PatientFhirView>> SearchAsync(PatientFhirSearchCriteria criteria, CancellationToken ct) =>
+        public Task<PatientFhirSearchResult> SearchAsync(PatientFhirSearchCriteria criteria, CancellationToken ct) =>
             throw new InvalidOperationException("Simulated unanticipated failure.");
     }
 }
