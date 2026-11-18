@@ -30,8 +30,8 @@ Decisions are in ADR 0080; this is the working record.
 |---|---|---|
 | L1 | A deleted issue cannot be restored, and its content is not recoverable from this service (the audit row holds none). | Legacy's behaviour, chosen by the user; the confirmation says so. |
 | L2 | The widest grant on a shared table: this service could in principle delete a row of any type in `lists`. | Not grantable more narrowly; pinned by tests that try. |
-| L3 | `uuid_registry` and `lists_touch` rows are left behind. | As legacy leaves them; a uuid is never reused. |
-| L4 | The panels' Delete buttons are covered by component tests only; nothing has been seen in a browser. | The browser check is outstanding. |
+| L3 | `uuid_registry` and `lists_touch` rows are left behind. **Seen in the legacy-UI check (Nov 18):** `lists_touch` is legacy's "this list has been reviewed" marker, so after an allergy is recorded and then deleted, OpenEMR's dashboard reads the empty, reviewed list as "No Known Allergies" where a patient who never had one shows "Nothing Recorded". | As legacy leaves them; a uuid is never reused. A delete made in OpenEMR leaves the same marker. |
+| L4 | ~~The Delete buttons have not been seen in a browser.~~ **Seen in a browser on Nov 18** for problems and allergies: the confirmation says it cannot be restored, the row is gone from the database, and a `problem.delete` audit row is written. That check also found that every delete reported failure (the OpenAPI document declared 200 for a 204), now fixed. | |
 
 ## 4. Tests (the new ones run and green; the full suites not run on this change)
 

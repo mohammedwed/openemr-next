@@ -37,6 +37,8 @@ Decisions are in ADR 0076; this note is the slice's working record: what was bui
 | L4 | Legacy's `return_value` (read, write, addonly) and its per-session cache are not reproduced. | Nothing here needs a narrowed right; a cache would serve revoked rights. |
 | L5 | Rules scoped to an extended object (`gacl_axo_*`) never grant the general right. | Legacy uses them for per-record rules this service has no notion of. |
 | L6 | Linked documents and `note_related_to` of a deleted clinical note are untouched. | Not modelled by this service yet (known gap). |
+| L7 | **OpenEMR's patient dashboard can still show deleted vitals as the "most recent vitals".** Found in the legacy-UI check (Nov 18). Its summary card (`vitals_fragment.php`) joins `forms` to `form_vitals` on `form_id` alone, with no `formdir = 'vitals'`, and `form_id` is shared by every form type, so a vitals set whose id equals another form's id (here, four deleted sets whose ids 3 to 6 matched four `newpatient` rows of other patients) is counted as not deleted. The flag is set exactly as legacy's own delete sets it, so a delete made in OpenEMR shows the same. Encounter lists and the vitals forms hide the set correctly. | A defect in OpenEMR's query, outside this service. The confirmation says so rather than promising "no longer shown in OpenEMR". |
+| L8 | A clinical note deleted here still leaves a "Clinical Notes Form" line in OpenEMR's encounter list. | OpenEMR's own delete only clears the note's `activity`, and its report filters on that; the encounter list does not. Same as a delete made in OpenEMR. |
 
 ## 4. Tests
 
