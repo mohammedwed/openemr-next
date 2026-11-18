@@ -1,6 +1,6 @@
 # 0079. Clinical Care serves read-only FHIR for five resources
 
-- **Status:** Proposed. Nothing is built; each decision below has a recommendation and needs the user's acceptance first (the scope rule for M5e).
+- **Status:** Accepted (Nov 17). The user confirmed the three decisions that were genuinely open (3, 6 and 7, each as recommended) and the rest follows the existing Patient Management pattern. Nothing is built yet.
 - **Date:** 2026-11-17
 - **Builds on:** [0052](0052-firely-net-fhir-sdk-replaces-hand-rolled-fhir-mapping.md) (Firely SDK, vendored US Core), [0072](0072-immunizations-are-versioned-by-a-content-hash-because-the-table-has-no-stamp.md) (content-hash versions), [0075](0075-the-gateway-validates-the-session-and-forwards-the-verified-user.md) (sign-in at the gateway)
 - **Closes:** M5e in the roadmap, once accepted and built.
@@ -16,9 +16,9 @@ Read from legacy's source (the 8.x tree) and from this repository's own read mod
 - **Timestamps:** encounters have `last_update`, vitals and clinical notes `last_updated`, problems and allergies `modifydate`. **Immunizations have no reliable stamp** (ADR 0072: the table's `update_date` is not maintained by every writer), which is why their JSON `ETag` is a content hash.
 - Legacy reaches practitioners, organizations and locations through their own FHIR resources; Clinical Care has none of those and cannot resolve a reference to them.
 
-## Decisions proposed
+## Decisions
 
-Each is a recommendation; the alternatives are named so the choice is visible.
+The alternatives are named so the choice is visible. **Confirmed by the user on Nov 17: decision 3 (derived Observation ids, accepting the mismatch with legacy's), decision 6 (an unsupported search parameter is a 400) and decision 7 (people and places are referenced with a display name, and the reference dangles).**
 
 1. **Five resources, read and search only.** `Encounter`, `Condition` (problem-list items), `AllergyIntolerance`, `Observation` (vital signs) and `Immunization`. Writes stay on the JSON API, as in the roadmap. SOAP notes and clinical notes have no FHIR mapping in legacy's resource list for this slice and are out (a `DocumentReference` mapping is a separate decision).
 2. **Identity: the record's own uuid is the FHIR id** for encounters, problems, allergies and immunizations.
