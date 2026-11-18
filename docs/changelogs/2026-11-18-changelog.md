@@ -23,3 +23,11 @@ The first real look at the WebApp, signed in on the rebuilt stack, found that **
 - **Fix:** each key is now the encounter id paired with the panel's name, so the reload-on-navigation behaviour is unchanged and the keys are unique.
 - **Why no test caught it:** those screens were only compile-checked, and the bUnit project covers the delete flows, not this page. That is the case for the browser check, and for a render test of this page (not yet written).
 - **Checked, not affected:** the patient page uses the same key pattern, but each panel sits in its own tab, so they are not siblings; its tabs all rendered correctly in the same check.
+
+## Fixed — CI on `main` failed after the stacked merge (`PageRequest` had a public setter)
+
+The stack was merged without waiting for CI on each pull request, so the first full test run of the combined code was the run on `main`, and it failed one test: the Clinical Care architecture rule `Has_no_publicly_settable_property` for `PageRequest`.
+
+- **Cause:** the `_lastUpdated` work (M5q) added `PageRequest.Updated` as `{ get; init; }` and copied the request with `with`. An `init` accessor is a public setter to reflection, and `PageRequest` is one of the types the architecture test requires to be immutable after construction.
+- **Fix:** `Updated` is read-only and set only by the private constructor. `Within(window)` builds a new request through that constructor. No caller changed.
+- **How it slipped through:** CI had been cancelled on the intermediate merges, and I built the whole solution but did not run the architecture project. A solution build cannot catch a rule like this.
