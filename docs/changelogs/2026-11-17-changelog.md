@@ -459,3 +459,10 @@ Full record: `docs/clinical-care/20-webapp-clinical-screens.md`. **Compile-check
 - **Not covered, on purpose:** reads of patient data (a separate access log), and legacy's own `log` table. The PM tests connect as the container owner, so the append-only grant is not exercised there.
 - **Database:** one new table created by the seed script (re-run it on an existing database); no legacy table touched.
 - **Tests:** Patient Management unit 166, architecture 17, integration 103 (17 new, `AuditTrailTests`; the existing ones were updated for the new constructors), all green. Mutation check: removing the in-transaction audit append from the registry and the insurance add fails 6 tests; restored. One `DuplicateScoringTests` failure appeared once in the first full run and did not recur in three more; not diagnosed.
+
+## Fixed — abandoned AuthFacade sessions are no longer kept for ever (M5l)
+
+- **The leak:** an expired session row was deleted only when that same session's cookie was presented again. A browser closed for good, or a lost device, left its row in `Sessions` for ever, so the table only grew. Found while reading the code for the gateway's per-request check (ADR 0075 amendment).
+- **The fix:** `AuthFacadeSessionStore` sweeps expired rows when a **new** session is created: up to 100 per sign-in, oldest first, keys read then deleted by key (so it works on both SQLite and MariaDB). No background job; a backlog is worked off over the next sign-ins. A session with no expiry is never swept; a live one is never touched; the existing "expired cookie is refused and removed" path is unchanged.
+- **Tests:** the session store had none. 5 new unit tests run the real store on a real in-memory SQLite database (an abandoned session is removed, a live and a no-expiry one are kept, one sign-in sweeps a bounded batch and the rest go on the next, renewing does not sweep, an expired cookie is still refused). AuthFacade unit 86, all green. Mutation check: removing the sweep call fails 2 tests; restored.
+- **No database change:** the table is unchanged.
