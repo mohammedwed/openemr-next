@@ -9,5 +9,6 @@ public interface IPatientFhirRepository
 {
     Task<PatientFhirView?> GetByUuidAsync(Guid uuid, CancellationToken ct);
 
-    Task<IReadOnlyList<PatientFhirView>> SearchAsync(PatientFhirSearchCriteria criteria, CancellationToken ct);
+    /// <summary>One bounded page of the patients matching <paramref name="criteria"/>, in a stable order, with the total that matched.</summary>
+    Task<PatientFhirSearchResult> SearchAsync(PatientFhirSearchCriteria criteria, CancellationToken ct);
 }

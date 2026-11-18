@@ -75,7 +75,7 @@ routes working and adds `uuid` routes, then retires the `pid` ones.
 | QRY-1 | Get patient | `GET /api/v1/patients/{uuid}` | summary (name, ids, date of birth, email) | Built |
 | QRY-2 | List and search patients | `GET /api/v1/patients?name=` | whole list | Built; **paging is a pending decision** |
 | QRY-3 | Get patient (FHIR) | `GET /fhir/Patient/{uuid}` | US Core Patient | Built |
-| QRY-4 | Search patients (FHIR) | `GET /fhir/Patient?…` | `Bundle`; about 15 parameters, ANDed | Built |
+| QRY-4 | Search patients (FHIR) | `GET /fhir/Patient?…` | `Bundle`; about 15 parameters, ANDed; a bounded page (`_count` 1 to 100, default 25, `_offset`) with `total` and `next` (ADR 0082) | Built |
 | QRY-5 | Effective insurance on a day | `GET …/insurance/effective?day=` | the policy in force per level; `day` defaults to today (UTC) | Built |
 | QRY-6 | Insurance **history** (all policies) | `GET …/insurance` | every policy, any level, any date | **[Target]**: nothing exposes this today, only the effective view |
 | QRY-7 | List directive documents | `GET …/documents` | summaries | Built |

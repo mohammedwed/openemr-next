@@ -79,11 +79,20 @@ public static class PatientEndpoints
     /// projected to a smaller shape. No new Domain or persistence logic.
     /// </summary>
     private static async Task<IResult> GetPatients(
-        string? name, SearchPatientFhirRecordsUseCase useCase, CancellationToken ct)
+        string? name, int? limit, int? offset, HttpContext http, SearchPatientFhirRecordsUseCase useCase, CancellationToken ct)
     {
-        var views = await useCase.ExecuteAsync(new PatientFhirSearchCriteria(Name: name), ct);
+        // Bounded like every search: at most 100 patients a request (100 when no limit is named), and the total that matched
+        // travels in X-Total-Count so a caller can tell a complete list from a page of it.
+        if (limit is < 1 or > PatientFhirSearchCriteria.MaxLimit)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["limit"] = [$"Limit must be between 1 and {PatientFhirSearchCriteria.MaxLimit}."] });
+        if (offset is < 0)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["offset"] = ["Offset cannot be negative."] });
 
-        return Results.Ok(views.Select(ToSummary).ToList());
+        var result = await useCase.ExecuteAsync(
+            new PatientFhirSearchCriteria(Name: name, Limit: limit ?? PatientFhirSearchCriteria.MaxLimit, Offset: offset ?? 0), ct);
+
+        http.Response.Headers["X-Total-Count"] = result.Total.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return Results.Ok(result.Items.Select(ToSummary).ToList());
     }
 
     /// <summary>

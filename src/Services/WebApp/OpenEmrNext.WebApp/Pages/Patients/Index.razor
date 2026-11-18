@@ -65,6 +65,12 @@
                 <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2" role="status">
                     @(_patients.Count == 1 ? "1 patient" : $"{_patients.Count} patients")
                 </MudText>
+                @if (_patients.Count >= MaxPatients)
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-2">
+                        Showing the first @MaxPatients patients. Search by name to find someone who is not listed.
+                    </MudAlert>
+                }
                 <MudTable Items="SortedPatients" RowsPerPage="10" Hover="true" Elevation="1" Dense="true" TableAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Patients" })">
                     <HeaderContent>
                         @* Real buttons, not MudTableSortLabel: its sort control is a focusless <span>, so keyboard
@@ -103,6 +109,9 @@
     private enum State { Loading, SignedOut, Error, Loaded }
 
     private State _state = State.Loading;
+    /// <summary>The most patients one request returns (the service's own maximum); the list says so when it is full.</summary>
+    private const int MaxPatients = 100;
+
     private List<PatientSummaryResponse> _patients = [];
     private string? _searchTerm;
     private bool _searchFailed;
@@ -192,7 +201,7 @@
 
         try
         {
-            var patients = await PatientManagement.GetPatientsAsync(null!);
+            var patients = await PatientManagement.GetPatientsAsync(null!, MaxPatients, 0);
             _patients = [.. patients];
             _state = State.Loaded;
         }
@@ -219,7 +228,7 @@
         var term = _searchTerm;
         try
         {
-            var patients = await PatientManagement.GetPatientsAsync(string.IsNullOrWhiteSpace(term) ? null! : term);
+            var patients = await PatientManagement.GetPatientsAsync(string.IsNullOrWhiteSpace(term) ? null! : term, MaxPatients, 0);
             if (term != _searchTerm)
             {
                 return; // the user has typed something else since this search started

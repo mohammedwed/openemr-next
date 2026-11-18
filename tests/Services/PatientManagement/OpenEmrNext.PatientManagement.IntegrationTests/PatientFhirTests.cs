@@ -138,7 +138,8 @@ public class PatientFhirTests(PatientDataContainerFixture fixture)
         var repository = new EfPatientFhirRepository(context);
         var results = await repository.SearchAsync(new PatientFhirSearchCriteria(Family: uniqueLastName), CancellationToken.None);
 
-        var found = Assert.Single(results);
+        var found = Assert.Single(results.Items);
+        Assert.Equal(1, results.Total);
         Assert.Equal(patient.Uuid, found.Uuid);
     }
 
