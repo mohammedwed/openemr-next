@@ -26,8 +26,12 @@ builder.Services.AddScoped(sp => new HttpClient(new TransientFailureCircuitBreak
 });
 builder.Services.AddScoped<IAuthFacadeClient>(sp => new AuthFacadeClient(sp.GetRequiredService<HttpClient>()));
 
-builder.Services.AddScoped<IPatientManagementClient>(_ => new PatientManagementClient(
-    new HttpClient(new TransientFailureCircuitBreakingHandler { InnerHandler = new HttpClientHandler() })
+// A creating POST carries an Idempotency-Key while a dialog's save is in progress, here as for Clinical Care (ADR 0084): registering a patient, adding a policy and swapping insurance.
+builder.Services.AddScoped<IPatientManagementClient>(sp => new PatientManagementClient(
+    new HttpClient(new OpenEmrNext.WebApp.Resilience.IdempotencyKeyHandler(sp.GetRequiredService<OpenEmrNext.WebApp.Shared.IdempotencyAttempt>())
+    {
+        InnerHandler = new TransientFailureCircuitBreakingHandler { InnerHandler = new HttpClientHandler() }
+    })
     {
         BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
     }));

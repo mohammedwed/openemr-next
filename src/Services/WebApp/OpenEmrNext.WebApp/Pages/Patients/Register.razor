@@ -5,6 +5,7 @@
 @using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
 @inject IAuthFacadeClient AuthFacade
 @inject IPatientManagementClient PatientManagement
+@inject OpenEmrNext.WebApp.Shared.IdempotencyAttempt Attempt
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -175,6 +176,8 @@
                 Email = string.IsNullOrWhiteSpace(_model.Email) ? null : _model.Email,
                 TrustedEmail = string.IsNullOrWhiteSpace(_model.TrustedEmail) ? null : _model.TrustedEmail
             };
+            // A retried save is one request, not two: the attempt lives until a save succeeds (ADR 0084).
+            Attempt.BeginIfNone();
             var registered = await PatientManagement.RegisterPatientAsync(request);
             Snackbar.Add($"Registered {_model.FirstName} {_model.LastName} (patient ID {registered.Pubpid}).", Severity.Success);
             _saved = true; // leaving now is expected, so the unsaved-changes prompt must not appear

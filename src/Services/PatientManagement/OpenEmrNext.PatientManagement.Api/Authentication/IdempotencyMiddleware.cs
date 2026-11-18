@@ -26,8 +26,8 @@ internal sealed class IdempotencyMiddleware(RequestDelegate next, TimeProvider c
             return;
         }
 
-        // A directive document is uploaded as a multipart file that can be far larger than a request can be fingerprinted at, so it takes no key. A key sent there is refused, not quietly ignored:
-        // the caller would believe a retry was safe.
+        // A directive document is uploaded as base64 in a JSON body of up to about 30 MB, far over the 1 MB a request can be fingerprinted at, so it takes no key. A key sent there is refused, not
+        // quietly ignored: the caller would believe a retry was safe.
         if (http.Request.Path.Value?.EndsWith("/advance-directives/documents", StringComparison.OrdinalIgnoreCase) == true)
         {
             await Problem(http, "Idempotency-Key not supported here.", "A document upload cannot carry an Idempotency-Key. Send it without one.", StatusCodes.Status400BadRequest);

@@ -37,8 +37,8 @@ Identifiers used here: **CMD-n** command, **QRY-n** query, **EVT-n** event, **WF
 ### 1.3 Idempotency
 
 `POST` commands that create something (register, add policy, upload) accept an optional
-**`Idempotency-Key`** header **[Target]**. A repeated key within a window returns the original result and
-creates nothing. The key and its result are stored in the same transaction as the change. See F-2.
+**`Idempotency-Key`** header **[Built, Nov 18]**. A repeated key within a window returns the original result and
+creates nothing. The key and its result are stored in the idempotency table by the middleware, not in the change's own transaction (a request that dies between the two is covered by a five-minute lease). Register, add policy and swap are covered; the document upload is not. See F-2 and `11-idempotency.md`.
 
 ## 2. Command catalogue
 
@@ -419,7 +419,7 @@ are the same whichever transport wins, so they can be built now without the deci
 | ID | Finding | Evidence | Severity | Fix |
 |---|---|---|---|---|
 | F-1 | **Registration reports failure after it has already committed.** Scoring runs in the endpoint after the transaction; if it throws, the caller sees `500` but the patient exists, and a retry registers a second copy. | `PatientEndpoints.RegisterPatient` calls `scoreUseCase.ExecuteAsync` after `useCase.ExecuteAsync`; same shape in `FhirPatientEndpoints.CreatePatient` | **High** | Move scoring to an event handler (WF-1 target) or at minimum swallow and log a scoring failure |
-| F-2 | **No idempotency.** A retried or double-submitted registration, policy, or upload creates a second record. A double-clicked button does this today. | No key or de-duplication anywhere in the use cases | High | `Idempotency-Key` (section 1.3) |
+| F-2 | ~~**No idempotency.**~~ **Closed Nov 18 for register, add policy and swap** (ADR 0084, `docs/patient-management/11-idempotency.md`). A document upload takes no key and refuses one; F-1 (a registration that commits and then answers 500) is not closed by it. | ~~No key or de-duplication anywhere in the use cases~~ `IdempotencyMiddleware`, `EfIdempotencyStore` | High | `Idempotency-Key` (section 1.3) |
 | F-3 | **No patient existence check** on insurance and directive routes. Orphan rows are possible and legacy has no foreign key to catch them. | `AddInsurancePolicyUseCase` has no lookup; domain rule tests only `pid > 0` | Medium | Patient-lookup port, `404`; fix the misleading message |
 | F-4 | **Directive file and row are not atomic.** | Doc 06; `EfAdvanceDirectiveRepository` compensates only handled failures | Low to medium | Reconciliation report |
 | F-5 | **Only registration produces an event.** Insurance and directive changes are invisible to every consumer and to audit. | `EfInsurancePolicyRepository` and `EfAdvanceDirectiveRepository` write no outbox row | Medium | Section 6.2 |

@@ -16,7 +16,7 @@ internal sealed class IdempotencyKeyHandler(IdempotencyAttempt attempt) : Delega
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var attemptId = attempt.Current;
-        var applies = attemptId is not null && request.Method == HttpMethod.Post && !request.Headers.Contains(HeaderName);
+        var applies = attemptId is not null && request.Method == HttpMethod.Post && !request.Headers.Contains(HeaderName) && !TakesNoKey(request);
         if (applies)
         {
             var body = request.Content is null ? [] : await request.Content.ReadAsByteArrayAsync(cancellationToken);
@@ -30,6 +30,13 @@ internal sealed class IdempotencyKeyHandler(IdempotencyAttempt attempt) : Delega
 
         return response;
     }
+
+    /// <summary>
+    /// A directive document upload carries its file as base64, far larger than a request can be fingerprinted at, so Patient Management takes no key there and refuses one (ADR 0084). An attempt that
+    /// outlived a failed dialog must not tag it.
+    /// </summary>
+    private static bool TakesNoKey(HttpRequestMessage request) =>
+        request.RequestUri?.AbsolutePath.EndsWith("/advance-directives/documents", StringComparison.OrdinalIgnoreCase) == true;
 
     /// <summary>32 characters of attempt id, a dash, and 16 of hash: 49 characters of letters, digits and a dash, inside the service's 64.</summary>
     internal static string KeyFor(string attemptId, string pathAndQuery, byte[] body)
