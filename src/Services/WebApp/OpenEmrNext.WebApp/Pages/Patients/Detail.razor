@@ -6,6 +6,8 @@
 @inject IPatientManagementClient PatientManagement
 @inject NavigationManager Navigation
 @inject PatientPageContext PatientPage
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 @implements IDisposable
 
 <PageTitle>@(_patient is null ? "Patient" : $"{_patient.FirstName} {_patient.LastName}")</PageTitle>
@@ -41,7 +43,11 @@
             @* Basic information stays above the tabs, so it is never one click away. The name is the page's
                heading. Sections are loaded here, once, and each panel renders what it is given. *@
             <MudPaper Outlined="true" Class="pa-5 mb-6">
-                <MudText Typo="Typo.h4" HtmlTag="h1" Class="mb-4">@patient.FirstName @patient.LastName</MudText>
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Class="mb-4">
+                    <MudText Typo="Typo.h4" HtmlTag="h1">@patient.FirstName @patient.LastName</MudText>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="OpenEditAsync" StartIcon="@Icons.Material.Filled.Edit"
+                        aria-label="@($"Edit {patient.FirstName} {patient.LastName}'s details")">Edit</MudButton>
+                </MudStack>
                 <dl class="op-details">
                     <dt>Patient ID</dt>
                     <dd>@(patient.PublicPatientId ?? patient.Pid.ToString())</dd>
@@ -147,6 +153,35 @@
     /// <summary>
     /// Loads the patient. Only the patient gates the page: a failed section shows its own message and retry.
     /// </summary>
+    /// <summary>
+    /// Corrects the name, date of birth, sex and emails (ADR 0081). The dialog is given the patient as this page read them, with that read's version; saved or out of date, the page reads the patient again so what it
+    /// shows is what is stored.
+    /// </summary>
+    private async Task OpenEditAsync()
+    {
+        if (_patient is null)
+        {
+            return;
+        }
+
+        var parameters = new DialogParameters<EditPatientDialog> { { x => x.Patient, _patient } };
+        var dialog = await DialogService.ShowAsync<EditPatientDialog>("Edit patient", parameters, DialogDefaults.Standard);
+        var result = await dialog.Result;
+        if (result is not { Canceled: false, Data: { } data })
+        {
+            return;
+        }
+
+        var outOfDate = data is IssueDialogResult { Stale: true };
+        Snackbar.Add(
+            outOfDate
+                ? "This patient was changed by someone else, so nothing was saved. What is stored now is shown; make your change again if you still want it."
+                : "Patient saved.",
+            outOfDate ? Severity.Warning : Severity.Success);
+
+        await LoadPatientAsync();
+    }
+
     private async Task LoadPatientAsync()
     {
         PatientPage.PatientName = "Loading…";
