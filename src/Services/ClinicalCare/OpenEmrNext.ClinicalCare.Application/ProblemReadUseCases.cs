@@ -16,10 +16,10 @@ public sealed class ListPatientProblemsUseCase(IPatientDirectory patients, IProb
 {
     /// <exception cref="ClinicalCareValidationException">The page bounds are outside what is allowed.</exception>
     /// <exception cref="PatientNotFoundException">No patient has this uuid.</exception>
-    public async Task<ProblemPage> ExecuteAsync(Guid patientUuid, int? limit, int? offset, CancellationToken ct)
+    public async Task<ProblemPage> ExecuteAsync(Guid patientUuid, int? limit, int? offset, CancellationToken ct, UpdatedWindow? updated = null)
     {
         // Bounds first: a caller asking for 10,000 rows is told so without a database round trip.
-        var page = PageRequest.Create(limit, offset);
+        var page = PageRequest.Create(limit, offset).Within(updated);
 
         var patient = await patients.FindAsync(patientUuid, ct)
             ?? throw new PatientNotFoundException(patientUuid);

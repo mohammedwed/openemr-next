@@ -35,6 +35,7 @@ public sealed class EfAllergyReader(ClinicalCareDbContext db) : IAllergyReader
     public async Task<AllergyPage> ListForPatientAsync(PatientReference patient, PageRequest page, CancellationToken ct)
     {
         var pid = patient.Pid;
+        var (from, until) = (page.Updated?.From, page.Updated?.Until);
 
         // Newest first by when the allergy began, then by row id so the order is total and pages never overlap or skip.
         var rows = await db.Database
@@ -47,6 +48,7 @@ public sealed class EfAllergyReader(ClinicalCareDbContext db) : IAllergyReader
                 FROM lists l
                 LEFT JOIN clinical_care_patient_ref pr ON pr.pid = l.pid
                 WHERE l.pid = {pid} AND l.type = {EfAllergyRegistry.AllergyType} AND l.uuid IS NOT NULL
+                  AND ({from} IS NULL OR l.modifydate >= {from}) AND ({until} IS NULL OR l.modifydate < {until})
                 ORDER BY l.begdate DESC, l.id DESC
                 LIMIT {page.Limit} OFFSET {page.Offset}
                 """)
@@ -57,6 +59,7 @@ public sealed class EfAllergyReader(ClinicalCareDbContext db) : IAllergyReader
                 $"""
                 SELECT COUNT(*) AS Value FROM lists l
                 WHERE l.pid = {pid} AND l.type = {EfAllergyRegistry.AllergyType} AND l.uuid IS NOT NULL
+                  AND ({from} IS NULL OR l.modifydate >= {from}) AND ({until} IS NULL OR l.modifydate < {until})
                 """)
             .SingleAsync(ct);
 

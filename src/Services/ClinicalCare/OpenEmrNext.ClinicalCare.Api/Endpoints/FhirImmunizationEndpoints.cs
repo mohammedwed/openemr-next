@@ -28,7 +28,7 @@ public static class FhirImmunizationEndpoints
         fhir.MapGet("/Immunization", (HttpContext http, ListPatientImmunizationsUseCase list, GetImmunizationUseCase get, IUserDirectory users, CancellationToken ct) =>
                 FhirEndpointKit.SearchAsync<ImmunizationView>(
                     http, Type, NoExtraParameters, FhirEndpointKit.NoExtra, get.ExecuteAsync, v => v.PatientUuid,
-                    async (patient, count, offset, c) =>
+                    async (patient, count, offset, _, c) =>
                     {
                         try
                         {
@@ -40,7 +40,7 @@ public static class FhirImmunizationEndpoints
                             return ([], 0);   // FHIR answers a search for a patient that is not there with an empty set, not an error
                         }
                     },
-                    (v, c) => MapAsync(v, users, c), ct))
+                    (v, c) => MapAsync(v, users, c), stampOf: null, ct))
             .WithName("FhirSearchImmunizations").WithTags("FHIR")
             .WithSummary("Search one patient's immunizations (patient, _id, _count, _offset), as a FHIR searchset Bundle")
             .Produces<Bundle>(contentType: FhirResult.ContentType)

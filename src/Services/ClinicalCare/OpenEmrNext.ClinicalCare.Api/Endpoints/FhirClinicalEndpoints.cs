@@ -41,11 +41,11 @@ public static class FhirClinicalEndpoints
         fhir.MapGet("/AllergyIntolerance", (HttpContext http, ListPatientAllergiesUseCase list, GetAllergyUseCase get, CancellationToken ct) =>
                 FhirEndpointKit.SearchAsync<AllergyView>(
                     http, type, NoExtraParameters, FhirEndpointKit.NoExtra, get.ExecuteAsync, v => v.PatientUuid,
-                    async (patient, count, offset, c) =>
+                    async (patient, count, offset, window, c) =>
                     {
                         try
                         {
-                            var page = await list.ExecuteAsync(patient, count, offset, c);
+                            var page = await list.ExecuteAsync(patient, count, offset, c, window);
                             return (page.Items, page.Total);
                         }
                         catch (PatientNotFoundException)
@@ -53,9 +53,9 @@ public static class FhirClinicalEndpoints
                             return ([], 0);
                         }
                     },
-                    (v, _) => Task.FromResult<IReadOnlyList<Resource>>(v.Select(x => (Resource)AllergyIntoleranceMapper.ToFhir(x)).ToList()), ct))
+                    (v, _) => Task.FromResult<IReadOnlyList<Resource>>(v.Select(x => (Resource)AllergyIntoleranceMapper.ToFhir(x)).ToList()), v => v.LastModified, ct))
             .WithName("FhirSearchAllergyIntolerances").WithTags("FHIR")
-            .WithSummary("Search one patient's allergies (patient, _id, _count, _offset), as a FHIR searchset Bundle")
+            .WithSummary("Search one patient's allergies (patient, _id, _lastUpdated, _count, _offset), as a FHIR searchset Bundle")
             .Produces<Bundle>(contentType: FhirResult.ContentType)
             .Produces<OperationOutcome>(StatusCodes.Status400BadRequest, FhirResult.ContentType);
     }
@@ -74,11 +74,11 @@ public static class FhirClinicalEndpoints
         fhir.MapGet("/Condition", (HttpContext http, ListPatientProblemsUseCase list, GetProblemUseCase get, CancellationToken ct) =>
                 FhirEndpointKit.SearchAsync<ProblemView>(
                     http, type, CategoryParameter, CheckCategory, get.ExecuteAsync, v => v.PatientUuid,
-                    async (patient, count, offset, c) =>
+                    async (patient, count, offset, window, c) =>
                     {
                         try
                         {
-                            var page = await list.ExecuteAsync(patient, count, offset, c);
+                            var page = await list.ExecuteAsync(patient, count, offset, c, window);
                             return (page.Items, page.Total);
                         }
                         catch (PatientNotFoundException)
@@ -86,7 +86,7 @@ public static class FhirClinicalEndpoints
                             return ([], 0);
                         }
                     },
-                    (v, _) => Task.FromResult<IReadOnlyList<Resource>>(v.Select(x => (Resource)ConditionMapper.ToFhir(x)).ToList()), ct))
+                    (v, _) => Task.FromResult<IReadOnlyList<Resource>>(v.Select(x => (Resource)ConditionMapper.ToFhir(x)).ToList()), v => v.LastModified, ct))
             .WithName("FhirSearchConditions").WithTags("FHIR")
             .WithSummary("Search one patient's problem-list conditions (patient, _id, category, _count, _offset), as a FHIR searchset Bundle")
             .Produces<Bundle>(contentType: FhirResult.ContentType)
@@ -120,11 +120,11 @@ public static class FhirClinicalEndpoints
         fhir.MapGet("/Encounter", (HttpContext http, ListPatientEncountersUseCase list, GetEncounterUseCase get, EncounterLookupsUseCase lookups, IUserDirectory users, CancellationToken ct) =>
                 FhirEndpointKit.SearchAsync<EncounterView>(
                     http, type, NoExtraParameters, FhirEndpointKit.NoExtra, get.ExecuteAsync, v => v.PatientUuid,
-                    async (patient, count, offset, c) =>
+                    async (patient, count, offset, window, c) =>
                     {
                         try
                         {
-                            var page = await list.ExecuteAsync(patient, count, offset, c);
+                            var page = await list.ExecuteAsync(patient, count, offset, c, window);
                             return (page.Items, page.Total);
                         }
                         catch (PatientNotFoundException)
@@ -132,7 +132,7 @@ public static class FhirClinicalEndpoints
                             return ([], 0);
                         }
                     },
-                    (v, c) => MapAsync(v, lookups, users, c), ct))
+                    (v, c) => MapAsync(v, lookups, users, c), v => v.LastUpdate, ct))
             .WithName("FhirSearchEncounters").WithTags("FHIR")
             .WithSummary("Search one patient's encounters (patient, _id, _count, _offset), as a FHIR searchset Bundle")
             .Produces<Bundle>(contentType: FhirResult.ContentType)

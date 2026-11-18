@@ -2798,7 +2798,7 @@
         "tags": [
           "FHIR"
         ],
-        "summary": "Search one patient's allergies (patient, _id, _count, _offset), as a FHIR searchset Bundle",
+        "summary": "Search one patient's allergies (patient, _id, _lastUpdated, _count, _offset), as a FHIR searchset Bundle",
         "operationId": "FhirSearchAllergyIntolerances",
         "responses": {
           "200": {
@@ -3046,7 +3046,7 @@
         "tags": [
           "FHIR"
         ],
-        "summary": "Search one patient's vital-sign Observations (patient, _id, category, _count, _offset), as a FHIR searchset Bundle",
+        "summary": "Search one patient's vital-sign Observations (patient, _id, category, _lastUpdated, _count, _offset), as a FHIR searchset Bundle",
         "operationId": "FhirSearchObservations",
         "responses": {
           "200": {

@@ -434,7 +434,6 @@ public class FhirClinicalResourceTests(ClinicalCareContainerFixture fixture) : I
     [InlineData("&category=laboratory")]
     [InlineData("&code=29463-7")]
     [InlineData("&date=ge2026-01-01")]
-    [InlineData("&_lastUpdated=gt2020-01-01")]
     public async Task What_the_service_will_not_guess_at_is_refused(string extra)
     {
         await RefusedAsync($"/fhir/Observation{Patient()}{extra}");
@@ -450,7 +449,6 @@ public class FhirClinicalResourceTests(ClinicalCareContainerFixture fixture) : I
     {
         await RefusedAsync($"/fhir/{type}");
         await RefusedAsync($"/fhir/{type}{Patient()}&date=2026-01-01");
-        await RefusedAsync($"/fhir/{type}{Patient()}&_lastUpdated=gt2020-01-01");
         await RefusedAsync($"/fhir/{type}{Patient()}&_count=0");
     }
 

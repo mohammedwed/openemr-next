@@ -505,3 +505,14 @@ Full record: `docs/clinical-care/20-webapp-clinical-screens.md`. **Compile-check
 - **Tests (run, green):** 45 new `FhirClinicalResourceTests`; with the Immunization tests, the route test and the OpenAPI tests that set is 103, and the gateway proxy tests are 44 (12 of them new across the FHIR work). **Every resource served validates against its US Core profile**, each of the ten Observation measurements against its own. The full Clinical Care suites were not run on this change.
 - **Mutation check:** making every problem active, dropping the diastolic component, and serving deleted vitals each fail tests (5 in all); restored.
 - **A test fixed, not the code:** a diagnosis that is not `SYSTEM:code` cannot be created through the JSON API, so that test writes it straight into the table, as legacy could.
+
+## Added — `_lastUpdated` search on the four stamped FHIR resources (M5e, ADR 0079 #6)
+
+- **`_lastUpdated` now works** on `Encounter`, `Condition`, `AllergyIntolerance` and `Observation` (it was refused until now). A value is a year, month, day or date and time and means the range its precision gives; `eq`, `gt`, `ge`, `lt` and `le` act on that range as FHIR defines them (`gt2026-03-15` excludes the 15th, `le2026-03-15` includes it); two parameters are a range; a zone is converted to the server's local time. `ne`, `sa`, `eb`, `ap` and malformed values are a 400 that says what is supported. **Immunization still refuses it** (no stamp).
+- **Applied in the database** for encounters, problems and allergies, with the window carried on the existing page request, so no reader interface changed and no test fake broke. For Observations it is applied after the read, to the latest 1000 vitals sets.
+- The window is kept in the Bundle's links and in `total`, and a search by `_id` is held to it.
+- **Also fixed:** PR #92 had broken the Clinical Care unit-test project (two fakes of `IVitalsReader` lacked the new reads), which I found by building the whole solution as CI does; fixed on that branch (307fbbf). Every branch in the stack builds as a whole.
+- **No database change.**
+- **Tests (run, green):** about 120 new (`FhirDateSearchTests`, pure, 39; `FhirLastUpdatedTests`, 4 resources x 14 queries whose expected sets are computed from the stamps by the FHIR rule, plus ranges, empty ranges, totals, paging through a window, `_id` held to the window and refusals). That set with the FHIR, route and OpenAPI tests is 223 integration tests, and the Clinical Care unit project is 722. The full suites were not run.
+- **Mutation check:** the `gt` boundary, the SQL window in a reader, and the in-memory window for vitals each fail many tests; restored.
+- **Two of my own tests were wrong, not the code:** an expected Observation count (three, not two: weight, pulse and blood pressure), and two earlier tests that asserted `_lastUpdated` is refused on resources where it now works.

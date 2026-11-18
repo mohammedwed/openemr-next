@@ -26,7 +26,7 @@ public static class FhirObservationEndpoints
 
         fhir.MapGet("/Observation", Search)
             .WithName("FhirSearchObservations").WithTags("FHIR")
-            .WithSummary("Search one patient's vital-sign Observations (patient, _id, category, _count, _offset), as a FHIR searchset Bundle")
+            .WithSummary("Search one patient's vital-sign Observations (patient, _id, category, _lastUpdated, _count, _offset), as a FHIR searchset Bundle")
             .Produces<Bundle>(contentType: FhirResult.ContentType)
             .Produces<OperationOutcome>(StatusCodes.Status400BadRequest, FhirResult.ContentType);
 
@@ -47,7 +47,7 @@ public static class FhirObservationEndpoints
 
     private static async Task<IResult> Search(HttpContext http, ListPatientVitalsUseCase list, FindVitalsAnywhereUseCase find, CancellationToken ct)
     {
-        if (!FhirSearchParser.TryParse(Type, http.Request.Query, CategoryParameter, out var search, out var refusal, idValid: id => ObservationMapper.TryParseId(id, out _, out _)))
+        if (!FhirSearchParser.TryParse(Type, http.Request.Query, CategoryParameter, out var search, out var refusal, idValid: id => ObservationMapper.TryParseId(id, out _, out _), lastUpdated: true))
             return refusal;
 
         string? category = null;
@@ -64,14 +64,15 @@ public static class FhirObservationEndpoints
         {
             ObservationMapper.TryParseId(idText, out var vitalsUuid, out var slug);
             var set = await find.ExecuteAsync(vitalsUuid, ct);
-            var one = set is null || (search.Patient is not null && set.PatientUuid != search.Patient) ? null : ObservationMapper.One(set, slug);
+            var inWindow = set is not null && (search.Updated is null || search.Updated.Contains(set.Vitals.LastUpdated));
+            var one = set is null || !inWindow || (search.Patient is not null && set.PatientUuid != search.Patient) ? null : ObservationMapper.One(set, slug);
             all = one is null ? [] : [one];
         }
         else
         {
             try
             {
-                all = (await list.ExecuteAsync(search.Patient!.Value, ct)).SelectMany(ObservationMapper.ToFhir).ToList();
+                all = (await list.ExecuteAsync(search.Patient!.Value, ct, search.Updated)).SelectMany(ObservationMapper.ToFhir).ToList();
             }
             catch (PatientNotFoundException)
             {
@@ -80,10 +81,11 @@ public static class FhirObservationEndpoints
         }
 
         var page = all.Skip(search.Offset).Take(search.Count).Cast<Resource>().ToList();
-        var filters = new Dictionary<string, string>();
-        if (search.Patient is { } p) filters["patient"] = p.ToString();
-        if (search.IdText is { } i) filters["_id"] = i;
-        if (category is not null) filters["category"] = category;
+        var filters = new List<KeyValuePair<string, string>>();
+        if (search.Patient is { } p) filters.Add(new("patient", p.ToString()));
+        if (search.IdText is { } i) filters.Add(new("_id", i));
+        if (category is not null) filters.Add(new("category", category));
+        foreach (var stamp in search.LastUpdatedAsSent ?? []) filters.Add(new("_lastUpdated", stamp));
 
         return new FhirResult(FhirBundles.SearchSet(http.Request, Type, page, all.Count, search, filters));
     }

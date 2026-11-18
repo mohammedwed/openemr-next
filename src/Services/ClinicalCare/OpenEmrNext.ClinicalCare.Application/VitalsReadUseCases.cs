@@ -51,9 +51,11 @@ public sealed class ListPatientVitalsUseCase(IPatientDirectory patients, IVitals
     public const int MaxSets = 1000;
 
     /// <exception cref="PatientNotFoundException">No patient has this uuid.</exception>
-    public async Task<IReadOnlyList<PatientVitals>> ExecuteAsync(Guid patientUuid, CancellationToken ct)
+    /// <param name="updated">Only sets changed inside this window (the FHIR <c>_lastUpdated</c> search). It is applied after the read, to the most recent <see cref="MaxSets"/> sets, so a window older than those finds nothing.</param>
+    public async Task<IReadOnlyList<PatientVitals>> ExecuteAsync(Guid patientUuid, CancellationToken ct, UpdatedWindow? updated = null)
     {
         var patient = await patients.FindAsync(patientUuid, ct) ?? throw new PatientNotFoundException(patientUuid);
-        return await reader.ListForPatientAsync(patient, MaxSets, ct);
+        var sets = await reader.ListForPatientAsync(patient, MaxSets, ct);
+        return updated is null ? sets : sets.Where(s => updated.Contains(s.Vitals.LastUpdated)).ToList();
     }
 }
