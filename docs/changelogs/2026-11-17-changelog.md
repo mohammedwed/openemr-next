@@ -443,3 +443,10 @@ Full record: `docs/clinical-care/20-webapp-clinical-screens.md`. **Compile-check
 - **Not done:** the WebApp does not send keys; the OpenAPI document does not declare the header (it would change every generated client signature); the other services have none.
 - **Database:** one new table owned by the service, created by the seed script (re-run it on an existing database); no legacy table touched.
 - **Tests:** Clinical Care unit 722, architecture 69, integration 911. Mutation check: with the key claim and the SOAP guard disabled, 11 tests fail; both restored.
+
+## Added — the first automated WebApp tests (M5i)
+
+- **New project `tests/Services/WebApp/OpenEmrNext.WebApp.UnitTests`** (bUnit 2.15, NSubstitute; in the solution, so CI runs it). It renders the real panels with MudBlazor's real dialog and snackbar and a scripted client: no browser, no Docker, about a second.
+- **24 tests** for the delete flows of the vitals, SOAP and clinical note panels: confirm sends the row's own `ETag` and reloads; "Keep it" sends nothing; 403, 404, 412 and a network failure each say the right thing and reload or not as they should.
+- **Mutation check:** making the 403 handling claim success fails 3 tests, sending a wrong `ETag` fails 4; both restored.
+- **Not covered:** everything else in the WebApp, and anything that needs a real browser. The browser check of all screens is still outstanding.

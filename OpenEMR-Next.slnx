@@ -51,5 +51,6 @@
     <Project Path="tests/Services/PatientManagement/OpenEmrNext.PatientManagement.UnitTests/OpenEmrNext.PatientManagement.UnitTests.csproj" />
     <Project Path="tests/Services/PatientManagement/OpenEmrNext.PatientManagement.ArchitectureTests/OpenEmrNext.PatientManagement.ArchitectureTests.csproj" />
     <Project Path="tests/Services/PatientManagement/OpenEmrNext.PatientManagement.IntegrationTests/OpenEmrNext.PatientManagement.IntegrationTests.csproj" />
+    <Project Path="tests/Services/WebApp/OpenEmrNext.WebApp.UnitTests/OpenEmrNext.WebApp.UnitTests.csproj" />
   </Folder>
 </Solution>
