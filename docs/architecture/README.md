@@ -85,3 +85,4 @@ old one's status is updated to point to it.
 | [0078](0078-patient-management-keeps-its-own-append-only-audit-trail.md) | Patient Management keeps its own append-only audit trail | Accepted | 2026-11-17 |
 | [0079](0079-clinical-care-serves-read-only-fhir-for-five-resources.md) | Clinical Care serves read-only FHIR for five resources | Accepted | 2026-11-17 |
 | [0080](0080-deleting-a-problem-or-an-allergy-removes-the-row-as-legacy-does.md) | Deleting a problem or an allergy removes the row, as legacy does | Accepted | 2026-11-17 |
+| [0081](0081-a-patients-demographics-are-corrected-with-a-content-hash-version-over-the-columns-this-service-owns.md) | A patient's demographics are corrected under a content-hash version of the columns this service owns | Accepted | 2026-11-18 |

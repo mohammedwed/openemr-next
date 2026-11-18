@@ -13,4 +13,4 @@ namespace OpenEmrNext.PatientManagement.Api.Contracts.Responses;
 /// the patient's identifier. Distinct from <paramref name="Pid"/>; may differ for patients imported from
 /// legacy data. Not an MRN: this service does not model one.</param>
 public sealed record PatientSummaryResponse(
-    Guid Uuid, long Pid, string FirstName, string LastName, DateOnly? DateOfBirth, string? Email, string? PublicPatientId);
+    Guid Uuid, long Pid, string FirstName, string LastName, DateOnly? DateOfBirth, string? Email, string? PublicPatientId, string? ETag = null, string? Sex = null, string? TrustedEmail = null);

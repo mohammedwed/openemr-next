@@ -393,6 +393,7 @@ discrepancies.
 **WebApp tests (M5i, started Nov 17):** a bUnit project exists (24 tests, the three delete flows); the other screens have none yet.
 **Gateway session check (M5j, analysis Nov 17):** one primary-key read and a small decrypt per request, no writes; no cache yet; a benchmark with a real session is owed (ADR 0075 amendment). **AuthFacade `Sessions` rows were deleted only when read again, so abandoned sessions accumulated; fixed in M5l (a new sign-in sweeps up to 100 expired ones).**
 **Patient Management audit trail (M5k, Nov 17; `docs/patient-management/09-audit-trail.md`, ADR 0078):** its own append-only `patient_management_audit` table, written in each write's own transaction (register, add and swap insurance, upload a directive document, set the directive status); refusals are audited as failed. Reads and legacy's `log` table are not covered.
+**Patient Management can correct a patient (M5r, Nov 18; `docs/patient-management/10-demographics-update.md`, ADR 0081):** name, date of birth, sex and emails, under a content-hash version, with a WebApp Edit dialog. Contact details and the FHIR `PUT` are not built.
 **Verification not yet done:** a browser check of every WebApp screen (including all the new M5d ones); a legacy-UI check that records written here display correctly in OpenEMR itself; shadow comparison of the update paths, vitals correction and immunizations (only creation was compared); a layered review of M5b to M5d.
 **New services, not started:** documents, pharmacy, labs, billing.
 **Then:** the post-M5 gate, and M6.

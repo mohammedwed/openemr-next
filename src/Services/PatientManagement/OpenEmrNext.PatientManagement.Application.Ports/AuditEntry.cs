@@ -23,6 +23,7 @@ public sealed record AuditOrigin(AuditActor Actor, string? CorrelationId, string
 public static class AuditActions
 {
     public const string PatientRegister = "patient.register";
+    public const string PatientUpdate = "patient.update";
     public const string InsuranceAdd = "insurance.add";
     public const string InsuranceSwap = "insurance.swap";
     public const string DirectiveDocumentUpload = "directive.document.upload";

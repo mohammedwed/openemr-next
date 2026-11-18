@@ -221,6 +221,7 @@ P0 items have no dependencies and should not wait for anything else.
 | # | Work | Effort |
 |---|---|---|
 | P4-1 | `Patient`: tolerant load, concurrency token, `CorrectDemographics`, FHIR `PUT` | L |
+|  | **Built Nov 18 (M5r, ADR 0081, `10-demographics-update.md`): the six registration fields, a content-hash version, `PUT /api/v1/patients/{uuid}`. Not built: the FHIR `PUT` (it would drop elements this service does not own).** |  |
 | P4-2 | Name history, deceased, communication preferences | M |
 | P4-3 | `AdvanceDirectiveStatus` aggregate; `Retire` for documents | M |
 | P4-4 | Insurance: end level, correct policy, history query | M |

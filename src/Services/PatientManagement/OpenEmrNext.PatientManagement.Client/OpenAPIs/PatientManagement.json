@@ -89,6 +89,98 @@
       }
     },
     "/api/v1/patients/{uuid}": {
+      "put": {
+        "tags": [
+          "Patients"
+        ],
+        "summary": "Correct a patient's name, date of birth, sex and emails, conditional on the ETag the caller read",
+        "operationId": "UpdatePatient",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePatientRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientSummaryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition Failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Precondition Required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "InternalGateway": []
+          }
+        ]
+      },
       "get": {
         "tags": [
           "Patients"
@@ -1046,6 +1138,62 @@
               "null",
               "string"
             ]
+          },
+          "eTag": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sex": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "trustedEmail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -1149,6 +1297,52 @@
           "policyUuid": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "UpdatePatientRequest": {
+        "required": [
+          "firstName",
+          "lastName",
+          "sex",
+          "dateOfBirth",
+          "email",
+          "trustedEmail"
+        ],
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "lastName": {
+            "maxLength": 255,
+            "minLength": 2,
+            "type": "string"
+          },
+          "sex": {
+            "maxLength": 30,
+            "minLength": 4,
+            "type": "string"
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date"
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "email"
+          },
+          "trustedEmail": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "email"
           }
         }
       },
