@@ -88,3 +88,4 @@ old one's status is updated to point to it.
 | [0081](0081-a-patients-demographics-are-corrected-with-a-content-hash-version-over-the-columns-this-service-owns.md) | A patient's demographics are corrected under a content-hash version of the columns this service owns | Accepted | 2026-11-18 |
 | [0082](0082-patient-searches-are-bounded-pages-and-like-text-is-matched-as-typed.md) | Patient searches are bounded pages, and text typed into a search is matched as typed | Accepted | 2026-11-18 |
 | [0083](0083-times-in-the-webapp-are-utc.md) | Times in the WebApp are UTC | Accepted | 2026-11-18 |
+| [0084](0084-patient-management-creating-requests-accept-an-idempotency-key.md) | Patient Management's creating requests accept an Idempotency-Key | Accepted | 2026-11-18 |

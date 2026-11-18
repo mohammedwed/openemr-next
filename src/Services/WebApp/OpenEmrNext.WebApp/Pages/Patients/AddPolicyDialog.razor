@@ -2,6 +2,7 @@
 @using OpenEmrNext.WebApp.Shared
 @using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
 @inject IPatientManagementClient PatientManagement
+@inject OpenEmrNext.WebApp.Shared.IdempotencyAttempt Attempt
 
 @* Adding a policy is a change, so it lives in its own dialog. It closes only when the save succeeds;
    on failure it stays open with the typed values intact. *@
@@ -68,6 +69,8 @@
                 StartDate = UtcTime.ToWire(_model.StartDate.Value),
                 EndDate = _model.EndDate is { } end ? UtcTime.ToWire(end) : null
             };
+            // A retried save is one request, not two: the attempt lives until a save succeeds (ADR 0084).
+            Attempt.BeginIfNone();
             await PatientManagement.AddInsurancePolicyAsync(Pid, request);
             MudDialog.Close(DialogResult.Ok(true));
         }

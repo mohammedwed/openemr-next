@@ -61,6 +61,23 @@ CREATE TABLE IF NOT EXISTS \`${DB_NAME}\`.\`patient_management_audit\` (
   KEY ix_patient_management_audit_subject (subject, at),
   KEY ix_patient_management_audit_at (at)
 );
+-- Idempotency keys (API-5, ADR 0084): what a creating request answered, by (user, key), kept 24 hours so a retried request is answered, not repeated. Only the hash of the
+-- request and the answer (identifiers, status, location) are held, never the request body. The primary key is what makes claiming a key atomic.
+CREATE TABLE IF NOT EXISTS \`${DB_NAME}\`.\`patient_management_idempotency\` (
+  actor_id BIGINT NOT NULL,
+  idem_key VARCHAR(64) NOT NULL,
+  fingerprint CHAR(64) NOT NULL,
+  state VARCHAR(8) NOT NULL,
+  claim_token VARCHAR(36) NOT NULL,
+  claimed_at DATETIME(6) NOT NULL,
+  completed_at DATETIME(6) DEFAULT NULL,
+  status_code INT DEFAULT NULL,
+  content_type VARCHAR(100) DEFAULT NULL,
+  location VARCHAR(300) DEFAULT NULL,
+  body TEXT DEFAULT NULL,
+  PRIMARY KEY (actor_id, idem_key),
+  KEY ix_patient_management_idempotency_claimed (claimed_at)
+);
 -- The relay's bookkeeping (EVT-7, ADR 0066): attempts and back-off, a lease so a crashed relay loses nothing, and a
 -- dead-letter mark. ADD COLUMN IF NOT EXISTS keeps this idempotent on a database that already has the older table.
 ALTER TABLE \`${DB_NAME}\`.\`patient_management_outbox\`
@@ -107,6 +124,8 @@ GRANT INSERT ON \`${DB_NAME}\`.uuid_registry TO '${PATIENT_MANAGEMENT_DB_USER}'@
 GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.patient_management_outbox TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 -- The audit trail is append-only by privilege: no UPDATE, no DELETE (ADR 0078).
 GRANT INSERT, SELECT ON \`${DB_NAME}\`.patient_management_audit TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
+-- The idempotency table is fully owned: claims are inserted, completed, released and swept.
+GRANT SELECT, INSERT, UPDATE, DELETE ON \`${DB_NAME}\`.patient_management_idempotency TO '${PATIENT_MANAGEMENT_DB_USER}'@'%';
 FLUSH PRIVILEGES;
 SQL
 

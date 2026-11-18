@@ -2,6 +2,7 @@
 @using OpenEmrNext.WebApp.Shared
 @using PatientManagementApiException = OpenEmrNext.PatientManagement.Client.ApiException
 @inject IPatientManagementClient PatientManagement
+@inject OpenEmrNext.WebApp.Shared.IdempotencyAttempt Attempt
 
 @* Swapping displaces whichever policy holds the target level, so the dialog names both policies before
    the user confirms. It is the only confirmation step: the button says exactly what it will do. *@
@@ -89,6 +90,8 @@
         try
         {
             var request = new SwapInsuranceRequest { TargetLevel = _targetLevel, PolicyUuid = policyUuid };
+            // A retried save is one request, not two: the attempt lives until a save succeeds (ADR 0084).
+            Attempt.BeginIfNone();
             await PatientManagement.SwapInsuranceAsync(Pid, request);
             MudDialog.Close(DialogResult.Ok(true));
         }
