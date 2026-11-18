@@ -10,7 +10,7 @@
    in the meantime is refused and the list reloads. An entry is voided with "entered in error", not deleted. The vaccine names come from the configured list, loaded once; if that fails the rows
    fall back to the CVX code or the vaccine's number. *@
 <PatientSectionCard Title="Immunizations"
-    HasData="_items is not null" Error="_error" OnRetry="LoadAsync"
+    HasData="_items is not null" Error="_error" StillSettingUp="_settingUp" OnRetry="LoadAsync"
     ErrorMessage="Could not load immunizations. The clinical care service may be unavailable."
     StaleMessage="Could not refresh immunizations. The list below may be out of date."
     LoadingLabel="Loading immunizations">
@@ -111,6 +111,9 @@
     private int _total;
     private int _page = 1;
     private bool _error;
+
+    /// <summary>The last failure was Clinical Care not knowing this patient yet (404): registration is only a few seconds old, so the card says so and retries.</summary>
+    private bool _settingUp;
     private bool _loading;
     private int _loadCounter;
 
@@ -159,6 +162,7 @@
             _total = result.Total;
             _page = page;
             _error = false;
+            _settingUp = false;
             await TotalChanged.InvokeAsync(_total);
         }
         catch (Exception ex) when (ex is ClinicalCareApiException or HttpRequestException)
@@ -166,6 +170,7 @@
             if (ticket == _loadCounter)
             {
                 _error = true;
+                _settingUp = ex is ClinicalCareApiException { StatusCode: 404 };
             }
         }
         finally

@@ -47,7 +47,7 @@
             var request = new SetAdvanceDirectiveStatusRequest
             {
                 Status = _status,
-                ReviewedAtUtc = _reviewedOn is { } reviewed ? new DateTimeOffset(reviewed) : null
+                ReviewedAtUtc = _reviewedOn is { } reviewed ? UtcTime.ToWire(reviewed) : null
             };
             await PatientManagement.SetAdvanceDirectiveStatusAsync(Pid, request);
             MudDialog.Close(DialogResult.Ok(true));

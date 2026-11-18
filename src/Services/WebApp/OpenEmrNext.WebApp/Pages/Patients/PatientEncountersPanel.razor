@@ -11,7 +11,7 @@
    total up through TotalChanged so the tab label can show a count. A failed first load shows an error with
    "Try again"; a failed page change keeps the last page on screen with a warning. *@
 <PatientSectionCard Title="Encounters"
-    HasData="_items is not null" Error="_error" OnRetry="LoadAsync"
+    HasData="_items is not null" Error="_error" StillSettingUp="_settingUp" OnRetry="LoadAsync"
     ErrorMessage="Could not load encounters. The clinical care service may be unavailable."
     StaleMessage="Could not refresh encounters. The list below may be out of date."
     LoadingLabel="Loading encounters">
@@ -87,6 +87,9 @@
     private int _total;
     private int _page = 1;
     private bool _error;
+
+    /// <summary>The last failure was Clinical Care not knowing this patient yet (404): registration is only a few seconds old, so the card says so and retries.</summary>
+    private bool _settingUp;
     private bool _loading;
 
     // Each load takes a number; only the latest one may apply its result, so a slow response for an
@@ -119,6 +122,7 @@
             _total = result.Total;
             _page = page;
             _error = false;
+            _settingUp = false;
             await TotalChanged.InvokeAsync(_total);
         }
         catch (Exception ex) when (ex is ClinicalCareApiException or HttpRequestException)
@@ -126,6 +130,7 @@
             if (ticket == _loadCounter)
             {
                 _error = true;
+                _settingUp = ex is ClinicalCareApiException { StatusCode: 404 };
             }
         }
         finally

@@ -220,7 +220,7 @@
             }
 
             _patient = patient;
-            _today = DateOnly.FromDateTime(DateTime.Today); // read once per load, not on every render
+            _today = DateOnly.FromDateTime(UtcTime.Today); // read once per load, not on every render
             _state = State.Ready;
             PatientPage.PatientName = $"{patient.FirstName} {patient.LastName}";
         }
