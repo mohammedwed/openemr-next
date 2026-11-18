@@ -2,6 +2,7 @@
 @using OpenEmrNext.WebApp.Shared
 @using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
 @inject IClinicalCareClient ClinicalCare
+@inject OpenEmrNext.WebApp.Shared.IdempotencyAttempt Attempt
 
 @* Chooses one of the patient's own problems or allergies to link to this encounter. The choices are read when the dialog opens, minus what is already linked. Linking is
    idempotent and a link is never edited (ADR 0070), so there is nothing to go stale here: a second link to the same issue simply finds the first. *@
@@ -136,6 +137,8 @@
         _error = null;
         try
         {
+            // A retried save is one request, not two: the attempt lives until a save succeeds (ADR 0077).
+            Attempt.BeginIfNone();
             var linked = await ClinicalCare.LinkIssueToEncounterAsync(EncounterUuid, _selected.IssueUuid, new LinkIssueRequest { Resolved = _resolved });
             MudDialog.Close(DialogResult.Ok(linked));
         }

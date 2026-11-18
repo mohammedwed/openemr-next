@@ -22,4 +22,8 @@
     <ProjectReference Include="..\..\ClinicalCare\OpenEmrNext.ClinicalCare.Client\OpenEmrNext.ClinicalCare.Client.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenEmrNext.WebApp.UnitTests" />
+  </ItemGroup>
+
 </Project>
