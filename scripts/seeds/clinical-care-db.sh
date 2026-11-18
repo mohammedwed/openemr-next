@@ -137,6 +137,11 @@ GRANT INSERT (uuid, \`date\`, type, title, begdate, enddate, diagnosis, outcome,
 -- Which ROWS an update may touch is the type filter in every statement, not this grant.
 GRANT UPDATE (title, begdate, enddate, diagnosis, outcome, occurrence, referredby, comments, verification, reaction, severity_al)
   ON \`${DB_NAME}\`.lists TO '${CLINICAL_CARE_DB_USER}'@'%';
+-- Deleting a problem or an allergy (M5n, ADR 0080): legacy removes the row, so this service must be able to. MariaDB cannot grant DELETE by column or by value, so this is
+-- DELETE on the whole table, which makes it the widest grant on lists: it could remove a medication or a surgery. That is held back by the code (every statement names its
+-- type, an architecture test enforces it, and the delete reaches a row only by its uuid and type) and pinned by tests that try to delete rows of other types. A deletion also
+-- needs legacy's admin/super right and a verified user.
+GRANT DELETE ON \`${DB_NAME}\`.lists TO '${CLINICAL_CARE_DB_USER}'@'%';
 -- Linking an issue to an encounter (M5c slice 4): legacy's issue_encounter row. SELECT and INSERT to read and make links, DELETE to remove a link (legacy's encounter
 -- screen does so on every save). It is a table of ids and a resolved flag with no clinical text. The link's uuid_registry row is not deleted on unlink (that would need
 -- DELETE on a table shared by every uuid in the system); a stale registry row is harmless because a uuid is never reused.

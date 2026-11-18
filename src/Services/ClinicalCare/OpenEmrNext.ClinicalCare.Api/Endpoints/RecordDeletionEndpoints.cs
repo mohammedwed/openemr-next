@@ -40,7 +40,47 @@ public static class RecordDeletionEndpoints
             .WithName("DeleteSoapNote").WithTags("SOAP notes")
             .WithSummary("Delete a SOAP note (flag it deleted; needs legacy's admin/super right), conditional on the ETag the caller read");
 
+        // Problems and allergies belong to a patient, not an encounter, so their routes have no encounter in them (ADR 0080). Legacy removes the row, so this does too.
+        app.MapDelete("/problems/{uuid:guid}", (
+                Guid uuid, DeleteIssueUseCase useCase, HttpContext http, [FromHeader(Name = "If-Match")] string? ifMatch, CancellationToken ct) =>
+            Preconditions.TryRead(ifMatch, out var offered)
+                ? DeleteIssueAsync(useCase, http, DeletableIssue.Problem, uuid, offered.Select(t => t.ToETag()).ToList(), ct)
+                : Task.FromResult(Preconditions.Required()))
+            .WithName("DeleteProblem").WithTags("Problems")
+            .WithSummary("Delete a problem (remove it and its encounter links; needs legacy's admin/super right), conditional on the ETag the caller read");
+
+        app.MapDelete("/allergies/{uuid:guid}", (
+                Guid uuid, DeleteIssueUseCase useCase, HttpContext http, [FromHeader(Name = "If-Match")] string? ifMatch, CancellationToken ct) =>
+            Preconditions.TryRead(ifMatch, out var offered)
+                ? DeleteIssueAsync(useCase, http, DeletableIssue.Allergy, uuid, offered.Select(t => t.ToETag()).ToList(), ct)
+                : Task.FromResult(Preconditions.Required()))
+            .WithName("DeleteAllergy").WithTags("Allergies")
+            .WithSummary("Delete an allergy (remove it and its encounter links; needs legacy's admin/super right), conditional on the ETag the caller read");
+
         return app;
+    }
+
+    private static async Task<IResult> DeleteIssueAsync(
+        DeleteIssueUseCase useCase, HttpContext http, DeletableIssue kind, Guid uuid, IReadOnlyList<string> offered, CancellationToken ct)
+    {
+        try
+        {
+            await useCase.ExecuteAsync(new DeleteIssueCommand(kind, uuid, offered, RequestOrigins.From(http)), ct);
+            return Results.NoContent();
+        }
+        catch (AccessDeniedException ex)
+        {
+            return Results.Problem(
+                title: "Not allowed.", detail: $"Deleting a record needs {ex.Right} in OpenEMR's access control, which the signed-in user does not hold.", statusCode: StatusCodes.Status403Forbidden);
+        }
+        catch (RecordNotFoundException ex)
+        {
+            return Results.Problem(title: "Record not found.", detail: ex.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+        catch (RecordVersionConflictException ex)
+        {
+            return Preconditions.Failed(ex.CurrentVersion);
+        }
     }
 
     private static async Task<IResult> DeleteAsync(

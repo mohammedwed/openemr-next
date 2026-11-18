@@ -38,4 +38,4 @@ Legacy decides who may delete with phpgacl: `AclMain::aclCheckCore` reads the `g
 
 ## Not decided
 
-- **Problems and allergies (issues).** The user chose a soft delete hidden from lists. Reading legacy shows that its issue screens do not hide an inactive issue, so the record would disappear from this application and still show in OpenEMR. The options are to hard-delete like legacy (consistent, not recoverable), to soft-delete here and accept the difference until legacy's screens filter on it, or to leave issues alone. Waiting on the user.
+- **Problems and allergies (issues).** ~~Waiting on the user.~~ **Decided Nov 17: hard delete, as legacy does** (ADR 0080), because legacy's issue screens do not hide an inactive issue and a flag would leave the two systems disagreeing.
