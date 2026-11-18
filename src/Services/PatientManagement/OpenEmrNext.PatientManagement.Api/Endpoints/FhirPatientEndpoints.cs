@@ -79,6 +79,15 @@ public static class FhirPatientEndpoints
         HttpRequest request, SearchPatientFhirRecordsUseCase useCase, CancellationToken ct)
     {
         var query = request.Query;
+
+        // A search is always a bounded page; a value that is not a whole number in range is refused, not quietly replaced.
+        var limit = PatientFhirSearchCriteria.DefaultLimit;
+        if (query.TryGetValue("_count", out var countText) && (!int.TryParse(countText[0], out limit) || limit is < 1 or > PatientFhirSearchCriteria.MaxLimit))
+            return FhirContent(ProblemOutcome($"The search parameter '_count' must be a whole number from 1 to {PatientFhirSearchCriteria.MaxLimit}."), StatusCodes.Status400BadRequest);
+        var offset = 0;
+        if (query.TryGetValue("_offset", out var offsetText) && (!int.TryParse(offsetText[0], out offset) || offset < 0))
+            return FhirContent(ProblemOutcome("The search parameter '_offset' must be a whole number, 0 or more."), StatusCodes.Status400BadRequest);
+
         var criteria = new PatientFhirSearchCriteria(
             Id: Guid.TryParse(query["_id"], out var id) ? id : null,
             Identifier: query["identifier"],
@@ -95,12 +104,19 @@ public static class FhirPatientEndpoints
             Phone: query["phone"],
             Telecom: query["telecom"],
             LastUpdatedSince: DateTime.TryParse(query["_lastUpdated"], out var since) ? since : null,
-            GeneralPractitioner: Guid.TryParse(query["generalPractitioner"], out var gp) ? gp : null);
+            GeneralPractitioner: Guid.TryParse(query["generalPractitioner"], out var gp) ? gp : null,
+            Limit: limit,
+            Offset: offset);
 
-        var views = await useCase.ExecuteAsync(criteria, ct);
-        var patients = views.Select(FhirPatientMapper.ToFhirPatient).ToList();
+        var result = await useCase.ExecuteAsync(criteria, ct);
+        var patients = result.Items.Select(FhirPatientMapper.ToFhirPatient).ToList();
 
-        var bundle = new Bundle { Type = Bundle.BundleType.Searchset, Total = patients.Count };
+        // Total is every patient that matched, not the size of this page; the links let a caller walk the rest.
+        var bundle = new Bundle { Type = Bundle.BundleType.Searchset, Total = result.Total };
+        var filters = query.Where(q => q.Key is not ("_count" or "_offset")).SelectMany(q => q.Value.Select(v => (q.Key, Value: v ?? ""))).ToList();
+        bundle.Link.Add(new Bundle.LinkComponent { Relation = "self", Url = SearchUrl(request, filters, limit, offset) });
+        if (offset + patients.Count < result.Total)
+            bundle.Link.Add(new Bundle.LinkComponent { Relation = "next", Url = SearchUrl(request, filters, limit, offset + limit) });
         bundle.Entry.AddRange(patients.Select(p => new Bundle.EntryComponent
         {
             FullUrl = $"Patient/{p.Id}",
@@ -191,6 +207,16 @@ public static class FhirPatientEndpoints
         if (string.IsNullOrWhiteSpace(body))
             throw new FormatException("Request body was empty.");
         return FhirJson.Parse<T>(body);
+    }
+
+    /// <summary>The address the caller used, not the one the gateway forwarded to: the proto and host the gateway saw.</summary>
+    private static string SearchUrl(HttpRequest request, IEnumerable<(string Key, string Value)> filters, int count, int offset)
+    {
+        var scheme = request.Headers["X-Forwarded-Proto"].FirstOrDefault() ?? request.Scheme;
+        var host = request.Headers["X-Forwarded-Host"].FirstOrDefault() ?? request.Host.Value;
+        var parameters = filters.Select(f => $"{Uri.EscapeDataString(f.Key)}={Uri.EscapeDataString(f.Value)}")
+            .Append($"_count={count}").Append($"_offset={offset}");
+        return $"{scheme}://{host}/fhir/Patient?{string.Join('&', parameters)}";
     }
 
     private static OperationOutcome ProblemOutcome(string diagnostics)

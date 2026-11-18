@@ -56,6 +56,15 @@ Deleting a vitals set from the encounter page showed **"Could not delete this re
 - Tests (six): a 404 says "still being set up" and not "unavailable", a 500 or 503 still says "unavailable", the section appears once Clinical Care knows the patient, the card retries by itself but only up to the limit, and a plain failure is never retried. Removing the cap, or the 404 recognition, fails the right tests.
 - **Checks:** WebApp unit 83 passed (also under the Cairo clock), whole solution builds with 0 errors and 0 warnings.
 
+## Changed — patient searches are bounded pages, and `LIKE` text is matched as typed (ADR 0082)
+
+An audit of how both services pass values to SQL found **no SQL injection path**: about 145 interpolated calls are parameterized by EF, 24 `SqlQueryRaw` calls use numbered placeholders, the one direct `MySqlCommand` uses a named parameter, and the only runtime-built SQL text (the `IN (…)` lists and the patient search filter) is made of placeholders and literal column names. It did find two weaknesses in Patient Management's patient search, both now fixed:
+
+- **Unbounded search.** `GET /fhir/Patient` had no limit, so no parameters (or `family=%`) loaded every patient. It is now a page: `_count` (1 to 100, default 25), `_offset`, a `total` of everything that matched, `self` and `next` links, and a 400 for a bad value. The order is by `pid`, which is unique, so paging is stable. The plain `GET /api/v1/patients` takes `limit` and `offset` (default and maximum 100) and returns the total in `X-Total-Count`; the WebApp's patient list says when it is showing the first 100.
+- **Wildcards in `LIKE` text.** `%` and `_` in `family`, `given`, `name` and the address parameters acted as wildcards. They are escaped, with an explicit `ESCAPE '!'`.
+- **Tests:** 26 new (`PatientSearchBoundsTests`): paging walked through every `next` link, the range checks, wildcards matched only as themselves, nine search parameters sent quote, `DROP TABLE`, `UNION` and `SLEEP` text (each matches nothing and a known patient is still found), and the plain list's limit and total. A mutation check (no escaping; no `LIMIT`) failed the right tests. The Patient Management suites pass: unit 188, architecture 17, integration 156 including these.
+- **Not changed, and said so in the ADR:** this service still ignores unknown search parameters (Clinical Care answers 400), and still drops an unparseable `_lastUpdated` or `birthdate` silently.
+
 ## Found in the legacy-UI check (the records written here, as OpenEMR shows them)
 
 With the project owner signed in to OpenEMR, the scratch patients' records were opened in OpenEMR itself. Problems, immunizations (CVX codes resolved to names), encounters and the SOAP and vitals deletions all appear as expected, with three exceptions, none of them caused by this service:

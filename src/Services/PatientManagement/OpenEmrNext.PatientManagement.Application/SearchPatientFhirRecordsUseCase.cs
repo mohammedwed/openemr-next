@@ -11,6 +11,6 @@ namespace OpenEmrNext.PatientManagement.Application;
 /// </summary>
 public sealed class SearchPatientFhirRecordsUseCase(IPatientFhirRepository repository)
 {
-    public Task<IReadOnlyList<PatientFhirView>> ExecuteAsync(PatientFhirSearchCriteria criteria, CancellationToken ct) =>
+    public Task<PatientFhirSearchResult> ExecuteAsync(PatientFhirSearchCriteria criteria, CancellationToken ct) =>
         repository.SearchAsync(criteria, ct);
 }
