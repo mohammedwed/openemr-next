@@ -43,9 +43,9 @@ a compatibility constraint.
 | M1 | Harden the identity bridge | Done | Oct 10, Oct 11, Oct 21, Oct 24, Oct 29, Oct 30, Oct 31, Nov 1, Nov 2 |
 | M2 | Schema inventory for slice contexts | Done | Oct 4 (entities scaffolded), Nov 13 (inventory) |
 | M3 | Gateway and token validation | In progress | Nov 13 |
-| M4 | Patient Management service | In progress | Nov 14 (registration, duplicate detection, insurance, advance directives, and the FHIR Patient API all done; the FHIR API now uses the real Firely .NET SDK with US Core validation, ADR 0052; insurance swap is a multi-entity aggregate, ADR 0053; only patient merge remains, deferred to M5+, ADR 0051; WebApp frontend for the patient list, patient view, and registration merged Nov 16, PR #73) |
-| M5 | Clinical Care service | In progress | Nov 16 (slices 1 Create Encounter, 2 Record Vitals and 3 relay + `PatientRegistered` consumption built, tested and verified on the running stack; legacy's own `EncounterService` and `VitalsService` read the rows; the `patient_data` stand-in is removed; shadow comparison against legacy creation done: 142 columns identical, 2 differ by documented rule; layered review done 2026-11-17 (`docs/clinical-care/04-layered-review.md`): 7 defects found and fixed; remaining: browser check of the legacy UI (needs a login); WebApp screens for encounters and vitals built Nov 17, ADR 0067, not yet checked in a browser) |
-| M5b | Clinical Care: update, delete, audit, lookups | In progress | Nov 17 (phase 0 research and ADRs 0068, 0069 written; no code yet) |
+| M4 | Patient Management service | In progress | Nov 14 (registration, duplicate detection, insurance, advance directives, and the FHIR Patient API all done; the FHIR API uses the real Firely .NET SDK with US Core validation, ADR 0052; insurance swap is a multi-entity aggregate, ADR 0053; WebApp patient pages merged Nov 16, PR #73). Nov 17-18: its own audit trail (M5k, ADR 0078), correcting a patient's demographics (M5r, ADR 0081) and bounded patient searches (ADR 0082), all merged. Only patient merge remains (deferred, ADR 0051); idempotency keys are being ported (branch, not merged) |
+| M5 | Clinical Care service | Built; verification in progress | Nov 18 (every slice built, tested and merged to `main`: encounters, vitals, problems, allergies, immunizations, SOAP notes, clinical notes, lookups, `PatientRegistered` consumption; update, delete, audit and idempotency (M5b, M5g, M5h, M5n); read-only FHIR for five resources (M5e); WebApp screens for all of it. Shadow comparison of creation done; layered review of the first slices done. **Browser check and legacy-UI check done Nov 18 on scratch patients**: they found and fixed five defects the automated tests could not see, see M5s) |
+| M5b | Clinical Care: update, delete, audit, lookups | Done | Nov 17-18 (conditional updates, append-only audit, lookups, the permission port and delete, idempotency keys; verified identity through the gateway, ADR 0075) |
 | M6 | Portfolio polish | Not started | — |
 
 **Done beyond the original plan:** a privilege boundary that limits the
@@ -340,7 +340,7 @@ Fills the remaining Clinical Care functionality that needs no new service and no
 7. **Idempotency keys and the SOAP retry guard** (**M5h, done Nov 17**; `22-idempotency.md`, ADR 0077): `Idempotency-Key` on every creating `POST` (replay, 409, 422, 24-hour window, own table), and a SOAP note no longer duplicates when its transaction is re-run after a lost commit acknowledgement. The WebApp sends keys from its eight creating dialogs (M5m, compile-checked and handler-tested, not seen in a browser). **Not done:** the OpenAPI document does not declare the header; Patient Management has no idempotency.
 - **Out of scope:** editing `sensitivity` (still needs its own permission decision).
 
-### M5e: FHIR for Clinical Care (not started)
+### M5e: FHIR for Clinical Care (done Nov 17, ADR 0079; PRs #88, #91 to #93)
 
 Clinical Care has no FHIR surface; only Patient Management does (`Patient`, Firely SDK with US Core validation, ADR 0052). Legacy exposes read-only FHIR for these resources, which are the parity targets:
 
@@ -358,17 +358,17 @@ Clinical Care has no FHIR surface; only Patient Management does (`Patient`, Fire
 - **Depends on** the gateway fix in M5b phase 1b: a clinical FHIR read must not be reachable without sign-in.
 
 
-### M5 frontend: WebApp encounter pages (built Nov 17, ADR 0067)
+### M5 frontend: WebApp encounter pages (built Nov 17, ADR 0067; checked in a browser Nov 18)
 
 All through the gateway and the generated ClinicalCare client, in the same style as the patient pages:
 
 - **Patient view, Encounters tab:** server-paged list, **New encounter** dialog, and a link into each visit. Creating one opens it.
 - **Encounter page:** the visit's details and a Vitals card (server-paged, US/metric switch, **Record vitals** dialog showing the derived BMI).
-- **Known gaps:** the provider id is a placeholder (`1`), facility and calendar category are free numeric fields (no lookup endpoints), and
-  date-only fields can shift a day when browser and server zones differ (`docs/patient-view-pending-decisions.md`, items 1, 9, 10).
-- **Verification:** builds with no warnings. **Not yet run in a browser**; no automated webapp tests (item 7).
+- **Known gaps (as built Nov 17, all since closed):** the provider id was a placeholder (now the verified user, ADR 0075, with a providers lookup), facility and calendar category were free numeric fields (now lookups, M5d), and
+  date-only fields could shift a day when browser and server zones differed (now every time is UTC, ADR 0083).
+- **Verification:** builds with no warnings. **Run in a browser on Nov 18** (M5s): that found the encounter page crashed on every encounter (four sibling panels shared one Blazor key) and that every delete was reported as a failure; both fixed. The WebApp now has 84 component tests (bUnit), including the real generated client.
 
-### M5b: Clinical Care update, delete, audit and lookups (in progress, branch `feat/m5b-update-and-audit`)
+### M5b: Clinical Care update, delete, audit and lookups (done Nov 17-18)
 
 M5 proved the slice pattern but both aggregates are create-only. M5b closes that. Research: `docs/clinical-care/05-update-and-audit-research.md`.
 
@@ -386,17 +386,27 @@ M5 proved the slice pattern but both aggregates are create-only. M5b closes that
 are recorded, end to end. The shadow comparison shows no unexplained
 discrepancies.
 
-### What remains before the post-M5 gate (as of Nov 17)
+### M5s: merging, verifying and hardening what M5 built (Nov 18)
 
-**Build (no identity needed):** M5e FHIR (read-only). M5d's API work and its WebApp screens (vitals correction, immunizations, SOAP notes, clinical notes, lookups; `20-webapp-clinical-screens.md`) are built, **but the screens are compile-checked only**.
-**Identity (M5b phase 1b) is done for sign-in and for Clinical Care** (ADR 0075): the gateway requires a session, Clinical Care acts as the verified user. Patient Management consumes it too (registration, document owner, directive reviewer). **Still open:** delete for problems and allergies (decision pending) and editing `sensitivity`; a bearer-token path for external FHIR clients (deliberately not built until there is a client to design it for).
-**WebApp tests (M5i, started Nov 17):** a bUnit project exists (24 tests, the three delete flows); the other screens have none yet.
-**Gateway session check (M5j, analysis Nov 17):** one primary-key read and a small decrypt per request, no writes; no cache yet; a benchmark with a real session is owed (ADR 0075 amendment). **AuthFacade `Sessions` rows were deleted only when read again, so abandoned sessions accumulated; fixed in M5l (a new sign-in sweeps up to 100 expired ones).**
-**Patient Management audit trail (M5k, Nov 17; `docs/patient-management/09-audit-trail.md`, ADR 0078):** its own append-only `patient_management_audit` table, written in each write's own transaction (register, add and swap insurance, upload a directive document, set the directive status); refusals are audited as failed. Reads and legacy's `log` table are not covered.
-**Patient Management can correct a patient (M5r, Nov 18; `docs/patient-management/10-demographics-update.md`, ADR 0081):** name, date of birth, sex and emails, under a content-hash version, with a WebApp Edit dialog. Contact details and the FHIR `PUT` are not built.
-**Verification not yet done:** a browser check of every WebApp screen (including all the new M5d ones); a legacy-UI check that records written here display correctly in OpenEMR itself; shadow comparison of the update paths, vitals correction and immunizations (only creation was compared); a layered review of M5b to M5d.
+The M5f to M5r work was delivered as twelve stacked pull requests (#83 to #94) and merged into `main` bottom-up in one session, with CI waited for only on the first two. The first full test run of the combined code then failed one architecture test, and the first real browser check found four more defects, so the day became a verification pass:
+
+- **Red CI on `main`:** `PageRequest.Updated` had an `init` accessor, a public setter to reflection, which the Clinical Care architecture rule forbids (the solution build cannot catch that; the architecture project can). Fixed in #96.
+- **The encounter page crashed on every encounter** (four sibling panels shared one Blazor `@key`). Fixed in #96.
+- **Every delete in the WebApp reported failure when it had worked:** the OpenAPI document declared 200 for five delete endpoints that return 204, and the generated client throws on an undeclared status. Fixed in #96, with tests that use the real generated client; the screen also stopped claiming "nothing was deleted" when the outcome was unknown.
+- **Times are UTC (ADR 0083, decided by the project owner):** a user in UTC+2 entered 06:30 and saw 04:30. Defaults come from an injected clock, picked times are sent as the same digits at a zero offset, and pages say UTC. Fixed in #96.
+- **A new patient's records looked like an outage for a few seconds** (Clinical Care learns of a patient from the registration event and answers 404 until then). The sections now say "still being set up" and retry by themselves. Fixed in #96.
+- **SQL parameter audit of both services:** no injection path (every value is a bound parameter). It did find an unbounded patient search and unescaped `LIKE` wildcards in Patient Management, fixed in #97 (ADR 0082): searches are bounded pages with a total and `next` links.
+- **Legacy-UI check (the records as OpenEMR itself shows them):** problems, immunizations, encounters, SOAP notes and deletions all appear correctly. Three legacy quirks, none caused here, are documented: OpenEMR's dashboard still shows deleted vitals when ids collide (its query joins on `form_id` alone), "No Known Allergies" after an allergy is deleted, and a deleted clinical note's form line. The vitals confirmation no longer promises otherwise (#98).
+- **Browser check, covered on scratch patients:** register, edit and save (the version check answers 200, 412, 428 and 404 through the gateway), create encounter with the providers lookup, record, correct and delete vitals, SOAP note, clinical note, problem, allergy and immunization, and the hard deletes.
+
+### What remains before the post-M5 gate (as of Nov 18)
+
+**Done:** everything in M5s; all M5 slices merged (PRs #83 to #97; #98 open); the live stack rebuilt from `main` once (re-run the seed scripts for new tables and grants); the WebApp has 84 component tests; ADRs run to 0083.
+**Verification still open:** the browser check of insurance, advance directives and the immunization correct and entered-in-error flows; the shadow comparison of the update paths, vitals correction, immunizations, SOAP and clinical notes, and delete (only creation was compared); a layered review of M5b to M5n; one HTTP 503 seen once on a delete that was never reproduced.
+**Build still open:** idempotency keys for Patient Management (finding F-2: ported on a local branch, not finished or merged); events for insurance, directive and demographics changes (finding F-5: deferred, because no service consumes them and ADR 0081 decided against a demographics event); the `Idempotency-Key` header is not declared in the OpenAPI documents; narrowing Patient Management's table-wide `UPDATE` grant; the FHIR `PUT /Patient` and a bearer-token path for external FHIR clients (deliberately not built until there is a client); editing `sensitivity`; clinical notes' linked documents.
+**Measurement still open:** a gateway benchmark with a real session (the per-request session check costs one primary-key read and a small decrypt; never measured).
 **New services, not started:** documents, pharmacy, labs, billing.
-**Then:** the post-M5 gate, and M6.
+**Then:** the post-M5 gate (does the slice meet its success criteria; the evidence is in M5s and the verification above), and M6.
 
 ### M6: Portfolio polish (not started)
 
