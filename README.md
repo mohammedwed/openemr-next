@@ -29,7 +29,7 @@ research vision below is the long-term direction, not the current deliverable.
 | AuthFacade | BFF (browser login via OIDC/PKCE, a revocable session cookie, logout, proxies browser calls to OpenEMR's API) — rate limited, circuit-broken, audit-logged, over HTTPS, with its own session state in a dedicated database | Built, hardened ([ADR 0047](docs/architecture/0047-the-identity-bridge-design.md)) |
 | WebApp | Blazor WebAssembly: sign-in and identity; patients (list with server-side limit, search, sort; registration; edit; insurance; advance directives) and the clinical screens (encounters, vitals, problems, allergies, immunizations, SOAP and clinical notes, with correct and delete flows). Times are UTC (ADR 0083). 84 component tests | Built, browser-checked Nov 18 |
 | API gateway | Terminates TLS, validates the browser's session with AuthFacade on every protected request and forwards the verified user to the services (ADR 0075), and routes by path: AuthFacade's prefixes, `/api` and `/fhir` to Patient Management and Clinical Care, everything else to the WebApp's static files | Built |
-| Patient Management | Registers, searches (bounded pages) and reads patients; corrects demographics; insurance; advance directives and documents; the FHIR Patient API (Firely SDK, US Core); an append-only audit trail; publishes `PatientRegistered`. Patient merge is still to do; idempotency keys are in progress | Built, merge pending |
+| Patient Management | Registers, searches (bounded pages) and reads patients; corrects demographics; insurance; advance directives and documents; the FHIR Patient API (Firely SDK, US Core); an append-only audit trail; `Idempotency-Key` on creating requests (ADR 0084); publishes `PatientRegistered`. Patient merge is still to do; idempotency keys are in progress | Built, merge pending |
 | Clinical Care | Encounters, vitals, problems, allergies, immunizations, SOAP and clinical notes, with conditional updates (`ETag` / `If-Match`), permissioned delete, `Idempotency-Key`, an append-only audit trail, and read-only FHIR for five resources; consumes `PatientRegistered` | Built, verification in progress ([design](docs/clinical-care/design/README.md)) |
 
 ## What exists today
@@ -270,7 +270,7 @@ gateway. It does not store passwords or user records.
   its own session record.
 - Document uploads are capped at 20 MB in the webapp, because the API's request size limit is about 30 MB and
   documents travel as base64 JSON. Raising the limit is an API change.
-- **Current gaps (Nov 18):** Patient Management has no idempotency keys yet (in progress) and its table-wide `UPDATE` grant on
+- **Current gaps (Nov 18):** Patient Management's table-wide `UPDATE` grant on
   `patient_data` is wider than it needs; neither service publishes events for most changes (only registration and Clinical Care's
   writes do); the OpenAPI documents do not declare the `Idempotency-Key` header; the FHIR APIs are read-only apart from `POST /fhir/Patient`,
   and there is no bearer-token path for external FHIR clients; the patient list shows the first 100 patients and the rest by search; the WebApp's
