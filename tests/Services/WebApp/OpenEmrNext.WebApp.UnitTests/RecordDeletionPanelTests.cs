@@ -248,6 +248,18 @@ public class RecordDeletionPanelTests
         a.Value.WaitFor(() => Assert.Equal(2, a.Value.ListsRead));
     }
 
+    [Fact]
+    public async Task The_vitals_confirmation_does_not_promise_that_openemrs_dashboard_stops_showing_them()
+    {
+        // OpenEMR's dashboard card joins forms to form_vitals on form_id alone, so a deleted set can still appear there as the latest vitals (found in the legacy-UI check).
+        await using var a = new Disposable(Arrange(Panel.Vitals));
+
+        a.Value.ClickRowDelete();
+
+        a.Value.Host.ShouldShow("patient dashboard can still show them");
+        a.Value.Host.ShouldNotShow("no longer shown here or in OpenEMR");
+    }
+
     [Theory]
     [InlineData(Panel.Vitals)]
     [InlineData(Panel.Soap)]
