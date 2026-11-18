@@ -459,3 +459,60 @@ Full record: `docs/clinical-care/20-webapp-clinical-screens.md`. **Compile-check
 - **Not covered, on purpose:** reads of patient data (a separate access log), and legacy's own `log` table. The PM tests connect as the container owner, so the append-only grant is not exercised there.
 - **Database:** one new table created by the seed script (re-run it on an existing database); no legacy table touched.
 - **Tests:** Patient Management unit 166, architecture 17, integration 103 (17 new, `AuditTrailTests`; the existing ones were updated for the new constructors), all green. Mutation check: removing the in-transaction audit append from the registry and the insurance add fails 6 tests; restored. One `DuplicateScoringTests` failure appeared once in the first full run and did not recur in three more; not diagnosed.
+
+## Fixed — abandoned AuthFacade sessions are no longer kept for ever (M5l)
+
+- **The leak:** an expired session row was deleted only when that same session's cookie was presented again. A browser closed for good, or a lost device, left its row in `Sessions` for ever, so the table only grew. Found while reading the code for the gateway's per-request check (ADR 0075 amendment).
+- **The fix:** `AuthFacadeSessionStore` sweeps expired rows when a **new** session is created: up to 100 per sign-in, oldest first, keys read then deleted by key (so it works on both SQLite and MariaDB). No background job; a backlog is worked off over the next sign-ins. A session with no expiry is never swept; a live one is never touched; the existing "expired cookie is refused and removed" path is unchanged.
+- **Tests:** the session store had none. 5 new unit tests run the real store on a real in-memory SQLite database (an abandoned session is removed, a live and a no-expiry one are kept, one sign-in sweeps a bounded batch and the rest go on the next, renewing does not sweep, an expired cookie is still refused). AuthFacade unit 86, all green. Mutation check: removing the sweep call fails 2 tests; restored.
+- **No database change:** the table is unchanged.
+
+## Added — the WebApp sends idempotency keys (M5m)
+
+- **All eight creating dialogs** (encounter, vitals, SOAP note, clinical note, immunization, problem, allergy, link an issue) now take part. A dialog starts an *attempt* when its user first presses save and keeps it while that save is retried; `IdempotencyKeyHandler` on the Clinical Care client turns it into an `Idempotency-Key` made of the attempt id and a short hash of the request, and a successful save ends the attempt (ADR 0077 #10).
+- **What that means for a user:** a save whose answer was lost and is pressed again does not create a second record; a save edited before the retry is a new request, not an error; recording the same vitals twice on purpose is still two records.
+- **Tests:** 15 new tests (`IdempotencyKeyHandlerTests`, WebApp unit 39 in all), including one that drives the real generated client through the handler. Mutation check: not clearing the attempt, or ignoring the body in the key, fails 6; restored.
+- **Not verified:** the dialogs' own calls to the attempt are compile-checked only; no test renders a dialog, and nothing has been seen in a browser.
+
+## Added — delete for problems and allergies (M5n, ADR 0080)
+
+- **`DELETE /api/v1/problems/{uuid}` and `/api/v1/allergies/{uuid}`** remove the row and its links to encounters, as legacy's `deleter.php` does. Decided by the user on Nov 17 (hard delete, like legacy), because legacy's issue screens do not hide an inactive issue, so a flag would have left the two systems disagreeing. Same rules as the other deletions: `admin/super` only, `If-Match` under a row lock, 401, 428, 403, 404, 412 in that order, one transaction with its event and audit row.
+- **The cost, stated:** the service's database user now holds `DELETE` on `lists`, which is table-wide because MariaDB cannot grant it any narrower. A row is reached only by its uuid and type, and tests try to delete a medication, a surgery and a device by uuid and fail. A deleted issue cannot be restored and its content is not kept in the audit row.
+- **WebApp:** a Delete button with a confirmation on each problem and allergy row ("cannot be restored"), using the same helper that explains a 403 as "only an administrator can delete".
+- **Database:** a grant only; re-run the seed script on an existing database.
+- **Tests: the new ones were run, the full suites were not.** `IssueDeletionTests` (28), the whole `LeastPrivilegeGrantTests` class and the rest of that filtered set pass (247 integration tests in all); the WebApp component tests pass (55). The **full** Clinical Care unit, architecture and integration suites were not run on this change (the user stopped that run), so CI on this PR is the first full run.
+- **A gap the first mutation check found:** removing the adapter's type filter was **not** caught, because the use case's reader already answers 404 before the adapter is reached. A test now calls the adapter directly with a uuid that exists under another type (4 cases): it passes on the real code and fails 4 of 4 with the filter removed. The filter is the last line of defence behind the table-wide `DELETE` grant.
+## Added — FHIR Immunization, the first clinical FHIR resource (M5e slice 1, ADR 0079)
+
+- **`GET /fhir/Immunization/{id}` and `GET /fhir/Immunization?patient=...`**: read-only FHIR R4, mapped with the Firely SDK as Patient Management's `Patient` is. Status follows legacy's rule (entered in error, then completed, else not-done, with the refusal reason); the CVX code is the vaccine code; people are `Practitioner/{uuid}` references with a display name; `meta.versionId` and a weak `ETag` carry the same token as the JSON API's; there is **no** `lastUpdated`, because the table has none.
+- **Search is strict, as decided:** `patient`, `_id`, `_count` (1 to 100) and `_offset` only; anything else, or a repeat, is a 400 `OperationOutcome` that names the parameter. A patient with nothing, or unknown, is an empty set. The Bundle has `total`, `self` and `next`.
+- **The gateway's `/fhir/**` is now split.** It all went to Patient Management; now `/fhir/Patient/**` does, and `/fhir/Immunization/**` goes to Clinical Care. Both need a signed-in session, and a test pins each path to the right service. Clinical Care's route test learned the `/fhir` prefix.
+- **Shared plumbing for the next four resources:** the result type, the search parser, the Bundle builder, `OperationOutcome`s, an id-to-uuid user lookup, and the verified-user middleware now covering `/fhir`.
+- **No database change.**
+- **Tests (run, green):** the 32 new `FhirImmunizationTests`, the route test and the OpenAPI tests (58 in that set), and the gateway proxy tests (32, 3 of them new). The full Clinical Care suites were not run on this change.
+- **Found by the US Core check:** an `education` entry needs a document type (`imm-1`) and the first mapping gave only dates; fixed ("Vaccine Information Statement" when there is a VIS date, "Patient education" otherwise).
+- **Mutation check:** accepting unsupported search parameters, and ignoring the entered-in-error flag, each fail tests (5 in all); restored.
+
+## Added — FHIR AllergyIntolerance, Condition, Encounter and Observation (M5e, slices 2 to 5, ADR 0079)
+
+- **Four more read-only FHIR R4 resources**, each with read by id and search by patient, on the flow built for Immunization: `AllergyIntolerance`, `Condition` (problem list), `Encounter`, and vital-sign `Observation`. Mapping rules and limitations: `docs/clinical-care/25-fhir-clinical-resources.md`.
+- **Vitals become up to ten Observations** (blood-pressure panel, heart rate, respiratory rate, temperature, oxygen saturation, weight, height, BMI, waist and head circumference), with LOINC codes and UCUM units. Their ids are derived, `{vitalsUuid}-{measurement}`, as decided (no write, differs from any id legacy issued). A search counts and pages over the Observations, and reads a patient's most recent 1000 sets.
+- **Two differences from the ADR, stated:** the id form above (reversible, where a hash is not) and **`_lastUpdated` search not built** (refused as unsupported; `meta.lastUpdated` is served).
+- **Diagnosis text becomes codings** (`SYSTEM:code;SYSTEM:code`: ICD-10, SNOMED and the rest mapped to FHIR code-system URIs).
+- **Two new reads:** `IVitalsReader.FindAnywhereAsync` and `ListForPatientAsync` (vitals were only reachable through an encounter), and `IUserDirectory.FindPeopleAsync` (uuid and display name).
+- **Gateway:** `/fhir/AllergyIntolerance`, `/fhir/Condition`, `/fhir/Encounter` and `/fhir/Observation` route to Clinical Care; all five clinical paths need a session and the proxy tests pin each to the right service.
+- **No database change.**
+- **Tests (run, green):** 45 new `FhirClinicalResourceTests`; with the Immunization tests, the route test and the OpenAPI tests that set is 103, and the gateway proxy tests are 44 (12 of them new across the FHIR work). **Every resource served validates against its US Core profile**, each of the ten Observation measurements against its own. The full Clinical Care suites were not run on this change.
+- **Mutation check:** making every problem active, dropping the diastolic component, and serving deleted vitals each fail tests (5 in all); restored.
+- **A test fixed, not the code:** a diagnosis that is not `SYSTEM:code` cannot be created through the JSON API, so that test writes it straight into the table, as legacy could.
+
+## Added — `_lastUpdated` search on the four stamped FHIR resources (M5e, ADR 0079 #6)
+
+- **`_lastUpdated` now works** on `Encounter`, `Condition`, `AllergyIntolerance` and `Observation` (it was refused until now). A value is a year, month, day or date and time and means the range its precision gives; `eq`, `gt`, `ge`, `lt` and `le` act on that range as FHIR defines them (`gt2026-03-15` excludes the 15th, `le2026-03-15` includes it); two parameters are a range; a zone is converted to the server's local time. `ne`, `sa`, `eb`, `ap` and malformed values are a 400 that says what is supported. **Immunization still refuses it** (no stamp).
+- **Applied in the database** for encounters, problems and allergies, with the window carried on the existing page request, so no reader interface changed and no test fake broke. For Observations it is applied after the read, to the latest 1000 vitals sets.
+- The window is kept in the Bundle's links and in `total`, and a search by `_id` is held to it.
+- **Also fixed:** PR #92 had broken the Clinical Care unit-test project (two fakes of `IVitalsReader` lacked the new reads), which I found by building the whole solution as CI does; fixed on that branch (307fbbf). Every branch in the stack builds as a whole.
+- **No database change.**
+- **Tests (run, green):** about 120 new (`FhirDateSearchTests`, pure, 39; `FhirLastUpdatedTests`, 4 resources x 14 queries whose expected sets are computed from the stamps by the FHIR rule, plus ranges, empty ranges, totals, paging through a window, `_id` held to the window and refusals). That set with the FHIR, route and OpenAPI tests is 223 integration tests, and the Clinical Care unit project is 722. The full suites were not run.
+- **Mutation check:** the `gt` boundary, the SQL window in a reader, and the in-memory window for vitals each fail many tests; restored.
+- **Two of my own tests were wrong, not the code:** an expected Observation count (three, not two: weight, pulse and blood pressure), and two earlier tests that asserted `_lastUpdated` is refused on resources where it now works.

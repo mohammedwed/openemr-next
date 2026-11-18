@@ -9,10 +9,10 @@ public sealed class ListPatientEncountersUseCase(IPatientDirectory patients, IEn
 {
     /// <exception cref="PatientNotFoundException">No patient has this uuid.</exception>
     /// <exception cref="ClinicalCareValidationException">The limit or offset is out of bounds.</exception>
-    public async Task<EncounterPage> ExecuteAsync(Guid patientUuid, int? limit, int? offset, CancellationToken ct)
+    public async Task<EncounterPage> ExecuteAsync(Guid patientUuid, int? limit, int? offset, CancellationToken ct, UpdatedWindow? updated = null)
     {
         // Bounds first: a caller asking for 10,000 rows should be told so without a database round trip.
-        var page = PageRequest.Create(limit, offset);
+        var page = PageRequest.Create(limit, offset).Within(updated);
 
         var patient = await patients.FindAsync(patientUuid, ct)
             ?? throw new PatientNotFoundException(patientUuid);

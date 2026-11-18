@@ -13,7 +13,7 @@ public class GatewayRoutesTests
     {
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(RepoFiles.Find("src/Services/ClinicalCare/OpenEmrNext.ClinicalCare.Client/OpenAPIs/ClinicalCare.json")));
         var served = document.RootElement.GetProperty("paths").EnumerateObject()
-            .Select(p => string.Join('/', p.Name.Split('/').Take(4)))   // "/api/v1/immunizations"
+            .Select(p => string.Join('/', p.Name.Split('/').Take(p.Name.StartsWith("/fhir/", StringComparison.Ordinal) ? 3 : 4)))   // "/api/v1/immunizations", "/fhir/Immunization"
             .Distinct().Order().ToList();
         var gateway = await File.ReadAllTextAsync(RepoFiles.Find("src/Services/Gateway/OpenEmrNext.Gateway/Program.cs"));
 

@@ -92,6 +92,8 @@ public static class ClinicalCareApiExtensions
         builder.Services.AddScoped<IRecordDeleter, EfRecordDeleter>();
         builder.Services.AddScoped<IIdempotencyStore, EfIdempotencyStore>();
         builder.Services.AddScoped<DeleteRecordUseCase>();
+        builder.Services.AddScoped<IIssueDeleter, EfIssueDeleter>();
+        builder.Services.AddScoped<DeleteIssueUseCase>();
         builder.Services.AddScoped<EncounterLookupsUseCase>();
 
         // SOAP notes (M5d slice 3, ADR 0073).
@@ -144,6 +146,8 @@ public static class ClinicalCareApiExtensions
         builder.Services.AddScoped<IVitalsReader, EfVitalsReader>();
         builder.Services.AddScoped<RecordVitalsUseCase>();
         builder.Services.AddScoped<GetVitalsUseCase>();
+        builder.Services.AddScoped<FindVitalsAnywhereUseCase>();
+        builder.Services.AddScoped<ListPatientVitalsUseCase>();
         builder.Services.AddScoped<ListEncounterVitalsUseCase>();
         builder.Services.AddScoped<IVitalsUpdater, EfVitalsUpdater>();
         builder.Services.AddScoped<CorrectVitalsUseCase>();

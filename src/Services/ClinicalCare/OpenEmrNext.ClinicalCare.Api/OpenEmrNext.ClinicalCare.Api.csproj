@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Hl7.Fhir.R4" Version="5.11.1" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.18.3" />
     <PackageReference Include="Microting.EntityFrameworkCore.MySql" Version="10.0.3" />
@@ -23,5 +24,12 @@
     <ProjectReference Include="..\OpenEmrNext.ClinicalCare.Application.Ports\OpenEmrNext.ClinicalCare.Application.Ports.csproj" />
     <ProjectReference Include="..\OpenEmrNext.ClinicalCare.Infrastructure\OpenEmrNext.ClinicalCare.Infrastructure.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>OpenEmrNext.ClinicalCare.IntegrationTests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 
 </Project>

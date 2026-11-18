@@ -46,3 +46,6 @@ public sealed record VitalsView(
 
 /// <summary>One page of an encounter's vitals, newest first, with the total so a caller can page.</summary>
 public sealed record VitalsPage(IReadOnlyList<VitalsView> Items, int Total);
+
+/// <summary>A vitals set with the encounter it was taken in and the patient it is for, for a read that does not start from an encounter (the FHIR Observation, ADR 0079).</summary>
+public sealed record PatientVitals(VitalsView Vitals, Guid EncounterUuid, Guid PatientUuid);

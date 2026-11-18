@@ -87,6 +87,49 @@ public sealed class EfVitalsReader(ClinicalCareDbContext db) : IVitalsReader
         return new VitalsPage(rows.Select(ToView).ToList(), (int)total);
     }
 
+    private const string PatientVitalsColumns =
+        "v.id AS Id, v.uuid AS Uuid, v.date AS Date, v.`user` AS RecordedBy, v.bps AS Bps, v.bpd AS Bpd, " +
+        "v.weight AS Weight, v.height AS Height, v.temperature AS Temperature, v.temp_method AS TempMethod, " +
+        "v.pulse AS Pulse, v.respiration AS Respiration, v.oxygen_saturation AS OxygenSaturation, " +
+        "v.waist_circ AS Waist, v.head_circ AS Head, v.BMI AS Bmi, v.BMI_status AS BmiStatus, v.note AS Note, " +
+        "v.last_updated AS LastUpdated, fe.uuid AS EncounterUuid, pr.patient_uuid AS PatientUuid";
+
+    // The encounter and the patient are reached the way every reader reaches them: through the forms row, the encounter's own row (not one legacy has deleted), and the patient reference table.
+    private const string PatientVitalsFrom =
+        " FROM form_vitals v" +
+        " JOIN forms f ON f.form_id = v.id AND f.formdir = 'vitals' AND f.deleted = 0" +
+        " JOIN form_encounter fe ON fe.encounter = f.encounter AND fe.pid = f.pid AND fe.uuid IS NOT NULL" +
+        " JOIN clinical_care_patient_ref pr ON pr.pid = f.pid";
+
+    private const string EncounterNotDeleted =
+        " AND NOT EXISTS (SELECT 1 FROM forms nf WHERE nf.form_id = fe.id AND nf.formdir = 'newpatient' AND nf.deleted <> 0)";
+
+    // These are fixed strings with numbered parameters ({0}, {1}); no value is ever concatenated into them.
+    public async Task<PatientVitals?> FindAnywhereAsync(Guid vitalsUuid, CancellationToken ct)
+    {
+        var uuidBytes = Rfc4122GuidConverter.ToRfc4122Bytes(vitalsUuid);
+        var rows = await db.Database
+            .SqlQueryRaw<PatientVitalsRow>("SELECT " + PatientVitalsColumns + PatientVitalsFrom + " WHERE v.uuid = {0}" + EncounterNotDeleted + " LIMIT 1", uuidBytes)
+            .ToListAsync(ct);
+
+        return rows.Select(ToPatientVitals).FirstOrDefault();
+    }
+
+    public async Task<IReadOnlyList<PatientVitals>> ListForPatientAsync(PatientReference patient, int max, CancellationToken ct)
+    {
+        var pid = patient.Pid;
+        var rows = await db.Database
+            .SqlQueryRaw<PatientVitalsRow>(
+                "SELECT " + PatientVitalsColumns + PatientVitalsFrom + " WHERE v.uuid IS NOT NULL AND f.pid = {0}" + EncounterNotDeleted + " ORDER BY v.date DESC, v.id DESC LIMIT {1}", pid, max)
+            .ToListAsync(ct);
+
+        // The order is stated again outside the raw SQL, as in ListForEncounterAsync.
+        return rows.OrderByDescending(r => r.Date).ThenByDescending(r => r.Id).Select(ToPatientVitals).ToList();
+    }
+
+    private static PatientVitals ToPatientVitals(PatientVitalsRow row) =>
+        new(ToView(row), Rfc4122GuidConverter.FromRfc4122Bytes(row.EncounterUuid), Rfc4122GuidConverter.FromRfc4122Bytes(row.PatientUuid));
+
     private static VitalsView ToView(VitalsRow row) => new(
         Rfc4122GuidConverter.FromRfc4122Bytes(row.Uuid!),
         row.Date,
@@ -117,7 +160,7 @@ public sealed class EfVitalsReader(ClinicalCareDbContext db) : IVitalsReader
     private static int? WholeNumber(string? stored) =>
         int.TryParse(stored?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) && value > 0 ? value : null;
 
-    private sealed class VitalsRow
+    private class VitalsRow
     {
         public long Id { get; set; }
         public byte[]? Uuid { get; set; }
@@ -138,5 +181,11 @@ public sealed class EfVitalsReader(ClinicalCareDbContext db) : IVitalsReader
         public string? BmiStatus { get; set; }
         public string? Note { get; set; }
         public DateTime? LastUpdated { get; set; }
+    }
+
+    private sealed class PatientVitalsRow : VitalsRow
+    {
+        public byte[] EncounterUuid { get; set; } = [];
+        public byte[] PatientUuid { get; set; } = [];
     }
 }

@@ -32,7 +32,7 @@ Decisions are in ADR 0077; this is the working record.
 | # | Limitation | Why accepted |
 |---|---|---|
 | L1 | A request that dies between committing its record and saving its answer, then is retried after five minutes, can create a second record. | The price of no lock across a request. Narrow. |
-| L2 | The WebApp does not send keys; the OpenAPI document does not declare the header. | Declaring it changes every generated client signature; a follow-up. |
+| L2 | ~~The WebApp does not send keys~~ **it does since M5m** (all eight creating dialogs, through `IdempotencyKeyHandler`); the OpenAPI document still does not declare the header. | Declaring it changes every generated client signature. |
 | L3 | An answer over 64 KB is not protected. | Creating requests answer with identifiers. |
 | L4 | Other services (Patient Management) still have no idempotency. | Their own slice (F-2 in their gaps list). |
 | L5 | The SOAP guard covers the service's own retry; a client retry is covered by the key. | Two different retries, two mechanisms. |

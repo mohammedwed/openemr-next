@@ -83,4 +83,6 @@ old one's status is updated to point to it.
 | [0076](0076-deleting-records-needs-legacys-admin-super-right-and-is-a-flag-not-a-removal.md) | Deleting vitals, SOAP notes and clinical notes needs legacy's admin/super right, and is a flag, not a removal | Accepted | 2026-11-17 |
 | [0077](0077-creating-requests-accept-an-idempotency-key-and-soap-notes-guard-their-own-retries.md) | Creating requests accept an Idempotency-Key, and a SOAP note guards its own retry | Accepted | 2026-11-17 |
 | [0078](0078-patient-management-keeps-its-own-append-only-audit-trail.md) | Patient Management keeps its own append-only audit trail | Accepted | 2026-11-17 |
+| [0079](0079-clinical-care-serves-read-only-fhir-for-five-resources.md) | Clinical Care serves read-only FHIR for five resources | Accepted | 2026-11-17 |
+| [0080](0080-deleting-a-problem-or-an-allergy-removes-the-row-as-legacy-does.md) | Deleting a problem or an allergy removes the row, as legacy does | Accepted | 2026-11-17 |
 | [0081](0081-a-patients-demographics-are-corrected-with-a-content-hash-version-over-the-columns-this-service-owns.md) | A patient's demographics are corrected under a content-hash version of the columns this service owns | Accepted | 2026-11-18 |

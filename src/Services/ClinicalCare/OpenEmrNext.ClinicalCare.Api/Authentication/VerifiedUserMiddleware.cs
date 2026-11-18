@@ -48,7 +48,9 @@ internal sealed class VerifiedUserMiddleware(RequestDelegate next)
 
 internal static class VerifiedUserExtensions
 {
-    /// <summary>Applies <see cref="VerifiedUserMiddleware"/> to <c>/api/v1</c> only: the event delivery endpoint is service-to-service and has its own secret (ADR 0066), and the OpenAPI document is not a user's request.</summary>
+    /// <summary>Applies <see cref="VerifiedUserMiddleware"/> to <c>/api/v1</c> and <c>/fhir</c> (ADR 0079): the event delivery endpoint is service-to-service and has its own secret (ADR 0066), and the OpenAPI document is not a user's request.</summary>
     public static IApplicationBuilder UseVerifiedUser(this IApplicationBuilder app) =>
-        app.UseWhen(context => context.Request.Path.StartsWithSegments("/api/v1", StringComparison.OrdinalIgnoreCase), branch => branch.UseMiddleware<VerifiedUserMiddleware>());
+        app.UseWhen(
+            context => context.Request.Path.StartsWithSegments("/api/v1", StringComparison.OrdinalIgnoreCase) || context.Request.Path.StartsWithSegments("/fhir", StringComparison.OrdinalIgnoreCase),
+            branch => branch.UseMiddleware<VerifiedUserMiddleware>());
 }

@@ -58,6 +58,8 @@
                     @* Named per allergy: a column of identical "Edit" buttons is not distinguishable to a screen reader. *@
                     <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Disabled="@Busy(allergy)" OnClick="@(() => OpenEditAsync(allergy))"
                         aria-label="@($"Edit allergy {allergy.Title}")">Edit</MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" Disabled="@Busy(allergy)" OnClick="@(() => DeleteAsync(allergy))"
+                        aria-label="@($"Delete allergy {allergy.Title}")">Delete</MudButton>
                     @if (allergy.EndDate is null)
                     {
                         <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Disabled="@Busy(allergy)" OnClick="@(() => SetEndedAsync(allergy, ended: true))"
@@ -157,6 +159,30 @@
     {
         var parameters = new DialogParameters<AllergyDialog> { { x => x.PatientUuid, PatientUuid } };
         await ShowDialogAsync("Record allergy", parameters);
+    }
+
+    /// <summary>
+    /// Deleting removes the allergy and its links to encounters, as OpenEMR does (ADR 0080), so the confirmation says it cannot be undone. Needs OpenEMR's administrator right: the service refuses anyone else and
+    /// <see cref="RecordDeletion"/> explains it. Based on the version the row was listed with.
+    /// </summary>
+    private async Task DeleteAsync(AllergyResponse allergy)
+    {
+        _busy = allergy.Uuid;
+        try
+        {
+            var reload = await RecordDeletion.ConfirmAndDeleteAsync(
+                DialogService, Snackbar, "Delete this allergy?",
+                $"\"{allergy.Title}\" is removed from the patient's record, here and in OpenEMR, together with its links to encounters. It cannot be restored. Ending an allergy instead keeps it on the record.",
+                () => ClinicalCare.DeleteAllergyAsync(allergy.Uuid, allergy.ETag));
+            if (reload)
+            {
+                await LoadAsync(_page > 1 && _items?.Count == 1 ? _page - 1 : _page);
+            }
+        }
+        finally
+        {
+            _busy = null;
+        }
     }
 
     private async Task OpenEditAsync(AllergyResponse allergy)

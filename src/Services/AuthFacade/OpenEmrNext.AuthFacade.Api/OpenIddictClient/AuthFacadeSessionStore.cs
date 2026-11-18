@@ -51,6 +51,7 @@ internal sealed class AuthFacadeSessionStore(IServiceScopeFactory scopeFactory, 
         var record = await db.Sessions.FindAsync(key);
         if (record is null)
         {
+            await SweepExpiredAsync(db);
             db.Sessions.Add(new AuthFacadeSessionRecord
             {
                 Key = key,
@@ -67,6 +68,28 @@ internal sealed class AuthFacadeSessionStore(IServiceScopeFactory scopeFactory, 
         }
 
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>How many expired sessions one new sign-in removes. Bounded so a sign-in never waits on a big clean-up; a backlog is worked off over the next sign-ins.</summary>
+    internal const int SweepBatchSize = 100;
+
+    /// <summary>
+    /// Removes sessions that have expired. An expired session is otherwise deleted only when its own cookie is presented again (<see cref="RetrieveAsync"/>), so a session that was abandoned, a closed browser or a
+    /// lost device, would stay in the table for ever. A sign-in is the natural moment to sweep: it needs no background job, and the table grows only when sessions are created. The keys are read first and deleted by
+    /// key, because a delete with a limit is not portable across the two databases this store runs on.
+    /// </summary>
+    private static async Task SweepExpiredAsync(AuthFacadeDbContext db)
+    {
+        var now = DateTime.UtcNow;
+        var expired = await db.Sessions
+            .Where(s => s.ExpiresUtc != null && s.ExpiresUtc <= now)
+            .OrderBy(s => s.ExpiresUtc)
+            .Select(s => s.Key)
+            .Take(SweepBatchSize)
+            .ToListAsync();
+
+        if (expired.Count > 0)
+            await db.Sessions.Where(s => expired.Contains(s.Key)).ExecuteDeleteAsync();
     }
 
     public async Task<AuthenticationTicket?> RetrieveAsync(string key)
