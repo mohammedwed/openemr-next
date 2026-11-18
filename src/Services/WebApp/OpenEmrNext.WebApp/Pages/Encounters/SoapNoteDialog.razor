@@ -2,6 +2,7 @@
 @using OpenEmrNext.WebApp.Shared
 @using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
 @inject IClinicalCareClient ClinicalCare
+@inject OpenEmrNext.WebApp.Shared.IdempotencyAttempt Attempt
 
 @* One dialog for recording a SOAP note and for editing one: the four sections are the same, and a correction replaces the whole set (a section you clear is removed). It closes only when the save
    succeeds, or the note turns out to be stale (which hands back a marker so the list reloads); on any other failure it stays open with the typed text intact. At least one section is required (SN-1). *@
@@ -89,6 +90,8 @@
         {
             if (Existing is null)
             {
+                // A retried save is one request, not two: the attempt lives until a save succeeds (ADR 0077).
+                Attempt.BeginIfNone();
                 await ClinicalCare.RecordSoapNoteAsync(EncounterUuid, new RecordSoapNoteRequest
                 {
                     Subjective = Blank(_model.Subjective),

@@ -2,6 +2,7 @@
 @using OpenEmrNext.WebApp.Shared
 @using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
 @inject IClinicalCareClient ClinicalCare
+@inject OpenEmrNext.WebApp.Shared.IdempotencyAttempt Attempt
 
 @* Creating an encounter is a change, so it lives in its own dialog. It closes only when the save succeeds,
    handing the created encounter back to the caller; on failure it stays open with the typed values intact. *@
@@ -222,6 +223,8 @@
                 OnsetDate = _model.OnsetDate is { } onset ? new DateTimeOffset(onset.Date) : null,
                 Sensitivity = string.IsNullOrWhiteSpace(_model.Sensitivity) ? null : _model.Sensitivity
             };
+            // A retried save is one request, not two: the attempt lives until a save succeeds (ADR 0077).
+            Attempt.BeginIfNone();
             var created = await ClinicalCare.CreateEncounterAsync(request);
             MudDialog.Close(DialogResult.Ok(created));
         }

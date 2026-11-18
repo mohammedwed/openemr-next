@@ -2,6 +2,7 @@
 @using OpenEmrNext.WebApp.Shared
 @using ClinicalCareApiException = OpenEmrNext.ClinicalCare.Client.ApiException
 @inject IClinicalCareClient ClinicalCare
+@inject OpenEmrNext.WebApp.Shared.IdempotencyAttempt Attempt
 
 @* Recording vitals is a change, so it lives in its own dialog, and so is correcting them (M5d): the fields are the same, and a correction replaces the whole set. It closes only when the save succeeds, handing the
    recorded set (with the BMI the service derived) back to the caller; on failure it stays open with the typed values intact. Every measurement is optional, but at least one is needed (CV-2). A correction
@@ -243,6 +244,8 @@
                 HeadCircumference = Quantity(_model.Head, _metric ? "cm" : "in"),
                 Note = string.IsNullOrWhiteSpace(_model.Note) ? null : _model.Note
             };
+            // A retried save is one request, not two: the attempt lives until a save succeeds (ADR 0077).
+            Attempt.BeginIfNone();
             var recorded = await ClinicalCare.RecordVitalsAsync(EncounterUuid, request);
             MudDialog.Close(DialogResult.Ok(recorded));
         }

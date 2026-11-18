@@ -51,6 +51,8 @@ public static class AuditActions
     public const string VitalsDelete = "vitals.delete";
     public const string SoapDelete = "soap.delete";
     public const string ClinicalNoteDelete = "clinical_note.delete";
+    public const string ProblemDelete = "problem.delete";
+    public const string AllergyDelete = "allergy.delete";
     public const string EncounterIssueLink = "encounter.issue.link";
     public const string EncounterIssueUnlink = "encounter.issue.unlink";
 }

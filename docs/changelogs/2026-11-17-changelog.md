@@ -467,6 +467,21 @@ Full record: `docs/clinical-care/20-webapp-clinical-screens.md`. **Compile-check
 - **Tests:** the session store had none. 5 new unit tests run the real store on a real in-memory SQLite database (an abandoned session is removed, a live and a no-expiry one are kept, one sign-in sweeps a bounded batch and the rest go on the next, renewing does not sweep, an expired cookie is still refused). AuthFacade unit 86, all green. Mutation check: removing the sweep call fails 2 tests; restored.
 - **No database change:** the table is unchanged.
 
+## Added — the WebApp sends idempotency keys (M5m)
+
+- **All eight creating dialogs** (encounter, vitals, SOAP note, clinical note, immunization, problem, allergy, link an issue) now take part. A dialog starts an *attempt* when its user first presses save and keeps it while that save is retried; `IdempotencyKeyHandler` on the Clinical Care client turns it into an `Idempotency-Key` made of the attempt id and a short hash of the request, and a successful save ends the attempt (ADR 0077 #10).
+- **What that means for a user:** a save whose answer was lost and is pressed again does not create a second record; a save edited before the retry is a new request, not an error; recording the same vitals twice on purpose is still two records.
+- **Tests:** 15 new tests (`IdempotencyKeyHandlerTests`, WebApp unit 39 in all), including one that drives the real generated client through the handler. Mutation check: not clearing the attempt, or ignoring the body in the key, fails 6; restored.
+- **Not verified:** the dialogs' own calls to the attempt are compile-checked only; no test renders a dialog, and nothing has been seen in a browser.
+
+## Added — delete for problems and allergies (M5n, ADR 0080)
+
+- **`DELETE /api/v1/problems/{uuid}` and `/api/v1/allergies/{uuid}`** remove the row and its links to encounters, as legacy's `deleter.php` does. Decided by the user on Nov 17 (hard delete, like legacy), because legacy's issue screens do not hide an inactive issue, so a flag would have left the two systems disagreeing. Same rules as the other deletions: `admin/super` only, `If-Match` under a row lock, 401, 428, 403, 404, 412 in that order, one transaction with its event and audit row.
+- **The cost, stated:** the service's database user now holds `DELETE` on `lists`, which is table-wide because MariaDB cannot grant it any narrower. A row is reached only by its uuid and type, and tests try to delete a medication, a surgery and a device by uuid and fail. A deleted issue cannot be restored and its content is not kept in the audit row.
+- **WebApp:** a Delete button with a confirmation on each problem and allergy row ("cannot be restored"), using the same helper that explains a 403 as "only an administrator can delete".
+- **Database:** a grant only; re-run the seed script on an existing database.
+- **Tests: the new ones were run, the full suites were not.** `IssueDeletionTests` (28), the whole `LeastPrivilegeGrantTests` class and the rest of that filtered set pass (247 integration tests in all); the WebApp component tests pass (55). The **full** Clinical Care unit, architecture and integration suites were not run on this change (the user stopped that run), so CI on this PR is the first full run.
+- **A gap the first mutation check found:** removing the adapter's type filter was **not** caught, because the use case's reader already answers 404 before the adapter is reached. A test now calls the adapter directly with a uuid that exists under another type (4 cases): it passes on the real code and fails 4 of 4 with the filter removed. The filter is the last line of defence behind the table-wide `DELETE` grant.
 ## Added — FHIR Immunization, the first clinical FHIR resource (M5e slice 1, ADR 0079)
 
 - **`GET /fhir/Immunization/{id}` and `GET /fhir/Immunization?patient=...`**: read-only FHIR R4, mapped with the Firely SDK as Patient Management's `Patient` is. Status follows legacy's rule (entered in error, then completed, else not-done, with the refusal reason); the CVX code is the vaccine code; people are `Practitioner/{uuid}` references with a display name; `meta.versionId` and a weak `ETag` carry the same token as the JSON API's; there is **no** `lastUpdated`, because the table has none.

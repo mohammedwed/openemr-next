@@ -34,8 +34,13 @@ builder.Services.AddScoped<IPatientManagementClient>(_ => new PatientManagementC
 
 // Same shape as PatientManagement above: the gateway routes /api/v1/encounters/** to ClinicalCare, and this
 // client gets its own HttpClient and breaker so a ClinicalCare outage never trips the patient pages' breaker.
-builder.Services.AddScoped<IClinicalCareClient>(_ => new ClinicalCareClient(
-    new HttpClient(new TransientFailureCircuitBreakingHandler { InnerHandler = new HttpClientHandler() })
+// A creating POST carries an Idempotency-Key while a dialog's save is in progress (ADR 0077), so a retried save is answered, not repeated.
+builder.Services.AddScoped<OpenEmrNext.WebApp.Shared.IdempotencyAttempt>();
+builder.Services.AddScoped<IClinicalCareClient>(sp => new ClinicalCareClient(
+    new HttpClient(new OpenEmrNext.WebApp.Resilience.IdempotencyKeyHandler(sp.GetRequiredService<OpenEmrNext.WebApp.Shared.IdempotencyAttempt>())
+    {
+        InnerHandler = new TransientFailureCircuitBreakingHandler { InnerHandler = new HttpClientHandler() }
+    })
     {
         BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
     }));
