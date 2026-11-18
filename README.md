@@ -117,9 +117,10 @@ notes) call Clinical Care.
 address a browser talks to, for the dashboard and for AuthFacade alike. Terminates TLS with a local dev
 certificate, redirects plain HTTP to HTTPS, and applies HSTS on every route
 ([ADR 0039](docs/architecture/0039-gateway-terminates-tls-authfacade-trusts-forwarded-headers.md)). Routes
-AuthFacade's own path prefixes (`/api/v1/me`, `/oidc`, `/callback`, `/logout`, `/bff`, `/health`, `/openapi`,
-`/scalar`) to it, the patient and clinical APIs and `/fhir` to Patient Management and Clinical Care, and everything
-else to WebApp's static files. Since ADR 0075 it also checks the browser's session with AuthFacade (one
+AuthFacade's own path prefixes (an `/api` catch-all, `/oidc`, `/callback`, `/logout`, `/sessions`, `/bff`, `/health`,
+`/openapi`, `/scalar`) to it, the more specific patient and clinical routes (`/api/v1/patients`, `/api/v1/encounters`,
+`/problems`, `/allergies`, `/immunizations`, `/lookups`, and `/fhir/<Resource>`) to Patient Management and Clinical Care, and
+everything else to WebApp's static files. Since ADR 0075 it also checks the browser's session with AuthFacade (one
 primary-key read per request, failing closed with a 503) before proxying a protected route, and forwards the
 verified user, which the services trust only when they also see the gateway's shared secret. See
 [ADR 0033](docs/architecture/0033-gateway-fronts-webapp-and-authfacade.md) and
