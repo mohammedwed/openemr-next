@@ -78,7 +78,7 @@ IDs keep their original document prefix.
 | ID | Finding | Sev | Effort | Fix |
 |---|---|---|---|---|
 | F-1 | Scoring runs after commit in the endpoint; failure returns `500` for a created patient; retry duplicates it | **High** | S then M | Containment now; event handler with the relay |
-| F-2 | No idempotency | High | M | `Idempotency-Key` |
+| F-2 | ~~No idempotency~~ **Closed Nov 18 for the creating routes** (register, add policy, swap; ADR 0084, `11-idempotency.md`). F-1 is not closed by it | High | M | `Idempotency-Key` |
 | F-4 / G-9 | Directive file and row not atomic; orphan and missing files undetected | Low to medium | M | Reconciliation report |
 | F-7 | A state conflict is returned as `400` | Low | S | `409` |
 
@@ -195,7 +195,7 @@ P0 items have no dependencies and should not wait for anything else.
 | P1-3 | Typed ids | 14.1 | S |
 | P1-4 | Patient-existence and payer checks; `404` | F-3, IC-8 | S |
 | P1-5 | A real migration step for the outbox (and later the audit table) | G-5 | S |
-| P1-6 | `Idempotency-Key`; `409` for state conflicts | F-2, F-7 | M |
+| P1-6 | ~~`Idempotency-Key`~~ **done Nov 18** (ADR 0084); `409` for state conflicts still open | F-2, F-7 | M |
 | P1-7 | Time rule and startup assertion | G-7 | S |
 | P1-8 | Rule ids in test names | 04-trace | S |
 

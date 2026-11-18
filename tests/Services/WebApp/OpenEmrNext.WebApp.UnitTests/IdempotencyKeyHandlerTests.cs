@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using OpenEmrNext.ClinicalCare.Client;
+using PmClient = OpenEmrNext.PatientManagement.Client;
 using OpenEmrNext.WebApp.Resilience;
 using OpenEmrNext.WebApp.Shared;
 
@@ -181,5 +182,39 @@ public class IdempotencyKeyHandlerTests
         Assert.NotNull(inner.Sent[0].Key);
         Assert.Null(inner.Sent[2].Key);
         Assert.All(inner.Sent, s => Assert.Equal($"/api/v1/encounters/{encounter}/soap-notes", s.Path));
+    }
+
+    [Fact]
+    public async Task A_directive_document_upload_carries_no_key_even_while_an_attempt_is_open()
+    {
+        // Patient Management refuses a key on the upload (its file is too large to fingerprint, ADR 0084), and an attempt that outlived a failed dialog must not tag it.
+        var attempt = new IdempotencyAttempt();
+        attempt.BeginIfNone();
+        var inner = new Recorder(HttpStatusCode.Created);
+
+        await Client(attempt, inner).PostAsync("/api/v1/patients/42/advance-directives/documents", Json("{\"fileName\":\"x.pdf\"}"));
+
+        Assert.Null(Assert.Single(inner.Sent).Key);
+        Assert.NotNull(attempt.Current);   // the attempt is not this request's, so it is left as it was
+    }
+
+    [Fact]
+    public async Task The_generated_patient_client_retrying_a_failed_registration_sends_the_same_key()
+    {
+        var attempt = new IdempotencyAttempt();
+        var inner = new Recorder(HttpStatusCode.ServiceUnavailable, HttpStatusCode.Created);
+        var client = new PmClient.PatientManagementClient(Client(attempt, inner));
+        var request = new PmClient.RegisterPatientRequest { FirstName = "Ada", LastName = "Lovelace", Sex = "female", DateOfBirth = new DateTimeOffset(1815, 12, 10, 0, 0, 0, TimeSpan.Zero) };
+
+        attempt.BeginIfNone();
+        await Assert.ThrowsAsync<PmClient.ApiException>(() => client.RegisterPatientAsync(request));   // the first try fails
+        attempt.BeginIfNone();                                                                         // the dialog's retry keeps the attempt
+        await client.RegisterPatientAsync(request);
+
+        Assert.Equal(2, inner.Sent.Count);
+        Assert.NotNull(inner.Sent[0].Key);
+        Assert.Equal(inner.Sent[0].Key, inner.Sent[1].Key);
+        Assert.Matches(ServiceKeyRule, inner.Sent[0].Key!);
+        Assert.All(inner.Sent, s => Assert.Equal("/api/v1/patients", s.Path));
     }
 }

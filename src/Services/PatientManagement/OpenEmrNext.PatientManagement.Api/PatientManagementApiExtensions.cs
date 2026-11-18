@@ -42,6 +42,9 @@ public static class PatientManagementApiExtensions
         // (Infrastructure's EfPatientRegistry) -- Application itself never sees this choice.
         builder.Services.AddScoped<IUserDirectory, EfUserDirectory>();
         builder.Services.AddScoped<IAuditLog, EfAuditLog>();
+        builder.Services.AddScoped<IIdempotencyStore, EfIdempotencyStore>();
+        builder.Services.AddSingleton(TimeProvider.System);   // the clock the idempotency middleware reads
+
         builder.Services.AddScoped<IPatientRegistry, EfPatientRegistry>();
         builder.Services.AddScoped<IPatientDemographicsStore, EfPatientDemographicsStore>();
         builder.Services.AddScoped<GetPatientDemographicsUseCase>();

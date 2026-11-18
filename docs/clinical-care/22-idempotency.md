@@ -2,6 +2,8 @@
 
 Decisions are in ADR 0077; this is the working record.
 
+**Patient Management has the same mechanism since Nov 18** (ADR 0084, `docs/patient-management/11-idempotency.md`), ported from this one: the same header, rules and answers, applied to registering a patient, adding a policy and swapping insurance. It differs in one place: its directive document upload carries a base64 file too large to fingerprint, so it takes no key and refuses one.
+
 ## 1. What was built
 
 | Piece | Where |
