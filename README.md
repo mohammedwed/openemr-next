@@ -27,10 +27,10 @@ research vision below is the long-term direction, not the current deliverable.
 | Database baseline | Reproducible schema and seed data from the OpenEMR installer | Built, not yet cleaned |
 | `OpenEmr.Data` | EF Core model scaffolded from the live database | Built |
 | AuthFacade | BFF (browser login via OIDC/PKCE, a revocable session cookie, logout, proxies browser calls to OpenEMR's API) — rate limited, circuit-broken, audit-logged, over HTTPS, with its own session state in a dedicated database | Built, hardened ([ADR 0047](docs/architecture/0047-the-identity-bridge-design.md)) |
-| WebApp | Blazor WebAssembly: sign-in and identity; patient list (search, sort, paging, retry), patient view (overview, insurance, advance directives with change dialogs), and registration. Encounters is still a stub | Built |
-| API gateway | Terminates TLS and routes a browser's requests by path: AuthFacade's own prefixes to it, everything else to the dashboard's static files (ADR 0033, ADR 0039). No token validation of its own yet, and nothing to route to beyond AuthFacade until a domain service exists | Built, narrower than originally planned |
-| Patient Management | Registers, lists, and reads patients; insurance; advance directives and documents; the FHIR Patient API; publishes `PatientRegistered`. Patient merge is still to do | Built, merge pending |
-| Clinical Care | Creates encounters and records vitals for registered patients | Planned |
+| WebApp | Blazor WebAssembly: sign-in and identity; patients (list with server-side limit, search, sort; registration; edit; insurance; advance directives) and the clinical screens (encounters, vitals, problems, allergies, immunizations, SOAP and clinical notes, with correct and delete flows). Times are UTC (ADR 0083). 84 component tests | Built, browser-checked Nov 18 |
+| API gateway | Terminates TLS, validates the browser's session with AuthFacade on every protected request and forwards the verified user to the services (ADR 0075), and routes by path: AuthFacade's prefixes, `/api` and `/fhir` to Patient Management and Clinical Care, everything else to the WebApp's static files | Built |
+| Patient Management | Registers, searches (bounded pages) and reads patients; corrects demographics; insurance; advance directives and documents; the FHIR Patient API (Firely SDK, US Core); an append-only audit trail; `Idempotency-Key` on creating requests (ADR 0084); publishes `PatientRegistered`. Patient merge is still to do; idempotency keys are in progress | Built, merge pending |
+| Clinical Care | Encounters, vitals, problems, allergies, immunizations, SOAP and clinical notes, with conditional updates (`ETag` / `If-Match`), permissioned delete, `Idempotency-Key`, an append-only audit trail, and read-only FHIR for five resources; consumes `PatientRegistered` | Built, verification in progress ([design](docs/clinical-care/design/README.md)) |
 
 ## What exists today
 
@@ -109,20 +109,41 @@ the session cookie never attaches. Calls `GET /api/v1/me` through a generated
 typed client ([ADR 0031](docs/architecture/0031-nswag-client-generated-from-a-committed-snapshot.md))
 and shows the signed-in identity, or a login link if unauthenticated. Patients is
 enabled: the list, the patient view with insurance and advance directives, and
-registration all call PatientManagement through the same gateway. Encounters is
-still disabled.
+registration all call PatientManagement through the same gateway, and the
+encounter pages (vitals, problems, allergies, immunizations, SOAP and clinical
+notes) call Clinical Care.
 
 **Gateway (`src/Services/Gateway`).** A YARP reverse proxy — the one external
 address a browser talks to, for the dashboard and for AuthFacade alike. Terminates TLS with a local dev
 certificate, redirects plain HTTP to HTTPS, and applies HSTS on every route
 ([ADR 0039](docs/architecture/0039-gateway-terminates-tls-authfacade-trusts-forwarded-headers.md)). Routes
-AuthFacade's own path prefixes (`/api`, `/oidc`, `/callback`, `/logout`, `/bff`, `/health`, `/openapi`,
-`/scalar`) to it and everything else to WebApp's static files, by plain ASP.NET Core route specificity, no
-exclusion pattern needed. Makes no auth decisions of its own — AuthFacade still does all of that. See
+AuthFacade's own path prefixes (an `/api` catch-all, `/oidc`, `/callback`, `/logout`, `/sessions`, `/bff`, `/health`,
+`/openapi`, `/scalar`) to it, the more specific patient and clinical routes (`/api/v1/patients`, `/api/v1/encounters`,
+`/problems`, `/allergies`, `/immunizations`, `/lookups`, and `/fhir/<Resource>`) to Patient Management and Clinical Care, and
+everything else to WebApp's static files. Since ADR 0075 it also checks the browser's session with AuthFacade (one
+primary-key read per request, failing closed with a 503) before proxying a protected route, and forwards the
+verified user, which the services trust only when they also see the gateway's shared secret. See
 [ADR 0033](docs/architecture/0033-gateway-fronts-webapp-and-authfacade.md) and
 [ADR 0034](docs/architecture/0034-gateway-preserves-the-original-host-header.md)
 (preserving the original `Host` header, needed for AuthFacade's own
 redirect-URI check to recognize `/callback` when reached through the proxy).
+
+**Patient Management (`src/Services/PatientManagement`).** The first domain service, in hexagonal layers (domain,
+read models, ports, application, infrastructure, composition, API) enforced by architecture tests. It writes OpenEMR's
+own `patient_data`, `insurance_data` and `documents` rows through a least-privilege database user, so the legacy UI stays
+live. It registers patients with duplicate detection, corrects demographics under a content-hash version (`ETag`),
+searches in bounded pages, holds insurance and advance directives, serves a FHIR `Patient` API validated against US Core
+with the Firely SDK, keeps its own append-only audit trail, and publishes `PatientRegistered` through an outbox. Design set:
+[`docs/patient-management/`](docs/patient-management/README.md).
+
+**Clinical Care (`src/Services/ClinicalCare`).** The second domain service, same layering. It writes the legacy
+`form_encounter`, `forms`, `form_vitals`, `lists`, `immunizations`, `form_soap` and `form_clinical_notes` rows, again through
+a least-privilege user, so legacy's own `EncounterService` and `VitalsService` read what it writes. Every update and delete is
+conditional on the version the caller read (`If-Match`: 428, then 412), deletes need legacy's own `admin/super` right (read from its
+`gacl_*` tables), creating requests accept an `Idempotency-Key`, and every write lands with an audit row and an outbox event in one
+transaction. It consumes `PatientRegistered` and serves read-only FHIR (`Immunization`, `AllergyIntolerance`, `Condition`,
+`Encounter`, `Observation`) with `_lastUpdated` search. Design set: [`docs/clinical-care/design/`](docs/clinical-care/design/README.md);
+slice-by-slice notes in `docs/clinical-care/`.
 
 ## Architecture
 
@@ -247,23 +268,21 @@ gateway. It does not store passwords or user records.
   revocation endpoint (confirmed against its own discovery document and source), so the underlying OpenEMR
   refresh token stays valid there until it naturally expires, independent of anything AuthFacade does with
   its own session record.
-- The patient API's list, detail, and insurance endpoints are reachable through the gateway without a user
-  sign-in check. This is the intended trust model (ADR 0055), so the webapp's own sign-in check is the only
-  per-user gate on patient data.
-- Directive changes and uploads are recorded under a placeholder user ID (`1`). The signed-in user has no
-  numeric OpenEMR ID yet, so the audit trail is wrong for those changes.
 - Document uploads are capped at 20 MB in the webapp, because the API's request size limit is about 30 MB and
   documents travel as base64 JSON. Raising the limit is an API change.
-- The webapp has no automated tests yet. Patient pages have been checked by hand in the browser.
-- The patient list loads every patient on each visit and pages and searches in the browser. Server-side paging
-  and search are not built.
+- **Current gaps (Nov 18):** Patient Management's table-wide `UPDATE` grant on
+  `patient_data` is wider than it needs; neither service publishes events for most changes (only registration and Clinical Care's
+  writes do); the OpenAPI documents do not declare the `Idempotency-Key` header; the FHIR APIs are read-only apart from `POST /fhir/Patient`,
+  and there is no bearer-token path for external FHIR clients; the patient list shows the first 100 patients and the rest by search; the WebApp's
+  insurance, directive and immunization-correction screens have not been through the browser check; the gateway's session check has
+  never been benchmarked. Patient merge is not built.
+- **Legacy quirks that show through, none caused here:** OpenEMR's dashboard can still show deleted vitals as the latest (its query joins on
+  `form_id` alone), and it reads "No Known Allergies" for a patient whose only allergy was deleted. See
+  [`docs/clinical-care/21-permissions-and-delete.md`](docs/clinical-care/21-permissions-and-delete.md).
 - The generated patient client types `GetPatientsAsync`'s name parameter as non-nullable, so the webapp passes
   `null!` for "no filter".
-
-- The gateway does no token validation of its own — it only routes by path.
-  Every auth decision still happens in AuthFacade. If a future domain service
-  needs authenticated requests, whether it validates its own token or the
-  gateway starts validating once at the edge is not yet decided.
+- Times are UTC everywhere (ADR 0083), which is correct while every clock in the stack is UTC (the database, both services and
+  legacy's PHP default are). Showing a clinic's local time would need a clinic timezone setting and a conversion rule.
 
 The full list of pending decisions, with options and costs, is in
 [`docs/patient-view-pending-decisions.md`](docs/patient-view-pending-decisions.md).
@@ -306,22 +325,23 @@ Known problems with the baseline:
 │   ├── Services/AuthFacade/    # BFF for the dashboard: Composition, Api, Client
 │   ├── Services/LoginUi/       # static page linking to AuthFacade's /oidc/login
 │   ├── Services/WebApp/        # Blazor WebAssembly dashboard, served by its own nginx container
-│   ├── Services/Gateway/       # YARP reverse proxy: the dashboard's one external origin
+│   ├── Services/Gateway/       # YARP reverse proxy: the one external origin; checks the session, forwards the verified user
+│   ├── Services/PatientManagement/  # Domain, Domain.ReadModels, Application.Ports, Application, Infrastructure, Composition, Api, Client
+│   ├── Services/ClinicalCare/       # the same layers for encounters, vitals, problems, allergies, immunizations, notes
 │   └── OpenEmr.Data/           # EF Core entities and context (scaffolded)
 ├── tests/
-│   └── Services/AuthFacade/    # unit, architecture, and black-box integration tests
+│   └── Services/               # per service: unit, architecture (reflection-based rules on layer references and on what domain types may expose) and integration (real MariaDB in Testcontainers); WebApp: bUnit component tests
 └── scripts/
     ├── setup/new-env.sh        # create .env with generated secrets
     ├── stack/                  # up.sh (--restore), apply-credentials.sh
     ├── snapshot/create.sh      # write a snapshot to snapshots/
-    ├── seeds/                  # AuthFacade OAuth client, run by the seed service
-    ├── dev/                    # generate-authfacade-openapi.sh: refresh the committed client snapshot
+    ├── seeds/                  # one seed per service: its database user, grants, and its own tables (outbox, audit, idempotency)
+    ├── dev/                    # generate-*-openapi.sh: refresh each committed client snapshot
     └── lib/env.sh              # shared shell helpers (sourced, not run)
 ```
 
-Planned additions: `src/PatientManagement`, `src/ClinicalCare`, and their
-tests. Each new service gets its own Compose entry, database, and slim entity
-model, and a route added to the existing gateway rather than a new one.
+Each new service gets its own Compose entry, seed script, database user and
+tables, and a route added to the existing gateway rather than a new gateway.
 
 ## Local development
 
@@ -367,8 +387,16 @@ This deletes all local data.
 **Run the tests:**
 
 ```bash
+dotnet build OpenEMR-Next.slnx -c Release      # the whole solution: do this before pushing (a service-only build misses broken test fakes)
 dotnet test tests/Services/AuthFacade/OpenEmrNext.AuthFacade.IntegrationTests  # needs the running stack
+dotnet test tests/Services/ClinicalCare/OpenEmrNext.ClinicalCare.ArchitectureTests  # fast; run it before merging Clinical Care changes
+dotnet test tests/Services/PatientManagement/OpenEmrNext.PatientManagement.IntegrationTests  # needs Docker (Testcontainers)
+dotnet test tests/Services/WebApp/OpenEmrNext.WebApp.UnitTests   # component tests, no browser, no database
 ```
+
+Last full results (Nov 18): Patient Management unit 188, architecture 17, integration 156; Clinical Care architecture 69
+(unit and integration: 722 and 911 at the last full run, before the M5n to M5r work, which was run in focused sets); WebApp 84;
+AuthFacade unit 86; gateway 44 proxy tests and 14 live tests. CI runs the whole solution on every pull request to `main`.
 
 The integration suite runs a readiness gate first, which checks the database,
 the seed, OpenEMR, and AuthFacade under one deadline. It is slow and needs
@@ -382,7 +410,8 @@ Measurement depth matches the current phase.
 **Measured now**
 
 - Functional equivalence for registration and encounter creation, on synthetic
-  scenarios (planned with M5)
+  scenarios (**done**: encounter creation compared column by column against legacy, 142 identical and 2 differing by documented rule;
+  problems and allergies 215 of 229 identical, the rest explained; the update paths are not yet compared)
 - Change-impact scope for representative changes
 - Architecture test results (planned with M6)
 - Security review of the identity bridge (M1, done — see [ADR 0047](docs/architecture/0047-the-identity-bridge-design.md))
@@ -418,8 +447,8 @@ decisions recorded in the changelogs are the first candidates.
 Candidates, not final boundaries: identity and authentication, authorization,
 patient administration, clinical records, scheduling, billing and claims,
 documents, notifications, reporting, and interoperability. In the current scope,
-identity is built; patient administration and clinical records are planned
-(M4, M5) but not started. The rest are design only.
+identity, patient administration (Patient Management) and clinical records
+(Clinical Care) are built as services (M1, M4, M5); the rest are design only.
 
 ## Non-goals
 
@@ -452,6 +481,9 @@ migration.
 - [Development Workflow](docs/development-workflow.md)
 - [Development and Test Environments](docs/environments.md)
 - [Domain-Driven Design Guide](docs/domain-driven-design.md)
+- Service design sets (bounded context, ubiquitous language, context map, domain model, workflows and events, data ownership, UML):
+  [Patient Management](docs/patient-management/README.md) and [Clinical Care](docs/clinical-care/design/README.md)
+- [Roadmap](ROADMAP.md): milestones, status and what remains before the post-M5 decision gate
 - ADRs in `docs/architecture/` — start with [ADR 0047](docs/architecture/0047-the-identity-bridge-design.md)
   for how AuthFacade's design fits together end to end; the rest are the individual decisions behind it
 - Changelogs (dated, one per working session)
